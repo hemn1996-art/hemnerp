@@ -136,7 +136,6 @@ export default function Sidebar({
       console.error("Auto-backup failed during logout:", error);
     }
     document.cookie = "auth_token=; path=/; max-age=0; SameSite=Lax";
-    localStorage.clear();
     sessionStorage.clear();
     window.location.href = "/login";
   };

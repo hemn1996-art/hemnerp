@@ -3218,11 +3218,6 @@ const leftPanel: CSSProperties = {
   border: "1px solid #e5e7eb",
   borderRadius: 14,
   padding: 12,
-  position: "var(--left-panel-position, sticky)" as any,
-  top: 12,
-  height: "calc(122vh - 30px)",
-  maxHeight: "calc(122vh - 30px)",
-  overflowY: "auto",
 };
 
 const mainContent: CSSProperties = {
