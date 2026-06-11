@@ -42,27 +42,55 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     fetchCurrencies();
   }, [fetchInvoices, fetchAccounts, fetchCurrencies]);
 
-  // 1. Calculate Totals for Cards
-  const totalSales = invoices
-    .filter((x: any) => x.type === "فرۆشتن")
-    .reduce((sum, x) => sum + x.total, 0);
+  const iqdRate = currencies.find((c: any) => c.code === "IQD")?.rate || 1500;
 
-  const totalPurchases = invoices
-    .filter((x: any) => x.type === "کڕین")
-    .reduce((sum, x) => sum + x.total, 0);
+  // Helper to calculate separate USD and IQD totals by voucher types
+  const getTotals = (filterType: string, sumField: "total" | "paid" = "total") => {
+    let usd = 0;
+    let iqd = 0;
 
-  const totalExpenses = invoices
-    .filter((x: any) => x.type === "خەرجی")
-    .reduce((sum, x) => sum + x.total, 0);
+    invoices.forEach((inv: any) => {
+      if (inv.type === filterType) {
+        if (sumField === "total") {
+          // Use voucher's main currency
+          const code = inv.currencyCode || "USD";
+          if (code === "USD") {
+            usd += inv.total || 0;
+          } else if (code === "IQD") {
+            iqd += inv.total || 0;
+          }
+        } else {
+          // Use actual paid amounts currencies
+          if (inv.paidAmounts && Array.isArray(inv.paidAmounts)) {
+            inv.paidAmounts.forEach((pa: any) => {
+              const curCode = currencies.find((c: any) => c.id === pa.currencyId)?.code || "USD";
+              if (curCode === "USD") {
+                usd += pa.amount || 0;
+              } else if (curCode === "IQD") {
+                iqd += pa.amount || 0;
+              }
+            });
+          } else {
+            // Fallback to voucher currency if paidAmounts is missing
+            const code = inv.currencyCode || "USD";
+            if (code === "USD") {
+              usd += inv.paid || 0;
+            } else if (code === "IQD") {
+              iqd += inv.paid || 0;
+            }
+          }
+        }
+      }
+    });
 
-  // Combine income and outcome if needed, or separate. Let's do Money In and Money Out combined or separate
-  const totalIncome = invoices
-    .filter((x: any) => x.type === "پارەی هاتوو")
-    .reduce((sum, x) => sum + x.paid, 0);
+    return { usd, iqd };
+  };
 
-  const totalMoneyOut = invoices
-    .filter((x: any) => x.type === "پارەی ڕۆشتوو")
-    .reduce((sum, x) => sum + x.paid, 0);
+  const salesTotals = getTotals("فرۆشتن", "total");
+  const purchaseTotals = getTotals("کڕین", "total");
+  const expenseTotals = getTotals("خەرجی", "total");
+  const moneyInTotals = getTotals("پارەی هاتوو", "paid");
+  const moneyOutTotals = getTotals("پارەی ڕۆشتوو", "paid");
 
   const barData = [
     { name: "January", value: 0 },
@@ -86,7 +114,12 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
       if (d.getFullYear() === chartYear) {
         const month = d.getMonth(); // 0 to 11
         if (month >= 0 && month < 12) {
-          barData[month].value += inv.total || 0;
+          let valInUsd = inv.total || 0;
+          if (inv.currencyCode === "IQD") {
+            const rate = inv.exchangeRate || iqdRate;
+            valInUsd = valInUsd / rate;
+          }
+          barData[month].value += valInUsd;
         }
       }
     }
@@ -183,8 +216,6 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
       }
     }
   });
-
-  const iqdRate = currencies.find((c: any) => c.code === "IQD")?.rate || 1500;
 
   const renderCardValues = (usd: number, iqd: number) => {
     const isUsdZero = usd === 0;
@@ -323,7 +354,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          {renderCardValues(totalSales, Math.round(totalSales * iqdRate))}
+          {renderCardValues(salesTotals.usd, salesTotals.iqd)}
         </div>
 
         {/* Card 2: Purchases (کڕین) */}
@@ -336,7 +367,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          {renderCardValues(totalPurchases, Math.round(totalPurchases * iqdRate))}
+          {renderCardValues(purchaseTotals.usd, purchaseTotals.iqd)}
         </div>
 
         {/* Card 3: Expenses (خەرجی) */}
@@ -349,7 +380,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          {renderCardValues(Math.round(totalExpenses / iqdRate), totalExpenses)}
+          {renderCardValues(expenseTotals.usd, expenseTotals.iqd)}
         </div>
 
         {/* Card 4: Outgoing Money (پارەی ڕۆشتوو) */}
@@ -362,7 +393,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          {renderCardValues(totalMoneyOut, Math.round(totalMoneyOut * iqdRate))}
+          {renderCardValues(moneyOutTotals.usd, moneyOutTotals.iqd)}
         </div>
 
         {/* Card 5: Incoming Money (پارەی هاتوو) */}
@@ -375,7 +406,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          {renderCardValues(totalIncome, Math.round(totalIncome * iqdRate))}
+          {renderCardValues(moneyInTotals.usd, moneyInTotals.iqd)}
         </div>
 
       </div>
