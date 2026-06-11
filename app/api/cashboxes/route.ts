@@ -117,8 +117,16 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await prisma.cashbox.delete({
-      where: { id: Number(id) },
+    await prisma.$transaction(async (tx) => {
+      // Delete associated cashbox balances first to avoid foreign key violations
+      await tx.cashboxBalance.deleteMany({
+        where: { cashboxId: Number(id) },
+      });
+
+      // Now delete the cashbox itself
+      await tx.cashbox.delete({
+        where: { id: Number(id) },
+      });
     });
 
     return NextResponse.json({ success: true });
