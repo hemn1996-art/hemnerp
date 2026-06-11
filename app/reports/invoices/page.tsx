@@ -1201,7 +1201,7 @@ function InvoiceReportContent() {
 
           {/* Card: Expenses */}
           <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">خەرجیەکان</span>
+            <span className="text-slate-600 text-xs font-bold">خەرجی پسووڵەی کڕین</span>
             <span className="text-purple-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.expensesByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
               {visibleColumns.expenses ? formatKPIMultiCurrency(totals.expensesByCurrency) : "ناچالاکە"}
             </span>
