@@ -33,6 +33,7 @@ interface StoreState {
   updateProduct: (productData: any) => Promise<any>;
   deleteProduct: (id: number) => Promise<boolean>;
   addAccount: (accountData: any) => Promise<any>;
+  updateAccount: (accountData: any) => Promise<any>;
   addAccountType: (accountTypeData: any) => Promise<any>;
   updateAccountType: (accountTypeData: any) => Promise<any>;
   deleteAccountType: (id: number) => Promise<boolean>;
@@ -271,6 +272,27 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     } catch (err) {
       console.error("Failed to create account", err);
+    }
+    return null;
+  },
+
+  updateAccount: async (accountData) => {
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(accountData),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        await get().fetchAccounts();
+        return updated;
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        console.error("Update account failed:", res.status, errBody);
+      }
+    } catch (err) {
+      console.error("Failed to update account", err);
     }
     return null;
   },

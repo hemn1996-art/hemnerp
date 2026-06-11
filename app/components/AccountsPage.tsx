@@ -443,55 +443,32 @@ export default function AccountsPage() {
     if (!validateForm()) return;
 
     if (editingId) {
-      const now = new Date().toISOString();
-      const oldAccount = accountsState.find((item: any) => item.id === editingId);
-      const balance = oldAccount ? Number(oldAccount.balance || 0) : 0;
-
-      const accountData: AccountLike = {
+      // نوێکردنەوەی هەژمار بە API — دیتابەیس ذخیرە دەکات
+      const apiData = {
         id: editingId,
         name: form.name.trim(),
-        accountTypeId: form.isShareholder ? undefined : Number(form.accountTypeId),
-
-        phone: form.phone.trim(),
-        email: form.email.trim(),
-
-        country: form.country.trim(),
-        city: form.city.trim(),
-        district: form.district.trim(),
-        address: form.address.trim(),
-
-        notes: form.notes.trim(),
-
-        discountPercent: toNumber(form.discountPercent),
+        phone: form.phone.trim() || undefined,
+        fullAddress: form.address.trim() || undefined,
+        accountTypeId: form.isShareholder ? undefined : Number(form.accountTypeId) || undefined,
+        isShareholder: form.isShareholder,
+        isActive: form.isActive,
         creditLimit: toNumber(form.creditLimit),
         creditLimitCurrencyId: Number(form.creditLimitCurrencyId),
         debtAlertDays: toNumber(form.debtAlertDays),
-        guarantorName: form.guarantorName.trim(),
-
-        balance,
-
-        isShareholder: form.isShareholder,
-
-        shareholderBalance: form.isShareholder
-          ? oldAccount?.shareholderBalance || 0
-          : undefined,
-
-        shareholderBalanceByCurrency: form.isShareholder
-          ? oldAccount?.shareholderBalanceByCurrency || { "1": 0, "2": 0 }
-          : undefined,
-
-        isActive: form.isActive,
-        createdAt: oldAccount?.createdAt || now,
-        updatedAt: now,
+        discountPercent: toNumber(form.discountPercent),
+        guarantorName: form.guarantorName.trim() || undefined,
+        notes: form.notes.trim() || undefined,
       };
 
-      const nextAccounts = accountsState.map((item: any) =>
-        item.id === editingId ? { ...item, ...accountData } : item
-      );
-
-      syncAccounts(nextAccounts);
-      showToast("هەژمار نوێکرایەوە ✅", "success");
       closeModal();
+
+      store.updateAccount(apiData).then((result: any) => {
+        if (result) {
+          showToast("هەژمار نوێکرایەوە ✅", "success");
+        } else {
+          showToast("هەڵەیەک ڕووی دا. هەژمار خەزن نەکرا.", "error");
+        }
+      });
     } else {
       // دروستکردنی هەژماری نوێ بە API — دیتابەیس ذخیرە دەکات
       const apiData = {

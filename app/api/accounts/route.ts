@@ -154,3 +154,48 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const data = await request.json();
+
+    if (!data.id) {
+      return NextResponse.json({ error: "Account ID is required" }, { status: 400 });
+    }
+
+    if (!data.name?.trim()) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+
+    const updateData: any = {
+      name: data.name.trim(),
+      phone: data.phone || null,
+      fullAddress: data.fullAddress || null,
+      isShareholder: data.isShareholder || false,
+      isActive: data.isActive ?? true,
+      creditLimit: data.creditLimit ?? 0,
+      creditLimitCurrencyId: data.creditLimitCurrencyId ?? 1,
+      debtAlertDays: data.debtAlertDays ?? 0,
+      discountPercent: data.discountPercent ?? 0,
+      guarantorName: data.guarantorName || null,
+      notes: data.notes || null,
+    };
+
+    if (data.accountTypeId) {
+      updateData.accountTypeId = Number(data.accountTypeId);
+    }
+
+    const account = await prisma.account.update({
+      where: { id: Number(data.id) },
+      data: updateData,
+    });
+
+    return NextResponse.json(account);
+  } catch (error) {
+    console.error("Error updating account:", error);
+    return NextResponse.json(
+      { error: "Failed to update account" },
+      { status: 500 }
+    );
+  }
+}
