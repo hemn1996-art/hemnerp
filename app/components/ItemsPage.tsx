@@ -100,15 +100,15 @@ function ItemsList({
   async function handleDelete(item: Product) {
     showAlert(
       "confirm",
-      "Ø¯ÚµÙ†ÛŒØ§ÛŒ Ù„Û• Ø³Ú•ÛŒÙ†Û•ÙˆÛ•ØŸ",
-      `Ø¯ÚµÙ†ÛŒØ§ÛŒ Ù„Û• Ø³Ú•ÛŒÙ†Û•ÙˆÛ•ÛŒ Ú©Û•Ø±Û•Ø³ØªÛ•ÛŒ "${item.name}"ØŸ`,
+      "دڵنیای لە سڕینەوە؟",
+      `دڵنیای لە سڕینەوەی کەرەستەی "${item.name}"؟`,
       async () => {
         closeAlert();
         const success = await deleteProduct(item.id);
         if (success) {
-          showAlert("success", "Ø³Û•Ø±Ú©Û•ÙˆØªÙˆÙˆ", "Ú©Û•Ø±Û•Ø³ØªÛ• Ø¨Û• Ø³Û•Ø±Ú©Û•ÙˆØªÙˆÙˆÛŒÛŒ Ø³Ú•Ø§ÛŒÛ•ÙˆÛ• âœ…");
+          showAlert("success", "سەرکەوتوو", "کەرەستە بە سەرکەوتوویی سڕایەوە ✅");
         } else {
-          showAlert("error", "Ù‡Û•ÚµÛ•", "Ú©Û•Ø±Û•Ø³ØªÛ• Ø³Ú•ÛŒÙ†Û•ÙˆÛ• Ø³Û•Ø±Ú©Û•ÙˆØªÙˆÙˆ Ù†Û•Ø¨ÙˆÙˆ. ØªÚ©Ø§ÛŒÛ• Ø¯ÙˆÙˆØ¨Ø§Ø±Û• Ù‡Û•ÙˆÚµ Ø¨Ø¯Û•.");
+          showAlert("error", "هەڵە", "کەرەستە سڕینەوە سەرکەوتوو نەبوو. تکایە دووبارە هەوڵ بدە.");
         }
       }
     );
@@ -120,21 +120,21 @@ function ItemsList({
         <button
           onClick={() => document.dispatchEvent(new CustomEvent("open-sidebar"))}
           className="sidebar-toggle-btn items-center justify-center w-10 h-10 bg-gradient-to-b from-[#061f5f] to-[#03133f] text-white rounded-xl shadow-sm border border-[#ffffff20] transition-transform hover:scale-105 cursor-pointer text-xl"
-          title="Ú¯Û•ÙˆØ±Û•Ú©Ø±Ø¯Ù†ÛŒ Ø³Ø§ÛŒØ¯Ø¨Ø§Ø±"
+          title="گەورەکردنی سایدبار"
         >
-          â˜°
+          ☰
         </button>
         <button style={primaryBtn} onClick={onAdd}>
-          + Ø²ÛŒØ§Ø¯Ú©Ø±Ø¯Ù†
+          + زیادکردن
         </button>
 
-        <button style={outlineBtn} onClick={() => fetchProducts()}>Ú•ÛŽÚ©Ø®Ø³ØªÙ†Û•ÙˆÛ•</button>
-        <button style={printBtn} onClick={() => window.print()}>ðŸ–¨</button>
+        <button style={outlineBtn} onClick={() => fetchProducts()}>ڕێکخستنەوە</button>
+        <button style={printBtn} onClick={() => window.print()}>🖨</button>
 
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Ú¯Û•Ú•Ø§Ù† Ø¨Û• Ù†Ø§ÙˆØŒ Ú©Û†Ø¯ØŒ Ø¨Ø±Ø§Ù†Ø¯ØŒ Ú©Ø§ØªÛŽÚ¯Û†Ø±ÛŒ..."
+          placeholder="گەڕان بە ناو، کۆد، براند، کاتێگۆری..."
           style={searchInput}
         />
       </div>
@@ -143,17 +143,17 @@ function ItemsList({
         <table style={table}>
           <thead>
             <tr>
-              <th style={th}>Ù†Ø§Ùˆ</th>
-              <th style={th}>Ú©Û†Ø¯</th>
-              <th style={th}>Ø¬Û†Ø±</th>
-              <th style={th}>Ú©Ø§ØªÛŒÚ¯Û†Ø±ÛŒ</th>
-              <th style={th}>Ø¨Ø±Ø§Ù†Ø¯</th>
-              <th style={th}>Ù†Ø±Ø®ÛŒ ÙØ±Û†Ø´ØªÙ†</th>
-              <th style={th}>ÙØ±Û• ÙˆÛ•Ø¬Ø¨Û•</th>
-              <th style={th}>Ø¦Ø§Ú¯Ø§Ø¯Ø§Ø±ÛŒ Ú©Û†Ú¯Ø§</th>
-              <th style={th}>Ø¨Û•Ø³Û•Ø±Ú†ÙˆÙˆÙ†</th>
-              <th style={th}>Ø­Ø§ÚµÛ•Øª</th>
-              <th style={th}>Ú†Ø§Ù„Ø§Ú©ÛŒ</th>
+              <th style={th}>ناو</th>
+              <th style={th}>کۆد</th>
+              <th style={th}>جۆر</th>
+              <th style={th}>کاتێگۆری</th>
+              <th style={th}>براند</th>
+              <th style={th}>نرخی فرۆشتن</th>
+              <th style={th}>فرە وەجبە</th>
+              <th style={th}>ئاگاداری کۆگا</th>
+              <th style={th}>بەسەرچوون</th>
+              <th style={th}>حاڵەت</th>
+              <th style={th}>چالاکی</th>
             </tr>
           </thead>
 
@@ -161,7 +161,7 @@ function ItemsList({
             {filteredProducts.length === 0 ? (
               <tr>
                 <td colSpan={11} style={emptyCell}>
-                  Ù‡ÛŒÚ† Ú©Û•Ø±Û•Ø³ØªÛ•ÛŒÛ•Ú© Ù†Û•Ø¯Û†Ø²Ø±Ø§ÛŒÛ•ÙˆÛ•
+                  هیچ کەرەستەیەک نەدۆزرایەوە
                 </td>
               </tr>
             ) : (
@@ -181,7 +181,7 @@ function ItemsList({
                     {formatSalePrices(item)}
                   </td>
 
-                  <td style={td}>{item.isMultiBatch ? "Ø¨Û•ÚµÛŽ" : "Ù†Û•Ø®ÛŽØ±"}</td>
+                  <td style={td}>{item.isMultiBatch ? "بەڵێ" : "نەخێر"}</td>
 
                   <td style={td}>
                     {!item.isExpense && !item.isService
@@ -191,8 +191,8 @@ function ItemsList({
 
                   <td style={td}>
                     {item.hasExpiry
-                      ? `${item.expiryAlertDays || 10} Ú•Û†Ú˜ Ù¾ÛŽØ´ØªØ±`
-                      : "Ù†ÛŒÛŒÛ•"}
+                      ? `${item.expiryAlertDays || 10} ڕۆژ پێشتر`
+                      : "نییە"}
                   </td>
 
                   <td style={td}>
@@ -208,21 +208,21 @@ function ItemsList({
                         fontWeight: "bold",
                       }}
                     >
-                      {item.isActive === false ? "Ù†Ø§Ú†Ø§Ù„Ø§Ú©" : "Ú†Ø§Ù„Ø§Ú©"}
+                      {item.isActive === false ? "ناچالاک" : "چالاک"}
                     </span>
                   </td>
 
                   <td style={td}>
                     <button style={smallBtn} onClick={() => onEdit(item)}>
-                      Ø¯Û•Ø³ØªÚ©Ø§Ø±ÛŒ
+                      دەستکاری
                     </button>
                     {item.isDeletable && (
                       <button
                         style={{ ...smallBtn, color: "#dc2626", borderColor: "#fecaca" }}
                         onClick={() => handleDelete(item)}
-                        title="Ø³Ú•ÛŒÙ†Û•ÙˆÛ•"
+                        title="سڕینەوە"
                       >
-                        ðŸ—‘ï¸
+                        🗑️
                       </button>
                     )}
                   </td>
@@ -268,8 +268,8 @@ function AddItemForm({
   const [code, setCode] = useState(productToEdit?.code || "");
   const [barcode, setBarcode] = useState("");
 
-  const [brand, setBrand] = useState("Ø¨ÛŽ Ø¨Ø±Ø§Ù†Ø¯");
-  const [category, setCategory] = useState("Ú¯Ø´ØªÛŒ");
+  const [brand, setBrand] = useState("بێ براند");
+  const [category, setCategory] = useState("گشتی");
 
   const [itemKind, setItemKind] = useState<ItemKind>(
     productToEdit?.isExpense
@@ -282,14 +282,14 @@ function AddItemForm({
   const [salePrices, setSalePrices] = useState([
     {
       currencyId: "1",
-      priceType: "ØªØ§Ú©",
+      priceType: "تاک",
       amount: "",
     },
   ]);
 
   const [packages, setPackages] = useState([
     {
-      name: "Ø¯Ø§Ù†Û•",
+      name: "دانە",
       quantity: "1",
     },
   ]);
@@ -302,23 +302,23 @@ function AddItemForm({
   const [isActive, setIsActive] = useState(productToEdit?.isActive ?? true);
 
   const [categories, setCategories] = useState<{ id: number; name: string; isActive: boolean }[]>(
-    [{ id: 1, name: "Ú¯Ø´ØªÛŒ", isActive: true }]
+    [{ id: 1, name: "گشتی", isActive: true }]
   );
   const [brands, setBrands] = useState<{ id: number; name: string; isActive: boolean }[]>(
-    [{ id: 1, name: "Ø¨ÛŽ Ø¨Ø±Ø§Ù†Ø¯", isActive: true }]
+    [{ id: 1, name: "بێ براند", isActive: true }]
   );
   const [packagings, setPackagings] = useState<{ id: number; name: string; isActive: boolean }[]>(
-    [{ id: 1, name: "Ø¯Ø§Ù†Û•", isActive: true }, { id: 2, name: "Ú©Ø§Ø±ØªÛ†Ù†", isActive: true }]
+    [{ id: 1, name: "دانە", isActive: true }, { id: 2, name: "کارتۆن", isActive: true }]
   );
   const [priceTypes, setPriceTypes] = useState<{ id: number; name: string; isActive: boolean }[]>(
-    [{ id: 1, name: "ØªØ§Ú©", isActive: true }, { id: 2, name: "Ú©Û†", isActive: true }]
+    [{ id: 1, name: "تاک", isActive: true }, { id: 2, name: "کۆ", isActive: true }]
   );
 
   useEffect(() => {
     // Load categories
     try {
       const rawCat = localStorage.getItem("__erp_categories");
-      const listCat = rawCat ? JSON.parse(rawCat) : [{ id: 1, name: "Ú¯Ø´ØªÛŒ", isActive: true }];
+      const listCat = rawCat ? JSON.parse(rawCat) : [{ id: 1, name: "گشتی", isActive: true }];
       const active = listCat.filter((x: any) => x.isActive !== false);
       setCategories(active);
       if (active.length > 0) setCategory(active[0].name);
@@ -327,7 +327,7 @@ function AddItemForm({
     // Load brands
     try {
       const rawBrand = localStorage.getItem("__erp_brands");
-      const listBrand = rawBrand ? JSON.parse(rawBrand) : [{ id: 1, name: "Ø¨ÛŽ Ø¨Ø±Ø§Ù†Ø¯", isActive: true }];
+      const listBrand = rawBrand ? JSON.parse(rawBrand) : [{ id: 1, name: "بێ براند", isActive: true }];
       const active = listBrand.filter((x: any) => x.isActive !== false);
       setBrands(active);
       if (active.length > 0) setBrand(active[0].name);
@@ -336,7 +336,7 @@ function AddItemForm({
     // Load packaging
     try {
       const rawPkg = localStorage.getItem("__erp_packaging");
-      const listPkg = rawPkg ? JSON.parse(rawPkg) : [{ id: 1, name: "Ø¯Ø§Ù†Û•", isActive: true }, { id: 2, name: "Ú©Ø§Ø±ØªÛ†Ù†", isActive: true }];
+      const listPkg = rawPkg ? JSON.parse(rawPkg) : [{ id: 1, name: "دانە", isActive: true }, { id: 2, name: "کارتۆن", isActive: true }];
       const active = listPkg.filter((x: any) => x.isActive !== false);
       setPackagings(active);
       if (active.length > 0) setPackages([{ name: active[0].name, quantity: "1" }]);
@@ -345,7 +345,7 @@ function AddItemForm({
     // Load priceTypes
     try {
       const rawPriceTypes = localStorage.getItem("__erp_price_types");
-      const listPriceTypes = rawPriceTypes ? JSON.parse(rawPriceTypes) : [{ id: 1, name: "ØªØ§Ú©", isActive: true }, { id: 2, name: "Ú©Û†", isActive: true }];
+      const listPriceTypes = rawPriceTypes ? JSON.parse(rawPriceTypes) : [{ id: 1, name: "تاک", isActive: true }, { id: 2, name: "کۆ", isActive: true }];
       const active = listPriceTypes.filter((x: any) => x.isActive !== false);
       setPriceTypes(active);
       if (active.length > 0) setSalePrices([{ currencyId: "1", priceType: active[0].name, amount: "" }]);
@@ -357,6 +357,7 @@ function AddItemForm({
     return englishVal.replace(/[^\d]/g, "");
   }
 
+  // Decimal cleanup
   function onlyDecimal(value: string) {
     const englishVal = convertDigits(value);
     return englishVal.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
@@ -384,7 +385,7 @@ function AddItemForm({
       ...prev,
       {
         currencyId: "",
-        priceType: priceTypes[0]?.name || "ØªØ§Ú©",
+        priceType: priceTypes[0]?.name || "تاک",
         amount: "",
       },
     ]);
@@ -418,7 +419,7 @@ function AddItemForm({
     setPackages((prev) => [
       ...prev,
       {
-        name: packagings[0]?.name || "Ø¯Ø§Ù†Û•",
+        name: packagings[0]?.name || "دانە",
         quantity: "",
       },
     ]);
@@ -433,7 +434,7 @@ function AddItemForm({
 
   async function save() {
     if (!name.trim()) {
-      showAlert("warning", "Ø¦Ø§Ú¯Ø§Ø¯Ø§Ø±ÛŒ", "Ù†Ø§ÙˆÛŒ Ú©ÙˆØ±Ø¯ÛŒ Ù¾Ú• Ø¨Ú©Û•Ø±Û•ÙˆÛ•");
+      showAlert("warning", "ئاگاداری", "ناوی کوردی پڕ بکەرەوە");
       return;
     }
 
@@ -456,33 +457,33 @@ function AddItemForm({
       : await store.addProduct(productData);
 
     if (result) {
-      showAlert("success", "Ø³Û•Ø±Ú©Û•ÙˆØªÙˆÙˆ", productToEdit ? "Ú©Û•Ø±Û•Ø³ØªÛ• Ø¨Û• Ø³Û•Ø±Ú©Û•ÙˆØªÙˆÙˆÛŒÛŒ Ø¯Û•Ø³ØªÚ©Ø§Ø±ÛŒ Ú©Ø±Ø§ âœ…" : "Ú©Û•Ø±Û•Ø³ØªÛ• Ø¨Û• Ø³Û•Ø±Ú©Û•ÙˆØªÙˆÙˆÛŒÛŒ Ø®Û•Ø²Ù† Ú©Ø±Ø§ âœ…", () => {
+      showAlert("success", "سەرکەوتوو", productToEdit ? "کەرەستە بە سەرکەوتوویی دەستکاری کرا ✅" : "کەرەستە بە سەرکەوتوویی خەزن کرا ✅", () => {
         closeAlert();
         onBack();
       });
     } else {
-      showAlert("error", "Ù‡Û•ÚµÛ•", "Ú©Û•Ø±Û•Ø³ØªÛ• Ø®Û•Ø²Ù† Ù†Û•Ú©Ø±Ø§. ØªÚ©Ø§ÛŒÛ• Ø¯ÙˆÙˆØ¨Ø§Ø±Û• Ù‡Û•ÙˆÚµ Ø¨Ø¯Û•.");
+      showAlert("error", "هەڵە", "کەرەستە خەزن نەکرا. تکایە دووبارە هەوڵ بدە.");
     }
   }
 
   return (
     <div>
-      <div style={notice}>Ø¦Û•Ùˆ ÙÛŒÙ„Ø¯Ø§Ù†Û•ÛŒ Ú©Û• Ø¨Û• * Ù†ÛŒØ´Ø§Ù†Û• Ú©Ø±Ø§ÙˆÙ† Ø¯Ø§ÙˆØ§Ú©Ø±Ø§ÙˆÙ†.</div>
+      <div style={notice}>ئەو فیڵدانەی کە بە * نیشانە کراون داواکراون.</div>
 
       <div style={titleBox}>
         <h2 style={{ margin: 0 }}>
-          {productToEdit ? "Ø¯Û•Ø³ØªÚ©Ø§Ø±ÛŒÚ©Ø±Ø¯Ù†ÛŒ Ú©Û•Ø±Û•Ø³ØªÛ•" : "Ø¯Ø±ÙˆØ³ØªÚ©Ø±Ø¯Ù†ÛŒ Ú©Û•Ø±Û•Ø³ØªÛ•"}
+          {productToEdit ? "دەستکاریکردنی کەرەستە" : "دروستکردنی کەرەستە"}
         </h2>
         <p style={{ margin: "6px 0 0", color: "#6b7280" }}>
           {productToEdit
-            ? "Ø¯Û•Ø³ØªÚ©Ø§Ø±ÛŒÚ©Ø±Ø¯Ù†ÛŒ Ø²Ø§Ù†ÛŒØ§Ø±ÛŒ Ùˆ Ú•ÛŽÚ©Ø®Ø³ØªÙ†Û•Ú©Ø§Ù†ÛŒ Ú©Û•Ø±Û•Ø³ØªÛ•"
-            : "Ø²Ø§Ù†ÛŒØ§Ø±ÛŒ Ú©Û•Ø±Û•Ø³ØªÛ•ØŒ Ù†Ø±Ø®ÛŒ ÙØ±Û†Ø´ØªÙ†ØŒ Ù¾ÛŽÚ†Ø§Ù†Û•ÙˆÛ• Ùˆ Ú•ÛŽÚ©Ø®Ø³ØªÙ†Û•Ú©Ø§Ù†"}
+            ? "دەستکاریکردنی زانیاری و ڕێکخستنەکانی کەرەستە"
+            : "زانیاری کەرەستە، نرخی فرۆشتن، پێچانەوە و ڕێکخستنەکان"}
         </p>
       </div>
 
-      <Section title="Ø²Ø§Ù†ÛŒØ§Ø±ÛŒ Ø¨Ù†Û•Ú•Û•ØªÛŒ" icon="â“˜">
+      <Section title="زانیاری بنەڕەتی" icon="ℹ">
         <div style={grid3}>
-          <Field label="* Ù†Ø§Ùˆ - Ú©ÙˆØ±Ø¯ÛŒ">
+          <Field label="* ناو - کوردی">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -490,7 +491,7 @@ function AddItemForm({
             />
           </Field>
 
-          <Field label="Ù†Ø§Ùˆ - Ø¹Û•Ø±Û•Ø¨ÛŒ">
+          <Field label="ناو - عەرەبی">
             <input
               value={nameArabic}
               onChange={(e) => setNameArabic(e.target.value)}
@@ -498,7 +499,7 @@ function AddItemForm({
             />
           </Field>
 
-          <Field label="Ù†Ø§Ùˆ - Ø¦ÛŒÙ†Ú¯Ù„ÛŒØ²ÛŒ">
+          <Field label="ناو - ئینگلیزی">
             <input
               value={nameEnglish}
               onChange={(e) => setNameEnglish(e.target.value)}
@@ -508,7 +509,7 @@ function AddItemForm({
         </div>
 
         <div style={grid3}>
-          <Field label="Ú©Û†Ø¯">
+          <Field label="کۆد">
             <input
               value={code}
               onChange={(e) => setCode(e.target.value)}
@@ -517,7 +518,7 @@ function AddItemForm({
             />
           </Field>
 
-          <Field label="Ø¨Ø§Ø±Ú©Û†Ø¯">
+          <Field label="بارکۆد">
             <input
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
@@ -526,7 +527,7 @@ function AddItemForm({
             />
           </Field>
 
-          <Field label="Ø¨Ø±Ø§Ù†Ø¯">
+          <Field label="براند">
             <select
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
@@ -542,7 +543,7 @@ function AddItemForm({
         </div>
 
         <div style={grid3}>
-          <Field label="Ú©Ø§ØªÛŒÚ¯Û†Ø±ÛŒ">
+          <Field label="کاتێگۆری">
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -558,7 +559,7 @@ function AddItemForm({
         </div>
       </Section>
 
-      <Section title="Ú•ÛŽÚ©Ø®Ø³ØªÙ†Û•Ú©Ø§Ù†ÛŒ Ú©Û•Ø±Û•Ø³ØªÛ•" icon="âš™">
+      <Section title="ڕێکخستنەکانی کەرەستە" icon="⚙">
         <div style={checksGrid}>
           <label style={checkLabel}>
             <input
@@ -566,7 +567,7 @@ function AddItemForm({
               checked={itemKind === "inventory"}
               onChange={() => setItemKind("inventory")}
             />
-            Ø¦Û•Ù… Ú©Û•Ø±Û•Ø³ØªÛ• Ø¯Û•Ú†ÛŽØªÛ• Ú©Û†Ú¯Ø§ØŸ
+            ئەم کەرەستەیە دەچێتە کۆگا؟
           </label>
 
           <label style={checkLabel}>
@@ -575,7 +576,7 @@ function AddItemForm({
               checked={itemKind === "service"}
               onChange={() => setItemKind("service")}
             />
-            Ø¦Û•Ù… Ú©Û•Ø±Û•Ø³ØªÛ• Ø¨Û† Ø®Ø²Ù…Û•ØªÚ¯ÙˆØ²Ø§Ø±ÛŒÛ•ØŸ
+            ئەم کەرەستەیە بۆ خزمەتگوزارییە؟
           </label>
 
           <label style={checkLabel}>
@@ -584,7 +585,7 @@ function AddItemForm({
               checked={itemKind === "expense"}
               onChange={() => setItemKind("expense")}
             />
-            Ø¦Û•Ù… Ú©Û•Ø±Û•Ø³ØªÛ• Ø®Û•Ø±Ø¬ÛŒÛ•ØŸ
+            ئەم کەرەستەیە خەرجییە؟
           </label>
 
           {itemKind === "inventory" && (
@@ -594,18 +595,18 @@ function AddItemForm({
                 checked={isMultiBatch}
                 onChange={(e) => setIsMultiBatch(e.target.checked)}
               />
-              Ø¦Û•Ù… Ú©Û•Ø±Û•Ø³ØªÛ• ÙØ±Û• ÙˆÛ•Ø¬Ø¨Û•ÛŒÛ•ØŸ
+              ئەم کەرەستەیە فرە وەجبەیە؟
             </label>
           )}
 
           <label style={checkLabel}>
             <input type="checkbox" />
-            Ø³Ø±ÛŒØ§ÚµÛŒ Ù‡Û•ÛŒÛ•ØŸ
+            سریاڵی هەیە؟
           </label>
         </div>
       </Section>
 
-      <Section title="Ù†Ø±Ø®ÛŒ ÙØ±Û†Ø´ØªÙ†" icon="$">
+      <Section title="نرخی فرۆشتن" icon="$">
         {salePrices.map((row, index) => (
           <div
             key={index}
@@ -617,7 +618,7 @@ function AddItemForm({
               marginBottom: 12,
             }}
           >
-            <Field label="Ø¯Ø±Ø§Ùˆ">
+            <Field label="دراو">
               <select
                 value={row.currencyId}
                 onChange={(e) =>
@@ -625,7 +626,7 @@ function AddItemForm({
                 }
                 style={input}
               >
-                <option value="">Ø¯Ø±Ø§Ùˆ</option>
+                <option value="">دراو</option>
                 {currencies
                   .filter((x: any) => x.isActive !== false)
                   .map((currency: any) => (
@@ -636,7 +637,7 @@ function AddItemForm({
               </select>
             </Field>
 
-            <Field label="Ø¬Û†Ø±ÛŒ Ù†Ø±Ø®">
+            <Field label="جۆری نرخ">
               <select
                 value={row.priceType}
                 onChange={(e) =>
@@ -652,7 +653,7 @@ function AddItemForm({
               </select>
             </Field>
 
-            <Field label="Ù†Ø±Ø®">
+            <Field label="نرخ">
               <input
                 type="text"
                 inputMode="decimal"
@@ -672,17 +673,17 @@ function AddItemForm({
               style={{ ...backBtn, color: "#b91c1c", height: 45 }}
               disabled={salePrices.length === 1}
             >
-              Ù„Ø§Ø¨Ø±Ø¯Ù†
+              لابردن
             </button>
           </div>
         ))}
 
         <button onClick={addSalePriceRow} style={outlineBtn}>
-          + Ø²ÛŒØ§Ø¯Ú©Ø±Ø¯Ù†ÛŒ Ù†Ø±Ø®ÛŒ ØªØ±
+          + زیادکردنی نرخی تر
         </button>
       </Section>
 
-      <Section title="Ù¾ÛŽÚ†Ø§Ù†Û•ÙˆÛ•" icon="ðŸ“¦">
+      <Section title="پێچانەوە" icon="📦">
         {packages.map((row, index) => (
           <div
             key={index}
@@ -694,7 +695,7 @@ function AddItemForm({
               marginBottom: 12,
             }}
           >
-            <Field label="Ù¾ÛŽÚ†Ø§Ù†Û•ÙˆÛ•">
+            <Field label="پێچانەوە">
               <select
                 value={row.name}
                 onChange={(e) => updatePackage(index, "name", e.target.value)}
@@ -708,7 +709,7 @@ function AddItemForm({
               </select>
             </Field>
 
-            <Field label="Ú˜Ù…Ø§Ø±Û•ÛŒ Ù†Ø§Ùˆ Ù¾ÛŽÚ†Ø§Ù†Û•ÙˆÛ•">
+            <Field label="ژمارەی ناو پێچانەوە">
               <input
                 type="text"
                 inputMode="numeric"
@@ -728,20 +729,20 @@ function AddItemForm({
               style={{ ...backBtn, color: "#b91c1c", height: 45 }}
               disabled={packages.length === 1}
             >
-              Ù„Ø§Ø¨Ø±Ø¯Ù†
+              لابردن
             </button>
           </div>
         ))}
 
         <button onClick={addPackageRow} style={outlineBtn}>
-          + Ø²ÛŒØ§Ø¯Ú©Ø±Ø¯Ù†ÛŒ Ù¾ÛŽÚ†Ø§Ù†Û•ÙˆÛ•ÛŒ ØªØ±
+          + زیادکردنی پێچانەوەی تر
         </button>
       </Section>
 
       {itemKind === "inventory" && (
-        <Section title="Ú•ÛŽÚ©Ø®Ø³ØªÙ†Û•Ú©Ø§Ù†ÛŒ Ú©Û†Ú¯Ø§ Ùˆ Ø¦Ø§Ú¯Ø§Ø¯Ø§Ø±ÛŒ" icon="â–¥">
+        <Section title="ڕێکخستنەکانی کۆگا و ئاگاداری" icon="▥">
           <div style={grid3}>
-            <Field label="Ú©Û•Ù…ØªØ±ÛŒÙ† Ø¦Ø§Ø³ØªÛŒ Ø¦Ø§Ú¯Ø§Ø¯Ø§Ø±ÛŒ">
+            <Field label="کەمترین ئاستی ئاگاداری">
               <input
                 type="text"
                 inputMode="numeric"
@@ -754,18 +755,18 @@ function AddItemForm({
               />
             </Field>
 
-            <Field label="Ø¨Û•Ø³Û•Ø±Ú†ÙˆÙˆÙ† Ù‡Û•ÛŒÛ•ØŸ">
+            <Field label="بەسەرچوون هەیە؟">
               <select
                 value={hasExpiry ? "yes" : "no"}
                 onChange={(e) => setHasExpiry(e.target.value === "yes")}
                 style={input}
               >
-                <option value="no">Ù†ÛŒÛŒÛ•</option>
-                <option value="yes">Ù‡Û•ÛŒÛ•</option>
+                <option value="no">نییە</option>
+                <option value="yes">هەیە</option>
               </select>
             </Field>
 
-            <Field label="Ø¦Ø§Ú¯Ø§Ø¯Ø§Ø±ÛŒ Ù¾ÛŽØ´ Ø¨Û•Ø³Û•Ø±Ú†ÙˆÙˆÙ† / Ú•Û†Ú˜">
+            <Field label="ئاگاداری پێش بەسەرچوون / ڕۆژ">
               <input
                 type="text"
                 inputMode="numeric"
@@ -785,23 +786,23 @@ function AddItemForm({
         </Section>
       )}
 
-      <Section title="Ø­Ø§ÚµÛ•Øª" icon="ðŸ‘">
+      <Section title="حاڵەت" icon="👍">
         <select
-          value={isActive ? "Ú†Ø§Ù„Ø§Ú©" : "Ù†Ø§Ú†Ø§Ù„Ø§Ú©"}
-          onChange={(e) => setIsActive(e.target.value === "Ú†Ø§Ù„Ø§Ú©")}
+          value={isActive ? "چالاک" : "ناچالاک"}
+          onChange={(e) => setIsActive(e.target.value === "چالاک")}
           style={input}
         >
-          <option>Ú†Ø§Ù„Ø§Ú©</option>
-          <option>Ù†Ø§Ú†Ø§Ù„Ø§Ú©</option>
+          <option>چالاک</option>
+          <option>ناچالاک</option>
         </select>
       </Section>
 
       <div style={footerActions}>
         <button onClick={save} style={saveBtn}>
-          ðŸ’¾ Ø®Û•Ø²Ù†Ú©Ø±Ø¯Ù†
+          💾 خەزنکردن
         </button>
         <button onClick={onBack} style={backBtn}>
-          Ù¾Ø§Ø´Ú¯Û•Ø²Ø¨ÙˆÙˆÙ†Û•ÙˆÛ•
+          پاشگەزبوونەوە
         </button>
       </div>
       <AlertModal {...alertConfig} onClose={closeAlert} />
@@ -810,9 +811,9 @@ function AddItemForm({
 }
 
 function getItemType(item: Product) {
-  if (item.isExpense) return "Ø®Û•Ø±Ø¬ÛŒ";
-  if (item.isService) return "Ø®Ø²Ù…Û•ØªÚ¯ÙˆØ²Ø§Ø±ÛŒ";
-  return "Ú©Û†Ú¯Ø§ÛŒÛŒ";
+  if (item.isExpense) return "خەرجی";
+  if (item.isService) return "خزمەتگوزاری";
+  return "کۆگایی";
 }
 
 function formatSalePrices(item: Product) {
