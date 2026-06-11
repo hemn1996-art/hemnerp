@@ -73,6 +73,7 @@ export interface Product {
   category?: string;
   brand?: string;
   barcode?: string;
+  packaging?: string;
 
   salePrices?: ProductPrice[];
   packages?: ProductPackage[];

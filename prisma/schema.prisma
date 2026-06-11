@@ -121,6 +121,9 @@ model Product {
   id                    Int                    @id @default(autoincrement())
   code                  String?                @unique
   name                  String
+  category              String?
+  brand                 String?
+  packaging             String?
   isMultiBatch          Boolean                @default(false)
   isExpense             Boolean                @default(false)
   isService             Boolean                @default(false)
@@ -294,3 +297,28 @@ model InvoiceTemplate {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
+
+model Category {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  isActive Boolean @default(true)
+}
+
+model Brand {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  isActive Boolean @default(true)
+}
+
+model Packaging {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  isActive Boolean @default(true)
+}
+
+model PriceType {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  isActive Boolean @default(true)
+}
+

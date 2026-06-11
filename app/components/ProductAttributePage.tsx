@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, useEffect, useCallback, type CSSProperties } from "react";
 import { useStore } from "../store/store";
 import AlertModal from "./AlertModal";
 
@@ -13,13 +13,6 @@ export type AttributeItem = {
 
 export type AttributeType = "category" | "brand" | "packaging" | "priceType";
 
-const STORAGE_KEY: Record<AttributeType, string> = {
-  category:  "__erp_categories",
-  brand:     "__erp_brands",
-  packaging: "__erp_packaging",
-  priceType: "__erp_price_types",
-};
-
 const LABELS: Record<AttributeType, { singular: string; plural: string }> = {
   category:  { singular: "کاتێگۆری", plural: "کاتێگۆرییەکان" },
   brand:     { singular: "براند",    plural: "براندەکان" },
@@ -27,30 +20,31 @@ const LABELS: Record<AttributeType, { singular: string; plural: string }> = {
   priceType: { singular: "جۆری نرخ", plural: "جۆرەکانی نرخ" },
 };
 
-function loadItems(type: AttributeType): AttributeItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY[type]);
-    if (raw) return JSON.parse(raw) as AttributeItem[];
-  } catch {}
-  
-  // Defaults
-  if (type === "category") return [{ id: 1, name: "گشتی", isActive: true }];
-  if (type === "brand") return [{ id: 1, name: "بێ براند", isActive: true }];
-  if (type === "packaging") return [{ id: 1, name: "دانە", isActive: true }, { id: 2, name: "کارتۆن", isActive: true }];
-  if (type === "priceType") return [{ id: 1, name: "تاک", isActive: true }, { id: 2, name: "کۆ", isActive: true }];
-  
-  return [];
-}
-
-function saveItems(type: AttributeType, items: AttributeItem[]) {
-  try { localStorage.setItem(STORAGE_KEY[type], JSON.stringify(items)); } catch {}
-}
-
 /* ── Main Component ── */
 export default function ProductAttributePage({ type }: { type: AttributeType }) {
   const labels = LABELS[type];
 
-  const [items,    setItems]    = useState<AttributeItem[]>(() => loadItems(type));
+  const [items, setItems] = useState<AttributeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/attributes?type=${type}`);
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch attributes", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [type]);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
   const [search,   setSearch]   = useState("");
   const [showModal,setShowModal]= useState(false);
   const [editId,   setEditId]   = useState<number | null>(null);
@@ -97,11 +91,6 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
     return items.filter(i => i.name.toLowerCase().includes(q));
   }, [items, search]);
 
-  function sync(next: AttributeItem[]) {
-    setItems(next);
-    saveItems(type, next);
-  }
-
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
@@ -119,23 +108,44 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
     setShowModal(true);
   }
 
-  function handleSave() {
+  async function handleSave() {
     const name = form.name.trim();
     if (!name) { showToast("تکایە ناو بنووسە."); return; }
 
     const dup = items.find(i => i.id !== editId && i.name.trim().toLowerCase() === name.toLowerCase());
     if (dup) { showToast("ئەم ناوە پێشتر هەیە."); return; }
 
-    if (editId !== null) {
-      const next = items.map(i => i.id === editId ? { ...i, name, isActive: form.isActive } : i);
-      sync(next);
-      showToast("نوێکرایەوە ✅");
-    } else {
-      const newId = items.reduce((m, i) => Math.max(m, i.id), 0) + 1;
-      sync([...items, { id: newId, name, isActive: form.isActive }]);
-      showToast("زیادکرا ✅");
+    try {
+      if (editId !== null) {
+        const res = await fetch(`/api/attributes?type=${type}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: editId, name, isActive: form.isActive }),
+        });
+        if (res.ok) {
+          showToast("نوێکرایەوە ✅");
+          fetchItems();
+        } else {
+          showToast("سەرکەوتوو نەبوو ❌");
+        }
+      } else {
+        const res = await fetch(`/api/attributes?type=${type}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, isActive: form.isActive }),
+        });
+        if (res.ok) {
+          showToast("زیادکرا ✅");
+          fetchItems();
+        } else {
+          showToast("سەرکەوتوو نەبوو ❌");
+        }
+      }
+      setShowModal(false);
+    } catch (err) {
+      console.error(err);
+      showToast("کێشەیەک لە پەیوەندی هەیە ❌");
     }
-    setShowModal(false);
   }
 
   function handleDelete(item: AttributeItem) {
@@ -143,10 +153,22 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
       "confirm",
       "دڵنیایت لە سڕینەوە؟",
       `دڵنیایت لە سڕینەوەی "${item.name}"؟`,
-      () => {
+      async () => {
         closeAlert();
-        sync(items.filter(i => i.id !== item.id));
-        showToast("سڕایەوە ✅");
+        try {
+          const res = await fetch(`/api/attributes?type=${type}&id=${item.id}`, {
+            method: "DELETE",
+          });
+          if (res.ok) {
+            showToast("سڕایەوە ✅");
+            fetchItems();
+          } else {
+            showToast("سەرکەوتوو نەبوو ❌");
+          }
+        } catch (err) {
+          console.error(err);
+          showToast("کێشەیەک لە پەیوەندی هەیە ❌");
+        }
       }
     );
   }

@@ -315,42 +315,68 @@ function AddItemForm({
   );
 
   useEffect(() => {
-    // Load categories
-    try {
-      const rawCat = localStorage.getItem("__erp_categories");
-      const listCat = rawCat ? JSON.parse(rawCat) : [{ id: 1, name: "گشتی", isActive: true }];
-      const active = listCat.filter((x: any) => x.isActive !== false);
-      setCategories(active);
-      if (active.length > 0) setCategory(active[0].name);
-    } catch { }
+    async function loadAttributes() {
+      // Load categories
+      try {
+        const res = await fetch("/api/attributes?type=category");
+        if (res.ok) {
+          const listCat = await res.json();
+          const active = listCat.filter((x: any) => x.isActive !== false);
+          setCategories(active);
+          if (productToEdit?.category) {
+            setCategory(productToEdit.category);
+          } else if (active.length > 0) {
+            setCategory(active[0].name);
+          }
+        }
+      } catch (err) { console.error(err); }
 
-    // Load brands
-    try {
-      const rawBrand = localStorage.getItem("__erp_brands");
-      const listBrand = rawBrand ? JSON.parse(rawBrand) : [{ id: 1, name: "بێ براند", isActive: true }];
-      const active = listBrand.filter((x: any) => x.isActive !== false);
-      setBrands(active);
-      if (active.length > 0) setBrand(active[0].name);
-    } catch { }
+      // Load brands
+      try {
+        const res = await fetch("/api/attributes?type=brand");
+        if (res.ok) {
+          const listBrand = await res.json();
+          const active = listBrand.filter((x: any) => x.isActive !== false);
+          setBrands(active);
+          if (productToEdit?.brand) {
+            setBrand(productToEdit.brand);
+          } else if (active.length > 0) {
+            setBrand(active[0].name);
+          }
+        }
+      } catch (err) { console.error(err); }
 
-    // Load packaging
-    try {
-      const rawPkg = localStorage.getItem("__erp_packaging");
-      const listPkg = rawPkg ? JSON.parse(rawPkg) : [{ id: 1, name: "دانە", isActive: true }, { id: 2, name: "کارتۆن", isActive: true }];
-      const active = listPkg.filter((x: any) => x.isActive !== false);
-      setPackagings(active);
-      if (active.length > 0) setPackages([{ name: active[0].name, quantity: "1" }]);
-    } catch { }
+      // Load packaging
+      try {
+        const res = await fetch("/api/attributes?type=packaging");
+        if (res.ok) {
+          const listPkg = await res.json();
+          const active = listPkg.filter((x: any) => x.isActive !== false);
+          setPackagings(active);
+          if (productToEdit?.packaging) {
+            setPackages([{ name: productToEdit.packaging, quantity: "1" }]);
+          } else if (active.length > 0) {
+            setPackages([{ name: active[0].name, quantity: "1" }]);
+          }
+        }
+      } catch (err) { console.error(err); }
 
-    // Load priceTypes
-    try {
-      const rawPriceTypes = localStorage.getItem("__erp_price_types");
-      const listPriceTypes = rawPriceTypes ? JSON.parse(rawPriceTypes) : [{ id: 1, name: "تاک", isActive: true }, { id: 2, name: "کۆ", isActive: true }];
-      const active = listPriceTypes.filter((x: any) => x.isActive !== false);
-      setPriceTypes(active);
-      if (active.length > 0) setSalePrices([{ currencyId: "1", priceType: active[0].name, amount: "" }]);
-    } catch { }
-  }, []);
+      // Load priceTypes
+      try {
+        const res = await fetch("/api/attributes?type=priceType");
+        if (res.ok) {
+          const listPriceTypes = await res.json();
+          const active = listPriceTypes.filter((x: any) => x.isActive !== false);
+          setPriceTypes(active);
+          if (active.length > 0) {
+            setSalePrices([{ currencyId: "1", priceType: active[0].name, amount: "" }]);
+          }
+        }
+      } catch (err) { console.error(err); }
+    }
+
+    loadAttributes();
+  }, [productToEdit]);
 
   function onlyNumbers(value: string) {
     const englishVal = convertDigits(value);
@@ -446,6 +472,9 @@ function AddItemForm({
       id: productToEdit?.id,
       name: name.trim(),
       code: code.trim() || undefined,
+      category,
+      brand,
+      packaging: packages[0]?.name || "دانە",
       isMultiBatch: isInventory ? isMultiBatch : false,
       isExpense,
       isService,

@@ -168,7 +168,7 @@ export default function Sidebar({
         ref={sidebarRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`bg-gradient-to-b from-[#061f5f] to-[#03133f] text-white transition-all duration-300 ease-in-out flex-shrink-0 z-[1000] no-scrollbar flex flex-col
+        className={`bg-[#0d1e3d] text-white transition-all duration-300 ease-in-out flex-shrink-0 z-[1000] no-scrollbar flex flex-col
           fixed top-0 bottom-0 right-0 h-screen overflow-y-auto
           lg:relative lg:top-auto lg:bottom-auto lg:right-auto lg:h-full lg:translate-x-0
           ${isExpanded ? "lg:w-[200px] w-[240px] lg:p-3" : "lg:w-[0px] lg:p-0 lg:opacity-0 lg:overflow-hidden"}
@@ -197,9 +197,13 @@ export default function Sidebar({
       </button>
 
       {isExpanded && (
-        <div className="text-center mb-3">
-          <h1 className="text-2xl m-0 font-black tracking-tight">ERP</h1>
-          <p className="text-xs opacity-80 mt-0.5">Version 1</p>
+        <div className="flex flex-col items-center py-4 mb-4 border-b border-white/5">
+          <span className="font-extrabold text-2.5xl tracking-wider bg-gradient-to-r from-white to-[#a5b4fc] bg-clip-text text-transparent font-mono">
+            GENO
+          </span>
+          <span className="text-[10px] font-bold text-[#818cf8] mt-1 tracking-widest font-mono">
+            V5.10.1 MERCURY
+          </span>
         </div>
       )}
 
@@ -229,7 +233,7 @@ export default function Sidebar({
                 className={`w-full py-2 rounded-xl border-none cursor-pointer text-white text-base font-bold transition-all ${
                   isExpanded ? "px-3.5" : "px-1"
                 } ${
-                  isActive ? "bg-blue-600 shadow-md" : "bg-transparent hover:bg-white/10"
+                  isActive ? "bg-[#233e72] shadow-md" : "bg-transparent hover:bg-[#172c54]"
                 }`}
               >
                 <div
@@ -260,7 +264,7 @@ export default function Sidebar({
                         key={child.name}
                         onClick={() => handleNavigate(child.path)}
                         className={`w-full py-1.5 px-3 rounded-lg border-none cursor-pointer text-white text-xs text-right transition-colors ${
-                          isChildActive ? "bg-blue-700 font-bold shadow-inner" : "bg-white/5 hover:bg-white/10"
+                          isChildActive ? "bg-[#233e72] font-bold shadow-inner" : "bg-[#172c54]/40 hover:bg-[#172c54]"
                         }`}
                       >
                         {child.name}
