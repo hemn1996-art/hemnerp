@@ -264,18 +264,21 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
             </button>
 
             {showNotifications && (
-              <div className="absolute left-0 mt-3 w-80 sm:w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden text-right rtl">
-                <div className="bg-slate-50 border-b border-gray-150 px-4 py-3 flex justify-between items-center">
-                  <span className="text-sm font-black text-gray-700">ئاگادارییەکان</span>
-                  <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+              <div className="absolute left-0 mt-3 w-80 sm:w-96 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl z-50 overflow-hidden text-right rtl animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="bg-slate-950 border-b border-slate-800 px-4 py-3 flex justify-between items-center">
+                  <span className="text-sm font-black text-slate-100">ئاگادارییەکان</span>
+                  <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">
                     {alerts.length} ئاگاداری
                   </span>
                 </div>
-                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/80">
                   {alerts.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500 flex flex-col items-center justify-center gap-2">
-                      <span className="text-3xl">✅</span>
-                      <span className="text-sm font-bold text-gray-400">هیچ ئاگادارییەک نییە</span>
+                    <div className="p-8 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-2xl">
+                        ✅
+                      </div>
+                      <span className="text-sm font-bold text-slate-300">هیچ ئاگادارییەک نییە</span>
+                      <span className="text-xs text-slate-500">هەموو شتێک بەباشی کاردەکات!</span>
                     </div>
                   ) : (
                     alerts.map((alert) => (
@@ -285,13 +288,13 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                           setShowNotifications(false);
                           router.push(`/reports/account-statement?accountId=${alert.accountId}`);
                         }}
-                        className="p-4 hover:bg-slate-50 transition-colors cursor-pointer block text-right text-slate-800"
+                        className="p-4 hover:bg-slate-800/50 transition-colors cursor-pointer block text-right text-slate-100"
                       >
                         <div className="flex items-center gap-2 mb-1 justify-start">
-                          <span className={`w-2.5 h-2.5 rounded-full ${alert.severity === 'danger' ? 'bg-red-500' : 'bg-amber-500'}`} />
-                          <span className="font-bold text-sm text-[#0b1f50]">{alert.title}</span>
+                          <span className={`w-2.5 h-2.5 rounded-full ${alert.severity === 'danger' ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`} />
+                          <span className="font-bold text-sm text-indigo-300">{alert.title}</span>
                         </div>
-                        <p className="text-xs text-gray-500 leading-relaxed font-semibold">{alert.message}</p>
+                        <p className="text-xs text-slate-400 leading-relaxed font-semibold">{alert.message}</p>
                       </div>
                     ))
                   )}
