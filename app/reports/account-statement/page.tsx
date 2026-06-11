@@ -84,7 +84,7 @@ function AccountStatementContent() {
       case "sales": return "فرۆشتن";
       case "purchase": return "کڕین";
       case "money_in": return "وەرگرتنی پارە";
-      case "money_out": return "پێدانی پارە";
+      case "money_out": return "پارەی ڕۆشتوو";
       case "expense": return "خەرجی";
       case "sales_return": return "گەڕانەوەی فرۆشتن";
       case "purchase_return": return "گەڕانەوەی کڕین";
@@ -153,7 +153,7 @@ function AccountStatementContent() {
             color = "text-white font-bold";
           }
           return (
-            <div key={curId} className={`${color} text-xs md:text-sm`} dir="ltr">
+            <div key={curId} className={`${color} text-sm md:text-base`} dir="ltr">
               {formatMoney(val, Number(curId))}
             </div>
           );
@@ -403,17 +403,17 @@ function AccountStatementContent() {
         </div>
 
         {/* Info Header Box */}
-        <div className="border border-gray-200 rounded-xl py-6 px-8 mb-6 bg-white shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+        <div className="border border-gray-200 rounded-2xl py-8 px-10 mb-8 bg-white shadow-md">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-base">
             {/* Left side (Balance Info) */}
-            <div className="flex flex-col gap-3 text-right md:text-left md:items-start md:mr-auto">
+            <div className="flex flex-col gap-4 text-right md:text-left md:items-start md:mr-auto">
               <div className="flex justify-start gap-3 flex-row-reverse md:flex-row items-center">
-                <span className="text-gray-500 font-bold">باڵانس :</span>
-                <span className="font-black text-lg text-gray-900" dir="ltr">{renderBalances(processed.finalBalances)}</span>
+                <span className="text-gray-500 font-extrabold text-base">باڵانس :</span>
+                <span className="font-black text-xl text-gray-900" dir="ltr">{renderBalances(processed.finalBalances)}</span>
               </div>
               <div className="flex justify-start gap-3 flex-row-reverse md:flex-row items-center">
-                <span className="text-gray-500 font-bold">سنووری قەرزی تێپەڕاندووە :</span>
-                <span className="font-bold text-gray-800">
+                <span className="text-gray-500 font-extrabold text-base">سنووری قەرزی تێپەڕاندووە :</span>
+                <span className="font-bold text-gray-800 text-base">
                   {account.creditLimit && Object.entries(processed.finalBalances).some(([curId, val]: [string, any]) => {
                     if (account.creditLimitCurrencyId && String(account.creditLimitCurrencyId) === curId) {
                       return val > account.creditLimit;
@@ -423,24 +423,24 @@ function AccountStatementContent() {
                 </span>
               </div>
               <div className="flex justify-start gap-3 flex-row-reverse md:flex-row items-center">
-                <span className="text-gray-500 font-bold">بەرواری پرینتکردن :</span>
-                <span className="font-bold text-gray-800" dir="ltr">{new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                <span className="text-gray-500 font-extrabold text-base">بەرواری پرینتکردن :</span>
+                <span className="font-bold text-gray-800 text-base" dir="ltr">{new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
               </div>
             </div>
 
             {/* Right side (Account Info) */}
-            <div className="flex flex-col gap-3 text-right">
+            <div className="flex flex-col gap-4 text-right">
               <div className="flex justify-end gap-3 items-center">
-                <span className="font-bold text-gray-900 text-lg">{account.name}</span>
-                <span className="text-gray-500 font-bold"> : کەشف حساب</span>
+                <span className="font-black text-slate-900 text-3xl">{account.name}</span>
+                <span className="text-slate-500 font-extrabold text-lg"> : کەشف حساب</span>
               </div>
               <div className="flex justify-end gap-3 items-center">
-                <span className="font-bold text-gray-800">{account.phone || "-"}</span>
-                <span className="text-gray-500 font-bold"> : ژمارە تەلەفۆن</span>
+                <span className="font-bold text-slate-800 text-lg">{account.phone || "-"}</span>
+                <span className="text-slate-500 font-extrabold text-base"> : ژمارە تەلەفۆن</span>
               </div>
               <div className="flex justify-end gap-3 items-center">
-                <span className="font-bold text-gray-800">{formatDate(startDate)} بۆ {formatDate(endDate)}</span>
-                <span className="text-gray-500 font-bold"> : بەروار</span>
+                <span className="font-bold text-slate-800 text-lg">{formatDate(startDate)} بۆ {formatDate(endDate)}</span>
+                <span className="text-slate-500 font-extrabold text-base"> : بەروار</span>
               </div>
             </div>
           </div>

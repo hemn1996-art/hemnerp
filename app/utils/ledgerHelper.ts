@@ -12,12 +12,14 @@ function getActiveCurrencies(customCurrencies?: { id: number; code: string }[]) 
 }
 
 function isUSD(id: number, customCurrencies?: { id: number; code: string }[]): boolean {
+  if (id === 1 || id === 5) return true; // Support both DB ID (1) and Mock ID (5)
   const list = getActiveCurrencies(customCurrencies);
   const code = list.find(c => c.id === id)?.code;
   return code === "USD";
 }
 
 function isIQD(id: number, customCurrencies?: { id: number; code: string }[]): boolean {
+  if (id === 2 || id === 6) return true; // Support both DB ID (2) and Mock ID (6)
   const list = getActiveCurrencies(customCurrencies);
   const code = list.find(c => c.id === id)?.code;
   return code === "IQD";
