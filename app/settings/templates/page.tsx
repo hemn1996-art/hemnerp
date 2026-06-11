@@ -58,7 +58,7 @@ export default function InvoiceTemplatesPage() {
     fixedNote: "سپاس بۆ کڕینەکەتان! هیوادارین تەندروست بن.",
     tableHeaderBg: "#E6F7FA",
     tableHeaderColor: "#000000",
-    employeeName: "هێمن مەلا فەرهاد",
+    employeeName: "کۆساری مەلا فەرهاد",
   });
 
   const fileInputHeaderRef = useRef<HTMLInputElement>(null);
@@ -197,7 +197,7 @@ export default function InvoiceTemplatesPage() {
       fixedNote: "سپاس بۆ کڕینەکەتان! هیوادارین تەندروست بن.",
       tableHeaderBg: "#E6F7FA",
       tableHeaderColor: "#000000",
-      employeeName: "هێمن مەلا فەرهاد",
+      employeeName: "کۆساری مەلا فەرهاد",
     });
     setIsEditing(true);
   };

@@ -119,7 +119,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     (store as any).user ||
     (store as any).authUser ||
     {};
-  const employeeName = loggedInUser.fullName || loggedInUser.name || loggedInUser.username || "هێمن مەلا فەرهاد";
+  const employeeName = loggedInUser.fullName || loggedInUser.name || loggedInUser.username || "کۆساری مەلا فەرهاد";
 
   const defaultCurrency =
     currencies[0] ||

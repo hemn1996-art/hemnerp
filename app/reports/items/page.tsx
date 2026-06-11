@@ -93,7 +93,7 @@ export default function ItemsReportPage() {
   const employeeOptions = React.useMemo(() => {
     if (!invoices) return [];
     const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["هێمن مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [invoices]);
 

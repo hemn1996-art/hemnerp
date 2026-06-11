@@ -29,7 +29,7 @@ export default function GeneralSettingsPage() {
     hideZeroBalance: true,
     showReportStats: true,
     logo: "",
-    companyName: "کۆگای دۆستان",
+    companyName: "سەنتەری کارەبای لەندەن",
     companyNameLang: "ku",
     about: "",
     aboutLang: "ku",
@@ -226,7 +226,7 @@ export default function GeneralSettingsPage() {
                     <img src={settings.logo} alt="Company Logo" className="w-full h-full object-contain" />
                   ) : (
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <span className="text-blue-600 text-sm font-bold">{settings.companyName || "کۆگای دۆستان"}</span>
+                      <span className="text-blue-600 text-sm font-bold">{settings.companyName || "سەنتەری کارەبای لەندەن"}</span>
                     </div>
                   )}
                 </div>

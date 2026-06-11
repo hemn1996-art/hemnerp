@@ -1324,7 +1324,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
           <div style={printHeaderArea}>
             <div style={printSmallTop}>{new Date().toLocaleString("en-US")}</div>
             <div style={printInvoiceCode}>Inv-MoneyIn-{receiptNumber}-{receiptDate}</div>
-            <h1 style={printCompanyTitle}>کۆگای دۆستان</h1>
+            <h1 style={printCompanyTitle}>سەنتەری کارەبای لەندەن</h1>
             <div style={printCompanySub}>بۆ دابینکردنی ئامێرەکارەباییەکان بە جوملە</div>
             <div style={printCompanyInfo}>ناونیشان: سلێمانی - کۆگاکانی شۆڕی بازڕگانی</div>
             <div style={printPhoneLine}>0770 140 3038 &nbsp;&nbsp; 0750 173 4006</div>

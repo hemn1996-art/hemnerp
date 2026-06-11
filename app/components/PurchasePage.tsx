@@ -1382,7 +1382,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       netAmount: itemsSubtotalInBase,
       internalNote: internalNote,
       printNote: printNote,
-      employeeName: employeeName || "هێمن مەلا فەرهاد",
+      employeeName: employeeName || "کۆساری مەلا فەرهاد",
       lines: rows.map((row: any) => {
         const warehouse = warehouses.find((w: any) => w.name === row.warehouseName);
         return {

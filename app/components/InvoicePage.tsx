@@ -1264,7 +1264,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       netAmount: total,
       internalNote: internalNote,
       printNote: printNote,
-      employeeName: employeeName || "هێمن مەلا فەرهاد",
+      employeeName: employeeName || "کۆساری مەلا فەرهاد",
       hasDelivery: hasDelivery,
       driverName: deliveryName || null,
       driverPhone: deliveryPhone || null,

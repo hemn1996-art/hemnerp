@@ -346,7 +346,7 @@ export async function POST(request: Request) {
         data: {
           voucherId: createdVoucher.id,
           version: 1,
-          employeeName: createdVoucher.employeeName || data.employeeName || "هێمن مەلا فەرهاد",
+          employeeName: createdVoucher.employeeName || data.employeeName || "کۆساری مەلا فەرهاد",
           data: JSON.stringify(data),
         }
       });

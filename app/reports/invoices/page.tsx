@@ -588,7 +588,7 @@ function InvoiceReportContent() {
   // Dynamic Employee List
   const employeeOptions = useMemo(() => {
     const fromVouchers = vouchers.map((v) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["هێمن مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [vouchers]);
 
@@ -624,7 +624,7 @@ function InvoiceReportContent() {
     const search = (searchTerm || generalSearch).trim().toLowerCase();
     if (search) {
       list = list.filter((v) => {
-        const empName = v.employeeName || "هێمن مەلا فەرهاد";
+        const empName = v.employeeName || "کۆساری مەلا فەرهاد";
         return (
           v.id.toString().includes(search) ||
           (v.referenceNo && v.referenceNo.toLowerCase().includes(search)) ||
@@ -681,7 +681,7 @@ function InvoiceReportContent() {
     // Employee Filter
     if (filterEmployee !== "all") {
       list = list.filter((v) => {
-        const empName = v.employeeName || "هێمن مەلا فەرهاد";
+        const empName = v.employeeName || "کۆساری مەلا فەرهاد";
         return empName === filterEmployee;
       });
     }
@@ -1470,7 +1470,7 @@ function InvoiceReportContent() {
                                     {voucher.versions?.length || 1}
                                   </span>
                                   <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-xl text-[10px] font-extrabold shadow-sm">
-                                    {voucher.employeeName || "هێمن مەلا فەرهاد"}
+                                    {voucher.employeeName || "کۆساری مەلا فەرهاد"}
                                   </span>
                                 </div>
                                 <span className="text-slate-500 font-bold">

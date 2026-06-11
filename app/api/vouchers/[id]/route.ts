@@ -436,7 +436,7 @@ export async function PUT(
           data: {
             voucherId,
             version: 1,
-            employeeName: existingVoucher.employeeName || "هێمن مەلا فەرهاد",
+            employeeName: existingVoucher.employeeName || "کۆساری مەلا فەرهاد",
             data: JSON.stringify(originalData),
             updatedAt: existingVoucher.createdAt,
           }
@@ -449,7 +449,7 @@ export async function PUT(
         data: {
           voucherId,
           version: nextVersionNum,
-          employeeName: updated.employeeName || data.employeeName || "هێمن مەلا فەرهاد",
+          employeeName: updated.employeeName || data.employeeName || "کۆساری مەلا فەرهاد",
           data: JSON.stringify(data),
         },
       });

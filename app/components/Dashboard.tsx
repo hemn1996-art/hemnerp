@@ -185,13 +185,52 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
   const iqdRate = currencies.find((c: any) => c.code === "IQD")?.rate || 1500;
 
+  const renderCardValues = (usd: number, iqd: number) => {
+    const isUsdZero = usd === 0;
+    const isIqdZero = iqd === 0;
+
+    // Default sizes:
+    // If both are non-zero: same size (e.g. text-[15px])
+    // If one is zero: the zero one is text-[12px] (smaller), the non-zero one is text-[15px]
+    // If both are zero: same size text-[13px]
+    let usdSize = "text-[15px] font-extrabold text-gray-800";
+    let iqdSize = "text-[15px] font-extrabold text-gray-855";
+
+    if (isUsdZero && !isIqdZero) {
+      usdSize = "text-[12px] font-semibold text-gray-500 font-mono";
+      iqdSize = "text-[15px] font-extrabold text-gray-800";
+    } else if (isIqdZero && !isUsdZero) {
+      usdSize = "text-[15px] font-extrabold text-gray-800 font-mono";
+      iqdSize = "text-[12px] font-semibold text-gray-500";
+    } else if (isUsdZero && isIqdZero) {
+      usdSize = "text-[13px] font-semibold text-gray-500 font-mono";
+      iqdSize = "text-[13px] font-semibold text-gray-500";
+    } else {
+      usdSize = "text-[15px] font-extrabold text-gray-800 font-mono";
+      iqdSize = "text-[15px] font-extrabold text-gray-800";
+    }
+
+    return (
+      <div className="flex flex-col text-right">
+        <span className={`${usdSize} mb-0.5`}>
+          $ {usd.toLocaleString()}
+        </span>
+        <span className={`${iqdSize}`}>
+          {iqd.toLocaleString()} دینار
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 rtl text-gray-900 font-sans min-h-screen bg-[#f4f6fc]">
       
       {/* 1. Welcome Banner */}
-      <div className="bg-white rounded-2xl p-6 mb-6 border border-gray-200 shadow-sm relative overflow-hidden flex justify-between items-center">
-        {/* Left-side gradient accent bar matching Geno styling */}
-        <div className="absolute top-0 left-0 w-[6px] h-full bg-gradient-to-b from-[#3b82f6] to-[#818cf8]" />
+      <div className="bg-white rounded-2xl p-6 mb-6 border border-gray-200 shadow-sm relative flex justify-between items-center z-30">
+        {/* Left-side gradient accent bar matching Geno styling wrapped to handle overflow */}
+        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-0 w-[6px] h-full bg-gradient-to-b from-[#3b82f6] to-[#818cf8]" />
+        </div>
         
         <div className="flex items-center gap-4 z-10">
           <button
@@ -203,15 +242,68 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
           
           <div>
             <h1 className="text-xl md:text-2xl font-bold mb-1 text-gray-800">
-              سڵاو هێمن مەلا فەرهاد، بەخێربێیتەوە!
+              سڵاو کۆساری مەلا فەرهاد، بەخێربێیتەوە!
             </h1>
             <p className="text-gray-500 text-sm font-normal">ڕاپۆرتی سەرجەم چالاکییە داراییەکان لە یەک چاودێریدا</p>
           </div>
         </div>
 
-        <span className="bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] px-4 py-1.5 rounded-full text-xs font-semibold">
-          کۆگای دۆستان
-        </span>
+        <div className="flex items-center gap-3 z-20">
+          {/* Notification Bell Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="flex items-center justify-center w-10 h-10 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:scale-105 active:scale-95 transition-all cursor-pointer relative"
+            >
+              <span className="text-lg">🔔</span>
+              {alerts.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white animate-pulse">
+                  {alerts.length}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute left-0 mt-3 w-80 sm:w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden text-right rtl">
+                <div className="bg-slate-50 border-b border-gray-150 px-4 py-3 flex justify-between items-center">
+                  <span className="text-sm font-black text-gray-700">ئاگادارییەکان</span>
+                  <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                    {alerts.length} ئاگاداری
+                  </span>
+                </div>
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                  {alerts.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500 flex flex-col items-center justify-center gap-2">
+                      <span className="text-3xl">✅</span>
+                      <span className="text-sm font-bold text-gray-400">هیچ ئاگادارییەک نییە</span>
+                    </div>
+                  ) : (
+                    alerts.map((alert) => (
+                      <div
+                        key={alert.id}
+                        onClick={() => {
+                          setShowNotifications(false);
+                          router.push(`/reports/account-statement?accountId=${alert.accountId}`);
+                        }}
+                        className="p-4 hover:bg-slate-50 transition-colors cursor-pointer block text-right text-slate-800"
+                      >
+                        <div className="flex items-center gap-2 mb-1 justify-start">
+                          <span className={`w-2.5 h-2.5 rounded-full ${alert.severity === 'danger' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                          <span className="font-bold text-sm text-[#0b1f50]">{alert.title}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 leading-relaxed font-semibold">{alert.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <span className="bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] px-4 py-1.5 rounded-full text-xs font-semibold">
+            سەنتەری کارەبای لەندەن
+          </span>
+        </div>
       </div>
 
       {/* 2. Stats Row (5 Cards) */}
@@ -227,14 +319,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          <div className="flex flex-col text-right">
-            <span className="text-[17px] font-extrabold text-gray-800 mb-0.5">
-              {Math.round(totalSales * iqdRate).toLocaleString()} دینار
-            </span>
-            <span className="text-[13px] font-semibold text-gray-500 font-mono">
-              $ {totalSales.toLocaleString()}
-            </span>
-          </div>
+          {renderCardValues(totalSales, Math.round(totalSales * iqdRate))}
         </div>
 
         {/* Card 2: Purchases (کڕین) */}
@@ -247,14 +332,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          <div className="flex flex-col text-right">
-            <span className="text-[17px] font-extrabold text-gray-800 mb-0.5">
-              {Math.round(totalPurchases * iqdRate).toLocaleString()} دینار
-            </span>
-            <span className="text-[13px] font-semibold text-gray-500 font-mono">
-              $ {totalPurchases.toLocaleString()}
-            </span>
-          </div>
+          {renderCardValues(totalPurchases, Math.round(totalPurchases * iqdRate))}
         </div>
 
         {/* Card 3: Expenses (خەرجی) */}
@@ -267,14 +345,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          <div className="flex flex-col text-right">
-            <span className="text-[17px] font-extrabold text-gray-800 mb-0.5">
-              {totalExpenses.toLocaleString()} دینار
-            </span>
-            <span className="text-[13px] font-semibold text-gray-500 font-mono">
-              $ {Math.round(totalExpenses / iqdRate).toLocaleString()}
-            </span>
-          </div>
+          {renderCardValues(Math.round(totalExpenses / iqdRate), totalExpenses)}
         </div>
 
         {/* Card 4: Outgoing Money (پارەی ڕۆشتوو) */}
@@ -287,14 +358,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          <div className="flex flex-col text-right">
-            <span className="text-[17px] font-extrabold text-gray-800 mb-0.5">
-              {Math.round(totalMoneyOut * iqdRate).toLocaleString()} دینار
-            </span>
-            <span className="text-[13px] font-semibold text-gray-500 font-mono">
-              $ {totalMoneyOut.toLocaleString()}
-            </span>
-          </div>
+          {renderCardValues(totalMoneyOut, Math.round(totalMoneyOut * iqdRate))}
         </div>
 
         {/* Card 5: Incoming Money (پارەی هاتوو) */}
@@ -307,14 +371,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </svg>
             </div>
           </div>
-          <div className="flex flex-col text-right">
-            <span className="text-[17px] font-extrabold text-gray-800 mb-0.5">
-              {Math.round(totalIncome * iqdRate).toLocaleString()} دینار
-            </span>
-            <span className="text-[13px] font-semibold text-gray-500 font-mono">
-              $ {totalIncome.toLocaleString()}
-            </span>
-          </div>
+          {renderCardValues(totalIncome, Math.round(totalIncome * iqdRate))}
         </div>
 
       </div>
@@ -464,7 +521,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                     <td className="px-4 py-3.5 text-center text-gray-400 text-xs truncate max-w-[120px]">{inv.internalNote || "-"}</td>
                     <td className="px-4 py-3.5 text-center text-gray-500">
                       <div className="flex flex-col items-center justify-center text-[10px] leading-tight">
-                        <span className="text-gray-800 font-bold mb-0.5 whitespace-nowrap bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">{inv.employeeName || "هێمن مەلا فەرهاد"}</span>
+                        <span className="text-gray-800 font-bold mb-0.5 whitespace-nowrap bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">{inv.employeeName || "کۆساری مەلا فەرهاد"}</span>
                         <span className="text-gray-400 font-mono">{inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : "02/06/2026"}</span>
                       </div>
                     </td>

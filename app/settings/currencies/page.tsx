@@ -37,7 +37,7 @@ const DEFAULT_HISTORY: RateHistory[] = [
     newRate: 1535,
     change: 5,
     changePercent: 0.33,
-    changedBy: "هێمن مەلا فەرهاد",
+    changedBy: "کۆساری مەلا فەرهاد",
     date: "16/05/2026, 03:31 pm",
   },
   {
@@ -48,7 +48,7 @@ const DEFAULT_HISTORY: RateHistory[] = [
     newRate: 1530,
     change: -20,
     changePercent: -1.29,
-    changedBy: "هێمن مەلا فەرهاد",
+    changedBy: "کۆساری مەلا فەرهاد",
     date: "16/05/2026, 03:01 pm",
   },
   {
@@ -59,7 +59,7 @@ const DEFAULT_HISTORY: RateHistory[] = [
     newRate: 1550,
     change: 50,
     changePercent: 3.33,
-    changedBy: "هێمن مەلا فەرهاد",
+    changedBy: "کۆساری مەلا فەرهاد",
     date: "16/05/2026, 02:51 pm",
   },
   {
@@ -70,7 +70,7 @@ const DEFAULT_HISTORY: RateHistory[] = [
     newRate: 1500,
     change: -50,
     changePercent: -3.23,
-    changedBy: "هێمن مەلا فەرهاد",
+    changedBy: "کۆساری مەلا فەرهاد",
     date: "16/05/2026, 02:51 pm",
   },
   {
@@ -81,7 +81,7 @@ const DEFAULT_HISTORY: RateHistory[] = [
     newRate: 1550,
     change: 15,
     changePercent: 0.98,
-    changedBy: "هێمن مەلا فەرهاد",
+    changedBy: "کۆساری مەلا فەرهاد",
     date: "16/05/2026, 02:49 pm",
   },
   {
@@ -92,7 +92,7 @@ const DEFAULT_HISTORY: RateHistory[] = [
     newRate: 1535,
     change: -15,
     changePercent: -0.97,
-    changedBy: "هێمن مەلا فەرهاد",
+    changedBy: "کۆساری مەلا فەرهاد",
     date: "16/05/2026, 02:48 pm",
   },
   {
@@ -103,7 +103,7 @@ const DEFAULT_HISTORY: RateHistory[] = [
     newRate: 1550,
     change: 195,
     changePercent: 14.39,
-    changedBy: "هێمن مەلا فەرهاد",
+    changedBy: "کۆساری مەلا فەرهاد",
     date: "16/05/2026, 02:48 pm",
   },
   {
@@ -114,7 +114,7 @@ const DEFAULT_HISTORY: RateHistory[] = [
     newRate: 1355,
     change: 1355,
     changePercent: 0,
-    changedBy: "هێمن مەلا فەرهاد",
+    changedBy: "کۆساری مەلا فەرهاد",
     date: "16/05/2026, 02:46 pm",
   },
 ];
@@ -252,7 +252,7 @@ export default function CurrenciesPage() {
             newRate,
             change,
             changePercent,
-            changedBy: "هێمن مەلا فەرهاد",
+            changedBy: "کۆساری مەلا فەرهاد",
             date: new Date().toLocaleString("en-GB", { hour12: true }),
           };
 
@@ -443,7 +443,7 @@ export default function CurrenciesPage() {
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-500 font-medium">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-bold text-slate-700">هێمن مەلا فەرهاد</span>
+                          <span className="font-bold text-slate-700">کۆساری مەلا فەرهاد</span>
                           <span>{new Date(curr.createdAt).toLocaleDateString("en-GB")}</span>
                         </div>
                       </td>

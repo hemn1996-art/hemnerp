@@ -42,7 +42,7 @@ type CollectionRow = {
 };
 
 const fallbackEmployees: EmployeeLike[] = [
-  { id: 1, name: "هێمن مەلا فەرهاد", phone: "07701403038", isActive: true },
+  { id: 1, name: "کۆساری مەلا فەرهاد", phone: "07701403038", isActive: true },
   { id: 2, name: "کارمەندی A", phone: "", isActive: true },
 ];
 
