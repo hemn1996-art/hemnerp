@@ -634,10 +634,20 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const isInvoiceSaved =
     rows.length > 0 && savedInvoiceSnapshot === currentInvoiceSnapshot;
 
+  const salesAccounts = useMemo(() => {
+    return accounts.filter((account: any) => {
+      const show = account.accountType?.showsInSales ?? account.showInSales;
+      if (typeof show === "boolean") {
+        return show;
+      }
+      return true;
+    });
+  }, [accounts]);
+
   const filteredAccounts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
     const searched = q
-      ? accounts.filter((account: any) => {
+      ? salesAccounts.filter((account: any) => {
           const typeName = getAccountTypeName(account.accountTypeId);
           return (
             String(account.name || "").toLowerCase().includes(q) ||
@@ -646,7 +656,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             typeName.toLowerCase().includes(q)
           );
         })
-      : accounts;
+      : salesAccounts;
 
     const seen = new Set();
     const unique = [];
@@ -660,7 +670,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
     }
     return unique;
-  }, [accountSearch, accounts]);
+  }, [accountSearch, salesAccounts]);
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();

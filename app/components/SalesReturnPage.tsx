@@ -284,7 +284,10 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
   const salesAccounts = useMemo(() => {
     return accounts.filter((account: any) => {
-      if (typeof account.showInSales === "boolean") return account.showInSales;
+      const show = account.accountType?.showsInSales ?? account.showInSales;
+      if (typeof show === "boolean") {
+        return show;
+      }
       return true;
     });
   }, [accounts]);
