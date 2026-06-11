@@ -1,0 +1,296 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Currency {
+  id              Int                 @id @default(autoincrement())
+  code            String              @unique
+  name            String
+  symbol          String
+  rate            Float               @default(1.0)
+  mode            String?
+  rounding        Boolean             @default(false)
+  color           String?
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  cashboxBalances CashboxBalance[]
+  ledgerEntries   LedgerEntry[]
+  vouchers        Voucher[]
+  paidAmounts     VoucherPaidAmount[]
+}
+
+model Country {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  accounts Account[]
+  cities   City[]
+}
+
+model City {
+  id        Int        @id @default(autoincrement())
+  name      String
+  countryId Int
+  accounts  Account[]
+  country   Country    @relation(fields: [countryId], references: [id])
+  districts District[]
+}
+
+model District {
+  id       Int       @id @default(autoincrement())
+  name     String
+  cityId   Int
+  accounts Account[]
+  city     City      @relation(fields: [cityId], references: [id])
+}
+
+model AccountType {
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  isBuiltIn    Boolean   @default(false)
+  showsInSales Boolean   @default(true)
+  showsInPurch Boolean   @default(true)
+  isActive     Boolean   @default(true)
+  accounts     Account[]
+}
+
+model Account {
+  id            Int           @id @default(autoincrement())
+  name          String
+  phone         String?
+  fullAddress   String?
+  countryId     Int?
+  cityId        Int?
+  districtId    Int?
+  accountTypeId Int
+  isShareholder Boolean       @default(false)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  creditLimit   Float         @default(0)
+  creditLimitCurrencyId Int   @default(1)
+  debtAlertDays Int         @default(0)
+  discountPercent Float       @default(0)
+  guarantorName String?
+  notes         String?
+  accountType   AccountType   @relation(fields: [accountTypeId], references: [id])
+  city          City?         @relation(fields: [cityId], references: [id])
+  country       Country?      @relation(fields: [countryId], references: [id])
+  district      District?     @relation(fields: [districtId], references: [id])
+  ledgerEntries LedgerEntry[]
+  vouchers      Voucher[]
+}
+
+model Warehouse {
+  id                    Int                    @id @default(autoincrement())
+  name                  String                 @unique
+  color                 String?
+  isMain                Boolean                @default(false)
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  inventoryTransactions InventoryTransaction[]
+}
+
+model Cashbox {
+  id            Int              @id @default(autoincrement())
+  name          String           @unique
+  type          String
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  balances      CashboxBalance[]
+  vouchers      Voucher[]        @relation("CashboxVouchers")
+  fromTransfers Voucher[]        @relation("FromCashbox")
+  toTransfers   Voucher[]        @relation("ToCashbox")
+}
+
+model CashboxBalance {
+  id         Int      @id @default(autoincrement())
+  cashboxId  Int
+  currencyId Int
+  amount     Float    @default(0)
+  cashbox    Cashbox  @relation(fields: [cashboxId], references: [id])
+  currency   Currency @relation(fields: [currencyId], references: [id])
+
+  @@unique([cashboxId, currencyId])
+}
+
+model Product {
+  id                    Int                    @id @default(autoincrement())
+  code                  String?                @unique
+  name                  String
+  isMultiBatch          Boolean                @default(false)
+  isExpense             Boolean                @default(false)
+  isService             Boolean                @default(false)
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  inventoryTransactions InventoryTransaction[]
+  voucherLines          VoucherLine[]
+}
+
+model Voucher {
+  id                    Int                    @id @default(autoincrement())
+  type                  String
+  referenceNo           String?
+  date                  DateTime               @default(now())
+  accountId             Int?
+  cashboxId             Int?
+  fromCashboxId         Int?
+  toCashboxId           Int?
+  currencyId            Int?
+  exchangeRate          Float                  @default(1)
+  totalAmount           Float                  @default(0)
+  totalDiscount         Float                  @default(0)
+  netAmount             Float                  @default(0)
+  internalNote          String?
+  printNote             String?
+  isSaved               Boolean                @default(false)
+  employeeName          String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  hasDelivery           Boolean                @default(false)
+  driverName            String?
+  driverPhone           String?
+  deliveryCity          String?
+  deliveryAddress       String?
+  deliveryFee           Float?
+  inventoryTransactions InventoryTransaction[]
+  ledgerEntries         LedgerEntry[]
+  account               Account?               @relation(fields: [accountId], references: [id])
+  cashbox               Cashbox?               @relation("CashboxVouchers", fields: [cashboxId], references: [id])
+  currency              Currency?              @relation(fields: [currencyId], references: [id])
+  fromCashbox           Cashbox?               @relation("FromCashbox", fields: [fromCashboxId], references: [id])
+  toCashbox             Cashbox?               @relation("ToCashbox", fields: [toCashboxId], references: [id])
+  expenses              VoucherExpense[]
+  lines                 VoucherLine[]
+  paidAmounts           VoucherPaidAmount[]
+  versions              VoucherVersion[]
+  extraPaymentHandling  String?
+
+  @@index([type, date])
+  @@index([accountId])
+  @@index([cashboxId])
+  @@index([currencyId])
+  @@index([date])
+  @@index([type])
+}
+
+model VoucherVersion {
+  id           Int      @id @default(autoincrement())
+  voucherId    Int
+  version      Int
+  data         String   // JSON string of voucher data
+  employeeName String?
+  updatedAt    DateTime @default(now())
+  voucher      Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
+}
+
+
+model VoucherLine {
+  id              Int     @id @default(autoincrement())
+  voucherId       Int
+  productId       Int
+  qty             Float   @default(0)
+  unitPrice       Float   @default(0)
+  discountPercent Float   @default(0)
+  discountAmount  Float   @default(0)
+  lineTotal       Float   @default(0)
+  note            String?
+  product         Product @relation(fields: [productId], references: [id])
+  voucher         Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
+  @@index([productId])
+}
+
+model VoucherExpense {
+  id               Int     @id @default(autoincrement())
+  voucherId        Int
+  amount           Float
+  currencyId       Int
+  accountId        Int?
+  note             String?
+  addToAccountDebt Boolean @default(false)
+  voucher          Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
+}
+
+model VoucherPaidAmount {
+  id           Int      @id @default(autoincrement())
+  voucherId    Int
+  currencyId   Int
+  amount       Float
+  exchangeRate Float    @default(1)
+  currency     Currency @relation(fields: [currencyId], references: [id])
+  voucher      Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
+  @@index([currencyId])
+}
+
+model LedgerEntry {
+  id           Int      @id @default(autoincrement())
+  voucherId    Int
+  accountId    Int
+  currencyId   Int
+  debit        Float    @default(0)
+  credit       Float    @default(0)
+  exchangeRate Float    @default(1)
+  date         DateTime @default(now())
+  account      Account  @relation(fields: [accountId], references: [id])
+  currency     Currency @relation(fields: [currencyId], references: [id])
+  voucher      Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, currencyId])
+  @@index([voucherId])
+  @@index([date])
+}
+
+model InventoryTransaction {
+  id          Int       @id @default(autoincrement())
+  voucherId   Int
+  productId   Int
+  warehouseId Int
+  batchNo     String?
+  qtyChange   Float
+  unitCost    Float     @default(0)
+  date        DateTime  @default(now())
+  product     Product   @relation(fields: [productId], references: [id])
+  voucher     Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@index([productId, warehouseId])
+  @@index([voucherId])
+  @@index([date])
+  @@index([warehouseId])
+}
+
+model InvoiceTemplate {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  isActive            Boolean  @default(true)
+  isMain              Boolean  @default(false)
+  format              String   @default("A4") // "A4" or "80mm"
+  
+  // Images (Stored as base64 data URIs)
+  headerImage         String?
+  footerImage         String?
+  watermarkImage      String?
+  statementHeaderImage String?
+
+  // Text content
+  fixedNote           String?
+
+  // Color styles
+  tableHeaderBg       String   @default("#E6F7FA")
+  tableHeaderColor    String   @default("#000000")
+
+  employeeName        String?  @default("سیستەم")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}

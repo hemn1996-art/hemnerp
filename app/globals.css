@@ -1,0 +1,217 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Speda";
+  src: url("/fonts/Speda.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Speda";
+  src: url("/fonts/Speda.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  direction: rtl;
+  background: #f3f4f6;
+  font-family: "Speda", "Segoe UI", Tahoma, Arial, sans-serif !important;
+  /* Use zoom on html only - this scales the entire page */
+  overflow: auto;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+body {
+  min-width: 1280px;
+}
+
+#root, #__next, .app, .main-layout, .dashboard-page {
+  min-width: 1280px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   GLOBAL SCALE: makes the app look like 80% zoom at 100% browser zoom.
+   zoom is applied to html so the entire tree scales uniformly.
+   We compensate viewport calculations via min-height on the body.
+─────────────────────────────────────────────────────────── */
+html {
+  zoom: 0.82;
+}
+
+body *,
+button,
+input,
+select,
+textarea,
+option {
+  font-family: "Speda", "Segoe UI", Tahoma, Arial, sans-serif !important;
+}
+
+/* Responsive Grid Custom Properties */
+:root {
+  --page-grid-cols: 380px 1fr;
+  --page-grid-cols-no-items: 1000px 1fr;
+  --left-panel-position: sticky;
+  --grid-2-cols: 1fr 1fr;
+  --grid-3-cols: 1fr 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+  body {
+    min-width: 1280px;
+  }
+
+  .main-layout,
+  .dashboard-page,
+  .content,
+  .dashboard-grid,
+  .reports-grid,
+  .table-wrapper {
+    min-width: 1280px;
+  }
+
+  .dashboard-grid,
+  .reports-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  table {
+    min-width: 1000px;
+  }
+}
+
+/* ── Custom Scrollbars ── */
+::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+  display: block !important;
+  transition: width 0.2s ease, height 0.2s ease !important;
+}
+
+*:hover::-webkit-scrollbar,
+::-webkit-scrollbar:hover {
+  width: 9px !important;
+  height: 9px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important;
+  border-radius: 8px !important;
+  transition: background-color 0.2s ease !important;
+}
+
+*:hover::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35) !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  transition: background-color 0.2s ease, border-width 0.2s ease !important;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border: 2px solid #f1f5f9 !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: #64748b !important;
+}
+
+* {
+  -ms-overflow-style: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent !important;
+}
+
+*:hover {
+  scrollbar-color: #cbd5e1 #f1f5f9 !important;
+}
+
+/* ── Main content: only place that scrolls, and fills available height ── */
+main {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+/* ── Prevent any horizontal escape ── */
+body,
+#__next,
+[data-nextjs-scroll-focus-boundary] {
+  overflow-x: auto !important;
+}
+
+/* ───────────────────────────────────────────────────────────
+   PREMIUM GLASSMORPHIC TOAST NOTIFICATION OVERRIDES
+─────────────────────────────────────────────────────────── */
+/* Target any toast container matching the common inline positioning styles */
+div[style*="position: fixed"][style*="left: 50%"][style*="transform: translateX(-50%)"],
+div[style*="position: fixed"][style*="left: 50%"][style*="transform:translateX(-50%)"] {
+  top: 24px !important;
+  padding: 14px 24px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  font-weight: 700 !important;
+  font-family: "Speda", "Segoe UI", Tahoma, Arial, sans-serif !important;
+  min-width: 360px !important;
+  max-width: 80vw !important;
+}
+
+/* Override background colors to semi-transparent glass style */
+/* Success */
+div[style*="position: fixed"][style*="left: 50%"][style*="background: #16a34a"],
+div[style*="position: fixed"][style*="left: 50%"][style*="background:#16a34a"],
+div[style*="position: fixed"][style*="left: 50%"][style*="background: rgb(22, 163, 74)"] {
+  background: rgba(22, 163, 74, 0.92) !important;
+}
+
+/* Error */
+div[style*="position: fixed"][style*="left: 50%"][style*="background: #ef4444"],
+div[style*="position: fixed"][style*="left: 50%"][style*="background:#ef4444"],
+div[style*="position: fixed"][style*="left: 50%"][style*="background: rgb(239, 68, 68)"] {
+  background: rgba(220, 38, 38, 0.92) !important;
+}
+
+/* Info / Default */
+div[style*="position: fixed"][style*="left: 50%"][style*="background: #2563eb"],
+div[style*="position: fixed"][style*="left: 50%"][style*="background:#2563eb"],
+div[style*="position: fixed"][style*="left: 50%"][style*="background: rgb(37, 99, 235)"],
+div[style*="position: fixed"][style*="left: 50%"][style*="background: #1e293b"],
+div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
+  background: rgba(30, 41, 59, 0.92) !important;
+}
+
+/* ───────────────────────────────────────────────────────────
+   SIDEBAR TOGGLE BUTTON RESPONSIVE VISIBILITY
+   Show the inline toggle button only on desktop when collapsed
+─────────────────────────────────────────────────────────── */
+.sidebar-toggle-btn {
+  display: none !important;
+}
+
+@media (min-width: 1024px) {
+  #main-content.sidebar-collapsed .sidebar-toggle-btn {
+    display: flex !important;
+  }
+}

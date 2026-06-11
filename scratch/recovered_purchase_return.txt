@@ -1,0 +1,89 @@
+Created At: 2026-06-05T13:52:10Z
+Completed At: 2026-06-05T13:52:11Z
+File Path: `file:///c:/Users/ZETTA/OneDrive/Desktop/project/app/components/PurchaseReturnPage.tsx`
+Total Lines: 2226
+Total Bytes: 86747
+Showing lines 701 to 1500
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+701:       setShowProductList(false);
+702:       return;
+703:     }
+704: 
+705:     const rowCurrencyId =
+706:       product.purchaseCurrencyId || product.costCurrencyId || returnCurrencyId;
+707: 
+708:     const newRow: ReturnRow = {
+709:       id: Date.now() + Math.floor(Math.random() * 100000),
+710:       productId: product.id,
+711:       productName: product.name,
+712:       code: product.code || "",
+713:       qty: "1",
+714:       returnPrice: String(product.purchasePrice || product.costPrice || 0),
+715:       discount: "",
+716:       note: "",
+717:       packageName: firstPackage.name,
+718:       packageQuantity: firstPackage.quantity || 1,
+719:       warehouseName: warehouses[0]?.name || "کۆگای سەرەکی",
+720:       currencyId: rowCurrencyId,
+721:       availableStock: product.stock || 0,
+722:     };
+723: 
+724:     setRows((prev) => [...prev, newRow]);
+725:     setProductSearch("");
+726:     setShowProductList(false);
+727:     setOpenedDetailRowId(null);
+728:   }
+729: 
+730:   function updateRow(rowId: number, patch: Partial<ReturnRow>) {
+731:     if (blockIfLocked()) return;
+732: 
+733:     setRows((prev) =>
+734:       prev.map((row) => (row.id === rowId ? { ...row, ...patch } : row))
+735:     );
+736:   }
+737: 
+738:   function removeRow(rowId: number) {
+739:     if (blockIfLocked()) return;
+740: 
+741:     setRows((prev) => prev.filter((row) => row.id !== rowId));
+742: 
+743:     if (openedDetailRowId === rowId) {
+744:       setOpenedDetailRowId(null);
+745:     }
+746:   }
+747: 
+748:   function
+<truncated 29360 bytes>
+          onChange={(e) =>
+1470:                                         changeRowPackage(row, e.target.value)
+1471:                                       }
+1472:                                       style={{
+1473:                                         ...compactInput,
+1474:                                         ...lockedFieldStyle,
+1475:                                       }}
+1476:                                     >
+1477:                                       {getProductPackages(
+1478:                                         products.find((p) => p.id === row.productId)
+1479:                                       ).map((pkg) => (
+1480:                                         <option key={pkg.name} value={pkg.name}>
+1481:                                           {pkg.name}
+1482:                                         </option>
+1483:                                       ))}
+1484:                                     </select>
+1485:                                   </Field>
+1486: 
+1487:                                   <Field label="کۆگا">
+1488:                                     <select
+1489:                                       value={row.warehouseName}
+1490:                                       disabled={isLocked}
+1491:                                       onChange={(e) =>
+1492:                                         updateRow(row.id, {
+1493:                                           warehouseName: e.target.value,
+1494:                                         })
+1495:                                       }
+1496:                                       style={{
+1497:                                         ...compactInput,
+1498:                                         ...lockedFieldStyle,
+1499:                                       }}
+1500:                                     >
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

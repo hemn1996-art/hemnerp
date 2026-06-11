@@ -1,0 +1,112 @@
+Created At: 2026-06-05T11:06:41Z
+Completed At: 2026-06-05T11:06:41Z
+File Path: `file:///c:/Users/ZETTA/OneDrive/Desktop/project/app/components/SalesReturnPage.tsx`
+Total Lines: 3176
+Total Bytes: 97475
+Showing lines 1030 to 1180
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1030:     account.balance = Number(account.balance || 0) - totalReductionInBase;
+1031:   }
+1032: 
+1033:   function resetInvoice() {
+1034:     setInvoiceNumber(Date.now().toString().slice(-6));
+1035:     setCreatedTime(
+1036:       new Date().toLocaleTimeString("en-US", {
+1037:         hour: "2-digit",
+1038:         minute: "2-digit",
+1039:       })
+1040:     );
+1041:     setInvoiceDate(new Date().toISOString().slice(0, 10));
+1042:     setCustomerId(undefined);
+1043:     setCustomerSearch("");
+1044:     setShowCustomerInfo(false);
+1045:     setShowCustomerList(false);
+1046:     setRows([]);
+1047:     setOpenedDetailRowId(null);
+1048:     setPaidAmounts({});
+1049:     setPaidCurrencyId(defaultCurrency.id);
+1050:     setExchangeRate("1500");
+1051:     setInternalNote("");
+1052:     setPrintNote("");
+1053:     setShowInvoiceNotes(false);
+1054:     setSavedSnapshot("");
+1055:     setIsLocked(false);
+1056:   }
+1057: 
+1058:   function hasUnsavedData() {
+1059:     const hasPaid = Object.values(paidAmounts).some((x) => x.trim() !== "");
+1060: 
+1061:     return (
+1062:       customerId !== undefined ||
+1063:       customerSearch.trim() !== "" ||
+1064:       rows.length > 0 ||
+1065:       hasPaid ||
+1066:       internalNote.trim() !== "" ||
+1067:       printNote.trim() !== ""
+1068:     );
+1069:   }
+1070: 
+1071:   function handleNewInvoice() {
+1072:     if (hasUnsavedData() && !isSaved && !isLocked) {
+1073:       setShowNewInvoiceConfirm(true);
+1074:       return;
+1075:     }
+1076: 
+1077:     resetInvoice();
+1078:   
+<truncated 1910 bytes>
+
+1128:       accountBalanceBeforeByCurrency,
+1129:       accountBalanceChangeByCurrency: customerBalanceReductionByCurrency,
+1130:       accountBalanceAfterByCurrency,
+1131: 
+1132:       profitReduction: profitReductionInBase,
+1133:       profitReductionByCurrency,
+1134: 
+1135:       items,
+1136:       note: internalNote,
+1137:       printNote,
+1138:       createdAt: new Date().toISOString(),
+1139:       date: invoiceDate,
+1140:       createdTime,
+1141:       exchangeRate,
+1142:     } as any);
+1143: 
+1144:     applyStockIncrease();
+1145:     applyCashboxDecrease();
+1146:     applyCustomerBalanceReduction();
+1147: 
+1148:     setSavedSnapshot(currentSnapshot);
+1149:     setIsLocked(true);
+1150: 
+1151:     showToast(
+1152:       "پسوڵەی گەڕانەوەی فرۆشتن خەزن کرا ✅ ستۆک زیادکرا، قاسە کەمکرا، باڵانس و قازانج نوێکرایەوە.",
+1153:       "success"
+1154:     );
+1155:   }
+1156: 
+1157:   function handlePrint() {
+1158:     if (rows.length === 0) {
+1159:       showToast("هیچ کەرەستەیەک لە پسوڵەکەدا نییە.");
+1160:       return;
+1161:     }
+1162: 
+1163:     if (!isLocked && !isSaved) {
+1164:       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
+1165:       return;
+1166:     }
+1167: 
+1168:     setTimeout(() => window.print(), 100);
+1169:   }
+1170: 
+1171:   function toggleColumn(key: keyof TableColumns) {
+1172:     setTableColumns((prev) => ({ ...prev, [key]: !prev[key] }));
+1173:   }
+1174: 
+1175:   function togglePrintOption(key: keyof PrintOptions) {
+1176:     setPrintOptions((prev) => ({ ...prev, [key]: !prev[key] }));
+1177:   }
+1178: 
+1179:   const lockedFieldStyle: CSSProperties = isLocked
+1180:     ? { background: "#f3f4f6", cursor: "not-allowed" }
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.
