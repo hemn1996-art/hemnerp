@@ -1,0 +1,450 @@
+  سریاڵی هەیە؟
+          </label>
+        </div>
+      </Section>
+
+      <Section title="نرخی �رۆشتن" icon="$">
+        {salePrices.map((row, index) => (
+          <div
+            key={index}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr auto",
+              gap: 12,
+              alignItems: "end",
+              marginBottom: 12,
+            }}
+          >
+            <Field label="دراو">
+              <select
+                value={row.currencyId}
+                onChange={(e) =>
+                  updateSalePrice(index, "currencyId", e.target.value)
+                }
+                style={input}
+              >
+                <option value="">دراو</option>
+                {currencies
+                  .filter((x: any) => x.isActive !== false)
+                  .map((currency: any) => (
+                    <option key={currency.id} value={currency.id}>
+                      {currency.name} - {currency.symbol}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+
+            <Field label="جۆری نرخ">
+              <select
+                value={row.priceType}
+                onChange={(e) =>
+                  updateSalePrice(index, "priceType", e.target.value)
+                }
+                style={input}
+              >
+                {priceTypes.map((pt) => (
+                  <option key={pt.id} value={pt.name}>
+                    {pt.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="نرخ">
+              <input
+                type="text"
+                inputMode="decimal"
+                lang="en"
+                dir="ltr"
+                value={row.amount}
+                onChange={(e) =>
+                  updateSalePrice(index, "amount", e.target.value)
+                }
+                style={numericInput}
+                placeholder="170"
+              />
+            </Field>
+
+            <button
+              onClick={() => removeSalePriceRow(index)}
+              style={{ ...backBtn, color: "#b91c1c", height: 45 }}
+              disabled={salePrices.length === 1}
+            >
+              لابردن
+            </button>
+          </div>
+        ))}
+
+        <button onClick={addSalePriceRow} style={outlineBtn}>
+          + زیادکردنی نرخی تر
+        </button>
+      </Section>
+
+      <Section title="پێچانەوە" icon="📦">
+        {packages.map((row, index) => (
+          <div
+            key={index}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr auto",
+              gap: 12,
+              alignItems: "end",
+              marginBottom: 12,
+            }}
+          >
+            <Field label="پێچانەوە">
+              <select
+                value={row.name}
+                onChange={(e) => updatePackage(index, "name", e.target.value)}
+                style={input}
+              >
+                {packagings.map((pkg) => (
+                  <option key={pkg.id} value={pkg.name}>
+                    {pkg.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="ژمارەی ناو پێچانەوە">
+              <input
+                type="text"
+                inputMode="numeric"
+                lang="en"
+                dir="ltr"
+                value={row.quantity}
+                onChange={(e) =>
+                  updatePackage(index, "quantity", e.target.value)
+                }
+                style={numericInput}
+                placeholder="1"
+              />
+            </Field>
+
+            <button
+              onClick={() => removePackageRow(index)}
+              style={{ ...backBtn, color: "#b91c1c", height: 45 }}
+              disabled={packages.length === 1}
+            >
+              لابردن
+            </button>
+          </div>
+        ))}
+
+        <button onClick={addPackageRow} style={outlineBtn}>
+          + زیادکردنی پێچانەوەی تر
+        </button>
+      </Section>
+
+      {itemKind === "inventory" && (
+        <Section title="ڕێکخستنەکانی کۆگا و ئاگاداری" icon="▥">
+          <div style={grid3}>
+            <Field label="کەمترین ئاستی ئاگاداری">
+              <input
+                type="text"
+                inputMode="numeric"
+                lang="en"
+                dir="ltr"
+                value={lowStockAlert}
+                onChange={(e) => setLowStockAlert(onlyNumbers(e.target.value))}
+                style={numericInput}
+                placeholder="5"
+              />
+            </Field>
+
+            <Field label="بەسەرچوون هەیە؟">
+              <select
+                value={hasExpiry ? "yes" : "no"}
+                onChange={(e) => setHasExpiry(e.target.value === "yes")}
+                style={input}
+              >
+                <option value="no">نییە</option>
+                <option value="yes">هەیە</option>
+              </select>
+            </Field>
+
+            <Field label="ئاگاداری پێش بەسەرچوون / ڕۆژ">
+              <input
+                type="text"
+                inputMode="numeric"
+                lang="en"
+                dir="ltr"
+                value={expiryAlertDays}
+                disabled={!hasExpiry}
+                onChange={(e) => setExpiryAlertDays(onlyNumbers(e.target.value))}
+                style={{
+                  ...numericInput,
+                  background: hasExpiry ? "white" : "#f3f4f6",
+                }}
+                placeholder="10"
+              />
+            </Field>
+          </div>
+        </Section>
+      )}
+
+      <Section title="حاڵەت" icon="�">
+        <select
+          value={isActive ? "چالاک" : "ناچالاک"}
+          onChange={(e) => setIsActive(e.target.value === "چالاک")}
+          style={input}
+        >
+          <option>چالاک</option>
+          <option>ناچالاک</option>
+        </select>
+      </Section>
+
+      <div style={footerActions}>
+        <button onClick={save} style={saveBtn}>
+          💾 خەزنکردن
+        </button>
+        <button onClick={onBack} style={backBtn}>
+          پاشگەزبوونەوە
+        </button>
+      </div>
+      <AlertModal {...alertConfig} onClose={closeAlert} />
+    </div>
+  );
+}
+
+function getItemType(item: Product) {
+  if (item.isExpense) return "خەرجی";
+  if (item.isService) return "خزمەتگوزاری";
+  return "کۆگایی";
+}
+
+function formatSalePrices(item: Product) {
+  if (!item.salePrices || item.salePrices.length === 0) {
+    return item.salePrice ? `${item.salePrice} $` : "-";
+  }
+
+  return item.salePrices
+    .map((price) => {
+      const currency = mockCurrencies.find((x: any) => x.id === price.currencyId);
+      const symbol = currency ? currency.symbol : "";
+      return `${price.amount} ${symbol}`;
+    })
+    .join(" | ");
+}
+
+function Section({ title, icon, children }: any) {
+  return (
+    <div style={section}>
+      <div style={sectionHeader}>
+        <span style={{ fontSize: 20 }}>{icon}</span>
+        <strong>{title}</strong>
+      </div>
+      <div style={sectionBody}>{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, children }: any) {
+  return (
+    <label>
+      <span style={labelStyle}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const pageBox: CSSProperties = {
+  background: "white",
+  padding: 20,
+  borderRadius: 16,
+  border: "1px solid #e5e7eb",
+};
+
+const topBar: CSSProperties = {
+  display: "flex",
+  gap: 10,
+  marginBottom: 20,
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const primaryBtn: CSSProperties = {
+  background: "#061f5f",
+  color: "white",
+  padding: "12px 25px",
+  border: 0,
+  borderRadius: 8,
+  cursor: "pointer",
+  fontWeight: "bold",
+};
+
+const outlineBtn: CSSProperties = {
+  background: "white",
+  padding: "12px 25px",
+  border: "1px solid #cbd5e1",
+  borderRadius: 8,
+  cursor: "pointer",
+};
+
+const printBtn: CSSProperties = {
+  background: "white",
+  padding: "12px 18px",
+  border: "1px solid #cbd5e1",
+  borderRadius: 8,
+  cursor: "pointer",
+};
+
+const searchInput: CSSProperties = {
+  marginRight: "auto",
+  padding: 12,
+  borderRadius: 8,
+  border: "1px solid #cbd5e1",
+  width: 350,
+  direction: "rtl",
+};
+
+const tableWrap: CSSProperties = { overflowX: "auto" };
+
+const table: CSSProperties = {
+  width: "100%",
+  minWidth: 800,
+  borderCollapse: "collapse",
+  textAlign: "center",
+};
+
+const th: CSSProperties = {
+  background: "#061f5f",
+  color: "white",
+  padding: 14,
+  whiteSpace: "nowrap",
+};
+
+const td: CSSProperties = {
+  padding: 14,
+  borderBottom: "1px solid #e5e7eb",
+  whiteSpace: "nowrap",
+};
+
+const emptyCell: CSSProperties = {
+  padding: 30,
+  textAlign: "center",
+  color: "#9ca3af",
+};
+
+const blueBadge: CSSProperties = {
+  background: "#eff6ff",
+  color: "#1d4ed8",
+  padding: "5px 10px",
+  borderRadius: 999,
+  fontSize: 13,
+  fontWeight: "bold",
+};
+
+const smallBtn: CSSProperties = {
+  marginLeft: 8,
+  padding: "7px 10px",
+  borderRadius: 8,
+  border: "1px solid #d1d5db",
+  background: "white",
+  cursor: "pointer",
+};
+
+const notice: CSSProperties = {
+  background: "#dbeafe",
+  padding: 14,
+  borderRadius: 8,
+  marginBottom: 15,
+  color: "#1e40af",
+};
+
+const titleBox: CSSProperties = {
+  background: "white",
+  border: "1px solid #e5e7eb",
+  borderRadius: 14,
+  padding: 22,
+  marginBottom: 15,
+};
+
+const section: CSSProperties = {
+  background: "white",
+  border: "1px solid #e5e7eb",
+  borderRadius: 14,
+  marginBottom: 14,
+  overflow: "hidden",
+};
+
+const sectionHeader: CSSProperties = {
+  background: "#f8fafc",
+  padding: 15,
+  display: "flex",
+  gap: 10,
+  alignItems: "center",
+};
+
+const sectionBody: CSSProperties = { padding: 18 };
+
+const grid3: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "var(--grid-3-cols, repeat(3, minmax(180px, 1fr)))",
+  gap: 16,
+  marginBottom: 16,
+};
+
+const input: CSSProperties = {
+  width: "100%",
+  padding: 13,
+  borderRadius: 8,
+  border: "1px solid #d1d5db",
+  fontSize: 15,
+  boxSizing: "border-box",
+  direction: "rtl",
+};
+
+const numericInput: CSSProperties = {
+  ...input,
+  direction: "ltr",
+  textAlign: "left",
+};
+
+const labelStyle: CSSProperties = {
+  display: "block",
+  marginBottom: 7,
+  color: "#374151",
+  fontWeight: "bold",
+};
+
+const checksGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "var(--grid-3-cols, repeat(3, 1fr))",
+  gap: 16,
+};
+
+const checkLabel: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: 12,
+  border: "1px solid #e5e7eb",
+  borderRadius: 10,
+};
+
+const footerActions: CSSProperties = {
+  background: "white",
+  padding: 18,
+  borderRadius: 14,
+  display: "flex",
+  gap: 15,
+};
+
+const saveBtn: CSSProperties = {
+  background: "#061f5f",
+  color: "white",
+  padding: "12px 25px",
+  border: 0,
+  borderRadius: 8,
+  cursor: "pointer",
+  fontWeight: "bold",
+};
+
+const backBtn: CSSProperties = {
+  background: "white",
+  padding: "12px 25px",
+  border: "1px solid #cbd5e1",
+  borderRadius: 8,
+  cursor: "pointer",
+};
