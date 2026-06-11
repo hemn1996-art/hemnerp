@@ -221,7 +221,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   );
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
 
-  const [exchangeRate, setExchangeRate] = useState("1500");
+  const [exchangeRate, setExchangeRate] = useState("150000");
 
   const [productSearch, setProductSearch] = useState("");
   const [showProductList, setShowProductList] = useState(false);
@@ -370,7 +370,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             }
             
             if (voucher.exchangeRate) {
-              setExchangeRate(String(voucher.exchangeRate));
+              setExchangeRate(String(voucher.exchangeRate * 100));
             }
             setOriginalVoucher(voucher);
             setIsInvoiceLocked(false);
@@ -484,6 +484,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (Number(accountId) !== originalVoucher.accountId) {
       return currentBalMap;
     }
+    if (originalVoucher.historicalBalanceBefore) {
+      return originalVoucher.historicalBalanceBefore;
+    }
     const computedBefore = { ...currentBalMap };
     if (originalVoucher.ledgerEntries) {
       originalVoucher.ledgerEntries.forEach((le: any) => {
@@ -499,7 +502,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const activeBalances = useMemo(() => {
     return Object.entries(accountBalanceBeforeByCurrency)
-      .filter(([, amount]) => Math.abs(amount) > 0.01);
+      .filter(([, amount]) => Math.abs(Number(amount)) > 0.01);
   }, [accountBalanceBeforeByCurrency]);
 
   const [targetCurrencyId, setTargetCurrencyId] = useState<number | undefined>();
@@ -537,7 +540,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const before = accountBalanceBeforeByCurrency;
 
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
-    const rate = toNumber(exchangeRate);
+    const rate = toNumber(exchangeRate) / 100;
 
     let mappedType = "sales";
     if (invoiceType === "کڕین") mappedType = "purchase";
@@ -553,7 +556,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: null,
       balanceBeforeByCurrency: before
@@ -735,7 +738,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     const from = currencies.find((c: any) => c.id === fromId);
     const to = currencies.find((c: any) => c.id === toId);
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
 
     if (!from || !to) return amount;
 
@@ -1190,7 +1193,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     else if (invoiceType === "گەڕانەوەی کڕین") mappedType = "purchase_return";
     else if (invoiceType === "نرخاندن") mappedType = "quotation";
 
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
     const activeTargetCurrencyId = targetCurrencyId || (selectedAccount ? getSingleAccountBalanceCurrencyId(selectedAccount) : 1);
     const before = accountBalanceBeforeByCurrency;
 
@@ -1213,7 +1216,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before
@@ -1280,7 +1283,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
       })),
       ledgerEntries: result.ledgerEntries,
       extraPaymentHandling: extraHandling,
@@ -1352,7 +1355,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     else if (invoiceType === "گەڕانەوەی کڕین") mappedType = "purchase_return";
     else if (invoiceType === "نرخاندن") mappedType = "quotation";
 
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
     const activeTargetCurrencyId = targetCurrencyId || (selectedAccount ? getSingleAccountBalanceCurrencyId(selectedAccount) : 1);
     const before = accountBalanceBeforeByCurrency;
 
@@ -1377,7 +1380,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: null,
       balanceBeforeByCurrency: before

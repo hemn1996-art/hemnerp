@@ -320,8 +320,8 @@ function InvoiceReportContent() {
   // Helper: Currency conversion utility
   const convertAmount = (amount: number, fromCurrencyId: number | null, targetCode = "USD", rate = 1500) => {
     if (!fromCurrencyId) return amount;
-    const currency = currencies.find((c: any) => c.id === fromCurrencyId);
-    if (!currency || currency.code === targetCode) return amount;
+    const currency = currencies.find((c: any) => Number(c.id) === Number(fromCurrencyId));
+    if (!currency || currency.code.toUpperCase() === targetCode.toUpperCase()) return amount;
 
     if (currency.code === "IQD" && targetCode === "USD") return amount / rate;
     if (currency.code === "USD" && targetCode === "IQD") return amount * rate;
@@ -330,10 +330,10 @@ function InvoiceReportContent() {
 
   // Robust currency converter between any two currency IDs
   const convertBetweenCurrencies = (amount: number, fromCurrencyId: number | null, toCurrencyId: number | null, rate = 1500) => {
-    if (!fromCurrencyId || !toCurrencyId || fromCurrencyId === toCurrencyId) return amount;
-    const fromCurrency = currencies.find((c: any) => c.id === fromCurrencyId);
-    const toCurrency = currencies.find((c: any) => c.id === toCurrencyId);
-    if (!fromCurrency || !toCurrency || fromCurrency.code === toCurrency.code) return amount;
+    if (!fromCurrencyId || !toCurrencyId || Number(fromCurrencyId) === Number(toCurrencyId)) return amount;
+    const fromCurrency = currencies.find((c: any) => Number(c.id) === Number(fromCurrencyId));
+    const toCurrency = currencies.find((c: any) => Number(c.id) === Number(toCurrencyId));
+    if (!fromCurrency || !toCurrency || fromCurrency.code.toUpperCase() === toCurrency.code.toUpperCase()) return amount;
 
     let usdAmount = amount;
     if (fromCurrency.code === "IQD") {
@@ -408,20 +408,26 @@ function InvoiceReportContent() {
         const curId = Number(curIdStr);
         total += convertBetweenCurrencies(amount, curId, targetId, 1500);
       });
-      return formatCurrencyValue(total, targetId);
+      return <span>{formatCurrencyValue(total, targetId)}</span>;
     }
     
     // When "all" currencies, show each currency separately
-    const parts: string[] = [];
+    const parts: any[] = [];
     Object.entries(perCurrencyTotals).forEach(([curIdStr, amount]) => {
       const curId = Number(curIdStr);
       if (Math.abs(amount) > 0.01) {
-        parts.push(formatCurrencyValue(amount, curId));
+        parts.push(
+          <div key={curId} className="text-sm md:text-[15px] font-bold leading-normal">
+            {formatCurrencyValue(amount, curId)}
+          </div>
+        );
       }
     });
     
-    if (parts.length === 0) return formatCurrencyValue(0, currencies.find((c: any) => c.code === "USD")?.id || 1);
-    return parts.join(" + ");
+    if (parts.length === 0) {
+      return <span>{formatCurrencyValue(0, currencies.find((c: any) => c.code === "USD")?.id || 1)}</span>;
+    }
+    return <div className="flex flex-col gap-0.5">{parts}</div>;
   };
 
   // Helper: Calculate paid sum in original currency, converted to USD
@@ -771,13 +777,8 @@ function InvoiceReportContent() {
       valueByCurrency[curId] = (valueByCurrency[curId] || 0) + v.netAmount;
       discountByCurrency[curId] = (discountByCurrency[curId] || 0) + v.totalDiscount;
       
-      // Paid amounts: use pa.amount * pa.exchangeRate to convert to voucher currency
-      // This matches the API logic (see voucher POST route line 210)
       const paidInVoucherCurrency = v.paidAmounts.reduce((sum, pa) => {
-        if (pa.currencyId === curId) {
-          return sum + pa.amount;
-        }
-        return sum + (pa.amount * pa.exchangeRate);
+        return sum + convertBetweenCurrencies(pa.amount, pa.currencyId, curId, pa.exchangeRate || v.exchangeRate || 1500);
       }, 0);
       paidByCurrency[curId] = (paidByCurrency[curId] || 0) + paidInVoucherCurrency;
       remainingByCurrency[curId] = (remainingByCurrency[curId] || 0) + Math.max(v.netAmount - paidInVoucherCurrency, 0);

@@ -272,7 +272,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             }
             
             if (voucher.exchangeRate) {
-              setExchangeRate(String(voucher.exchangeRate));
+              setExchangeRate(String(voucher.exchangeRate * 100));
             }
             if (voucher.currencyId) {
               setPurchaseCurrencyId(voucher.currencyId);
@@ -315,7 +315,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
 
-  const [exchangeRate, setExchangeRate] = useState("1500");
+  const [exchangeRate, setExchangeRate] = useState("150000");
 
   const [productSearch, setProductSearch] = useState("");
   const [showProductList, setShowProductList] = useState(false);
@@ -473,6 +473,9 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     if (Number(supplierId) !== originalVoucher.accountId) {
       return currentBalMap;
     }
+    if (originalVoucher.historicalBalanceBefore) {
+      return originalVoucher.historicalBalanceBefore;
+    }
     const computedBefore = { ...currentBalMap };
     if (originalVoucher.ledgerEntries) {
       originalVoucher.ledgerEntries.forEach((le: any) => {
@@ -488,7 +491,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   const activeBalances = useMemo(() => {
     return Object.entries(accountBalanceBeforeByCurrency)
-      .filter(([, amount]) => Math.abs(amount) > 0.01);
+      .filter(([, amount]) => Math.abs(Number(amount)) > 0.01);
   }, [accountBalanceBeforeByCurrency]);
 
   const [targetCurrencyId, setTargetCurrencyId] = useState<number | undefined>();
@@ -511,7 +514,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const before = accountBalanceBeforeByCurrency;
 
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(supplier);
-    const rate = toNumber(exchangeRate);
+    const rate = toNumber(exchangeRate) / 100;
 
     const result = calculateLedgerEntries({
       type: "purchase",
@@ -521,7 +524,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === purchaseCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: null,
       balanceBeforeByCurrency: before
@@ -746,7 +749,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   function convertCurrency(amount: number, fromId: number, toId: number) {
     if (fromId === toId) return amount;
 
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
 
     if (isIqd(fromId) && isUsd(toId)) return amount / rate;
     if (isUsd(fromId) && isIqd(toId)) return amount * rate;
@@ -1261,7 +1264,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setPaidAmounts({});
     setPurchaseCurrencyId(defaultCurrency.id);
     setPaidCurrencyId(defaultCurrency.id);
-    setExchangeRate("1500");
+    setExchangeRate("150000");
     setManualExpenseTotal("");
     setIsExpenseTotalManual(false);
     setExpenseGeneralNote("");
@@ -1308,7 +1311,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
     setExcessModalConfig(null);
 
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
     const activeTargetCurrencyId = targetCurrencyId || (supplier ? getSingleAccountBalanceCurrencyId(supplier) : (defaultCurrency?.id || 5));
     const before = accountBalanceBeforeByCurrency;
 
@@ -1331,7 +1334,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === purchaseCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before
@@ -1446,7 +1449,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       return;
     }
 
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
     const activeTargetCurrencyId = targetCurrencyId || (supplier ? getSingleAccountBalanceCurrencyId(supplier) : (defaultCurrency?.id || 5));
     const before = accountBalanceBeforeByCurrency;
 
@@ -1809,7 +1812,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             )}
 
             {showRate && (
-              <Field label="ڕەیتی 1 دۆلار بۆ پارەدان">
+              <Field label="ڕەیتی 100 دۆلار بۆ پارەدان">
                 <FormattedNumberInput
                   value={exchangeRate}
                   disabled={isLocked}
@@ -2303,7 +2306,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               </Field>
 
               {hasMixedExpenseCurrency && (
-                <Field label="ڕەیتی 1 دۆلار بۆ خەرجی">
+                <Field label="ڕەیتی 100 دۆلار بۆ خەرجی">
                   <FormattedNumberInput
                     value={exchangeRate}
                     disabled={isLocked}
@@ -2759,7 +2762,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
               {shouldShowExchangeRate && (
                 <PrintSummaryLine
-                  label="ڕەیتی 1 دۆلار"
+                  label="ڕەیتی 100 دۆلار"
                   value={`${Number(exchangeRate || 0).toLocaleString(
                     "en-US"
                   )} دینار`}
@@ -3044,7 +3047,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                 <div style={settingsSection}>
                   <h3 style={settingsTitle}>نرخی گۆڕینەوە</h3>
 
-                  <Field label="ڕەیتی 1 دۆلار بە دینار">
+                  <Field label="ڕەیتی 100 دۆلار بە دینار">
                     <FormattedNumberInput
                       value={exchangeRate}
                       disabled={isLocked}

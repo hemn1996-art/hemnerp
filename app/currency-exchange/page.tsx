@@ -32,7 +32,7 @@ export default function CurrencyExchangePage() {
   const closeAlert = () => setAlertConfig(a => ({...a, isOpen: false}));
   
   const [cashboxId, setCashboxId] = useState("");
-  const [rate, setRate] = useState("1500");
+  const [rate, setRate] = useState("150000");
   
   const iqdCurrency = currencies.find(c => c.code === "IQD" || c.name.includes("دینار"));
   const usdCurrency = currencies.find(c => c.code === "USD" || c.name.includes("دۆلار"));
@@ -61,7 +61,7 @@ export default function CurrencyExchangePage() {
   function handleFromChange(val: string) {
     setFromAmount(val);
     const num = parseFloat(val) || 0;
-    const r = parseFloat(rate) || 1;
+    const r = (parseFloat(rate) || 0) / 100;
     if (direction === "USD_TO_IQD") {
       setToAmount((num * r).toString());
     } else {
@@ -77,7 +77,7 @@ export default function CurrencyExchangePage() {
 
   function handleRateChange(val: string) {
     setRate(val);
-    const r = parseFloat(val) || 1;
+    const r = (parseFloat(val) || 0) / 100;
     const num = parseFloat(fromAmount) || 0;
     if (direction === "USD_TO_IQD") {
       setToAmount((num * r).toString());
@@ -121,7 +121,7 @@ export default function CurrencyExchangePage() {
       type: "cashbox_exchange",
       cashboxId: Number(cashboxId),
       date: new Date().toISOString(),
-      exchangeRate: Number(rate),
+      exchangeRate: (parseFloat(rate.replace(/,/g, '')) || 0) / 100,
       internalNote: note,
       paidAmounts: [
         { currencyId: fromCurId, amount: -Math.abs(parseFloat(fromAmount) || 0) }, // Negative = deduct
@@ -178,7 +178,7 @@ export default function CurrencyExchangePage() {
     setCashboxId(row.cashboxId?.toString() || "");
     setNote(row.note);
     setIsNoteEdited(true);
-    setRate(row.exchangeRate?.toString() || "1500");
+    setRate(row.exchangeRate ? (Number(row.exchangeRate) * 100).toString() : "150000");
     setFromAmount(row.rawFromAmount.toString());
     setToAmount(row.rawToAmount.toString());
     
@@ -278,11 +278,11 @@ export default function CurrencyExchangePage() {
 
             {/* Rates */}
             <div style={fieldGroup}>
-              <label style={label}>نرخی دراوەکان</label>
+              <label style={label}>ڕەیتی ١٠٠ دۆلار بە دینار</label>
               <div style={{ display: "flex", gap: 20 }}>
                 <div style={rateField}>
-                  <span style={rateLabel}>$</span>
-                  <input style={inputBase} value="1" readOnly disabled />
+                  <span style={rateLabel}>$100</span>
+                  <input style={inputBase} value="100" readOnly disabled />
                 </div>
                 <div style={rateField}>
                   <span style={rateLabel}>دینار</span>

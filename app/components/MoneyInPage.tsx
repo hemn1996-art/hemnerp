@@ -143,7 +143,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             if (voucher.internalNote || voucher.printNote) setShowNotes(true);
 
             if (voucher.exchangeRate) {
-              setExchangeRate(String(voucher.exchangeRate));
+              setExchangeRate(String(voucher.exchangeRate * 100));
             }
             if (voucher.currencyId) {
               setTargetCurrencyId(voucher.currencyId);
@@ -171,7 +171,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     defaultCurrency.id
   );
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
-  const [exchangeRate, setExchangeRate] = useState("1500");
+  const [exchangeRate, setExchangeRate] = useState("150000");
 
   const [receiptNote, setReceiptNote] = useState("");
   const [printNote, setPrintNote] = useState("");
@@ -233,6 +233,10 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       return currentBalMap;
     }
 
+    if (originalVoucher.historicalBalanceBefore) {
+      return originalVoucher.historicalBalanceBefore;
+    }
+
     // Reverse the contribution of this voucher to get the balance BEFORE this voucher
     const computedBefore = { ...currentBalMap };
     if (originalVoucher.ledgerEntries) {
@@ -250,7 +254,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
   const activeBalances = useMemo(() => {
     return Object.entries(accountBalanceBeforeByCurrency)
-      .filter(([, amount]) => Math.abs(amount) > 0.01);
+      .filter(([, amount]) => Math.abs(Number(amount)) > 0.01);
   }, [accountBalanceBeforeByCurrency]);
 
   const isMultiCurrencyAccount = activeBalances.length > 1;
@@ -295,7 +299,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     if (!selectedAccount) return {};
     const before = accountBalanceBeforeByCurrency;
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
-    const rate = toNumber(exchangeRate);
+    const rate = toNumber(exchangeRate) / 100;
 
     const result = calculateLedgerEntries({
       type: "money_in",
@@ -305,7 +309,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: null,
       balanceBeforeByCurrency: before
@@ -410,7 +414,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   function convertCurrency(amount: number, fromId: number, toId: number) {
     if (fromId === toId) return amount;
 
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
 
     if (isIqd(fromId) && isUsd(toId)) return amount / rate;
     if (isUsd(fromId) && isIqd(toId)) return amount * rate;
@@ -665,7 +669,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
     const before = accountBalanceBeforeByCurrency;
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(account);
-    const rate = toNumber(exchangeRate);
+    const rate = toNumber(exchangeRate) / 100;
 
     const extraHandling = action === "cross_deduct"
       ? "convert_to_other_currency"
@@ -679,7 +683,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before
@@ -711,7 +715,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     setShowAccountList(false);
     setPaidAmounts({});
     setPaidCurrencyId(defaultCurrency.id);
-    setExchangeRate("1500");
+    setExchangeRate("150000");
     setReceiptNote("");
     setPrintNote("");
     setShowNotes(false);
@@ -751,7 +755,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const before = accountBalanceBeforeByCurrency;
-    const rate = toNumber(exchangeRate);
+    const rate = toNumber(exchangeRate) / 100;
 
     const extraHandling = action === "cross_deduct"
       ? "convert_to_other_currency"
@@ -765,7 +769,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before
@@ -819,7 +823,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
       })),
       ledgerEntries: result.ledgerEntries,
       extraPaymentHandling: extraHandling
@@ -868,7 +872,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const before = accountBalanceBeforeByCurrency;
-    const rate = toNumber(exchangeRate);
+    const rate = toNumber(exchangeRate) / 100;
 
     const result = calculateLedgerEntries({
       type: "money_in",
@@ -878,7 +882,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (currencies.find((c: any) => c.id === p.currencyId)?.code === "USD") ? 1 : rate
+        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: null,
       balanceBeforeByCurrency: before
@@ -1187,16 +1191,21 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             </div>
 
             {showRate && (
-              <Field label="ڕەیتی 1 دۆلار بۆ پارەی دراو">
-                <FormattedNumberInput
-                  value={exchangeRate}
-                  disabled={isLocked}
-                  onChange={(val) => {
-                    if (blockIfLocked()) return;
-                    setExchangeRate(val);
-                  }}
-                  style={{ ...input, ...lockedFieldStyle }}
-                />
+              <Field label="ڕەیتی 100 دۆلار بۆ پارەی دراو">
+                <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
+                  <FormattedNumberInput
+                    value={exchangeRate}
+                    disabled={isLocked}
+                    onChange={(val) => {
+                      if (blockIfLocked()) return;
+                      setExchangeRate(val);
+                    }}
+                    style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text" }}
+                  />
+                  <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", minWidth: "80px" }}>
+                    دینار
+                  </span>
+                </div>
               </Field>
             )}
 
@@ -1384,7 +1393,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             <div style={printSummaryBox}>
               {showRate && (
                 <PrintSummaryLine
-                  label="ڕەیتی 1 دۆلار"
+                  label="ڕەیتی 100 دۆلار"
                   value={`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}
                 />
               )}
@@ -1561,7 +1570,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
               {showRate && (
                 <div style={settingsSection}>
                   <h3 style={settingsTitle}>نرخی گۆڕینەوە</h3>
-                  <Field label="ڕەیتی 1 دۆلار بە دینار">
+                  <Field label="ڕەیتی 100 دۆلار بە دینار">
                     <FormattedNumberInput
                       value={exchangeRate}
                       disabled={isLocked}

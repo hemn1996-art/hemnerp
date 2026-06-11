@@ -124,10 +124,10 @@ function AccountStatementContent() {
   };
 
   const convertAmount = (amount: number, fromCurrencyId: number | null, toCurrencyId: number | null, rate = 1500) => {
-    if (!fromCurrencyId || !toCurrencyId || fromCurrencyId === toCurrencyId) return amount;
-    const fromCur = currencies.find((c: any) => c.id === fromCurrencyId);
-    const toCur = currencies.find((c: any) => c.id === toCurrencyId);
-    if (!fromCur || !toCur || fromCur.code === toCur.code) return amount;
+    if (!fromCurrencyId || !toCurrencyId || Number(fromCurrencyId) === Number(toCurrencyId)) return amount;
+    const fromCur = currencies.find((c: any) => Number(c.id) === Number(fromCurrencyId));
+    const toCur = currencies.find((c: any) => Number(c.id) === Number(toCurrencyId));
+    if (!fromCur || !toCur || fromCur.code.toUpperCase() === toCur.code.toUpperCase()) return amount;
 
     let usd = amount;
     if (fromCur.code === "IQD") usd = amount / rate;
@@ -192,7 +192,7 @@ function AccountStatementContent() {
           totalAmount: v.netAmount,
           currencyId: v.currencyId || 1,
           totalDiscount: v.totalDiscount,
-          paidAmounts: v.paidAmounts ? v.paidAmounts.map(pa => ({ currencyId: pa.currencyId, amount: pa.amount })) : [],
+          paidAmounts: v.paidAmounts ? v.paidAmounts.map(pa => ({ currencyId: pa.currencyId, amount: pa.amount, exchangeRate: pa.exchangeRate })) : [],
           note: v.printNote || v.internalNote || "",
           ledgerEntries: mainEntries.filter(le => le.accountId === targetAccountId),
           hasLines: v.lines && v.lines.length > 0,
@@ -535,15 +535,23 @@ function AccountStatementContent() {
                         {visibleColumns.discount && <td className="p-3 text-center text-red-500" dir="ltr">{v.totalDiscount > 0 ? formatMoney(v.totalDiscount, v.currencyId || 1) : "—"}</td>}
                         {visibleColumns.paidAmount && (
                           <td className="p-3 text-center text-emerald-700 font-bold" dir="ltr">
-                            {v.paidAmounts && v.paidAmounts.length > 0 ? (
-                              <div className="flex flex-col gap-0.5 items-center justify-center">
-                                {v.paidAmounts.map((pa: any, idx: number) => (
-                                  <span key={idx} dir="ltr">
-                                    {formatMoney(pa.amount, pa.currencyId)}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
+                            {v.paidAmounts && v.paidAmounts.length > 0 ? (() => {
+                              let accountCurrencyId = v.currencyId;
+                              if (!accountCurrencyId || !currencies.some((c: any) => Number(c.id) === Number(accountCurrencyId))) {
+                                accountCurrencyId = account?.balanceCurrencyId || account?.creditLimitCurrencyId;
+                              }
+                              if (!accountCurrencyId || !currencies.some((c: any) => Number(c.id) === Number(accountCurrencyId))) {
+                                accountCurrencyId = currencies.length > 0 ? currencies[0].id : 8;
+                              }
+
+                              const totalConverted = v.paidAmounts.reduce((sum: number, pa: any) => {
+                                const actualRate = (Number(pa.currencyId) === Number(accountCurrencyId))
+                                  ? 1
+                                  : (pa.exchangeRate && pa.exchangeRate > 10 ? pa.exchangeRate : (v.exchangeRate && v.exchangeRate > 10 ? v.exchangeRate : 1500));
+                                return sum + convertAmount(pa.amount, pa.currencyId, accountCurrencyId, actualRate);
+                              }, 0);
+                              return formatMoney(totalConverted, accountCurrencyId);
+                            })() : (
                               "—"
                             )}
                           </td>

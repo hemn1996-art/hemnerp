@@ -108,6 +108,41 @@ export async function POST(request: Request) {
   try {
     const data = await request.json();
 
+    const dbCurrencies = await prisma.currency.findMany();
+    let autoNote = "";
+    if (data.paidAmounts && Array.isArray(data.paidAmounts)) {
+      const nonZeroPayments = data.paidAmounts.filter((p: any) => Number(p.amount) !== 0);
+      if (nonZeroPayments.length > 1) {
+        const parts = nonZeroPayments.map((p: any) => {
+          const cur = dbCurrencies.find(c => Number(c.id) === Number(p.currencyId));
+          const curName = cur ? (cur.code === "IQD" ? "دینار" : cur.symbol || cur.name) : "";
+          const formattedAmount = Math.abs(Number(p.amount)).toLocaleString("en-US");
+          return `${formattedAmount} ${curName}`;
+        });
+        const displayRate = data.exchangeRate > 100 ? data.exchangeRate : data.exchangeRate * 100;
+        const formattedRate = Number(displayRate).toLocaleString("en-US");
+        autoNote = `${parts.join("   ")}   ڕەیتی گۆڕینەوە ${formattedRate}`;
+      }
+    }
+
+    if (autoNote) {
+      if (data.printNote) {
+        if (!data.printNote.includes(autoNote)) {
+          data.printNote = `${data.printNote} | ${autoNote}`;
+        }
+      } else {
+        data.printNote = autoNote;
+      }
+
+      if (data.internalNote) {
+        if (!data.internalNote.includes(autoNote)) {
+          data.internalNote = `${data.internalNote} | ${autoNote}`;
+        }
+      } else {
+        data.internalNote = autoNote;
+      }
+    }
+
     const voucher = await prisma.$transaction(async (tx) => {
       const createdVoucher = await tx.voucher.create({
         data: {

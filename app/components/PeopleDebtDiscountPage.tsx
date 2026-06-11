@@ -160,7 +160,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
 
             if (loadedAmount !== undefined && loadedAmount !== null) setDebtAmount(String(loadedAmount));
             if (loadedCurrencyId !== undefined && loadedCurrencyId !== null) setDebtCurrencyId(loadedCurrencyId);
-            if (voucher.exchangeRate) setExchangeRate(String(voucher.exchangeRate));
+            if (voucher.exchangeRate) setExchangeRate(String(voucher.exchangeRate * 100));
 
             setReceiptNote(voucher.internalNote || "");
             setPrintNote(voucher.printNote || "");
@@ -182,7 +182,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
   const [debtCurrencyId, setDebtCurrencyId] = useState<number>(
     defaultCurrency.id
   );
-  const [exchangeRate, setExchangeRate] = useState("1500");
+  const [exchangeRate, setExchangeRate] = useState("150000");
 
   const [receiptNote, setReceiptNote] = useState("");
   const [printNote, setPrintNote] = useState("");
@@ -368,7 +368,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
   function convertCurrency(amount: number, fromId: number, toId: number) {
     if (fromId === toId) return amount;
 
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
 
     if (isIqd(fromId) && isUsd(toId)) return amount / rate;
     if (isUsd(fromId) && isIqd(toId)) return amount * rate;
@@ -590,7 +590,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
     setShowAccountList(false);
     setDebtAmount("");
     setDebtCurrencyId(defaultCurrency.id);
-    setExchangeRate("1500");
+    setExchangeRate("150000");
     setReceiptNote("");
     setPrintNote("");
     setShowNotes(false);
@@ -1286,7 +1286,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
                 <div style={settingsSection}>
                   <h3 style={settingsTitle}>نرخی گۆڕینەوە</h3>
 
-                  <Field label="ڕەیتی 1 دۆلار بە دینار">
+                  <Field label="ڕەیتی 100 دۆلار بە دینار">
                     <FormattedNumberInput
                       value={exchangeRate}
                       disabled={isLocked}

@@ -163,7 +163,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
             if (voucher.internalNote || voucher.printNote) setShowNotes(true);
 
             if (voucher.exchangeRate) {
-              setExchangeRate(String(voucher.exchangeRate));
+              setExchangeRate(String(voucher.exchangeRate * 100));
             }
 
             setIsLocked(false);
@@ -182,7 +182,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     cashboxes[0]?.id
   );
 
-  const [exchangeRate, setExchangeRate] = useState("1500");
+  const [exchangeRate, setExchangeRate] = useState("150000");
 
   const [productSearch, setProductSearch] = useState("");
   const [showProductList, setShowProductList] = useState(false);
@@ -355,7 +355,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
   function convertCurrency(amount: number, fromId: number, toId: number) {
     if (fromId === toId) return amount;
 
-    const rate = toNumber(exchangeRate) || 1500;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
 
     if (isIqd(fromId) && isUsd(toId)) return amount / rate;
     if (isUsd(fromId) && isIqd(toId)) return amount * rate;
@@ -551,7 +551,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     setRows([]);
     setProductSearch("");
     setShowProductList(false);
-    setExchangeRate("1500");
+    setExchangeRate("150000");
     setReceiptNote("");
     setPrintNote("");
     setShowNotes(false);
@@ -1329,7 +1329,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
                 <div style={settingsSection}>
                   <h3 style={settingsTitle}>نرخی گۆڕینەوە</h3>
 
-                  <Field label="ڕەیتی 1 دۆلار بە دینار">
+                  <Field label="ڕەیتی 100 دۆلار بە دینار">
                     <FormattedNumberInput
                       value={exchangeRate}
                       disabled={isLocked}

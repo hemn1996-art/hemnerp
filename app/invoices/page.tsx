@@ -194,38 +194,7 @@ function InvoicesRouteContent() {
           <span className="text-xs text-gray-400 font-normal">{isOpen ? "▲" : "▼"}</span>
         </button>
 
-        {/* New invoice button — shown when in edit mode, to exit edit and create new */}
-        {editId && (
-          <button
-            onClick={() => clearEditId()}
-            style={{
-              background: "linear-gradient(135deg, #059669, #10b981)",
-              color: "#fff",
-              border: "none",
-              borderRadius: 10,
-              padding: "7px 16px",
-              fontWeight: 800,
-              fontSize: 13,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              boxShadow: "0 2px 8px rgba(5,150,105,0.3)",
-              transition: "transform 0.15s, box-shadow 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.05)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 14px rgba(5,150,105,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 8px rgba(5,150,105,0.3)";
-            }}
-          >
-            <span style={{ fontSize: 16 }}>+</span>
-            پسووڵەی نوێ
-          </button>
-        )}
+        {/* New invoice button has been removed as requested */}
 
         {/* Dropdown — tall 2-column grid, no scroll */}
         {isOpen && (

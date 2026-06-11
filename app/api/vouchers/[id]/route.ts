@@ -51,7 +51,28 @@ export async function GET(
       return NextResponse.json({ error: "Voucher not found" }, { status: 404 });
     }
 
-    return NextResponse.json(voucher);
+    let balanceBeforeByCurrency: Record<string, number> = {};
+    if (voucher.accountId) {
+      const priorEntries = await prisma.ledgerEntry.groupBy({
+        by: ["currencyId"],
+        where: {
+          accountId: voucher.accountId,
+          OR: [
+            { date: { lt: voucher.date } },
+            { date: voucher.date, id: { lt: voucherId } }
+          ]
+        },
+        _sum: { debit: true, credit: true }
+      });
+      for (const entry of priorEntries) {
+        balanceBeforeByCurrency[String(entry.currencyId)] = (entry._sum.debit || 0) - (entry._sum.credit || 0);
+      }
+    }
+
+    return NextResponse.json({
+      ...voucher,
+      historicalBalanceBefore: balanceBeforeByCurrency
+    });
   } catch (error) {
     console.error("Error fetching voucher:", error);
     return NextResponse.json(
@@ -69,6 +90,41 @@ export async function PUT(
     const { id } = await params;
     const voucherId = Number(id);
     const data = await request.json();
+
+    const dbCurrencies = await prisma.currency.findMany();
+    let autoNote = "";
+    if (data.paidAmounts && Array.isArray(data.paidAmounts)) {
+      const nonZeroPayments = data.paidAmounts.filter((p: any) => Number(p.amount) !== 0);
+      if (nonZeroPayments.length > 1) {
+        const parts = nonZeroPayments.map((p: any) => {
+          const cur = dbCurrencies.find(c => Number(c.id) === Number(p.currencyId));
+          const curName = cur ? (cur.code === "IQD" ? "دینار" : cur.symbol || cur.name) : "";
+          const formattedAmount = Math.abs(Number(p.amount)).toLocaleString("en-US");
+          return `${formattedAmount} ${curName}`;
+        });
+        const displayRate = data.exchangeRate > 100 ? data.exchangeRate : data.exchangeRate * 100;
+        const formattedRate = Number(displayRate).toLocaleString("en-US");
+        autoNote = `${parts.join("   ")}   ڕەیتی گۆڕینەوە ${formattedRate}`;
+      }
+    }
+
+    if (autoNote) {
+      if (data.printNote) {
+        if (!data.printNote.includes(autoNote)) {
+          data.printNote = `${data.printNote} | ${autoNote}`;
+        }
+      } else {
+        data.printNote = autoNote;
+      }
+
+      if (data.internalNote) {
+        if (!data.internalNote.includes(autoNote)) {
+          data.internalNote = `${data.internalNote} | ${autoNote}`;
+        }
+      } else {
+        data.internalNote = autoNote;
+      }
+    }
 
     const updatedVoucher = await prisma.$transaction(async (tx) => {
       // 1. Fetch the existing voucher with its payments and lines to reverse them
