@@ -65,7 +65,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   fetchProducts: async () => {
     try {
-      const res = await fetch("/api/products");
+      const res = await fetch(`/api/products?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         set({ products: data });
@@ -89,7 +89,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   fetchCurrencies: async () => {
     try {
-      const res = await fetch("/api/currencies");
+      const res = await fetch(`/api/currencies?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         set({ currencies: data });
@@ -107,7 +107,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   fetchAccountTypes: async () => {
     try {
-      const res = await fetch("/api/account-types");
+      const res = await fetch(`/api/account-types?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         set({ accountTypes: data });
@@ -119,7 +119,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   fetchCashboxes: async () => {
     try {
-      const res = await fetch("/api/cashboxes");
+      const res = await fetch(`/api/cashboxes?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         set({ cashboxes: data });
@@ -131,7 +131,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   fetchWarehouses: async () => {
     try {
-      const res = await fetch("/api/warehouses");
+      const res = await fetch(`/api/warehouses?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         set({ warehouses: data });
@@ -143,7 +143,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   fetchInvoices: async () => {
     try {
-      const res = await fetch("/api/vouchers");
+      const res = await fetch(`/api/vouchers?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         
