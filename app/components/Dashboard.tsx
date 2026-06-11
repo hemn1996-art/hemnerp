@@ -35,6 +35,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [chartType, setChartType] = useState<"sales" | "purchases">("sales");
   const [chartYear, setChartYear] = useState<number>(2026);
+  const [chartCurrency, setChartCurrency] = useState<"all" | "USD" | "IQD">("all");
 
   useEffect(() => {
     fetchInvoices();
@@ -93,18 +94,18 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const moneyOutTotals = getTotals("پارەی ڕۆشتوو", "paid");
 
   const barData = [
-    { name: "January", value: 0 },
-    { name: "February", value: 0 },
-    { name: "March", value: 0 },
-    { name: "April", value: 0 },
-    { name: "May", value: 0 },
-    { name: "June", value: 0 },
-    { name: "July", value: 0 },
-    { name: "August", value: 0 },
-    { name: "September", value: 0 },
-    { name: "October", value: 0 },
-    { name: "November", value: 0 },
-    { name: "December", value: 0 },
+    { name: "January", usd: 0, iqd: 0 },
+    { name: "February", usd: 0, iqd: 0 },
+    { name: "March", usd: 0, iqd: 0 },
+    { name: "April", usd: 0, iqd: 0 },
+    { name: "May", usd: 0, iqd: 0 },
+    { name: "June", usd: 0, iqd: 0 },
+    { name: "July", usd: 0, iqd: 0 },
+    { name: "August", usd: 0, iqd: 0 },
+    { name: "September", usd: 0, iqd: 0 },
+    { name: "October", usd: 0, iqd: 0 },
+    { name: "November", usd: 0, iqd: 0 },
+    { name: "December", usd: 0, iqd: 0 },
   ];
 
   invoices.forEach((inv) => {
@@ -114,18 +115,19 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
       if (d.getFullYear() === chartYear) {
         const month = d.getMonth(); // 0 to 11
         if (month >= 0 && month < 12) {
-          let valInUsd = inv.total || 0;
-          if (inv.currencyCode === "IQD") {
-            const rate = inv.exchangeRate || iqdRate;
-            valInUsd = valInUsd / rate;
+          const curCode = inv.currencyCode || "USD";
+          if (curCode === "USD") {
+            barData[month].usd += inv.total || 0;
+          } else if (curCode === "IQD") {
+            barData[month].iqd += inv.total || 0;
           }
-          barData[month].value += valInUsd;
         }
       }
     }
   });
 
-  const chartSum = barData.reduce((sum, item) => sum + item.value, 0);
+  const chartSumUsd = barData.reduce((sum, item) => sum + item.usd, 0);
+  const chartSumIqd = barData.reduce((sum, item) => sum + item.iqd, 0);
 
   // 3. Chart Data: Vouchers Donut
   const pieData = [
@@ -416,16 +418,40 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         
         {/* Bar Chart - Sales / Purchases per month */}
         <div className="bg-white rounded-2xl p-6 shadow-sm lg:col-span-2 border border-gray-200">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-4 relative z-20">
             <div className="flex flex-col gap-0.5">
               <span className="font-bold text-gray-800 text-base">
                 {chartType === "sales" ? "فرۆشی ساڵ" : "کڕینی ساڵ"}
               </span>
-              <span className="text-2xl font-black font-mono" style={{ color: chartType === "sales" ? "#3b82f6" : "#22c55e" }}>
-                $ {chartSum.toLocaleString()}
-              </span>
+              {chartCurrency === "all" ? (
+                <div className="flex flex-col gap-0">
+                  <span className="text-lg font-black font-mono text-[#3b82f6]">
+                    $ {chartSumUsd.toLocaleString()}
+                  </span>
+                  <span className="text-lg font-black font-mono text-[#22c55e]">
+                    {chartSumIqd.toLocaleString()} دینار
+                  </span>
+                </div>
+              ) : chartCurrency === "USD" ? (
+                <span className="text-2xl font-black font-mono text-[#3b82f6]">
+                  $ {chartSumUsd.toLocaleString()}
+                </span>
+              ) : (
+                <span className="text-2xl font-black font-mono text-[#22c55e]">
+                  {chartSumIqd.toLocaleString()} دینار
+                </span>
+              )}
             </div>
             <div className="flex gap-2">
+              <select
+                value={chartCurrency}
+                onChange={(e) => setChartCurrency(e.target.value as any)}
+                className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none cursor-pointer"
+              >
+                <option value="all">هەمووی</option>
+                <option value="IQD">دینار</option>
+                <option value="USD">$</option>
+              </select>
               <select
                 value={chartType}
                 onChange={(e) => setChartType(e.target.value as any)}
@@ -450,9 +476,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               <BarChart data={barData} margin={{ top: 10, right: 0, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} width={75} tickFormatter={(val) => '$' + val.toLocaleString()} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} width={75} tickFormatter={(val) => chartCurrency === "IQD" ? val.toLocaleString() + ' د.ع' : '$' + val.toLocaleString()} />
                 <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }} />
-                <Bar dataKey="value" fill={chartType === "sales" ? "#3b82f6" : "#22c55e"} radius={[6, 6, 0, 0]} barSize={22} />
+                {(chartCurrency === "all" || chartCurrency === "USD") && (
+                  <Bar dataKey="usd" name="$" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={chartCurrency === "all" ? 16 : 22} />
+                )}
+                {(chartCurrency === "all" || chartCurrency === "IQD") && (
+                  <Bar dataKey="iqd" name="دینار" fill="#22c55e" radius={[6, 6, 0, 0]} barSize={chartCurrency === "all" ? 16 : 22} />
+                )}
               </BarChart>
             </ResponsiveContainer>
           </div>
