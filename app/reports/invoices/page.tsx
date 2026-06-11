@@ -224,7 +224,8 @@ function InvoiceReportContent() {
       const res = await fetch("/api/vouchers");
       if (res.ok) {
         const data = await res.json();
-        setVouchers(data);
+        const filtered = (data || []).filter((v: any) => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange" && v.rawType !== "cashbox_transfer" && v.rawType !== "cashbox_exchange");
+        setVouchers(filtered);
       }
     } catch (err) {
       console.error("Failed to load vouchers for report page:", err);

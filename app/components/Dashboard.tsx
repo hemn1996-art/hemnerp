@@ -24,7 +24,8 @@ import { useRouter } from "next/navigation";
 
 export default function Dashboard({ openInvoice }: DashboardProps) {
   const router = useRouter();
-  const invoices = useStore((state) => state.invoices) || [];
+  const rawInvoices = useStore((state) => state.invoices) || [];
+  const invoices = rawInvoices.filter((v: any) => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange" && v.rawType !== "cashbox_transfer" && v.rawType !== "cashbox_exchange");
   const fetchInvoices = useStore((state) => state.fetchInvoices);
   const accounts = useStore((state) => state.accounts) || [];
   const fetchAccounts = useStore((state) => state.fetchAccounts);

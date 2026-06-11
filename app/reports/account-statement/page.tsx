@@ -70,7 +70,9 @@ function AccountStatementContent() {
       setLoading(true);
       const res = await fetch("/api/vouchers");
       if (res.ok) {
-        setVouchers(await res.json());
+        const data = await res.json();
+        const filtered = (data || []).filter((v: any) => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange" && v.rawType !== "cashbox_transfer" && v.rawType !== "cashbox_exchange");
+        setVouchers(filtered);
       }
     } finally {
       setLoading(false);
