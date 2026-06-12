@@ -38,9 +38,9 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(items);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error fetching attributes:", error);
-    return NextResponse.json({ error: "Failed to fetch attributes", message: error?.message, stack: error?.stack }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch attributes" }, { status: 500 });
   }
 }
 
@@ -72,9 +72,9 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(newItem, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating attribute:", error);
-    return NextResponse.json({ error: "Failed to create attribute", message: error?.message, stack: error?.stack }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create attribute" }, { status: 500 });
   }
 }
 
@@ -107,9 +107,9 @@ export async function PUT(request: Request) {
     });
 
     return NextResponse.json(updatedItem);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating attribute:", error);
-    return NextResponse.json({ error: "Failed to update attribute", message: error?.message, stack: error?.stack }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update attribute" }, { status: 500 });
   }
 }
 
@@ -134,8 +134,8 @@ export async function DELETE(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error deleting attribute:", error);
-    return NextResponse.json({ error: "Failed to delete attribute", message: error?.message, stack: error?.stack }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete attribute" }, { status: 500 });
   }
 }
