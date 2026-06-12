@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -69,15 +70,35 @@ export default function LoginPage() {
 
           <div style={inputGroup}>
             <label style={label}>پاسوۆردی دەستپێگەیشتن</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              style={input}
-              required
-              disabled={isLoading}
-            />
+            <div style={inputContainer}>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                style={{ ...input, width: "100%", paddingLeft: 40 }}
+                required
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={eyeBtn}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           <button type="submit" style={loginBtn} disabled={isLoading}>
@@ -208,4 +229,28 @@ const loginBtn: CSSProperties = {
   marginTop: 10,
   boxShadow: "0 4px 12px rgba(29, 78, 216, 0.3)",
   fontFamily: appFont,
+};
+
+const inputContainer: CSSProperties = {
+  position: "relative",
+  display: "flex",
+  alignItems: "center",
+  width: "100%",
+};
+
+const eyeBtn: CSSProperties = {
+  position: "absolute",
+  left: 12,
+  background: "none",
+  border: "none",
+  color: "#94a3b8",
+  cursor: "pointer",
+  fontSize: 16,
+  padding: 4,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  outline: "none",
+  userSelect: "none",
+  zIndex: 10,
 };
