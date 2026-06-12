@@ -1,11 +1,47 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 
+import { getCurrentUser } from "../../lib/auth";
+
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (currentUser.role === "admin") {
+      const cashboxes = await prisma.cashbox.findMany({
+        include: {
+          balances: {
+            include: {
+              currency: true,
+            },
+          },
+        },
+        orderBy: { id: "asc" },
+      });
+      return NextResponse.json(cashboxes);
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+      select: { allowedCashboxes: true },
+    });
+
+    if (!dbUser || !dbUser.allowedCashboxes) {
+      return NextResponse.json([]);
+    }
+
+    const allowedIds = dbUser.allowedCashboxes
+      .split(",")
+      .filter(Boolean)
+      .map(Number);
+
     const cashboxes = await prisma.cashbox.findMany({
+      where: { id: { in: allowedIds } },
       include: {
         balances: {
           include: {
@@ -15,6 +51,7 @@ export async function GET() {
       },
       orderBy: { id: "asc" },
     });
+
     return NextResponse.json(cashboxes);
   } catch (error) {
     console.error("Error fetching cashboxes:", error);

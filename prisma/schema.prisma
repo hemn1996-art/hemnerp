@@ -322,3 +322,33 @@ model PriceType {
   isActive Boolean @default(true)
 }
 
+model User {
+  id                Int              @id @default(autoincrement())
+  username          String           @unique
+  password          String
+  name              String
+  role              String           @default("employee")
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  phone             String?
+  canSeeOthersData  Boolean          @default(true)
+  allowedWarehouses String?          // Comma-separated warehouse IDs
+  allowedCashboxes  String?          // Comma-separated cashbox IDs
+  permissions       UserPermission[]
+}
+
+model UserPermission {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  module    String
+  canView   Boolean @default(false)
+  canCreate Boolean @default(false)
+  canUpdate Boolean @default(false)
+  canDelete Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, module])
+  @@index([userId])
+}
+

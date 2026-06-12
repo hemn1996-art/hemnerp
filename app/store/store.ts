@@ -1,6 +1,29 @@
 import { create } from "zustand";
 import { currencies as mockCurrencies } from "../data/mockData";
 
+interface UserPermission {
+  id: number;
+  userId: number;
+  module: string;
+  canView: boolean;
+  canCreate: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+}
+
+interface CurrentUser {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+  isActive: boolean;
+  phone?: string | null;
+  canSeeOthersData?: boolean;
+  allowedWarehouses?: string | null;
+  allowedCashboxes?: string | null;
+  permissions: UserPermission[];
+}
+
 interface StoreState {
   accounts: any[];
   accountTypes: any[];
@@ -10,6 +33,10 @@ interface StoreState {
   currencies: any[];
   warehouses: any[];
   
+  // User & Auth
+  currentUser: CurrentUser | null;
+  userLoaded: boolean;
+  
   // Actions to set state directly
   setAccounts: (accounts: any[]) => void;
   setAccountTypes: (accountTypes: any[]) => void;
@@ -18,6 +45,11 @@ interface StoreState {
   setInvoices: (invoices: any[]) => void;
   setCurrencies: (currencies: any[]) => void;
   setWarehouses: (warehouses: any[]) => void;
+  
+  // User actions
+  fetchCurrentUser: () => Promise<void>;
+  isAdmin: () => boolean;
+  hasPermission: (module: string, action: "canView" | "canCreate" | "canUpdate" | "canDelete") => boolean;
   
   // Async Fetchers
   fetchProducts: () => Promise<void>;
@@ -55,6 +87,10 @@ export const useStore = create<StoreState>((set, get) => ({
   invoices: [],
   currencies: [],
   warehouses: [],
+  
+  // User & Auth
+  currentUser: null,
+  userLoaded: false,
 
   setAccounts: (accounts) => set({ accounts }),
   setAccountTypes: (accountTypes) => set({ accountTypes }),
@@ -63,6 +99,37 @@ export const useStore = create<StoreState>((set, get) => ({
   setInvoices: (invoices) => set({ invoices }),
   setCurrencies: (currencies) => set({ currencies }),
   setWarehouses: (warehouses) => set({ warehouses }),
+
+  fetchCurrentUser: async () => {
+    try {
+      const res = await fetch(`/api/users/me?_t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        set({ currentUser: data, userLoaded: true });
+      } else {
+        // Clear session cookies client-side on failure (deactivation/unauthorized)
+        document.cookie = "auth_token=; path=/; max-age=0; SameSite=Lax";
+        document.cookie = "user_session=; path=/; max-age=0; SameSite=Lax";
+        set({ currentUser: null, userLoaded: true });
+      }
+    } catch (err) {
+      console.error("Failed to fetch current user", err);
+      set({ currentUser: null, userLoaded: true });
+    }
+  },
+
+  isAdmin: () => {
+    const user = get().currentUser;
+    return user?.role === "admin";
+  },
+
+  hasPermission: (module, action) => {
+    const user = get().currentUser;
+    if (!user) return false;
+    if (user.role === "admin") return true;
+    const perm = user.permissions?.find((p) => p.module === module);
+    return perm?.[action] ?? false;
+  },
 
   fetchProducts: async () => {
     try {

@@ -1,13 +1,43 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 
+import { getCurrentUser } from "../../lib/auth";
+
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (currentUser.role === "admin") {
+      const warehouses = await prisma.warehouse.findMany({
+        orderBy: { id: "asc" },
+      });
+      return NextResponse.json(warehouses);
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+      select: { allowedWarehouses: true },
+    });
+
+    if (!dbUser || !dbUser.allowedWarehouses) {
+      return NextResponse.json([]);
+    }
+
+    const allowedIds = dbUser.allowedWarehouses
+      .split(",")
+      .filter(Boolean)
+      .map(Number);
+
     const warehouses = await prisma.warehouse.findMany({
+      where: { id: { in: allowedIds } },
       orderBy: { id: "asc" },
     });
+
     return NextResponse.json(warehouses);
   } catch (error) {
     console.error("Error fetching warehouses:", error);

@@ -41,3 +41,12 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# temporary & scratch files
+/scratch
+/backups
+/temp.json
+/temp2.json
+/temp3.json
+/seed-admin.js
+

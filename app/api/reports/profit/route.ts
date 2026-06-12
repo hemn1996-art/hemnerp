@@ -8,7 +8,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
-    const displayCurrencyId = Number(searchParams.get("currencyId") || 1);
     
     const dateFilter: any = {};
     if (startDate) {
@@ -66,6 +65,10 @@ export async function GET(request: Request) {
       })
     ]);
 
+    const usdCurrency = currencies.find(c => c.code === "USD");
+    const usdId = usdCurrency ? usdCurrency.id : 1;
+
+    const displayCurrencyId = Number(searchParams.get("currencyId") || usdId);
     const targetCurrency = currencies.find(c => c.id === displayCurrencyId);
     const targetRate = targetCurrency ? targetCurrency.rate : 1.0;
 
@@ -77,7 +80,7 @@ export async function GET(request: Request) {
     };
 
     const convertVoucherToTarget = (amount: number, voucherCurId: number, exchangeRate: number) => {
-      const rate = voucherCurId === 1 ? 1.0 : exchangeRate || 1500;
+      const rate = voucherCurId === usdId ? 1.0 : exchangeRate || 1500;
       const usdAmount = amount / rate;
       return usdAmount * targetRate;
     };
@@ -91,7 +94,7 @@ export async function GET(request: Request) {
     let totalLosses = 0;
 
     vouchers.forEach((v: any) => {
-      const amount = convertVoucherToTarget(v.netAmount, v.currencyId || 1, v.exchangeRate);
+      const amount = convertVoucherToTarget(v.netAmount, v.currencyId || usdId, v.exchangeRate);
 
       if (v.type === "sales") {
         totalSales += amount;
@@ -99,14 +102,14 @@ export async function GET(request: Request) {
         v.inventoryTransactions.forEach((tx: any) => {
           cogs += Math.abs(tx.qtyChange) * tx.unitCost;
         });
-        totalCOGS += convertToTarget(cogs, 1);
+        totalCOGS += convertToTarget(cogs, usdId);
       } else if (v.type === "sales_return") {
         totalSales -= amount;
         let cogs = 0;
         v.inventoryTransactions.forEach((tx: any) => {
           cogs += Math.abs(tx.qtyChange) * tx.unitCost;
         });
-        totalCOGS -= convertToTarget(cogs, 1);
+        totalCOGS -= convertToTarget(cogs, usdId);
       } else if (v.type === "my_debt_discount") {
         totalMyDebtDiscount += amount;
       } else if (v.type === "people_debt_discount") {

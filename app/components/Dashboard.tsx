@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 
 export default function Dashboard({ openInvoice }: DashboardProps) {
   const router = useRouter();
+  const currentUser = useStore((state) => state.currentUser);
   const rawInvoices = useStore((state) => state.invoices) || [];
   const invoices = rawInvoices.filter((v: any) => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange" && v.rawType !== "cashbox_transfer" && v.rawType !== "cashbox_exchange");
   const fetchInvoices = useStore((state) => state.fetchInvoices);
@@ -269,14 +270,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         <div className="flex items-center gap-4 z-10">
           <button
             onClick={() => document.dispatchEvent(new CustomEvent("open-sidebar"))}
-            className="md:hidden sidebar-toggle-btn items-center justify-center w-10 h-10 bg-gray-50 text-gray-500 border border-gray-200 rounded-xl transition-colors hover:bg-gray-100 cursor-pointer"
+            className="sidebar-toggle-btn items-center justify-center w-10 h-10 bg-gray-50 text-gray-500 border border-gray-200 rounded-xl transition-colors hover:bg-gray-100 cursor-pointer"
           >
             ☰
           </button>
           
           <div>
             <h1 className="text-xl md:text-2xl font-bold mb-1 text-gray-800">
-              سڵاو کۆساری مەلا فەرهاد، بەخێربێیتەوە!
+              سڵاو {currentUser?.name || "کارمەند"}، بەخێربێیتەوە!
             </h1>
             <p className="text-gray-500 text-sm font-normal">ڕاپۆرتی سەرجەم چالاکییە داراییەکان لە یەک چاودێریدا</p>
           </div>

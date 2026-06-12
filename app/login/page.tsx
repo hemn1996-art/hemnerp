@@ -26,6 +26,10 @@ export default function LoginPage() {
       if (res.ok && data.success) {
         // Set cookie on client side as well for safety
         document.cookie = "auth_token=authenticated_session; path=/; max-age=604800; SameSite=Lax";
+        // Also set user session cookie
+        if (data.user) {
+          document.cookie = `user_session=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=604800; SameSite=Lax`;
+        }
         window.location.href = "/dashboard";
       } else {
         setError(data.error || "چوونەژوورەوە سەرکەوتوو نەبوو");

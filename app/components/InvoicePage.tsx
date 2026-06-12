@@ -137,6 +137,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const products = (useStore((s) => s.products) || []) as ProductLike[];
   const invoices = (useStore((s) => s.invoices) || []) as any[];
   const accountTypesStore = (useStore((s) => s.accountTypes) || []) as any[];
+  const currentUser = useStore((s) => s.currentUser);
 
   const fetchAccounts = useStore((s) => s.fetchAccounts);
   const storeCurrencies = useStore((s: any) => s.currencies) || [];
@@ -151,6 +152,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const updateVoucher = useStore((s) => s.updateVoucher);
 
   const loggedInUser =
+    currentUser ||
     (store as any).currentUser ||
     (store as any).user ||
     (store as any).authUser ||
@@ -193,13 +195,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       })
     );
     setInvoiceDate(new Date().toISOString().slice(0, 10));
-    setEmployeeName(
-      loggedInUser.name || loggedInUser.fullName || loggedInUser.username || ""
-    );
-    setEmployeePhone(
-      loggedInUser.phone || loggedInUser.mobile || loggedInUser.phoneNumber || ""
-    );
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      setEmployeeName(currentUser.name || currentUser.username || "");
+      setEmployeePhone(currentUser.phone || "");
+    }
+  }, [currentUser]);
 
   const [accountSearch, setAccountSearch] = useState("");
   const [accountId, setAccountId] = useState<number | undefined>();

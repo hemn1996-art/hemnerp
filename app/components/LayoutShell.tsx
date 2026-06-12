@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
 import { useStore } from "../store/store";
 
@@ -31,13 +31,51 @@ type LayoutShellProps = {
 export default function LayoutShell({ children }: LayoutShellProps) {
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const isLoginPage = pathname === "/login";
   
   const fetchCurrencies = useStore((s) => s.fetchCurrencies);
+  const fetchCurrentUser = useStore((s) => s.fetchCurrentUser);
+  const userLoaded = useStore((s) => s.userLoaded);
+  const currentUser = useStore((s) => s.currentUser);
 
   useEffect(() => {
     fetchCurrencies();
-  }, [fetchCurrencies]);
+    if (!isLoginPage) {
+      fetchCurrentUser();
+    }
+  }, [fetchCurrencies, fetchCurrentUser, isLoginPage, pathname]);
+
+  useEffect(() => {
+    if (!isLoginPage && userLoaded && !currentUser) {
+      router.push("/login");
+    }
+  }, [isLoginPage, userLoaded, currentUser, router]);
+
+  // Real-time updates via SSE (Server-Sent Events)
+  useEffect(() => {
+    if (isLoginPage || !currentUser) return;
+
+    const eventSource = new EventSource("/api/users/me/updates");
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "permissions_updated" || data.type === "user_updated" || data.type === "deactivated") {
+          // Trigger fetchCurrentUser to sync permissions/status.
+          // If deactivated, this fetch will fail with 401 and automatically log the user out.
+          fetchCurrentUser();
+        }
+      } catch (err) {
+        console.error("Error parsing real-time updates:", err);
+      }
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [currentUser, isLoginPage, fetchCurrentUser]);
+
 
   /* Global: auto-convert Arabic/Kurdish digits → English on any numeric input */
   useEffect(() => {
@@ -61,6 +99,18 @@ export default function LayoutShell({ children }: LayoutShellProps) {
     return () =>
       document.removeEventListener("beforeinput", handleBeforeInput, true);
   }, []);
+
+  if (!isLoginPage && !userLoaded) {
+    return (
+      <div style={{ display: "flex", width: "100vw", height: "100vh", alignItems: "center", justifyContent: "center", background: "#f3f4f6", fontFamily: '"Speda", sans-serif' }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <div style={{ width: 40, height: 40, border: "4px solid #d1d5db", borderTop: "4px solid #3b82f6", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#4b5563" }}>داخڵبوون...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
