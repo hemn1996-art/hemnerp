@@ -3,6 +3,32 @@ const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { Pool } = require("pg");
 
+const fs = require('fs');
+const path = require('path');
+
+// Try to load .env file manually
+try {
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1];
+        let value = (match[2] || '').trim();
+        if (value.startsWith('"') && value.endsWith('"')) {
+          value = value.slice(1, -1);
+        } else if (value.startsWith("'") && value.endsWith("'")) {
+          value = value.slice(1, -1);
+        }
+        process.env[key] = value;
+      }
+    });
+  }
+} catch (e) {
+  console.log("No .env file found or failed to parse:", e.message);
+}
+
 // Same hash function as in auth.ts
 function simpleHash(str) {
   let hash = 0;
@@ -21,8 +47,11 @@ function simpleHash(str) {
 }
 
 async function main() {
+  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL || "postgresql://postgres.xjjilptidbrekoptqpde:GoxlanPass2026@aws-1-eu-central-1.pooler.supabase.com:5432/postgres";
+  console.log("Connecting to database:", connectionString.split("@")[1] || "fallback");
+  
   const pool = new Pool({
-    connectionString: process.env.DIRECT_URL || "postgresql://postgres.xjjilptidbrekoptqpde:GoxlanPass2026@aws-1-eu-central-1.pooler.supabase.com:5432/postgres",
+    connectionString,
     max: 2,
   });
   const adapter = new PrismaPg(pool);
