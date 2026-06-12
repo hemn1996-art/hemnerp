@@ -55,12 +55,12 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} style={form}>
           <div style={inputGroup}>
-            <label style={label}>یوزەرنەیمی بەڕێوبەر</label>
+            <label style={label}>ناو بەکارهێنەر</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
+              placeholder="username"
               style={input}
               required
               disabled={isLoading}
