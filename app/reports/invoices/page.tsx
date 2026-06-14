@@ -187,24 +187,45 @@ function InvoiceReportContent() {
   const [versionBIndex, setVersionBIndex] = useState<number>(0);
 
   // Visible Columns state (16 columns matching the screenshot)
-  const [visibleColumns, setVisibleColumns] = useState({
-    invoiceId: true,
-    type: true,
-    paymentStatus: true,
-    account: true,
-    total: true,
-    discount: true,
-    paid: true,
-    remaining: true,
-    deliveryFee: true,
-    expenses: true,
-    profit: false,
-    cashbox: true,
-    offer: false,
-    notes: true,
-    date: true,
-    actions: true,
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const defaultCols = {
+      invoiceId: true,
+      type: true,
+      paymentStatus: true,
+      account: true,
+      total: true,
+      discount: true,
+      paid: true,
+      remaining: true,
+      deliveryFee: true,
+      expenses: true,
+      profit: false,
+      cashbox: true,
+      offer: false,
+      notes: true,
+      date: true,
+      actions: true,
+    };
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("__erp_invoices_report_cols");
+        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return defaultCols;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("__erp_invoices_report_cols", JSON.stringify(visibleColumns));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [visibleColumns]);
 
   // Load dependency data on mount
   useEffect(() => {
@@ -879,12 +900,12 @@ function InvoiceReportContent() {
     };
     const columnKey = sortFieldToColumnMap[field];
     if (columnKey && !visibleColumns[columnKey]) {
-      setVisibleColumns(prev => ({ ...prev, [columnKey]: true }));
+      setVisibleColumns((prev: any) => ({ ...prev, [columnKey]: true }));
     }
   };
 
   const toggleColumn = (key: keyof typeof visibleColumns) => {
-    setVisibleColumns((prev) => ({
+    setVisibleColumns((prev: any) => ({
       ...prev,
       [key]: !prev[key],
     }));
@@ -1008,19 +1029,50 @@ function InvoiceReportContent() {
       ...linesB.map(l => Number(l.productId))
     ]));
 
+    // Only show items that changed
+    const changedProductIds = allProductIds.filter(productId => {
+      const lineA = linesA.find(l => Number(l.productId) === productId);
+      const lineB = linesB.find(l => Number(l.productId) === productId);
+
+      const qtyA = lineA ? Number(lineA.qty || 0) : 0;
+      const qtyB = lineB ? Number(lineB.qty || 0) : 0;
+      const priceA = lineA ? Number(lineA.unitPrice || 0) : 0;
+      const priceB = lineB ? Number(lineB.unitPrice || 0) : 0;
+
+      const qtyChanged = qtyA !== qtyB;
+      const priceChanged = priceA !== priceB;
+      const isAdded = !lineA && lineB;
+      const isDeleted = lineA && !lineB;
+      
+      return isAdded || isDeleted || qtyChanged || priceChanged;
+    });
+
     const getProductName = (productId: number) => {
       const storeProduct = (products || []).find((p: any) => p.id === productId);
       return storeProduct?.name || `کەرەستەی #${productId}`;
     };
 
+    if (changedProductIds.length === 0) {
+      return (
+        <div className="border border-slate-200 rounded-2xl p-5 bg-white shadow-sm mt-6 text-right">
+          <h5 className="text-sm font-black text-slate-800 mb-2 border-b border-slate-100 pb-2.5 flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <span>📊 بەراوردکردنی وردەکاری کەرەستەکان</span>
+            </div>
+          </h5>
+          <div className="text-slate-500 text-center py-4 text-xs font-bold">هیچ گۆڕانکارییەک لە کەرەستەکاندا نەکراوە</div>
+        </div>
+      );
+    }
+
     return (
       <div className="border border-slate-200 rounded-2xl p-5 bg-white shadow-sm mt-6 text-right">
         <h5 className="text-sm font-black text-slate-800 mb-4 border-b border-slate-100 pb-2.5 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span>📊 بەراوردکردنی وردەکاری کەرەستەکانی نێوان هەردوو وەشانەکە</span>
+            <span>📊 بەراوردکردنی وردەکاری کەرەستەکان</span>
           </div>
           <span className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold">
-            کۆی گشتی کەرەستەکان: {allProductIds.length}
+            کەرەستە گۆڕدراوەکان: {changedProductIds.length}
           </span>
         </h5>
         
@@ -1029,17 +1081,17 @@ function InvoiceReportContent() {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px]">
                 <th className="py-3 px-4 text-right">ناو و کۆدی کەرەستە</th>
-                <th className="py-3 px-4 text-center">عەدەدی (وەشانی {verA?.versionNum})</th>
-                <th className="py-3 px-4 text-center">عەدەدی (وەشانی {verB?.versionNum})</th>
-                <th className="py-3 px-4 text-center">نرخی (وەشانی {verA?.versionNum})</th>
-                <th className="py-3 px-4 text-center">نرخی (وەشانی {verB?.versionNum})</th>
-                <th className="py-3 px-4 text-center">کۆی گشتی (وەشانی {verA?.versionNum})</th>
-                <th className="py-3 px-4 text-center">کۆی گشتی (وەشانی {verB?.versionNum})</th>
+                <th className="py-3 px-4 text-center">عەدەدی (وەشانی ا)</th>
+                <th className="py-3 px-4 text-center">عەدەدی (وەشانی ب)</th>
+                <th className="py-3 px-4 text-center">نرخی (وەشانی ا)</th>
+                <th className="py-3 px-4 text-center">نرخی (وەشانی ب)</th>
+                <th className="py-3 px-4 text-center">کۆی گشتی (وەشانی ا)</th>
+                <th className="py-3 px-4 text-center">کۆی گشتی (وەشانی ب)</th>
                 <th className="py-3 px-4 text-center">دۆخی گۆڕانکاری</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {allProductIds.map((productId) => {
+              {changedProductIds.map((productId) => {
                 const lineA = linesA.find(l => Number(l.productId) === productId);
                 const lineB = linesB.find(l => Number(l.productId) === productId);
 
@@ -2335,26 +2387,36 @@ function InvoiceReportContent() {
 
             {/* Comparison Content */}
             <div className="p-6 space-y-6 flex-grow">
+              
+              {/* Top columns showing version details side-by-side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-right space-y-1">
+                  <div className="font-black text-slate-500 uppercase">وەشانی ا (سەرەتایی)</div>
+                  <div className="text-sm font-black text-slate-800">وەشانی {getVersionData(versionAIndex)?.versionNum}</div>
+                  <div className="text-slate-600 font-medium">کارمەند: <span className="font-bold text-slate-800">{getVersionData(versionAIndex)?.employeeName || "نەناسراو"}</span></div>
+                  <div className="text-[10px] text-slate-400">بەروار: {getVersionData(versionAIndex)?.updatedAt ? formatDateTime(getVersionData(versionAIndex).updatedAt) : "-"}</div>
+                </div>
+                
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-right space-y-1">
+                  <div className="font-black text-slate-500 uppercase">وەشانی ب (نوێکراوە)</div>
+                  <div className="text-sm font-black text-slate-800">وەشانی {getVersionData(versionBIndex)?.versionNum}</div>
+                  <div className="text-slate-600 font-medium">کارمەند: <span className="font-bold text-slate-800">{getVersionData(versionBIndex)?.employeeName || "نەناسراو"}</span></div>
+                  <div className="text-[10px] text-slate-400">بەروار: {getVersionData(versionBIndex)?.updatedAt ? formatDateTime(getVersionData(versionBIndex).updatedAt) : "-"}</div>
+                </div>
+              </div>
+
               {/* Values Table */}
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-100 text-slate-700 text-xs font-bold text-center">
                     <tr>
-                      <th className="py-2.5 px-4 text-right w-1/4">خانە / زانیاری</th>
-                      <th className="py-2.5 px-4 w-3/8">وەشانی {getVersionData(versionAIndex)?.versionNum}</th>
-                      <th className="py-2.5 px-4 w-3/8">وەشانی {getVersionData(versionBIndex)?.versionNum}</th>
+                      <th className="py-2.5 px-4 text-right w-1/4">زانیاری گۆڕاوەکان</th>
+                      <th className="py-2.5 px-4 w-3/8">وەشانی ا</th>
+                      <th className="py-2.5 px-4 w-3/8">وەشانی ب</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-right">
-                    <tr className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-2.5 px-4 text-right font-black text-xs text-slate-500">بەرواری دروستکردنی پسوڵە</td>
-                      <td colSpan={2} className="py-2.5 px-4 text-center text-xs font-bold text-slate-800">
-                        {selectedVoucherForVersions?.createdAt ? formatDateTime(selectedVoucherForVersions.createdAt) : "-"}
-                      </td>
-                    </tr>
-                    {renderComparisonRow("کاتی گۆڕانکاری", getVersionData(versionAIndex)?.updatedAt, getVersionData(versionBIndex)?.updatedAt, (d) => d ? formatDateTime(d) : "-", true)}
-                    {renderComparisonRow("کارمەند / ئەنجامدەر", getVersionData(versionAIndex)?.employeeName, getVersionData(versionBIndex)?.employeeName, undefined, true)}
-                    {renderComparisonRow("کۆی گشتی پارەی جوڵاو", getVersionData(versionAIndex)?.netAmount, getVersionData(versionBIndex)?.netAmount, (v) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1))}
+                    {/* Render only changed rows */}
                     {renderComparisonRow("داشکاندن", getVersionData(versionAIndex)?.totalDiscount, getVersionData(versionBIndex)?.totalDiscount, (v) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1))}
                     {renderComparisonRow("تێبینی ناوخۆیی", getVersionData(versionAIndex)?.internalNote || getVersionData(versionAIndex)?.note, getVersionData(versionBIndex)?.internalNote || getVersionData(versionBIndex)?.note)}
                     {renderComparisonRow("تێبینی چاپ", getVersionData(versionAIndex)?.printNote, getVersionData(versionBIndex)?.printNote)}
@@ -2363,6 +2425,17 @@ function InvoiceReportContent() {
                     {renderComparisonRow("بڕی دراو (پارەی دراو)", getVersionData(versionAIndex)?.paidAmounts, getVersionData(versionBIndex)?.paidAmounts, (paid) => formatPaidAmounts(paid))}
                     {renderComparisonRow("ڕێژەی گۆڕینەوە", getVersionData(versionAIndex)?.exchangeRate, getVersionData(versionBIndex)?.exchangeRate)}
                     {renderComparisonRow("دراوی پسوڵە", getVersionData(versionAIndex)?.currencyId, getVersionData(versionBIndex)?.currencyId, (id) => currencies.find((c: any) => c.id === Number(id))?.name || "-")}
+                    
+                    {/* Bottom-most row showing invoice net amount total value (always shown) */}
+                    <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold text-slate-800">
+                      <td className="py-3 px-4 text-right font-black text-xs">بەهای پسوولە (کۆی گشتی)</td>
+                      <td className="py-3 px-4 text-center text-xs">
+                        {formatCurrencyValue(Number(getVersionData(versionAIndex)?.netAmount || 0), selectedVoucherForVersions?.currencyId || 1)}
+                      </td>
+                      <td className="py-3 px-4 text-center text-xs">
+                        {formatCurrencyValue(Number(getVersionData(versionBIndex)?.netAmount || 0), selectedVoucherForVersions?.currencyId || 1)}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

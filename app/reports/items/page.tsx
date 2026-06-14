@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useStore } from "../../store/store";
+import { useRouter } from "next/navigation";
 
 export default function ItemsReportPage() {
+  const router = useRouter();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -52,17 +54,38 @@ export default function ItemsReportPage() {
   const [showColumnsModal, setShowColumnsModal] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  const [visibleColumns, setVisibleColumns] = useState({
-    voucherReference: true,
-    voucherType: true,
-    productName: true,
-    category: true,
-    brand: true,
-    label: true,
-    warehouseName: true,
-    quantity: true,
-    accountName: true,
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const defaultCols = {
+      voucherReference: true,
+      voucherType: true,
+      productName: true,
+      category: true,
+      brand: true,
+      label: true,
+      warehouseName: true,
+      quantity: true,
+      accountName: true,
+    };
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("__erp_items_report_cols");
+        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return defaultCols;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("__erp_items_report_cols", JSON.stringify(visibleColumns));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [visibleColumns]);
 
   useEffect(() => {
     fetchAccounts?.();
@@ -195,7 +218,53 @@ export default function ItemsReportPage() {
   }, [items, searchTerm, category, brand, label, products]);
 
   const totalQty = filteredItems.reduce((s, i) => s + (i.quantity || 0), 0);
-  const totalAmount = filteredItems.reduce((s, i) => s + (i.lineTotal || 0), 0);
+
+  // Group line totals by currency
+  const perCurrencyTotals = React.useMemo(() => {
+    const totals: Record<number, number> = {};
+    filteredItems.forEach((i) => {
+      const curId = Number(i.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1);
+      totals[curId] = (totals[curId] || 0) + (i.lineTotal || 0);
+    });
+    return totals;
+  }, [filteredItems, currencies]);
+
+  const formatCurrencyValue = (amount: number, curId: number) => {
+    const currencyObj = currencies.find((c: any) => c.id === curId);
+    const formattedNumber = amount.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
+    if (currencyObj?.code === "IQD") {
+      return `${formattedNumber} دینار`;
+    } else if (currencyObj?.code === "USD") {
+      return `${formattedNumber} دۆلار`;
+    }
+    return `${formattedNumber} ${currencyObj?.name || ""}`;
+  };
+
+  const renderTotalMoney = () => {
+    if (currencyId !== "all") {
+      const filterCurId = Number(currencyId);
+      const amount = perCurrencyTotals[filterCurId] || 0;
+      return <span>{formatCurrencyValue(amount, filterCurId)}</span>;
+    }
+
+    const parts: string[] = [];
+    Object.entries(perCurrencyTotals).forEach(([curIdStr, amount]) => {
+      const curId = Number(curIdStr);
+      if (Math.abs(amount) > 0.01) {
+        parts.push(formatCurrencyValue(amount, curId));
+      }
+    });
+
+    if (parts.length === 0) {
+      const defCur = currencies.find((c: any) => c.code === "USD") || currencies[0] || { id: 1, name: "دۆلار" };
+      return <span>{formatCurrencyValue(0, defCur.id)}</span>;
+    }
+
+    return <span>{parts.join(" + ")}</span>;
+  };
 
   return (
     <div className="p-0 bg-slate-50 min-h-screen font-ckb text-slate-800">
@@ -256,7 +325,7 @@ export default function ItemsReportPage() {
       {/* Summary Cards */}
       <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center gap-6 justify-end">
         <div className="text-center px-6 py-2 border-r border-slate-200">
-          <p className="text-2xl font-bold text-slate-800">{totalAmount.toLocaleString("en-US")}</p>
+          <p className="text-2xl font-bold text-slate-800">{renderTotalMoney()}</p>
           <p className="text-[11px] text-slate-500">گشتی پارە</p>
         </div>
         <div className="text-center px-6 py-2 border-r border-slate-200">
@@ -301,9 +370,17 @@ export default function ItemsReportPage() {
                   {visibleColumns.category && <td className="p-2.5 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
                   {visibleColumns.productName && <td className="p-2.5 border-r border-slate-200 text-center text-slate-700 font-medium">{item.productName}</td>}
                   {visibleColumns.voucherType && <td className="p-2.5 border-r border-slate-200 text-center text-slate-600">{translateVoucherType(item.voucherType)}</td>}
-                  {visibleColumns.voucherReference && <td className="p-2.5 border-r border-slate-200 text-center">
-                    <span className="bg-[#1e40af] text-white px-4 py-1 rounded text-[10px] font-bold inline-block min-w-[50px]">{item.voucherReference}</span>
-                  </td>}
+                  {visibleColumns.voucherReference && (
+                    <td className="p-2.5 border-r border-slate-200 text-center">
+                      <span 
+                        onClick={() => router.push(`/invoices?editId=${item.voucherId}&type=${item.voucherType}`)}
+                        className="bg-[#1e40af] text-white px-4 py-1 rounded text-[10px] font-bold inline-block min-w-[50px] cursor-pointer hover:bg-blue-800 transition"
+                        title="کردنەوەی پسوولە"
+                      >
+                        {item.voucherReference}
+                      </span>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -335,7 +412,7 @@ export default function ItemsReportPage() {
                   <span className="text-[13px] font-medium text-slate-700">{lbl}</span>
                   <input type="checkbox"
                     checked={visibleColumns[key as keyof typeof visibleColumns]}
-                    onChange={(e) => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+                    onChange={(e) => setVisibleColumns((prev: any) => ({ ...prev, [key]: e.target.checked }))}
                     className="w-4 h-4 rounded text-blue-600" />
                 </label>
               ))}
@@ -474,6 +551,13 @@ export default function ItemsReportPage() {
                     <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)}>
                       <option value="all"></option>
                       {warehouses?.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="mui-outline">
+                    <label>دراو (پارە)</label>
+                    <select value={currencyId} onChange={e => setCurrencyId(e.target.value)}>
+                      <option value="all">هەموو</option>
+                      {currencies?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                   <div className="mui-outline">

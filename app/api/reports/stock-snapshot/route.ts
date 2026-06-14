@@ -42,13 +42,13 @@ export async function GET(request: Request) {
       if (!stockMap[key]) {
         stockMap[key] = {
           productId: t.productId,
-          productName: t.product.name,
-          productCode: t.product.code || "-",
+          productName: t.product?.name || "نەزانراو",
+          productCode: t.product?.code || "-",
           category: "-",
           brand: "-",
           sellPrice: 0,
           warehouseId: t.warehouseId,
-          warehouseName: t.warehouse.name,
+          warehouseName: t.warehouse?.name || "نەزانراو",
           quantity: 0,
           purchasePrice: 0,
           expense: 0,
@@ -64,9 +64,9 @@ export async function GET(request: Request) {
       if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
         stockMap[key].purchasePrice = t.unitCost;
         stockMap[key].cost = t.unitCost;
-        stockMap[key].sellerName = t.voucher.account?.name || "نەزانراو";
-        stockMap[key].sellerId = t.voucher.account?.id || null;
-        stockMap[key].purchaseDate = t.voucher.date;
+        stockMap[key].sellerName = t.voucher?.account?.name || "نەزانراو";
+        stockMap[key].sellerId = t.voucher?.account?.id || null;
+        stockMap[key].purchaseDate = t.voucher?.date || "-";
       }
     });
 

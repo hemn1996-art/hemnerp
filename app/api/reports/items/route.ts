@@ -92,6 +92,7 @@ export async function GET(request: Request) {
             type: true,
             date: true,
             employeeName: true,
+            currencyId: true,
             account: { select: { name: true } },
             inventoryTransactions: {
               select: {
@@ -121,6 +122,7 @@ export async function GET(request: Request) {
         warehouseName: matchTx?.warehouse?.name || "-",
         quantity: line.qty || 0,
         lineTotal: line.lineTotal || 0,
+        currencyId: line.voucher.currencyId,
         accountName: line.voucher.account?.name || "نەزانراو",
         date: line.voucher.date,
         employeeName: line.voucher.employeeName || "-",

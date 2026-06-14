@@ -58,17 +58,38 @@ export default function DebtReportPage() {
   const [filterBeforeDate, setFilterBeforeDate] = useState("");
   const [filterDebtType, setFilterDebtType] = useState("people"); // "people", "mine"
 
-  const [visibleColumns, setVisibleColumns] = useState({
-    account: true,
-    phone: true,
-    city: false,
-    district: false,
-    creditLimitExceeded: true,
-    debtBeforeLastPayment: true,
-    lastPaymentAmount: true,
-    lastPaymentDate: true,
-    totalDebt: true,
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const defaultCols = {
+      account: true,
+      phone: true,
+      city: false,
+      district: false,
+      creditLimitExceeded: true,
+      debtBeforeLastPayment: true,
+      lastPaymentAmount: true,
+      lastPaymentDate: true,
+      totalDebt: true,
+    };
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("__erp_debts_report_cols");
+        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return defaultCols;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("__erp_debts_report_cols", JSON.stringify(visibleColumns));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [visibleColumns]);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -266,7 +287,7 @@ export default function DebtReportPage() {
                       type="checkbox" 
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       checked={visibleColumns[key as keyof typeof visibleColumns]}
-                      onChange={(e) => setVisibleColumns(prev => ({...prev, [key]: e.target.checked}))}
+                      onChange={(e) => setVisibleColumns((prev: any) => ({...prev, [key]: e.target.checked}))}
                     />
                     <span className="text-sm font-medium text-gray-700">{label}</span>
                   </label>

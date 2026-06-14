@@ -59,21 +59,42 @@ export default function StockReportPage() {
   });
 
   // Columns visibility state
-  const [visibleColumns, setVisibleColumns] = useState({
-    id: true,
-    productName: true,
-    category: true,
-    brand: true,
-    sellPrice: true,
-    warehouseName: true,
-    quantity: true,
-    purchasePrice: true,
-    expense: true,
-    cost: false,
-    warehouseValue: false,
-    sellerName: true,
-    purchaseDate: true,
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const defaultCols = {
+      id: true,
+      productName: true,
+      category: true,
+      brand: true,
+      sellPrice: true,
+      warehouseName: true,
+      quantity: true,
+      purchasePrice: true,
+      expense: true,
+      cost: false,
+      warehouseValue: false,
+      sellerName: true,
+      purchaseDate: true,
+    };
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("__erp_stock_report_cols");
+        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return defaultCols;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("__erp_stock_report_cols", JSON.stringify(visibleColumns));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [visibleColumns]);
 
   useEffect(() => {
     fetchWarehouses?.();
@@ -162,7 +183,7 @@ export default function StockReportPage() {
   const totalValue = filteredStockData.reduce((sum, item) => sum + (item.cost * item.quantity), 0);
 
   const toggleColumn = (key: keyof typeof visibleColumns) => {
-    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
+    setVisibleColumns((prev: any) => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (

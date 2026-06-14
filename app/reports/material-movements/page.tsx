@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useStore } from "../../store/store";
+import { useRouter } from "next/navigation";
 
 export default function ItemsReportPage() {
+  const router = useRouter();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -54,23 +56,44 @@ export default function ItemsReportPage() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showColumnsModal, setShowColumnsModal] = useState(false);
 
-  const [visibleColumns, setVisibleColumns] = useState({
-    voucherReference: true,
-    voucherType: true,
-    accountName: true,
-    productName: true,
-    category: true,
-    brand: true,
-    warehouseName: true,
-    cost: true,
-    quantity: true,
-    price: true,
-    offers: false,
-    discount: true,
-    lineTotal: true,
-    profit: false,
-    date: true,
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const defaultCols = {
+      voucherReference: true,
+      voucherType: true,
+      accountName: true,
+      productName: true,
+      category: true,
+      brand: true,
+      warehouseName: true,
+      cost: true,
+      quantity: true,
+      price: true,
+      offers: false,
+      discount: true,
+      lineTotal: true,
+      profit: false,
+      date: true,
+    };
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("__erp_mat_movements_cols");
+        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return defaultCols;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("__erp_mat_movements_cols", JSON.stringify(visibleColumns));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [visibleColumns]);
 
   useEffect(() => {
     fetchAccounts?.();
@@ -214,7 +237,17 @@ export default function ItemsReportPage() {
               ) : (
                 items.map((item, i) => (
                   <tr key={item.id} className={`border-b border-slate-200 hover:bg-slate-100 transition ${i % 2 === 0 ? 'bg-white' : 'bg-[#f8fafc]'}`}>
-                    {visibleColumns.voucherReference && <td className="p-2 border-r border-slate-200 text-center"><span className="bg-[#1e40af] text-white px-3 py-1 rounded text-[10px] font-bold">{item.voucherReference}</span></td>}
+                    {visibleColumns.voucherReference && (
+                      <td className="p-2 border-r border-slate-200 text-center">
+                        <span 
+                          onClick={() => router.push(`/invoices?editId=${item.voucherId}&type=${item.voucherType}`)}
+                          className="bg-[#1e40af] text-white px-3 py-1 rounded text-[10px] font-bold cursor-pointer hover:bg-blue-800 transition"
+                          title="کردنەوەی پسوولە"
+                        >
+                          {item.voucherReference}
+                        </span>
+                      </td>
+                    )}
                     {visibleColumns.voucherType && <td className="p-2 border-r border-slate-200 text-center font-medium text-slate-600">{translateVoucherType(item.voucherType)}</td>}
                     {visibleColumns.accountName && <td className="p-2 border-r border-slate-200 text-center text-blue-700 font-bold">{item.accountName}</td>}
                     {visibleColumns.productName && <td className="p-2 border-r border-slate-200 text-center font-bold text-[#334155]">{item.productName}</td>}
@@ -268,7 +301,7 @@ export default function ItemsReportPage() {
                   <input
                     type="checkbox"
                     checked={visibleColumns[key as keyof typeof visibleColumns]}
-                    onChange={(e) => setVisibleColumns(prev => ({ ...prev, [key]: e.target.checked }))}
+                    onChange={(e) => setVisibleColumns((prev: any) => ({ ...prev, [key]: e.target.checked }))}
                     className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   />
                 </label>
