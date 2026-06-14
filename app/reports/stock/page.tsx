@@ -26,6 +26,7 @@ export default function StockReportPage() {
   const router = useRouter();
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
     warehouses, fetchWarehouses,
@@ -116,6 +117,7 @@ export default function StockReportPage() {
   const loadStockData = async () => {
     try {
       setLoading(true);
+      setErrorMsg(null);
       const query = new URLSearchParams();
       if (filters.fromDate) query.append("fromDate", filters.fromDate);
       if (filters.toDate) query.append("toDate", filters.toDate);
@@ -125,10 +127,24 @@ export default function StockReportPage() {
 
       const res = await fetch(`/api/reports/stock?${query.toString()}`);
       if (res.ok) {
-        setStockData(await res.json());
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setStockData(data);
+        } else {
+          setStockData([]);
+          setErrorMsg(data?.error || "کێشەیەک ڕوویدا لە هێنانی داتا");
+        }
+      } else {
+        try {
+          const errData = await res.json();
+          setErrorMsg(errData?.error || "کێشەیەک ڕوویدا لە سێرڤەر");
+        } catch {
+          setErrorMsg("کێشەیەک ڕوویدا لە سێرڤەر");
+        }
       }
     } catch (err) {
       console.error(err);
+      setErrorMsg("کێشەیەک ڕوویدا لە پەیوەندی کردن بە سێرڤەرەوە");
     } finally {
       setLoading(false);
     }
@@ -290,6 +306,21 @@ export default function StockReportPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={13} className="p-8 text-center text-gray-500 font-bold">باردەکرێت...</td>
+                  </tr>
+                ) : errorMsg ? (
+                  <tr>
+                    <td colSpan={13} className="p-8 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <span className="text-red-500 text-3xl">⚠️</span>
+                        <span className="text-red-600 font-bold text-sm">{errorMsg}</span>
+                        <button 
+                          onClick={loadStockData} 
+                          className="bg-[#0b1f50] text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-[#061f5f] transition-colors"
+                        >
+                          هەوڵی دووبارە بدەرەوە 🔄
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ) : filteredStockData.length === 0 ? (
                   <tr>

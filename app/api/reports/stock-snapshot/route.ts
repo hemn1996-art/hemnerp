@@ -73,8 +73,11 @@ export async function GET(request: Request) {
     const result = Object.values(stockMap).filter((item: any) => item.quantity !== 0);
 
     return NextResponse.json(result);
-  } catch (error) {
-    console.error("Error fetching stock snapshot:", error);
-    return NextResponse.json({ error: "Failed to fetch stock snapshot" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Error fetching stock snapshot:", error?.message || error);
+    return NextResponse.json({ 
+      error: "کێشەیەک ڕوویدا لە هێنانی ڕوونمایی کۆگا", 
+      details: error?.message || "Unknown error" 
+    }, { status: 500 });
   }
 }

@@ -93,8 +93,11 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(result);
-  } catch (error) {
-    console.error("Error fetching stock report:", error);
-    return NextResponse.json({ error: "Failed to fetch stock report" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Error fetching stock report:", error?.message || error);
+    return NextResponse.json({ 
+      error: "کێشەیەک ڕوویدا لە هێنانی ڕاپۆرتی کۆگا", 
+      details: error?.message || "Unknown error" 
+    }, { status: 500 });
   }
 }
