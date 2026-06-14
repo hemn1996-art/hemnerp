@@ -196,7 +196,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
               ? "bg-rose-100 border-rose-300 text-rose-950"
               : announcement.type === "success"
               ? "bg-emerald-100 border-emerald-300 text-emerald-950"
-              : "bg-blue-100 border-blue-300 text-blue-955"
+              : "bg-blue-100 border-blue-300 text-blue-950"
           }`}
           style={{ direction: "rtl" }}
           title="بۆ داخستنی ئەم ئاگادارییە، کلیک لە هەر شوێنێکی ئەم بۆکسە بکە"

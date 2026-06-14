@@ -232,6 +232,7 @@ export const useStore = create<StoreState>((set, get) => ({
             type: uiType,
             total: v.netAmount,
             paid: v.paidAmounts?.reduce((sum: number, pa: any) => sum + pa.amount, 0) || 0,
+            totalDiscount: v.totalDiscount || 0,
             date: v.date,
             referenceNo: v.referenceNo,
             accountName: v.account?.name || "",

@@ -1184,7 +1184,7 @@ function InvoiceReportContent() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] text-slate-800 rtl select-none">
+    <div className="flex flex-col min-h-screen bg-[#f8fafc] text-slate-800 rtl select-none">
       {/* Print styles */}
       <style jsx global>{`
         @media print {
@@ -1296,11 +1296,7 @@ function InvoiceReportContent() {
       {/* ── Main Scrollable Body ── */}
       <div 
         id="print-report-area" 
-        className="flex-1 overflow-y-auto p-6 space-y-6"
-        onScroll={(e) => {
-          const st = e.currentTarget.scrollTop;
-          setLastScrollTop(st <= 0 ? 0 : st);
-        }}
+        className="flex-1 p-6 space-y-6"
       >
         {/* Summary KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">

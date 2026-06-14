@@ -63,6 +63,24 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
   const iqdRate = currencies.find((c: any) => c.code === "IQD")?.rate || 1500;
 
+  const getPaymentStatus = (total: number, paid: number) => {
+    if (paid <= 0.01) {
+      return { label: "قەرز", color: "bg-rose-100 text-rose-700 border-rose-200" };
+    }
+    if (paid >= total - 0.01) {
+      return { label: "نەقد", color: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+    }
+    return { label: "بەشەکی", color: "bg-amber-100 text-amber-700 border-amber-200" };
+  };
+
+  const formatInvoiceCurrency = (val: number, currencyCode: string) => {
+    if (currencyCode === "IQD") {
+      return `${val.toLocaleString()} دینار`;
+    }
+    const cur = currencies.find((c: any) => c.code === currencyCode);
+    return `${cur?.symbol || "$"}${val.toLocaleString()}`;
+  };
+
   // Helper to calculate separate USD and IQD totals by voucher types
   const getTotals = (filterType: string, sumField: "total" | "paid" = "total") => {
     let usd = 0;
@@ -584,66 +602,87 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
       </div>
 
-      {/* 4. Pending Invoices Table Card */}
+      {/* 4. High Value Invoices Table Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-[#0d1e3d] text-white">
-          <span className="font-bold text-base">پسوولە بەردەوامەکان</span>
+          <span className="font-bold text-base">پسوولە بەها بەرزەکان</span>
           <select className="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-1.5 text-sm font-bold outline-none cursor-pointer">
             <option className="text-gray-900">هەمووی</option>
           </select>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-right text-sm">
-            <thead className="bg-[#122850] text-white/90 text-xs font-semibold">
+            <thead className="bg-[#0f172a] text-white text-xs font-semibold">
               <tr>
-                <th className="px-4 py-3 text-center">پسوولە</th>
-                <th className="px-4 py-3 text-center">جۆر</th>
-                <th className="px-4 py-3 text-center">هەژمار</th>
-                <th className="px-4 py-3 text-center">کۆی گشتی</th>
-                <th className="px-4 py-3 text-center">داشکاندن</th>
-                <th className="px-4 py-3 text-center">پارەی دراو</th>
-                <th className="px-4 py-3 text-center">ماوە</th>
-                <th className="px-4 py-3 text-center">قاسە</th>
-                <th className="px-4 py-3 text-center">تێبینی</th>
-                <th className="px-4 py-3 text-center">بەروار</th>
+                <th className="px-4 py-3.5 text-center">پسوولە</th>
+                <th className="px-4 py-3.5 text-center">جۆر</th>
+                <th className="px-4 py-3.5 text-center">دۆخی پارەدان</th>
+                <th className="px-4 py-3.5 text-right">هەژمار</th>
+                <th className="px-4 py-3.5 text-center">کۆی گشتی</th>
+                <th className="px-4 py-3.5 text-center">داشکاندن</th>
+                <th className="px-4 py-3.5 text-center">پارەی دراو</th>
+                <th className="px-4 py-3.5 text-center">ماوە</th>
+                <th className="px-4 py-3.5 text-center">قاسە</th>
+                <th className="px-4 py-3.5 text-center">تێبینی</th>
+                <th className="px-4 py-3.5 text-center">بەروار</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {invoices.slice(-5).reverse().map((inv, idx) => {
-                let badgeClass = "bg-gray-100 text-gray-800";
-                if (inv.type === "فرۆشتن") badgeClass = "bg-[#fee2e2] text-[#ef4444]";
-                else if (inv.type === "کڕین") badgeClass = "bg-[#dcfce7] text-[#22c55e]";
-                else if (inv.type === "خەرجی") badgeClass = "bg-[#ffedd5] text-[#f97316]";
-                else if (inv.type === "پارەی هاتوو") badgeClass = "bg-[#f3e8ff] text-[#8b5cf6]";
-                else if (inv.type === "پارەی ڕۆشتوو") badgeClass = "bg-[#ecfeff] text-[#06b6d4]";
+            <tbody className="divide-y divide-gray-100 bg-white text-slate-700 font-semibold">
+              {[...invoices]
+                .sort((a: any, b: any) => b.total - a.total)
+                .slice(0, 5)
+                .map((inv, idx) => {
+                  let badgeClass = "bg-gray-100 text-gray-800";
+                  if (inv.type === "فرۆشتن") badgeClass = "bg-[#fee2e2] text-[#ef4444]";
+                  else if (inv.type === "کڕین") badgeClass = "bg-[#dcfce7] text-[#22c55e]";
+                  else if (inv.type === "خەرجی") badgeClass = "bg-[#ffedd5] text-[#f97316]";
+                  else if (inv.type === "پارەی هاتوو") badgeClass = "bg-[#f3e8ff] text-[#8b5cf6]";
+                  else if (inv.type === "پارەی ڕۆشتوو") badgeClass = "bg-[#ecfeff] text-[#06b6d4]";
 
-                return (
-                  <tr key={inv.id || idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3.5 text-center text-blue-600 font-bold font-mono">{inv.id}</td>
-                    <td className="px-4 py-3.5 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold inline-block ${badgeClass}`}>
-                        {inv.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-center text-gray-700 font-semibold">{inv.accountName || "نەناسراو"}</td>
-                    <td className="px-4 py-3.5 text-center font-bold font-mono text-gray-800">${inv.total.toLocaleString()}</td>
-                    <td className="px-4 py-3.5 text-center text-gray-400 font-mono">-</td>
-                    <td className="px-4 py-3.5 text-center text-green-600 font-bold font-mono">${inv.paid.toLocaleString()}</td>
-                    <td className="px-4 py-3.5 text-center text-red-500 font-bold font-mono">${(inv.total - inv.paid).toLocaleString()}</td>
-                    <td className="px-4 py-3.5 text-center text-gray-500">{inv.cashboxName || "-"}</td>
-                    <td className="px-4 py-3.5 text-center text-gray-400 text-xs truncate max-w-[120px]">{inv.internalNote || "-"}</td>
-                    <td className="px-4 py-3.5 text-center text-gray-500">
-                      <div className="flex flex-col items-center justify-center text-[10px] leading-tight">
-                        <span className="text-gray-800 font-bold mb-0.5 whitespace-nowrap bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">{inv.employeeName || "کۆساری مەلا فەرهاد"}</span>
-                        <span className="text-gray-400 font-mono">{inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : "02/06/2026"}</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                  const payStatus = getPaymentStatus(inv.total, inv.paid);
+                  const currencyCode = inv.currencyCode || "USD";
+                  const remaining = Math.max(inv.total - inv.paid, 0);
+
+                  return (
+                    <tr key={inv.id || idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3.5 text-center text-blue-600 font-bold font-mono">{inv.id}</td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold inline-block ${badgeClass}`}>
+                          {inv.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold border ${payStatus.color}`}>
+                          {payStatus.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right text-gray-700 font-semibold">{inv.accountName || "-"}</td>
+                      <td className="px-4 py-3.5 text-center font-bold font-mono text-gray-800">
+                        {formatInvoiceCurrency(inv.total, currencyCode)}
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-rose-600 font-mono">
+                        {inv.totalDiscount > 0 ? formatInvoiceCurrency(inv.totalDiscount, currencyCode) : "-"}
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-green-600 font-bold font-mono">
+                        {inv.paid > 0 ? formatInvoiceCurrency(inv.paid, currencyCode) : "-"}
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-red-500 font-bold font-mono">
+                        {remaining > 0 ? formatInvoiceCurrency(remaining, currencyCode) : "-"}
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-gray-500">{inv.cashboxName || "-"}</td>
+                      <td className="px-4 py-3.5 text-center text-gray-400 text-xs truncate max-w-[120px]">{inv.internalNote || "-"}</td>
+                      <td className="px-4 py-3.5 text-center text-gray-500">
+                        <div className="flex flex-col items-center justify-center text-[10px] leading-tight">
+                          <span className="text-gray-800 font-bold mb-0.5 whitespace-nowrap bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">{inv.employeeName || "سیستەم"}</span>
+                          <span className="text-gray-400 font-mono">{inv.date ? new Date(inv.date).toLocaleDateString('en-GB') : "-"}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               {invoices.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={11} className="px-4 py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <span className="text-4xl text-blue-500 animate-bounce">📁</span>
                       <span className="text-sm font-semibold">ببوورە، هیچ داتایەک نەدۆزرایەوە!</span>
