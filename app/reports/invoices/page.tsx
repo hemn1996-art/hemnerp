@@ -1199,7 +1199,7 @@ function InvoiceReportContent() {
 
           {/* Card: Total Value */}
           <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">کۆی گشتی بەها</span>
+            <span className="text-slate-600 text-xs font-bold">کۆی گشتی پارەی جوڵاو</span>
             <span className="text-indigo-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.valueByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
               {visibleColumns.total ? formatKPIMultiCurrency(totals.valueByCurrency) : "ناچالاکە"}
             </span>
@@ -2316,7 +2316,7 @@ function InvoiceReportContent() {
                     </tr>
                     {renderComparisonRow("کاتی گۆڕانکاری", getVersionData(versionAIndex)?.updatedAt, getVersionData(versionBIndex)?.updatedAt, (d) => d ? formatDateTime(d) : "-", true)}
                     {renderComparisonRow("کارمەند / ئەنجامدەر", getVersionData(versionAIndex)?.employeeName, getVersionData(versionBIndex)?.employeeName, undefined, true)}
-                    {renderComparisonRow("کۆی گشتی بەها", getVersionData(versionAIndex)?.netAmount, getVersionData(versionBIndex)?.netAmount, (v) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1))}
+                    {renderComparisonRow("کۆی گشتی پارەی جوڵاو", getVersionData(versionAIndex)?.netAmount, getVersionData(versionBIndex)?.netAmount, (v) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1))}
                     {renderComparisonRow("داشکاندن", getVersionData(versionAIndex)?.totalDiscount, getVersionData(versionBIndex)?.totalDiscount, (v) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1))}
                     {renderComparisonRow("تێبینی ناوخۆیی", getVersionData(versionAIndex)?.internalNote || getVersionData(versionAIndex)?.note, getVersionData(versionBIndex)?.internalNote || getVersionData(versionBIndex)?.note)}
                     {renderComparisonRow("تێبینی چاپ", getVersionData(versionAIndex)?.printNote, getVersionData(versionBIndex)?.printNote)}
