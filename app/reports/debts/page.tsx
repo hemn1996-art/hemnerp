@@ -260,7 +260,7 @@ export default function DebtReportPage() {
                 {/* Section 2: Account Details */}
                 <div>
                    <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2 border-b border-gray-100 pb-2"><span className="text-lg">👤</span> زانیاری هەژمار</h3>
-                   <div className="grid grid-cols-1 gap-4">
+                   <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1">جۆری هەژمار</label>
                         <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterAccountType} onChange={e => setFilterAccountType(e.target.value)}>
@@ -268,6 +268,15 @@ export default function DebtReportPage() {
                           {accountTypes.map((type: any) => (
                             <option key={type.id} value={type.id}>{type.name}</option>
                           ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1">کۆلێکشن</label>
+                        <select
+                          disabled
+                          className="w-full border border-gray-200 rounded-lg p-2 text-sm font-bold bg-gray-50 text-gray-400 cursor-not-allowed"
+                        >
+                          <option value="">دیاری نەکراوە</option>
                         </select>
                       </div>
                    </div>
