@@ -26,7 +26,10 @@ export async function GET(request: Request) {
         },
         inventoryTransactions: {
           select: {
+            id: true,
             qtyChange: true,
+            unitCost: true,
+            date: true,
           },
         },
       },
@@ -38,6 +41,10 @@ export async function GET(request: Request) {
         (sum, t) => sum + t.qtyChange,
         0
       );
+      const purchaseTx = p.inventoryTransactions
+        .filter((t) => t.qtyChange > 0 && t.unitCost > 0)
+        .sort((a, b) => b.id - a.id);
+      const latestCost = purchaseTx.length > 0 ? purchaseTx[0].unitCost : 0;
       const hasTransactions = (p._count?.inventoryTransactions || 0) > 0 || (p._count?.voucherLines || 0) > 0;
       return {
         id: p.id,
@@ -52,6 +59,7 @@ export async function GET(request: Request) {
         isActive: p.isActive,
         createdAt: p.createdAt,
         stock: stock,
+        costPrice: latestCost,
         isDeletable: !hasTransactions,
       };
     });

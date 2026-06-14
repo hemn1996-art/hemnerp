@@ -22,8 +22,8 @@ type Props = {
 };
 
 type DiscountMode = "amount" | "percent";
-type PriceTypeName = "جۆملە" | "تاک" | "تایبەت";
-const priceTypes: PriceTypeName[] = ["جۆملە", "تاک", "تایبەت"];
+type PriceTypeName = "جوملە" | "تاک" | "تایبەت";
+const priceTypes: PriceTypeName[] = ["جوملە", "تاک", "تایبەت"];
 type ToastType = "error" | "success" | "info";
 
 type PaidAmounts = {
@@ -117,7 +117,7 @@ type PrintOptions = {
   showPrintBalance: boolean;
 };
 
-const warehouses = [
+const fallbackWarehouses = [
   { id: 1, name: "کۆگای سەرەکی" },
   { id: 2, name: "کۆگای دووکان" },
 ];
@@ -147,6 +147,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const fetchProducts = useStore((s) => s.fetchProducts);
   const fetchInvoices = useStore((s) => s.fetchInvoices);
   const fetchAccountTypes = useStore((s) => s.fetchAccountTypes);
+
+  const warehousesFromStore = (useStore((s) => (s as any).warehouses) || []) as any[];
+  const fetchWarehouses = useStore((s: any) => s.fetchWarehouses);
+
+  const warehouses = useMemo(() => {
+    return warehousesFromStore.length > 0
+      ? warehousesFromStore
+      : fallbackWarehouses;
+  }, [warehousesFromStore]);
 
   const addVoucher = useStore((s) => s.addVoucher);
   const updateVoucher = useStore((s) => s.updateVoucher);
@@ -184,6 +193,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (products.length === 0) fetchProducts();
     if (invoices.length === 0) fetchInvoices();
     if (accountTypesStore.length === 0) fetchAccountTypes();
+    if (warehousesFromStore.length === 0) fetchWarehouses();
   }, []);
 
   useEffect(() => {
@@ -250,7 +260,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [deliveryFee, setDeliveryFee] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
 
-  const [invoicePriceType, setInvoicePriceType] = useState<PriceTypeName | string>("جۆملە");
+  const [invoicePriceType, setInvoicePriceType] = useState<PriceTypeName | string>("جوملە");
 
   const [savedInvoiceSnapshot, setSavedInvoiceSnapshot] = useState("");
   const [originalVoucher, setOriginalVoucher] = useState<any>(null);
@@ -329,11 +339,17 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 note: line.note || "",
                 packageName: line.packageName || "دانە",
                 packageQuantity: line.packageQuantity || 1,
-                warehouseName: line.warehouseName || "کۆگای سەرەکی",
-                priceType: line.priceType || "جۆملە",
+                warehouseName: (() => {
+                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
+                  return tx?.warehouse?.name || "کۆگای سەرەکی";
+                })(),
+                priceType: line.priceType || "جوملە",
                 currencyId: line.currencyId || voucher.currencyId || 1,
                 availableQty: (line.product?.stock || 0) + line.qty,
-                costPrice: line.product?.costPrice || 0,
+                costPrice: (() => {
+                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
+                  return tx ? tx.unitCost : (line.product?.costPrice || 0);
+                })(),
                 showCost: false,
               }));
               setRows(mappedRows);
@@ -932,7 +948,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     return [
       {
-        priceType: "جۆملە",
+        priceType: "جوملە",
         currencyId: invoiceCurrencyId,
         amount: product?.salePrice || 0,
       },
@@ -1284,15 +1300,20 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       deliveryCity: deliveryCity || null,
       deliveryAddress: deliveryAddress || null,
       deliveryFee: deliveryFeeAmount || null,
-      lines: rows.map((row: any) => ({
-        productId: row.productId,
-        qty: toNumber(row.qty) * row.packageQuantity,
-        unitPrice: toNumber(row.price),
-        discountPercent: row.discountMode === "percent" ? toNumber(row.discountValue) : 0,
-        discountAmount: getRowDiscountAmount(row),
-        lineTotal: getRowTotal(row),
-        note: row.note,
-      })),
+      lines: rows.map((row: any) => {
+        const warehouseId = warehouses.find((w: any) => w.name === row.warehouseName)?.id || warehouses[0]?.id || 1;
+        return {
+          productId: row.productId,
+          qty: toNumber(row.qty) * row.packageQuantity,
+          unitPrice: toNumber(row.price),
+          discountPercent: row.discountMode === "percent" ? toNumber(row.discountValue) : 0,
+          discountAmount: getRowDiscountAmount(row),
+          lineTotal: getRowTotal(row),
+          note: row.note,
+          warehouseId,
+          unitCost: toNumber(row.costPrice || 0),
+        };
+      }),
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,

@@ -84,7 +84,7 @@ type PrintOptions = {
   showBalance: boolean;
 };
 
-const warehouses = [
+const fallbackWarehouses = [
   { id: 1, name: "کۆگای سەرەکی" },
   { id: 2, name: "کۆگای دووکان" },
 ];
@@ -113,6 +113,18 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
   const addVoucher = useStore((s) => s.addVoucher);
   const updateVoucher = useStore((s) => s.updateVoucher);
   const fetchProducts = useStore((s) => s.fetchProducts);
+  const warehousesFromStore = (useStore((s) => (s as any).warehouses) || []) as any[];
+  const fetchWarehouses = useStore((s: any) => s.fetchWarehouses);
+
+  const warehouses = useMemo(() => {
+    return warehousesFromStore.length > 0
+      ? warehousesFromStore
+      : fallbackWarehouses;
+  }, [warehousesFromStore]);
+
+  useEffect(() => {
+    if (warehousesFromStore.length === 0) fetchWarehouses();
+  }, []);
 
   const loggedInUser =
     (store as any).currentUser ||
@@ -184,10 +196,16 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                 note: line.note || "",
                 packageName: line.packageName || "دانە",
                 packageQuantity: line.packageQuantity || 1,
-                warehouseName: line.warehouseName || "کۆگای سەرەکی",
+                warehouseName: (() => {
+                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
+                  return tx?.warehouse?.name || "کۆگای سەرەکی";
+                })(),
                 currencyId: line.currencyId || voucher.currencyId || 1,
                 availableStock: line.product?.stock || 0,
-                costPrice: line.product?.costPrice || 0,
+                costPrice: (() => {
+                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
+                  return tx ? tx.unitCost : (line.product?.costPrice || 0);
+                })(),
                 costCurrencyId: line.product?.costCurrencyId || voucher.currencyId || 1,
               }));
               setRows(mappedRows);
@@ -1171,15 +1189,20 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
       internalNote: internalNote,
       printNote: printNote,
       employeeName: employeeName,
-      lines: rows.map((row: any) => ({
-        productId: row.productId,
-        qty: toNumber(row.qty) * row.packageQuantity,
-        unitPrice: toNumber(row.returnPrice),
-        discountPercent: 0,
-        discountAmount: toNumber(row.discount),
-        lineTotal: getRowTotal(row),
-        note: row.note,
-      })),
+      lines: rows.map((row: any) => {
+        const warehouseId = warehouses.find((w: any) => w.name === row.warehouseName)?.id || warehouses[0]?.id || 1;
+        return {
+          productId: row.productId,
+          qty: toNumber(row.qty) * row.packageQuantity,
+          unitPrice: toNumber(row.returnPrice),
+          discountPercent: 0,
+          discountAmount: toNumber(row.discount),
+          lineTotal: getRowTotal(row),
+          note: row.note,
+          warehouseId,
+          unitCost: toNumber(row.costPrice || 0),
+        };
+      }),
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,

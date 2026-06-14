@@ -103,6 +103,11 @@ interface RawVoucher {
   ledgerEntries: LedgerEntry[];
   employeeName: string | null;
   versions?: any[];
+  inventoryTransactions?: Array<{
+    productId: number;
+    qtyChange: number;
+    unitCost: number;
+  }>;
 }
 
 function InvoiceReportContent() {
@@ -114,10 +119,12 @@ function InvoiceReportContent() {
     accountTypes,
     cashboxes,
     currencies,
+    products,
     fetchAccounts,
     fetchAccountTypes,
     fetchCashboxes,
     fetchCurrencies,
+    fetchProducts,
   } = useStore();
 
   // Local state
@@ -205,6 +212,7 @@ function InvoiceReportContent() {
     fetchAccountTypes();
     fetchCashboxes();
     fetchCurrencies();
+    fetchProducts();
     loadVouchers();
   }, []);
 
@@ -450,8 +458,21 @@ function InvoiceReportContent() {
   // Helper: Calculate cost of goods sold (COGS) in USD
   const getVoucherCostUSD = (voucher: RawVoucher) => {
     if (voucher.type !== "sales") return 0;
+
+    // Use transaction unitCost if available
+    if (voucher.inventoryTransactions && voucher.inventoryTransactions.length > 0) {
+      return voucher.inventoryTransactions.reduce((sum, tx) => {
+        if (tx.qtyChange < 0) {
+          return sum + Math.abs(tx.qtyChange) * (tx.unitCost || 0);
+        }
+        return sum;
+      }, 0);
+    }
+
+    // Fallback: lookup costPrice from products loaded in store
     return voucher.lines.reduce((sum, line) => {
-      const cost = line.product?.costPrice || 0;
+      const storeProduct = (products || []).find((p: any) => p.id === line.productId);
+      const cost = storeProduct?.costPrice || 0;
       return sum + line.qty * cost;
     }, 0);
   };

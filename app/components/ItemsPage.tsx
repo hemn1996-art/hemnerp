@@ -13,6 +13,7 @@ type ItemKind = "inventory" | "service" | "expense";
 export default function ItemsPage() {
   const [mode, setMode] = useState<"list" | "add" | "edit">("list");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   return (
     <div style={{ direction: "rtl", minWidth: 0 }}>
@@ -26,11 +27,17 @@ export default function ItemsPage() {
             setSelectedProduct(product);
             setMode("edit");
           }}
+          successMsg={successMessage}
+          clearSuccessMsg={() => setSuccessMessage(null)}
         />
       ) : (
         <AddItemForm
           productToEdit={selectedProduct}
           onBack={() => setMode("list")}
+          onSuccess={(msg) => {
+            setSuccessMessage(msg);
+            setMode("list");
+          }}
         />
       )}
     </div>
@@ -40,9 +47,13 @@ export default function ItemsPage() {
 function ItemsList({
   onAdd,
   onEdit,
+  successMsg,
+  clearSuccessMsg,
 }: {
   onAdd: () => void;
   onEdit: (product: Product) => void;
+  successMsg: string | null;
+  clearSuccessMsg: () => void;
 }) {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
@@ -78,6 +89,13 @@ function ItemsList({
       setSearch(decodeURIComponent(s));
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (successMsg) {
+      showAlert("success", "سەرکەوتوو", successMsg);
+      clearSuccessMsg();
+    }
+  }, [successMsg, clearSuccessMsg]);
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -240,9 +258,11 @@ function ItemsList({
 function AddItemForm({
   productToEdit,
   onBack,
+  onSuccess,
 }: {
   productToEdit?: Product | null;
   onBack: () => void;
+  onSuccess: (message: string) => void;
 }) {
   const [name, setName] = useState(productToEdit?.name || "");
   const storeCurrencies = useStore((s: any) => s.currencies) || [];
@@ -268,8 +288,8 @@ function AddItemForm({
   const [code, setCode] = useState(productToEdit?.code || "");
   const [barcode, setBarcode] = useState("");
 
-  const [brand, setBrand] = useState("بێ براند");
-  const [category, setCategory] = useState("گشتی");
+  const [brand, setBrand] = useState(productToEdit?.brand || "");
+  const [category, setCategory] = useState(productToEdit?.category || "");
 
   const [itemKind, setItemKind] = useState<ItemKind>(
     productToEdit?.isExpense
@@ -281,16 +301,16 @@ function AddItemForm({
 
   const [salePrices, setSalePrices] = useState([
     {
-      currencyId: "1",
-      priceType: "تاک",
+      currencyId: "",
+      priceType: "",
       amount: "",
     },
   ]);
 
   const [packages, setPackages] = useState([
     {
-      name: "دانە",
-      quantity: "1",
+      name: productToEdit?.packaging || "",
+      quantity: productToEdit ? "1" : "",
     },
   ]);
 
@@ -301,18 +321,10 @@ function AddItemForm({
 
   const [isActive, setIsActive] = useState(productToEdit?.isActive ?? true);
 
-  const [categories, setCategories] = useState<{ id: number; name: string; isActive: boolean }[]>(
-    [{ id: 1, name: "گشتی", isActive: true }]
-  );
-  const [brands, setBrands] = useState<{ id: number; name: string; isActive: boolean }[]>(
-    [{ id: 1, name: "بێ براند", isActive: true }]
-  );
-  const [packagings, setPackagings] = useState<{ id: number; name: string; isActive: boolean }[]>(
-    [{ id: 1, name: "دانە", isActive: true }, { id: 2, name: "کارتۆن", isActive: true }]
-  );
-  const [priceTypes, setPriceTypes] = useState<{ id: number; name: string; isActive: boolean }[]>(
-    [{ id: 1, name: "تاک", isActive: true }, { id: 2, name: "کۆ", isActive: true }]
-  );
+  const [categories, setCategories] = useState<{ id: number; name: string; isActive: boolean }[]>([]);
+  const [brands, setBrands] = useState<{ id: number; name: string; isActive: boolean }[]>([]);
+  const [packagings, setPackagings] = useState<{ id: number; name: string; isActive: boolean }[]>([]);
+  const [priceTypes, setPriceTypes] = useState<{ id: number; name: string; isActive: boolean }[]>([]);
 
   useEffect(() => {
     async function loadAttributes() {
@@ -325,8 +337,8 @@ function AddItemForm({
           setCategories(active);
           if (productToEdit?.category) {
             setCategory(productToEdit.category);
-          } else if (active.length > 0) {
-            setCategory(active[0].name);
+          } else {
+            setCategory("");
           }
         }
       } catch (err) { console.error(err); }
@@ -340,8 +352,8 @@ function AddItemForm({
           setBrands(active);
           if (productToEdit?.brand) {
             setBrand(productToEdit.brand);
-          } else if (active.length > 0) {
-            setBrand(active[0].name);
+          } else {
+            setBrand("");
           }
         }
       } catch (err) { console.error(err); }
@@ -355,8 +367,8 @@ function AddItemForm({
           setPackagings(active);
           if (productToEdit?.packaging) {
             setPackages([{ name: productToEdit.packaging, quantity: "1" }]);
-          } else if (active.length > 0) {
-            setPackages([{ name: active[0].name, quantity: "1" }]);
+          } else {
+            setPackages([{ name: "", quantity: "" }]);
           }
         }
       } catch (err) { console.error(err); }
@@ -368,9 +380,6 @@ function AddItemForm({
           const listPriceTypes = await res.json();
           const active = listPriceTypes.filter((x: any) => x.isActive !== false);
           setPriceTypes(active);
-          if (active.length > 0) {
-            setSalePrices([{ currencyId: "1", priceType: active[0].name, amount: "" }]);
-          }
         }
       } catch (err) { console.error(err); }
     }
@@ -464,6 +473,32 @@ function AddItemForm({
       return;
     }
 
+    if (!code.trim()) {
+      showAlert("warning", "ئاگاداری", "کۆدی کەرەستە پڕ بکەرەوە");
+      return;
+    }
+
+    if (!category) {
+      showAlert("warning", "ئاگاداری", "تکایە کاتێگۆری دیاری بکە");
+      return;
+    }
+
+    if (!brand) {
+      showAlert("warning", "ئاگاداری", "تکایە براند دیاری بکە");
+      return;
+    }
+
+    const firstPackage = packages[0];
+    if (!firstPackage || !firstPackage.name) {
+      showAlert("warning", "ئاگاداری", "تکایە پێچانەوە دیاری بکە");
+      return;
+    }
+
+    if (!firstPackage.quantity || Number(firstPackage.quantity) <= 0) {
+      showAlert("warning", "ئاگاداری", "تکایە ژمارەی ناو پێچانەوە بە دروستی بنووسە");
+      return;
+    }
+
     const isExpense = itemKind === "expense";
     const isService = itemKind === "service";
     const isInventory = itemKind === "inventory";
@@ -474,7 +509,7 @@ function AddItemForm({
       code: code.trim() || undefined,
       category,
       brand,
-      packaging: packages[0]?.name || "دانە",
+      packaging: firstPackage.name,
       isMultiBatch: isInventory ? isMultiBatch : false,
       isExpense,
       isService,
@@ -486,10 +521,11 @@ function AddItemForm({
       : await store.addProduct(productData);
 
     if (result) {
-      showAlert("success", "سەرکەوتوو", productToEdit ? "کەرەستە بە سەرکەوتوویی دەستکاری کرا ✅" : "کەرەستە بە سەرکەوتوویی خەزن کرا ✅", () => {
-        closeAlert();
-        onBack();
-      });
+      onSuccess(
+        productToEdit
+          ? "کەرەستە بە سەرکەوتوویی دەستکاری کرا ✅"
+          : "کەرەستە بە سەرکەوتوویی خەزن کرا ✅"
+      );
     } else {
       showAlert("error", "هەڵە", "کەرەستە خەزن نەکرا. تکایە دووبارە هەوڵ بدە.");
     }
@@ -538,12 +574,12 @@ function AddItemForm({
         </div>
 
         <div style={grid3}>
-          <Field label="کۆد">
+          <Field label="* کۆد">
             <input
               value={code}
               onChange={(e) => setCode(e.target.value)}
               style={{ ...input, direction: "ltr", textAlign: "left" }}
-              placeholder="18"
+              placeholder="کۆدی کەرەستە"
             />
           </Field>
 
@@ -556,12 +592,13 @@ function AddItemForm({
             />
           </Field>
 
-          <Field label="براند">
+          <Field label="* براند">
             <select
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               style={input}
             >
+              <option value="">براند دیاری بکە...</option>
               {brands.map((b: any) => (
                 <option key={b.id} value={b.name}>
                   {b.name}
@@ -572,12 +609,13 @@ function AddItemForm({
         </div>
 
         <div style={grid3}>
-          <Field label="کاتێگۆری">
+          <Field label="* کاتێگۆری">
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               style={input}
             >
+              <option value="">کاتێگۆری دیاری بکە...</option>
               {categories.map((c: any) => (
                 <option key={c.id} value={c.name}>
                   {c.name}
@@ -655,7 +693,7 @@ function AddItemForm({
                 }
                 style={input}
               >
-                <option value="">دراو</option>
+                <option value="">دراو دیاری بکە...</option>
                 {currencies
                   .filter((x: any) => x.isActive !== false)
                   .map((currency: any) => (
@@ -674,6 +712,7 @@ function AddItemForm({
                 }
                 style={input}
               >
+                <option value="">جۆری نرخ دیاری بکە...</option>
                 {priceTypes.map((pt) => (
                   <option key={pt.id} value={pt.name}>
                     {pt.name}
@@ -724,12 +763,13 @@ function AddItemForm({
               marginBottom: 12,
             }}
           >
-            <Field label="پێچانەوە">
+            <Field label="* پێچانەوە">
               <select
                 value={row.name}
                 onChange={(e) => updatePackage(index, "name", e.target.value)}
                 style={input}
               >
+                <option value="">پێچانەوە دیاری بکە...</option>
                 {packagings.map((pkg) => (
                   <option key={pkg.id} value={pkg.name}>
                     {pkg.name}
@@ -738,7 +778,7 @@ function AddItemForm({
               </select>
             </Field>
 
-            <Field label="ژمارەی ناو پێچانەوە">
+            <Field label="* ژمارەی ناو پێچانەوە">
               <input
                 type="text"
                 inputMode="numeric"
@@ -749,7 +789,7 @@ function AddItemForm({
                   updatePackage(index, "quantity", e.target.value)
                 }
                 style={numericInput}
-                placeholder="1"
+                placeholder="ژمارە بنووسە"
               />
             </Field>
 

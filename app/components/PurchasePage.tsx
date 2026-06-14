@@ -1394,6 +1394,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           lineTotal: getRowTotal(row),
           note: row.note,
           warehouseId: warehouse?.id || warehouses[0]?.id || 1,
+          unitCost: getFinalCostPerUnitInRowCurrency(row),
         };
       }),
       expenses: expenses.map((exp) => ({

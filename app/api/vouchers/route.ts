@@ -74,6 +74,13 @@ export async function GET(request: Request) {
             product: { select: { id: true, name: true, code: true } },
           },
         },
+        inventoryTransactions: {
+          select: {
+            productId: true,
+            qtyChange: true,
+            unitCost: true,
+          },
+        },
         ledgerEntries: {
           select: {
             id: true,

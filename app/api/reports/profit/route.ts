@@ -49,6 +49,9 @@ export async function GET(request: Request) {
           inventoryTransactions: {
             select: { qtyChange: true, unitCost: true },
           },
+          lines: {
+            select: { productId: true, qty: true },
+          },
         },
       }),
       prisma.currency.findMany({ where: { isActive: true } }),
@@ -93,22 +96,44 @@ export async function GET(request: Request) {
     let totalGifts = 0;
     let totalLosses = 0;
 
+    // Calculate the latest purchase cost for every product
+    const productCosts: Record<number, number> = {};
+    inventoryTrans.forEach((t) => {
+      if (t.qtyChange > 0 && t.unitCost > 0) {
+        productCosts[t.productId] = t.unitCost;
+      }
+    });
+
     vouchers.forEach((v: any) => {
       const amount = convertVoucherToTarget(v.netAmount, v.currencyId || usdId, v.exchangeRate);
 
       if (v.type === "sales") {
         totalSales += amount;
         let cogs = 0;
-        v.inventoryTransactions.forEach((tx: any) => {
-          cogs += Math.abs(tx.qtyChange) * tx.unitCost;
-        });
+        if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
+          v.inventoryTransactions.forEach((tx: any) => {
+            cogs += Math.abs(tx.qtyChange) * tx.unitCost;
+          });
+        } else if (v.lines) {
+          v.lines.forEach((line: any) => {
+            const cost = productCosts[line.productId] || 0;
+            cogs += line.qty * cost;
+          });
+        }
         totalCOGS += convertToTarget(cogs, usdId);
       } else if (v.type === "sales_return") {
         totalSales -= amount;
         let cogs = 0;
-        v.inventoryTransactions.forEach((tx: any) => {
-          cogs += Math.abs(tx.qtyChange) * tx.unitCost;
-        });
+        if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
+          v.inventoryTransactions.forEach((tx: any) => {
+            cogs += Math.abs(tx.qtyChange) * tx.unitCost;
+          });
+        } else if (v.lines) {
+          v.lines.forEach((line: any) => {
+            const cost = productCosts[line.productId] || 0;
+            cogs += line.qty * cost;
+          });
+        }
         totalCOGS -= convertToTarget(cogs, usdId);
       } else if (v.type === "my_debt_discount") {
         totalMyDebtDiscount += amount;
