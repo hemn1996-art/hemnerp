@@ -2338,13 +2338,61 @@ function InvoiceReportContent() {
       )}
 
       {/* ── Modal: Version Comparison (وەشانەکان) ── */}
-      {showVersionsModal && selectedVoucherForVersions && (
+      {showVersionsModal && selectedVoucherForVersions && (() => {
+        const verA = getVersionData(versionAIndex);
+        const verB = getVersionData(versionBIndex);
+        const vNumA = verA?.versionNum || (versionAIndex + 1);
+        const vNumB = verB?.versionNum || (versionBIndex + 1);
+
+        // Collect all comparable fields with labels
+        const fields = [
+          { key: "netAmount", label: "بەهای پسوڵە (کۆی گشتی)", fmt: (v: any) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1) },
+          { key: "totalDiscount", label: "داشکاندن", fmt: (v: any) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1) },
+          { key: "totalAmount", label: "کۆی گشتی بەبێ داشکاندن", fmt: (v: any) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1) },
+          { key: "exchangeRate", label: "ڕێژەی گۆڕینەوە", fmt: (v: any) => v ? String(v) : "-" },
+          { key: "accountId", label: "هەژمار", fmt: (id: any) => accounts.find((a: any) => a.id === Number(id))?.name || "-" },
+          { key: "cashboxId", label: "قاسە", fmt: (id: any) => cashboxes.find((c: any) => c.id === Number(id))?.name || "-" },
+          { key: "currencyId", label: "دراو", fmt: (id: any) => currencies.find((c: any) => c.id === Number(id))?.name || "-" },
+          { key: "paidAmounts", label: "پارەی دراو", fmt: (paid: any) => formatPaidAmounts(paid) },
+          { key: "internalNote", label: "تێبینی ناوخۆیی", fmt: (v: any) => v || "-" },
+          { key: "printNote", label: "تێبینی چاپ", fmt: (v: any) => v || "-" },
+        ];
+
+        // Filter to only changed fields
+        const changedFields = fields.filter(f => {
+          const a = verA?.[f.key];
+          const b = verB?.[f.key];
+          return f.fmt(a) !== f.fmt(b);
+        });
+
+        // Items comparison data
+        const linesA: any[] = verA?.lines || [];
+        const linesB: any[] = verB?.lines || [];
+        const allProductIds = Array.from(new Set([
+          ...linesA.map((l: any) => Number(l.productId)),
+          ...linesB.map((l: any) => Number(l.productId))
+        ]));
+        const changedProducts = allProductIds.filter(pid => {
+          const la = linesA.find((l: any) => Number(l.productId) === pid);
+          const lb = linesB.find((l: any) => Number(l.productId) === pid);
+          const qA = la ? Number(la.qty || 0) : 0;
+          const qB = lb ? Number(lb.qty || 0) : 0;
+          const pA = la ? Number(la.unitPrice || 0) : 0;
+          const pB = lb ? Number(lb.unitPrice || 0) : 0;
+          return !la || !lb || qA !== qB || pA !== pB;
+        });
+        const getProductName = (productId: number) => {
+          const storeProduct = (products || []).find((p: any) => p.id === productId);
+          return storeProduct?.name || `کەرەستەی #${productId}`;
+        };
+
+        return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 select-text">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
+          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#0f172a] text-white">
               <h2 className="text-lg font-black m-0 flex items-center gap-2">
-                <span>📜 مێژووی گۆڕانکاری و وەشانەکانی پسوڵەی ژمارە #{selectedVoucherForVersions.id}</span>
+                <span>📜 بەراوردکردنی وەشانەکانی پسوڵەی #{selectedVoucherForVersions.id}</span>
               </h2>
               <button
                 onClick={() => setShowVersionsModal(false)}
@@ -2354,98 +2402,174 @@ function InvoiceReportContent() {
               </button>
             </div>
 
-            {/* Selector Row */}
-            <div className="p-6 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-4 flex-wrap text-sm font-bold">
+            {/* Version Selectors */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-center gap-6 flex-wrap text-sm font-bold">
               <div className="flex items-center gap-2">
-                <span className="text-slate-600">بەراوردکردنی:</span>
+                <span className="text-slate-600 text-xs">وەشانی یەکەم:</span>
                 <select
                   value={versionAIndex}
                   onChange={(e) => setVersionAIndex(Number(e.target.value))}
-                  className="border border-slate-300 rounded-xl px-3 py-1.5 bg-white text-xs font-bold"
+                  className="border border-blue-300 rounded-xl px-3 py-1.5 bg-blue-50 text-xs font-bold text-blue-800"
                 >
                   {selectedVoucherForVersions.versions?.map((v: any, idx: number) => (
                     <option key={v.id} value={idx}>
-                      وەشانی {v.version} ({v.employeeName || "نەناسراو"})
+                      وەشانی {v.version} — {v.employeeName || "نەناسراو"}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="text-slate-400 font-extrabold">◀ ─── بەراوردکردن لەگەڵ ─── ▶</div>
+              <span className="text-slate-300 text-lg">⟷</span>
 
               <div className="flex items-center gap-2">
-                <span className="text-slate-600">وەشانی دووەم:</span>
+                <span className="text-slate-600 text-xs">وەشانی دووەم:</span>
                 <select
                   value={versionBIndex}
                   onChange={(e) => setVersionBIndex(Number(e.target.value))}
-                  className="border border-slate-300 rounded-xl px-3 py-1.5 bg-white text-xs font-bold"
+                  className="border border-emerald-300 rounded-xl px-3 py-1.5 bg-emerald-50 text-xs font-bold text-emerald-800"
                 >
                   {selectedVoucherForVersions.versions?.map((v: any, idx: number) => (
                     <option key={v.id} value={idx}>
-                      وەشانی {v.version} ({v.employeeName || "نەناسراو"})
+                      وەشانی {v.version} — {v.employeeName || "نەناسراو"}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
 
-            {/* Comparison Content */}
+            {/* Side-by-side comparison boxes */}
             <div className="p-6 space-y-6 flex-grow">
-              
-              {/* Top columns showing version details side-by-side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-right space-y-1">
-                  <div className="font-black text-slate-500 uppercase">وەشانی ا (سەرەتایی)</div>
-                  <div className="text-sm font-black text-slate-800">وەشانی {getVersionData(versionAIndex)?.versionNum}</div>
-                  <div className="text-slate-600 font-medium">کارمەند: <span className="font-bold text-slate-800">{getVersionData(versionAIndex)?.employeeName || "نەناسراو"}</span></div>
-                  <div className="text-[10px] text-slate-400">بەروار: {getVersionData(versionAIndex)?.updatedAt ? formatDateTime(getVersionData(versionAIndex).updatedAt) : "-"}</div>
-                </div>
-                
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-right space-y-1">
-                  <div className="font-black text-slate-500 uppercase">وەشانی ب (نوێکراوە)</div>
-                  <div className="text-sm font-black text-slate-800">وەشانی {getVersionData(versionBIndex)?.versionNum}</div>
-                  <div className="text-slate-600 font-medium">کارمەند: <span className="font-bold text-slate-800">{getVersionData(versionBIndex)?.employeeName || "نەناسراو"}</span></div>
-                  <div className="text-[10px] text-slate-400">بەروار: {getVersionData(versionBIndex)?.updatedAt ? formatDateTime(getVersionData(versionBIndex).updatedAt) : "-"}</div>
-                </div>
-              </div>
 
-              {/* Values Table */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-100 text-slate-700 text-xs font-bold text-center">
-                    <tr>
-                      <th className="py-2.5 px-4 text-right w-1/4">زانیاری گۆڕاوەکان</th>
-                      <th className="py-2.5 px-4 w-3/8">وەشانی ا</th>
-                      <th className="py-2.5 px-4 w-3/8">وەشانی ب</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-right">
-                    {/* Render only changed rows */}
-                    {renderComparisonRow("داشکاندن", getVersionData(versionAIndex)?.totalDiscount, getVersionData(versionBIndex)?.totalDiscount, (v) => formatCurrencyValue(Number(v || 0), selectedVoucherForVersions?.currencyId || 1))}
-                    {renderComparisonRow("تێبینی ناوخۆیی", getVersionData(versionAIndex)?.internalNote || getVersionData(versionAIndex)?.note, getVersionData(versionBIndex)?.internalNote || getVersionData(versionBIndex)?.note)}
-                    {renderComparisonRow("تێبینی چاپ", getVersionData(versionAIndex)?.printNote, getVersionData(versionBIndex)?.printNote)}
-                    {renderComparisonRow("هەژماری پسوڵە", getVersionData(versionAIndex)?.accountId, getVersionData(versionBIndex)?.accountId, (id) => accounts.find((a: any) => a.id === Number(id))?.name || "-")}
-                    {renderComparisonRow("قاسەی پسوڵە", getVersionData(versionAIndex)?.cashboxId, getVersionData(versionBIndex)?.cashboxId, (id) => cashboxes.find((c: any) => c.id === Number(id))?.name || "-")}
-                    {renderComparisonRow("بڕی دراو (پارەی دراو)", getVersionData(versionAIndex)?.paidAmounts, getVersionData(versionBIndex)?.paidAmounts, (paid) => formatPaidAmounts(paid))}
-                    {renderComparisonRow("ڕێژەی گۆڕینەوە", getVersionData(versionAIndex)?.exchangeRate, getVersionData(versionBIndex)?.exchangeRate)}
-                    {renderComparisonRow("دراوی پسوڵە", getVersionData(versionAIndex)?.currencyId, getVersionData(versionBIndex)?.currencyId, (id) => currencies.find((c: any) => c.id === Number(id))?.name || "-")}
-                    
-                    {/* Bottom-most row showing invoice net amount total value (always shown) */}
-                    <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold text-slate-800">
-                      <td className="py-3 px-4 text-right font-black text-xs">بەهای پسوولە (کۆی گشتی)</td>
-                      <td className="py-3 px-4 text-center text-xs">
-                        {formatCurrencyValue(Number(getVersionData(versionAIndex)?.netAmount || 0), selectedVoucherForVersions?.currencyId || 1)}
-                      </td>
-                      <td className="py-3 px-4 text-center text-xs">
-                        {formatCurrencyValue(Number(getVersionData(versionBIndex)?.netAmount || 0), selectedVoucherForVersions?.currencyId || 1)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {/* No changes message */}
+              {changedFields.length === 0 && changedProducts.length === 0 && (
+                <div className="text-center py-10 text-slate-400 font-bold text-sm">
+                  <span className="text-4xl block mb-3">✅</span>
+                  هیچ جیاوازییەک نییە لە نێوان ئەم دوو وەشانەدا
+                </div>
+              )}
 
-              {/* Items Table Comparison */}
-              {renderItemsTableComparison()}
+              {/* Changed fields - side by side boxes */}
+              {changedFields.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Box 1: Version A */}
+                  <div className="border-2 border-blue-200 rounded-2xl overflow-hidden">
+                    <div className="bg-blue-600 text-white px-4 py-2.5 text-center font-black text-sm">
+                      وەشانی {vNumA}
+                    </div>
+                    <div className="p-3 space-y-0 divide-y divide-blue-100">
+                      {changedFields.map(f => (
+                        <div key={f.key} className="flex items-center justify-between py-2.5 px-2">
+                          <span className="text-[11px] font-bold text-slate-500">{f.label}</span>
+                          <span className="text-xs font-black text-slate-800">{f.fmt(verA?.[f.key])}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Box 2: Version B */}
+                  <div className="border-2 border-emerald-200 rounded-2xl overflow-hidden">
+                    <div className="bg-emerald-600 text-white px-4 py-2.5 text-center font-black text-sm">
+                      وەشانی {vNumB}
+                    </div>
+                    <div className="p-3 space-y-0 divide-y divide-emerald-100">
+                      {changedFields.map(f => {
+                        const valA = f.fmt(verA?.[f.key]);
+                        const valB = f.fmt(verB?.[f.key]);
+                        const isDiff = valA !== valB;
+                        return (
+                          <div key={f.key} className={`flex items-center justify-between py-2.5 px-2 ${isDiff ? "bg-amber-50/60" : ""}`}>
+                            <span className="text-[11px] font-bold text-slate-500">{f.label}</span>
+                            <span className={`text-xs font-black ${isDiff ? "text-amber-700" : "text-slate-800"}`}>
+                              {valB}
+                              {isDiff && <span className="text-[10px] mr-1">⚡</span>}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Items comparison - side by side */}
+              {changedProducts.length > 0 && (
+                <div>
+                  <h5 className="text-sm font-black text-slate-800 mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">📊 بەراوردکردنی کەرەستەکان</div>
+                    <span className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold">
+                      {changedProducts.length} کەرەستە گۆڕاوە
+                    </span>
+                  </h5>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Items Box 1: Version A */}
+                    <div className="border-2 border-blue-200 rounded-2xl overflow-hidden">
+                      <div className="bg-blue-600 text-white px-4 py-2 text-center font-black text-sm">
+                        وەشانی {vNumA}
+                      </div>
+                      <div className="divide-y divide-blue-100">
+                        {changedProducts.map(pid => {
+                          const la = linesA.find((l: any) => Number(l.productId) === pid);
+                          const lb = linesB.find((l: any) => Number(l.productId) === pid);
+                          const isDeleted = la && !lb;
+                          const isAdded = !la && lb;
+                          return (
+                            <div key={pid} className={`px-3 py-2.5 ${isDeleted ? "bg-rose-50/50" : isAdded ? "bg-slate-50/50 opacity-40" : ""}`}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-bold text-slate-700">{getProductName(pid)}</span>
+                                {isDeleted && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">سڕاوە</span>}
+                                {isAdded && <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold">نەبووە</span>}
+                              </div>
+                              {la ? (
+                                <div className="flex gap-4 text-[11px]">
+                                  <span className="text-slate-500">عدد: <b className="text-slate-800">{Number(la.qty || 0)}</b></span>
+                                  <span className="text-slate-500">نرخ: <b className="text-slate-800">{formatCurrencyValue(Number(la.unitPrice || 0), selectedVoucherForVersions?.currencyId || 1)}</b></span>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-slate-400">—</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Items Box 2: Version B */}
+                    <div className="border-2 border-emerald-200 rounded-2xl overflow-hidden">
+                      <div className="bg-emerald-600 text-white px-4 py-2 text-center font-black text-sm">
+                        وەشانی {vNumB}
+                      </div>
+                      <div className="divide-y divide-emerald-100">
+                        {changedProducts.map(pid => {
+                          const la = linesA.find((l: any) => Number(l.productId) === pid);
+                          const lb = linesB.find((l: any) => Number(l.productId) === pid);
+                          const isAdded = !la && lb;
+                          const isDeleted = la && !lb;
+                          const qtyChanged = la && lb && Number(la.qty || 0) !== Number(lb.qty || 0);
+                          const priceChanged = la && lb && Number(la.unitPrice || 0) !== Number(lb.unitPrice || 0);
+                          return (
+                            <div key={pid} className={`px-3 py-2.5 ${isAdded ? "bg-emerald-50/50" : isDeleted ? "bg-slate-50/50 opacity-40" : ""}`}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-bold text-slate-700">{getProductName(pid)}</span>
+                                {isAdded && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">زیادکراوە</span>}
+                                {isDeleted && <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold">سڕاوە</span>}
+                              </div>
+                              {lb ? (
+                                <div className="flex gap-4 text-[11px]">
+                                  <span className="text-slate-500">عدد: <b className={qtyChanged ? "text-amber-700" : "text-slate-800"}>{Number(lb.qty || 0)}{qtyChanged ? " ⚡" : ""}</b></span>
+                                  <span className="text-slate-500">نرخ: <b className={priceChanged ? "text-amber-700" : "text-slate-800"}>{formatCurrencyValue(Number(lb.unitPrice || 0), selectedVoucherForVersions?.currencyId || 1)}{priceChanged ? " ⚡" : ""}</b></span>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-slate-400">—</div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
@@ -2459,7 +2583,8 @@ function InvoiceReportContent() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Delete Confirmation Modal */}
       {deleteVoucherId !== null && (
