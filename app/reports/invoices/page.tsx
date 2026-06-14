@@ -1460,7 +1460,8 @@ function InvoiceReportContent() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedVouchers.map((voucher) => {
+                  paginatedVouchers.map((voucher, index) => {
+                    const isNearBottom = index >= paginatedVouchers.length - 2 && paginatedVouchers.length > 2;
                     const payStatus = getPaymentStatus(voucher);
                     const isExpanded = expandedRowId === voucher.id;
 
@@ -1634,7 +1635,9 @@ function InvoiceReportContent() {
                                   </button>
                                   
                                   {activeDropdownId === voucher.id && (
-                                    <div className="absolute left-0 mt-1 w-36 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-50 text-right">
+                                    <div className={`absolute left-0 w-36 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-50 text-right ${
+                                      isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
+                                    }`}>
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
