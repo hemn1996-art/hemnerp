@@ -8,6 +8,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const accountTypeId = searchParams.get("accountTypeId");
+    const accountIds = searchParams.get("accountIds");
     const city = searchParams.get("city");
     const district = searchParams.get("district");
     const beforeDate = searchParams.get("beforeDate");
@@ -23,6 +24,12 @@ export async function GET(request: Request) {
     }
     if (accountTypeId && accountTypeId !== "all") {
       whereClause.accountTypeId = Number(accountTypeId);
+    }
+    if (accountIds && accountIds !== "all" && accountIds.trim() !== "") {
+      const ids = accountIds.split(",").map(id => Number(id.trim())).filter(id => !isNaN(id));
+      if (ids.length > 0) {
+        whereClause.id = { in: ids };
+      }
     }
     if (city && city !== "all") {
       whereClause.city = { name: city };

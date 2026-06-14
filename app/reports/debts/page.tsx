@@ -61,6 +61,9 @@ export default function DebtReportPage() {
   const [showColumnsModal, setShowColumnsModal] = useState(false);
   
   const [filterAccountType, setFilterAccountType] = useState("all");
+  const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
+  const [accountSearch, setAccountSearch] = useState("");
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [filterCity, setFilterCity] = useState("all");
   const [filterDistrict, setFilterDistrict] = useState("all");
   const [filterBeforeDate, setFilterBeforeDate] = useState("");
@@ -107,6 +110,7 @@ export default function DebtReportPage() {
       const params = new URLSearchParams();
       if (search) params.append("search", search);
       if (filterAccountType !== "all") params.append("accountTypeId", filterAccountType);
+      if (filterAccountIds.length > 0) params.append("accountIds", filterAccountIds.join(","));
       if (filterCity !== "all") params.append("city", filterCity);
       if (filterDistrict !== "all") params.append("district", filterDistrict);
       if (filterBeforeDate) params.append("beforeDate", filterBeforeDate);
@@ -124,7 +128,7 @@ export default function DebtReportPage() {
 
   useEffect(() => {
     fetchReport();
-  }, [search, filterAccountType, filterCity, filterDistrict, filterBeforeDate, filterDebtType]);
+  }, [search, filterAccountType, filterAccountIds, filterCity, filterDistrict, filterBeforeDate, filterDebtType]);
 
   const totalOverallDebt = data.reduce((sum, item) => sum + item.totalDebt, 0);
 
@@ -260,7 +264,7 @@ export default function DebtReportPage() {
                 {/* Section 2: Account Details */}
                 <div>
                    <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2 border-b border-gray-100 pb-2"><span className="text-lg">👤</span> زانیاری هەژمار</h3>
-                   <div className="grid grid-cols-2 gap-4">
+                   <div className="grid grid-cols-2 gap-4 mb-3">
                       <div>
                         <label className="block text-xs font-bold text-gray-600 mb-1">جۆری هەژمار</label>
                         <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterAccountType} onChange={e => setFilterAccountType(e.target.value)}>
@@ -279,7 +283,96 @@ export default function DebtReportPage() {
                           <option value="">دیاری نەکراوە</option>
                         </select>
                       </div>
-                   </div>
+                    </div>
+                    <div className="mt-2 relative">
+                      <label className="block text-xs font-bold text-gray-600 mb-1">هەژمارەکان (دیاریکردنی یەک یان زیاتر)</label>
+                      <div className="relative mb-2">
+                        <input
+                          type="text"
+                          placeholder={filterAccountIds.length === 0 ? "گەڕان بەدوای هەژمار..." : `${filterAccountIds.length} هەژمار دیاریکراوە`}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold text-right cursor-pointer"
+                          value={accountSearch}
+                          onChange={e => {
+                            setAccountSearch(e.target.value);
+                            setShowAccountDropdown(true);
+                          }}
+                          onFocus={() => setShowAccountDropdown(true)}
+                        />
+                        <span className="absolute left-3 top-2.5 text-gray-400 text-xs pointer-events-none">
+                          {showAccountDropdown ? "▲" : "▼"}
+                        </span>
+                      </div>
+
+                      {showAccountDropdown && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-40 bg-transparent"
+                            onClick={() => {
+                              setShowAccountDropdown(false);
+                              setAccountSearch("");
+                            }}
+                          />
+                          <div className="absolute left-0 right-0 mt-1 border border-gray-200 bg-white rounded-lg shadow-lg z-50 p-2 max-h-60 overflow-y-auto space-y-1 pr-1 font-bold text-right" dir="rtl">
+                            {(() => {
+                              const filtered = accounts.filter((acc: any) => {
+                                if (filterAccountType !== "all" && acc.accountTypeId !== Number(filterAccountType)) return false;
+                                if (filterCity !== "all" && acc.city !== filterCity) return false;
+                                if (filterDistrict !== "all" && acc.district !== filterDistrict) return false;
+                                if (accountSearch.trim()) {
+                                  const s = accountSearch.toLowerCase();
+                                  return acc.name.toLowerCase().includes(s) || (acc.phone && acc.phone.includes(s));
+                                }
+                                return true;
+                              });
+                              if (filtered.length === 0) {
+                                return <div className="text-xs text-gray-400 py-2 text-center font-bold">هیچ هەژمارێک نەدۆزرایەوە</div>;
+                              }
+                              return filtered.map((acc: any) => {
+                                const isChecked = filterAccountIds.includes(acc.id);
+                                return (
+                                  <label key={acc.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer text-xs transition-colors">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setFilterAccountIds(prev => prev.filter(id => id !== acc.id));
+                                        } else {
+                                          setFilterAccountIds(prev => [...prev, acc.id]);
+                                        }
+                                      }}
+                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                    />
+                                    <span className="text-gray-700 select-none">{acc.name}</span>
+                                  </label>
+                                );
+                              });
+                            })()}
+                          </div>
+                        </>
+                      )}
+
+                      {filterAccountIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {filterAccountIds.map(id => {
+                            const acc = accounts.find((a: any) => a.id === id);
+                            if (!acc) return null;
+                            return (
+                              <span key={id} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-bold">
+                                {acc.name}
+                                <button
+                                  type="button"
+                                  onClick={() => setFilterAccountIds(prev => prev.filter(item => item !== id))}
+                                  className="text-blue-500 hover:text-red-500 font-bold bg-transparent border-none p-0 cursor-pointer text-sm leading-none"
+                                >
+                                  &times;
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                 </div>
 
                 {/* Section 3: Location Details */}
@@ -321,6 +414,9 @@ export default function DebtReportPage() {
               <div className="p-4 border-t border-gray-100 flex gap-2">
                 <button onClick={() => {
                   setFilterAccountType("all");
+                  setFilterAccountIds([]);
+                  setAccountSearch("");
+                  setShowAccountDropdown(false);
                   setFilterCity("all");
                   setFilterDistrict("all");
                   setFilterBeforeDate("");
