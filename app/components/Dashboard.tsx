@@ -34,9 +34,26 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const fetchCurrencies = useStore((state) => state.fetchCurrencies);
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [customNotifications, setCustomNotifications] = useState<any[]>([]);
   const [chartType, setChartType] = useState<"sales" | "purchases">("sales");
   const [chartYear, setChartYear] = useState<number>(2026);
   const [chartCurrency, setChartCurrency] = useState<"all" | "USD" | "IQD">("all");
+
+  useEffect(() => {
+    const load = () => {
+      try {
+        const stored = localStorage.getItem("__dismissed_notifications");
+        setCustomNotifications(stored ? JSON.parse(stored) : []);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
+    window.addEventListener("notifications-updated", load);
+    return () => {
+      window.removeEventListener("notifications-updated", load);
+    };
+  }, []);
 
   useEffect(() => {
     fetchInvoices();
@@ -151,12 +168,12 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   // Calculate Alerts
   const alerts: Array<{
     id: string;
-    accountId: number;
-    accountName: string;
-    type: "limit" | "overdue";
+    accountId?: number;
+    accountName?: string;
+    type: string;
     title: string;
     message: string;
-    severity: "warning" | "danger";
+    severity: "warning" | "danger" | "info" | "success";
   }> = [];
 
   accounts.forEach((acc: any) => {
@@ -218,6 +235,16 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         }
       }
     }
+  });
+
+  customNotifications.forEach((n: any) => {
+    alerts.push({
+      id: `announcement-${n.id}`,
+      type: "announcement",
+      title: n.type === "warning" || n.type === "confirm" ? "ئاگادارکردنەوەی سیستەم" : n.type === "error" ? "هەڵەی سیستەم" : n.type === "success" ? "ئۆپەریشن سەرکەوتوو بوو" : "ئاگاداری سیستەم",
+      message: n.message,
+      severity: n.type === "error" ? "danger" : n.type === "warning" || n.type === "confirm" ? "warning" : n.type === "success" ? "success" : "info",
+    });
   });
 
   const renderCardValues = (usd: number, iqd: number) => {
@@ -316,22 +343,41 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                       <span className="text-xs text-slate-500">هەموو شتێک بەباشی کاردەکات!</span>
                     </div>
                   ) : (
-                    alerts.map((alert) => (
-                      <div
-                        key={alert.id}
-                        onClick={() => {
-                          setShowNotifications(false);
-                          router.push(`/reports/account-statement?accountId=${alert.accountId}`);
-                        }}
-                        className="p-4 hover:bg-slate-800/50 transition-colors cursor-pointer block text-right text-slate-100"
-                      >
-                        <div className="flex items-center gap-2 mb-1 justify-start">
-                          <span className={`w-2.5 h-2.5 rounded-full ${alert.severity === 'danger' ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`} />
-                          <span className="font-bold text-sm text-indigo-300">{alert.title}</span>
+                    alerts.map((alert) => {
+                      let indicatorColor = "bg-blue-500";
+                      if (alert.severity === 'danger') indicatorColor = "bg-red-500 animate-pulse";
+                      else if (alert.severity === 'warning') indicatorColor = "bg-amber-500";
+                      else if (alert.severity === 'success') indicatorColor = "bg-emerald-500";
+
+                      return (
+                        <div
+                          key={alert.id}
+                          onClick={() => {
+                            setShowNotifications(false);
+                            if (alert.type === "announcement") {
+                              const targetId = Number(alert.id.replace("announcement-", ""));
+                              const updated = customNotifications.filter((n: any) => n.id !== targetId);
+                              localStorage.setItem("__dismissed_notifications", JSON.stringify(updated));
+                              setCustomNotifications(updated);
+                            } else if (alert.accountId) {
+                              router.push(`/reports/account-statement?accountId=${alert.accountId}`);
+                            }
+                          }}
+                          className="p-4 hover:bg-slate-800/50 transition-colors cursor-pointer block text-right text-slate-100"
+                        >
+                          <div className="flex items-center gap-2 mb-1 justify-start">
+                            <span className={`w-2.5 h-2.5 rounded-full ${indicatorColor}`} />
+                            <span className="font-bold text-sm text-indigo-300">{alert.title}</span>
+                            {alert.type === "announcement" && (
+                              <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded mr-auto select-none">
+                                پاککردنەوە ×
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400 leading-relaxed font-semibold">{alert.message}</p>
                         </div>
-                        <p className="text-xs text-slate-400 leading-relaxed font-semibold">{alert.message}</p>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

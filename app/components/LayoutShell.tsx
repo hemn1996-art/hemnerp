@@ -88,7 +88,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
     };
 
     fetchAnnouncement();
-    const interval = setInterval(fetchAnnouncement, 30000); // Poll every 30 seconds
+    const interval = setInterval(fetchAnnouncement, 5000); // Poll every 5 seconds
 
     return () => clearInterval(interval);
   }, [currentUser, isLoginPage]);
@@ -153,6 +153,28 @@ export default function LayoutShell({ children }: LayoutShellProps) {
     );
   }
 
+  const handleDismissAnnouncement = (ann: { id: number; message: string; type: string }) => {
+    setDismissedId(ann.id);
+    try {
+      sessionStorage.setItem("__dismissed_announcement_id", ann.id.toString());
+      
+      const saved = localStorage.getItem("__dismissed_notifications");
+      const list = saved ? JSON.parse(saved) : [];
+      if (!list.some((n: any) => n.id === ann.id)) {
+        list.push({
+          id: ann.id,
+          message: ann.message,
+          type: ann.type,
+          timestamp: new Date().toISOString(),
+        });
+        localStorage.setItem("__dismissed_notifications", JSON.stringify(list));
+        window.dispatchEvent(new Event("notifications-updated"));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div
       style={{
@@ -166,19 +188,21 @@ export default function LayoutShell({ children }: LayoutShellProps) {
       {/* System Announcement Banner */}
       {announcement && announcement.id !== dismissedId && (
         <div
-          className={`px-4 py-3 text-right flex justify-between items-center transition-all shadow-sm border-b font-sans ${
+          onClick={() => handleDismissAnnouncement(announcement)}
+          className={`px-6 py-4 flex items-center justify-center transition-all shadow-md border-b font-sans cursor-pointer hover:opacity-95 text-center relative ${
             announcement.type === "warning" || announcement.type === "confirm"
-              ? "bg-amber-50 border-amber-200 text-amber-900"
+              ? "bg-amber-100 border-amber-300 text-amber-950"
               : announcement.type === "error"
-              ? "bg-rose-50 border-rose-200 text-rose-900"
+              ? "bg-rose-100 border-rose-300 text-rose-950"
               : announcement.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-              : "bg-indigo-50 border-indigo-200 text-indigo-900"
+              ? "bg-emerald-100 border-emerald-300 text-emerald-950"
+              : "bg-blue-100 border-blue-300 text-blue-955"
           }`}
           style={{ direction: "rtl" }}
+          title="بۆ داخستنی ئەم ئاگادارییە، کلیک لە هەر شوێنێکی ئەم بۆکسە بکە"
         >
-          <div className="flex items-center gap-3">
-            <span className="text-xl">
+          <div className="flex items-center justify-center gap-3 w-full">
+            <span className="text-2xl animate-bounce">
               {announcement.type === "warning" || announcement.type === "confirm"
                 ? "⚠️"
                 : announcement.type === "error"
@@ -187,22 +211,13 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                 ? "✅"
                 : "📢"}
             </span>
-            <span className="text-sm font-bold leading-normal">{announcement.message}</span>
+            <span className="text-base md:text-lg font-extrabold tracking-wide select-none leading-normal">
+              {announcement.message}
+            </span>
+            <span className="text-xs opacity-60 mr-4 border border-black/10 px-2.5 py-0.5 rounded-full whitespace-nowrap bg-black/5 select-none">
+              داخستن ×
+            </span>
           </div>
-          <button
-            onClick={() => {
-              setDismissedId(announcement.id);
-              try {
-                sessionStorage.setItem("__dismissed_announcement_id", announcement.id.toString());
-              } catch (e) {
-                console.error(e);
-              }
-            }}
-            className="w-7 h-7 rounded-lg hover:bg-black/5 active:scale-95 transition-all flex items-center justify-center text-sm font-bold border-none bg-transparent cursor-pointer text-inherit"
-            title="داخستن"
-          >
-            ✕
-          </button>
         </div>
       )}
 
