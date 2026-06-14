@@ -1003,66 +1003,104 @@ function InvoiceReportContent() {
 
     if (linesA.length === 0 && linesB.length === 0) return null;
 
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-        {/* Version A Items */}
-        <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 text-right">
-          <h5 className="text-xs font-black text-slate-800 mb-3 border-b border-slate-200 pb-1.5 flex justify-between">
-            <span>📦 کەرەستەکانی وەشانی {verA?.versionNum}</span>
-            <span className="text-[10px] text-slate-400">کۆی جۆرەکان: {linesA.length}</span>
-          </h5>
-          {linesA.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-4">کەرەستە بوونی نییە</p>
-          ) : (
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="text-slate-400 text-[10px] border-b border-slate-200">
-                  <th className="pb-1 text-right">ناو</th>
-                  <th className="pb-1 text-center">عەدد</th>
-                  <th className="pb-1 text-center">کۆ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {linesA.map((line: any, idx: number) => (
-                  <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-100">
-                    <td className="py-2 font-bold text-slate-800">{line.productName || line.product?.name || `کەرەستەی #${line.productId}`}</td>
-                    <td className="py-2 text-center font-extrabold">{line.qty}</td>
-                    <td className="py-2 text-center font-black">{formatCurrencyValue(line.lineTotal, selectedVoucherForVersions?.currencyId || 1)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+    const allProductIds = Array.from(new Set([
+      ...linesA.map(l => Number(l.productId)),
+      ...linesB.map(l => Number(l.productId))
+    ]));
 
-        {/* Version B Items */}
-        <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 text-right">
-          <h5 className="text-xs font-black text-slate-800 mb-3 border-b border-slate-200 pb-1.5 flex justify-between">
-            <span>📦 کەرەستەکانی وەشانی {verB?.versionNum}</span>
-            <span className="text-[10px] text-slate-400">کۆی جۆرەکان: {linesB.length}</span>
-          </h5>
-          {linesB.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-4">کەرەستە بوونی نییە</p>
-          ) : (
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="text-slate-400 text-[10px] border-b border-slate-200">
-                  <th className="pb-1 text-right">ناو</th>
-                  <th className="pb-1 text-center">عەدد</th>
-                  <th className="pb-1 text-center">کۆ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {linesB.map((line: any, idx: number) => (
-                  <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-100">
-                    <td className="py-2 font-bold text-slate-800">{line.productName || line.product?.name || `کەرەستەی #${line.productId}`}</td>
-                    <td className="py-2 text-center font-extrabold">{line.qty}</td>
-                    <td className="py-2 text-center font-black">{formatCurrencyValue(line.lineTotal, selectedVoucherForVersions?.currencyId || 1)}</td>
+    const getProductName = (productId: number) => {
+      const storeProduct = (products || []).find((p: any) => p.id === productId);
+      return storeProduct?.name || `کەرەستەی #${productId}`;
+    };
+
+    return (
+      <div className="border border-slate-200 rounded-2xl p-5 bg-white shadow-sm mt-6 text-right">
+        <h5 className="text-sm font-black text-slate-800 mb-4 border-b border-slate-100 pb-2.5 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span>📊 بەراوردکردنی وردەکاری کەرەستەکانی نێوان هەردوو وەشانەکە</span>
+          </div>
+          <span className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-bold">
+            کۆی گشتی کەرەستەکان: {allProductIds.length}
+          </span>
+        </h5>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px]">
+                <th className="py-3 px-4 text-right">ناو و کۆدی کەرەستە</th>
+                <th className="py-3 px-4 text-center">عەدەدی (وەشانی {verA?.versionNum})</th>
+                <th className="py-3 px-4 text-center">عەدەدی (وەشانی {verB?.versionNum})</th>
+                <th className="py-3 px-4 text-center">نرخی (وەشانی {verA?.versionNum})</th>
+                <th className="py-3 px-4 text-center">نرخی (وەشانی {verB?.versionNum})</th>
+                <th className="py-3 px-4 text-center">کۆی گشتی (وەشانی {verA?.versionNum})</th>
+                <th className="py-3 px-4 text-center">کۆی گشتی (وەشانی {verB?.versionNum})</th>
+                <th className="py-3 px-4 text-center">دۆخی گۆڕانکاری</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {allProductIds.map((productId) => {
+                const lineA = linesA.find(l => Number(l.productId) === productId);
+                const lineB = linesB.find(l => Number(l.productId) === productId);
+
+                const qtyA = lineA ? Number(lineA.qty || 0) : 0;
+                const qtyB = lineB ? Number(lineB.qty || 0) : 0;
+                const priceA = lineA ? Number(lineA.unitPrice || 0) : 0;
+                const priceB = lineB ? Number(lineB.unitPrice || 0) : 0;
+                const totalA = lineA ? Number(lineA.lineTotal || 0) : 0;
+                const totalB = lineB ? Number(lineB.lineTotal || 0) : 0;
+
+                const qtyChanged = qtyA !== qtyB;
+                const priceChanged = priceA !== priceB;
+                const isAdded = !lineA && lineB;
+                const isDeleted = lineA && !lineB;
+                const isModified = lineA && lineB && (qtyChanged || priceChanged);
+
+                let rowClass = "hover:bg-slate-50/50 transition-colors";
+                let statusBadge = <span className="text-slate-400 text-[10px]">—</span>;
+
+                if (isAdded) {
+                  rowClass = "bg-emerald-50/35 hover:bg-emerald-50/50 text-emerald-900 border-r-4 border-r-emerald-500 font-semibold";
+                  statusBadge = <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">زیادکراوە ➕</span>;
+                } else if (isDeleted) {
+                  rowClass = "bg-rose-50/35 hover:bg-rose-50/50 text-rose-900 border-r-4 border-r-rose-400 line-through opacity-75 font-semibold";
+                  statusBadge = <span className="bg-rose-100 text-rose-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">سڕاوەتەوە ➖</span>;
+                } else if (isModified) {
+                  rowClass = "bg-amber-50/35 hover:bg-amber-50/50 text-amber-900 border-r-4 border-r-amber-500 font-semibold";
+                  statusBadge = <span className="bg-amber-100 text-amber-800 text-[10px] px-2.5 py-0.5 rounded-full font-bold">دەستکاریکراوە ✏️</span>;
+                }
+
+                return (
+                  <tr key={productId} className={rowClass}>
+                    <td className="py-3 px-4 font-bold text-slate-800 text-right">
+                      {getProductName(productId)}
+                    </td>
+                    <td className="py-3 px-4 text-center font-medium">
+                      {lineA ? qtyA : "—"}
+                    </td>
+                    <td className={`py-3 px-4 text-center font-bold ${qtyChanged && !isAdded && !isDeleted ? "text-amber-700 bg-amber-100/30 rounded" : ""}`}>
+                      {lineB ? qtyB : "—"}
+                    </td>
+                    <td className="py-3 px-4 text-center font-medium">
+                      {lineA ? formatCurrencyValue(priceA, selectedVoucherForVersions?.currencyId || 1) : "—"}
+                    </td>
+                    <td className={`py-3 px-4 text-center font-bold ${priceChanged && !isAdded && !isDeleted ? "text-amber-700 bg-amber-100/30 rounded" : ""}`}>
+                      {lineB ? formatCurrencyValue(priceB, selectedVoucherForVersions?.currencyId || 1) : "—"}
+                    </td>
+                    <td className="py-3 px-4 text-center font-medium">
+                      {lineA ? formatCurrencyValue(totalA, selectedVoucherForVersions?.currencyId || 1) : "—"}
+                    </td>
+                    <td className="py-3 px-4 text-center font-black">
+                      {lineB ? formatCurrencyValue(totalB, selectedVoucherForVersions?.currencyId || 1) : "—"}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {statusBadge}
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     );
