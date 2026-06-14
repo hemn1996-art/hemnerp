@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 interface StockItem {
@@ -52,40 +52,42 @@ export default function StockSnapshotReportPage() {
   });
 
   // Columns visibility state
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    const defaultCols = {
-      id: true,
-      productName: true,
-      category: true,
-      brand: true,
-      sellPrice: true,
-      warehouseName: true,
-      quantity: true,
-      purchasePrice: true,
-      expense: true,
-      cost: false,
-      warehouseValue: false,
-      sellerName: true,
-      purchaseDate: true,
-    };
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("__erp_stock_snapshot_report_cols");
-        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return defaultCols;
-  });
+  const defaultSnapshotCols = {
+    id: true,
+    productName: true,
+    category: true,
+    brand: true,
+    sellPrice: true,
+    warehouseName: true,
+    quantity: true,
+    purchasePrice: true,
+    expense: true,
+    cost: false,
+    warehouseValue: false,
+    sellerName: true,
+    purchaseDate: true,
+  };
+  const [visibleColumns, setVisibleColumns] = useState(defaultSnapshotCols);
+  const colsLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("__erp_stock_snapshot_report_cols", JSON.stringify(visibleColumns));
-      } catch (e) {
-        console.error(e);
+    try {
+      const stored = localStorage.getItem("__erp_stock_snapshot_report_cols");
+      if (stored) {
+        setVisibleColumns(prev => ({ ...prev, ...JSON.parse(stored) }));
       }
+    } catch (e) {
+      console.error(e);
+    }
+    colsLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!colsLoadedRef.current) return;
+    try {
+      localStorage.setItem("__erp_stock_snapshot_report_cols", JSON.stringify(visibleColumns));
+    } catch (e) {
+      console.error(e);
     }
   }, [visibleColumns]);
 

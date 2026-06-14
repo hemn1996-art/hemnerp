@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 
@@ -54,36 +54,38 @@ export default function ItemsReportPage() {
   const [showColumnsModal, setShowColumnsModal] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    const defaultCols = {
-      voucherReference: true,
-      voucherType: true,
-      productName: true,
-      category: true,
-      brand: true,
-      label: true,
-      warehouseName: true,
-      quantity: true,
-      accountName: true,
-    };
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("__erp_items_report_cols");
-        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return defaultCols;
-  });
+  const defaultItemsCols = {
+    voucherReference: true,
+    voucherType: true,
+    productName: true,
+    category: true,
+    brand: true,
+    label: true,
+    warehouseName: true,
+    quantity: true,
+    accountName: true,
+  };
+  const [visibleColumns, setVisibleColumns] = useState(defaultItemsCols);
+  const colsLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("__erp_items_report_cols", JSON.stringify(visibleColumns));
-      } catch (e) {
-        console.error(e);
+    try {
+      const stored = localStorage.getItem("__erp_items_report_cols");
+      if (stored) {
+        setVisibleColumns(prev => ({ ...prev, ...JSON.parse(stored) }));
       }
+    } catch (e) {
+      console.error(e);
+    }
+    colsLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!colsLoadedRef.current) return;
+    try {
+      localStorage.setItem("__erp_items_report_cols", JSON.stringify(visibleColumns));
+    } catch (e) {
+      console.error(e);
     }
   }, [visibleColumns]);
 

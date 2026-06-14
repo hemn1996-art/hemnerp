@@ -187,43 +187,47 @@ function InvoiceReportContent() {
   const [versionBIndex, setVersionBIndex] = useState<number>(0);
 
   // Visible Columns state (16 columns matching the screenshot)
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    const defaultCols = {
-      invoiceId: true,
-      type: true,
-      paymentStatus: true,
-      account: true,
-      total: true,
-      discount: true,
-      paid: true,
-      remaining: true,
-      deliveryFee: true,
-      expenses: true,
-      profit: false,
-      cashbox: true,
-      offer: false,
-      notes: true,
-      date: true,
-      actions: true,
-    };
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("__erp_invoices_report_cols");
-        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return defaultCols;
-  });
+  const defaultCols = {
+    invoiceId: true,
+    type: true,
+    paymentStatus: true,
+    account: true,
+    total: true,
+    discount: true,
+    paid: true,
+    remaining: true,
+    deliveryFee: true,
+    expenses: true,
+    profit: false,
+    cashbox: true,
+    offer: false,
+    notes: true,
+    date: true,
+    actions: true,
+  };
+  const [visibleColumns, setVisibleColumns] = useState(defaultCols);
+  const colsLoadedRef = useRef(false);
 
+  // Load saved columns from localStorage on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("__erp_invoices_report_cols", JSON.stringify(visibleColumns));
-      } catch (e) {
-        console.error(e);
+    try {
+      const stored = localStorage.getItem("__erp_invoices_report_cols");
+      if (stored) {
+        setVisibleColumns(prev => ({ ...prev, ...JSON.parse(stored) }));
       }
+    } catch (e) {
+      console.error(e);
+    }
+    colsLoadedRef.current = true;
+  }, []);
+
+  // Save columns to localStorage only after initial load
+  useEffect(() => {
+    if (!colsLoadedRef.current) return;
+    try {
+      localStorage.setItem("__erp_invoices_report_cols", JSON.stringify(visibleColumns));
+    } catch (e) {
+      console.error(e);
     }
   }, [visibleColumns]);
 

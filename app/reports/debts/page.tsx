@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { store, useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
 
@@ -58,36 +58,38 @@ export default function DebtReportPage() {
   const [filterBeforeDate, setFilterBeforeDate] = useState("");
   const [filterDebtType, setFilterDebtType] = useState("people"); // "people", "mine"
 
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    const defaultCols = {
-      account: true,
-      phone: true,
-      city: false,
-      district: false,
-      creditLimitExceeded: true,
-      debtBeforeLastPayment: true,
-      lastPaymentAmount: true,
-      lastPaymentDate: true,
-      totalDebt: true,
-    };
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem("__erp_debts_report_cols");
-        if (stored) return { ...defaultCols, ...JSON.parse(stored) };
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return defaultCols;
-  });
+  const defaultDebtCols = {
+    account: true,
+    phone: true,
+    city: false,
+    district: false,
+    creditLimitExceeded: true,
+    debtBeforeLastPayment: true,
+    lastPaymentAmount: true,
+    lastPaymentDate: true,
+    totalDebt: true,
+  };
+  const [visibleColumns, setVisibleColumns] = useState(defaultDebtCols);
+  const colsLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("__erp_debts_report_cols", JSON.stringify(visibleColumns));
-      } catch (e) {
-        console.error(e);
+    try {
+      const stored = localStorage.getItem("__erp_debts_report_cols");
+      if (stored) {
+        setVisibleColumns(prev => ({ ...prev, ...JSON.parse(stored) }));
       }
+    } catch (e) {
+      console.error(e);
+    }
+    colsLoadedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!colsLoadedRef.current) return;
+    try {
+      localStorage.setItem("__erp_debts_report_cols", JSON.stringify(visibleColumns));
+    } catch (e) {
+      console.error(e);
     }
   }, [visibleColumns]);
 
