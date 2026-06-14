@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useStore } from "../../store/store";
 
 type SettingsState = {
   // Original compatibility fields
@@ -23,6 +24,8 @@ type SettingsState = {
 };
 
 export default function GeneralSettingsPage() {
+  const currentUser = useStore((s) => s.currentUser) as any;
+
   const [settings, setSettings] = useState<SettingsState>({
     timezone: "Asia/Baghdad",
     language: "کوردی",
@@ -45,7 +48,10 @@ export default function GeneralSettingsPage() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-
+  // Announcement states
+  const [announcementMsg, setAnnouncementMsg] = useState("");
+  const [announcementType, setAnnouncementType] = useState("info");
+  const [announcementActive, setAnnouncementActive] = useState(false);
 
   // Accordion open/close state
   const [collapsed, setCollapsed] = useState({
@@ -54,7 +60,27 @@ export default function GeneralSettingsPage() {
     contact: false,
     system: false,
     display: false,
+    announcement: true,
   });
+
+  useEffect(() => {
+    const fetchActiveAnnouncement = async () => {
+      try {
+        const res = await fetch("/api/announcements");
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            setAnnouncementMsg(data.message);
+            setAnnouncementType(data.type);
+            setAnnouncementActive(data.isActive);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchActiveAnnouncement();
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("general_settings");
@@ -75,6 +101,34 @@ export default function GeneralSettingsPage() {
   const handleSave = () => {
     localStorage.setItem("general_settings", JSON.stringify(settings));
     showToast("ڕێکخستنەکان بە سەرکەوتوویی خەزن کران ✅", "success");
+  };
+
+  const handlePublishAnnouncement = async (isActiveStatus = true) => {
+    try {
+      const res = await fetch("/api/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: announcementMsg,
+          type: announcementType,
+          isActive: isActiveStatus,
+        }),
+      });
+      if (res.ok) {
+        setAnnouncementActive(isActiveStatus);
+        if (isActiveStatus) {
+          showToast("ئاگاداری سیستەم بە سەرکەوتوویی بڵاوکرایەوە 📢", "success");
+        } else {
+          setAnnouncementMsg("");
+          showToast("ئاگاداری سیستەم ناچالاک کرا 🛑", "success");
+        }
+      } else {
+        showToast("کردارەکە سەرکەوتوو نەبوو", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("کێشە لە پەیوەندی سێرڤەر هەیە", "error");
+    }
   };
 
   const showToast = (msg: string, type: "success" | "error") => {
@@ -670,6 +724,100 @@ export default function GeneralSettingsPage() {
           )}
         </div>
 
+        {/* Accordion: 6. ئاگاداری گشتی سیستەم (Admin only) */}
+        {currentUser?.role === "admin" && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-150 overflow-hidden border-t-4 border-[#dc2626]">
+            <div
+              onClick={() => toggleCollapsed("announcement")}
+              className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-[#dc2626]">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                  </svg>
+                </div>
+                <div className="text-right">
+                  <h3 className="text-[16px] font-bold text-slate-850 m-0">ئاگاداری سیستەم (Announcement)</h3>
+                  <p className="text-[12px] text-slate-400 m-0 mt-0.5">بڵاوکردنەوەی پەیام و ئاگاداری ڕاستەوخۆ بۆ بەکارهێنەران</p>
+                </div>
+              </div>
+              <span className={`text-slate-400 transition-transform duration-300 font-mono text-lg ${collapsed.announcement ? "" : "rotate-180"}`}>
+                ▲
+              </span>
+            </div>
+
+            {!collapsed.announcement && (
+              <div className="p-6 border-t border-slate-100 bg-white space-y-6">
+                {/* Active Announcement Status Alert Box */}
+                {announcementActive && announcementMsg ? (
+                  <div className="p-4 bg-emerald-50 border border-emerald-150 rounded-2xl flex items-center justify-between animate-fadeIn">
+                    <div className="flex items-center gap-3">
+                      <span className="text-emerald-600 text-lg">📢</span>
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-emerald-800 m-0">ئاگاداریی چالاک هەیە</p>
+                        <p className="text-xs text-emerald-650 m-0 mt-0.5">بەکارهێنەران لەم کاتەدا ئەم پەیامە دەبینن.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handlePublishAnnouncement(false)}
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer border-none shadow-sm active:scale-95"
+                    >
+                      🛑 ناچالاککردن و سڕینەوە
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 border border-slate-250 rounded-2xl">
+                    <p className="text-xs font-bold text-slate-500 m-0 text-right">هیچ ئاگادارییەک چالاک نییە لای بەکارهێنەران</p>
+                  </div>
+                )}
+
+                {/* Form Fields */}
+                <div className="space-y-4">
+                  <div className="relative border border-slate-200 rounded-xl bg-white focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all p-1">
+                    <span className="absolute -top-2.5 right-4 px-1.5 bg-white text-[11px] font-bold text-slate-400">
+                      پەیامەکە (Message)
+                    </span>
+                    <textarea
+                      rows={3}
+                      value={announcementMsg}
+                      onChange={(e) => setAnnouncementMsg(e.target.value)}
+                      placeholder="بۆ نموونە: دوای ٢ خولەکی تر ئەپدێت دێت، بۆ ماوەیەکی کورت پڕۆگرامەکە دەوەستێت..."
+                      className="w-full bg-transparent px-3 py-2 text-sm font-semibold outline-none text-slate-800 text-right min-h-[70px] resize-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1 border border-slate-200 rounded-xl bg-white focus-within:border-blue-500 transition-all p-1">
+                      <span className="absolute -top-2.5 right-4 px-1.5 bg-white text-[11px] font-bold text-slate-400">
+                        جۆری ئاگاداری (Alert Type)
+                      </span>
+                      <select
+                        value={announcementType}
+                        onChange={(e) => setAnnouncementType(e.target.value)}
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-semibold outline-none text-slate-700 cursor-pointer text-right appearance-none"
+                      >
+                        <option value="info">📢 سەرنج (شین - پەیامی ئاسایی)</option>
+                        <option value="warning">⚠️ ئاگاداری (زەرد - گرنگ)</option>
+                        <option value="error">❌ مەترسی (سوور - وەستان)</option>
+                        <option value="success">✅ سەرکەوتوو (سەوز)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handlePublishAnnouncement(true)}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-sm font-bold transition-all cursor-pointer border-none shadow-md active:scale-95"
+                  >
+                    🚀 بڵاوکردنەوەی پەیامەکە
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
 

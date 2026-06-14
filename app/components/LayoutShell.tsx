@@ -39,6 +39,9 @@ export default function LayoutShell({ children }: LayoutShellProps) {
   const userLoaded = useStore((s) => s.userLoaded);
   const currentUser = useStore((s) => s.currentUser);
 
+  const [announcement, setAnnouncement] = useState<{ id: number; message: string; type: string } | null>(null);
+  const [dismissedId, setDismissedId] = useState<number | null>(null);
+
   useEffect(() => {
     fetchCurrencies();
     if (!isLoginPage) {
@@ -51,6 +54,44 @@ export default function LayoutShell({ children }: LayoutShellProps) {
       router.push("/login");
     }
   }, [isLoginPage, userLoaded, currentUser, router]);
+
+  // Poll for announcements
+  useEffect(() => {
+    if (isLoginPage || !currentUser) {
+      setAnnouncement(null);
+      return;
+    }
+
+    try {
+      const storedDismissed = sessionStorage.getItem("__dismissed_announcement_id");
+      if (storedDismissed) {
+        setDismissedId(Number(storedDismissed));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    const fetchAnnouncement = async () => {
+      try {
+        const res = await fetch("/api/announcements");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.isActive) {
+            setAnnouncement(data);
+          } else {
+            setAnnouncement(null);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch announcements", err);
+      }
+    };
+
+    fetchAnnouncement();
+    const interval = setInterval(fetchAnnouncement, 30000); // Poll every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [currentUser, isLoginPage]);
 
   // Real-time updates via SSE (Server-Sent Events)
   useEffect(() => {
@@ -122,6 +163,49 @@ export default function LayoutShell({ children }: LayoutShellProps) {
         minHeight: "100vh",
       }}
     >
+      {/* System Announcement Banner */}
+      {announcement && announcement.id !== dismissedId && (
+        <div
+          className={`px-4 py-3 text-right flex justify-between items-center transition-all shadow-sm border-b font-sans ${
+            announcement.type === "warning" || announcement.type === "confirm"
+              ? "bg-amber-50 border-amber-200 text-amber-900"
+              : announcement.type === "error"
+              ? "bg-rose-50 border-rose-200 text-rose-900"
+              : announcement.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+              : "bg-indigo-50 border-indigo-200 text-indigo-900"
+          }`}
+          style={{ direction: "rtl" }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">
+              {announcement.type === "warning" || announcement.type === "confirm"
+                ? "⚠️"
+                : announcement.type === "error"
+                ? "❌"
+                : announcement.type === "success"
+                ? "✅"
+                : "📢"}
+            </span>
+            <span className="text-sm font-bold leading-normal">{announcement.message}</span>
+          </div>
+          <button
+            onClick={() => {
+              setDismissedId(announcement.id);
+              try {
+                sessionStorage.setItem("__dismissed_announcement_id", announcement.id.toString());
+              } catch (e) {
+                console.error(e);
+              }
+            }}
+            className="w-7 h-7 rounded-lg hover:bg-black/5 active:scale-95 transition-all flex items-center justify-center text-sm font-bold border-none bg-transparent cursor-pointer text-inherit"
+            title="داخستن"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Mobile Top Bar - hidden on desktop */}
       {!isLoginPage && (
         <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center z-[999] shadow-sm flex-shrink-0">

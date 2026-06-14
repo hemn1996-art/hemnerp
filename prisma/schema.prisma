@@ -352,3 +352,12 @@ model UserPermission {
   @@index([userId])
 }
 
+model SystemAnnouncement {
+  id        Int      @id @default(autoincrement())
+  message   String
+  type      String   @default("info") // "info", "warning", "error", "success"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
