@@ -44,7 +44,7 @@ export async function GET(request: Request) {
         deliveryAddress: true,
         deliveryFee: true,
         extraPaymentHandling: true,
-        account: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true, accountTypeId: true, city: { select: { name: true } }, district: { select: { name: true } } } },
         cashbox: { select: { id: true, name: true } },
         fromCashbox: { select: { id: true, name: true } },
         toCashbox: { select: { id: true, name: true } },

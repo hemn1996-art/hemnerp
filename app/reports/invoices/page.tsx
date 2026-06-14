@@ -63,6 +63,8 @@ interface Account {
   name: string;
   accountTypeId: number;
   isShareholder: boolean;
+  city?: { name: string } | null;
+  district?: { name: string } | null;
 }
 
 interface Cashbox {
@@ -167,6 +169,8 @@ function InvoiceReportContent() {
   const [filterDiscountType, setFilterDiscountType] = useState("all"); // all, discounted, none
   const [filterEmployee, setFilterEmployee] = useState("all"); // employee filter
   const [filterCurrencyId, setFilterCurrencyId] = useState("all"); // currency filter
+  const [filterCityName, setFilterCityName] = useState("all");
+  const [filterDistrictName, setFilterDistrictName] = useState("all");
 
   // Table Sorting
   const [sortField, setSortField] = useState<string>("id");
@@ -639,6 +643,11 @@ function InvoiceReportContent() {
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [vouchers]);
 
+  // Dynamic City & District Lists from accounts
+  const cityOptions = useMemo(() => {
+    return Array.from(new Set(accounts.map((a: any) => a.city).filter(Boolean))) as string[];
+  }, [accounts]);
+
   // Sorting & Filtering logic
   const processedVouchers = useMemo(() => {
     let list = [...vouchers];
@@ -716,6 +725,16 @@ function InvoiceReportContent() {
     // Specific Currency Filter
     if (filterCurrencyId !== "all") {
       list = list.filter((v) => v.currencyId === Number(filterCurrencyId));
+    }
+
+    // City Filter
+    if (filterCityName !== "all") {
+      list = list.filter((v) => v.account?.city?.name === filterCityName);
+    }
+
+    // District Filter
+    if (filterDistrictName !== "all") {
+      list = list.filter((v) => v.account?.district?.name === filterDistrictName);
     }
 
     // Discount Filter
@@ -923,6 +942,8 @@ function InvoiceReportContent() {
     setFilterAccountId("all");
     setFilterCashboxId("all");
     setFilterCurrencyId("all");
+    setFilterCityName("all");
+    setFilterDistrictName("all");
     setFilterInvoiceNo("");
     setFilterDiscountType("all");
     setFilterEmployee("all");
@@ -1921,11 +1942,17 @@ function InvoiceReportContent() {
 
       {/* ── Modal: Filtering Options (ئۆپشنەکانی فلتەرکردن) ── */}
       {showFiltersModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 select-text">
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#0f172a] text-white">
-              <h2 className="text-lg font-black m-0 flex items-center gap-2">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#03133f] text-white">
+              <button
+                onClick={clearFilters}
+                className="bg-transparent border-none text-white hover:text-rose-200 font-extrabold text-xs cursor-pointer transition-colors"
+              >
+                لابردنی هەموو
+              </button>
+              <h2 className="text-sm font-black m-0 flex items-center gap-2">
                 <span>⚙️ ئۆپشنەکانی فلتەرکردن</span>
               </h2>
               <button
@@ -1937,187 +1964,262 @@ function InvoiceReportContent() {
             </div>
 
             {/* Content */}
-            <div className="p-6 space-y-4 flex-1 text-sm font-semibold">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-                {/* Invoice Type */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">جۆری پسوڵە</label>
-                  <select
-                    value={filterInvoiceType}
-                    onChange={(e) => setFilterInvoiceType(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">ھەموو</option>
-                    <option value="sales">فرۆشتن</option>
-                    <option value="purchase">کڕین</option>
-                    <option value="money_in">پارەی هاتوو</option>
-                    <option value="money_out">پارەی ڕۆشتوو</option>
-                    <option value="expense">خەرجی</option>
-                    <option value="sales_return">گەڕانەوەی فرۆشتن</option>
-                    <option value="purchase_return">گەڕانەوەی کڕین</option>
-                    
-                    
-                    <option value="shareholder_deposit">دانانی پارە</option>
-                    <option value="shareholder_withdrawal">کشانەوەی پارە</option>
-                    <option value="my_debt_discount">داشکاندن لە قەرزی من</option>
-                    <option value="people_debt_discount">داشکاندن لە قەرزی خەڵک</option>
-                  </select>
-                </div>
+            <div className="p-6 space-y-6 flex-1 text-sm font-semibold text-right" dir="rtl">
+              {/* Section 1: Invoice Details */}
+              <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+                <h3 className="text-xs font-black text-slate-500 mb-4 flex items-center gap-2 border-b border-slate-200/60 pb-2">
+                  <span className="text-sm">📝</span> وردەکاری پسوڵە
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Invoice Type */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">جۆری پسوڵە</label>
+                    <select
+                      value={filterInvoiceType}
+                      onChange={(e) => setFilterInvoiceType(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو</option>
+                      <option value="sales">فرۆشتن</option>
+                      <option value="purchase">کڕین</option>
+                      <option value="money_in">پارەی هاتوو</option>
+                      <option value="money_out">پارەی ڕۆشتوو</option>
+                      <option value="expense">خەرجی</option>
+                      <option value="sales_return">گەڕانەوەی فرۆشتن</option>
+                      <option value="purchase_return">گەڕانەوەی کڕین</option>
+                      <option value="shareholder_deposit">دانانی پارە</option>
+                      <option value="shareholder_withdrawal">کشانەوەی پارە</option>
+                      <option value="my_debt_discount">داشکاندن لە قەرزی من</option>
+                      <option value="people_debt_discount">داشکاندن لە قەرزی خەڵک</option>
+                    </select>
+                  </div>
 
-                {/* Payment Status */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">دۆخی پارەدان</label>
-                  <select
-                    value={filterPaymentStatus}
-                    onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">ھەموو</option>
-                    <option value="قەرز">قەرز</option>
-                    <option value="بەشەکی">بەشەکی</option>
-                    <option value="نەقد">نەقد</option>
-                  </select>
-                </div>
+                  {/* Payment Status */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">دۆخی پارەدان</label>
+                    <select
+                      value={filterPaymentStatus}
+                      onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو</option>
+                      <option value="قەرز">قەرز</option>
+                      <option value="بەشەکی">بەشەکی</option>
+                      <option value="نەقد">نەقد</option>
+                    </select>
+                  </div>
 
-                {/* Employee / Created By Filter (لەلایەن) */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">لەلایەن (کارمەند)</label>
-                  <select
-                    value={filterEmployee}
-                    onChange={(e) => setFilterEmployee(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">ھەموو کارمەندەکان</option>
-                    {employeeOptions.map((emp) => (
-                      <option key={emp} value={emp}>
-                        {emp}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Account Type */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">جۆری ھەژمار</label>
-                  <select
-                    value={filterAccountType}
-                    onChange={(e) => {
-                      setFilterAccountType(e.target.value);
-                      setFilterAccountId("all"); // Reset specific account
-                    }}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">ھەموو</option>
-                    {accountTypes.map((type: any) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Specific Account */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">ھەژماری تایبەت</label>
-                  <select
-                    value={filterAccountId}
-                    onChange={(e) => setFilterAccountId(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">ھەموو</option>
-                    {accounts
-                      .filter((acc: any) => filterAccountType === "all" || acc.accountTypeId === Number(filterAccountType))
-                      .map((acc: any) => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.name}
+                  {/* Employee */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">لەلایەن (کارمەند)</label>
+                    <select
+                      value={filterEmployee}
+                      onChange={(e) => setFilterEmployee(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو کارمەندەکان</option>
+                      {employeeOptions.map((emp) => (
+                        <option key={emp} value={emp}>
+                          {emp}
                         </option>
                       ))}
-                  </select>
-                </div>
+                    </select>
+                  </div>
 
-                {/* Specific Cashbox */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">قاسە</label>
-                  <select
-                    value={filterCashboxId}
-                    onChange={(e) => setFilterCashboxId(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">ھەموو</option>
-                    {cashboxes.map((cb: any) => (
-                      <option key={cb.id} value={cb.id}>
-                        {cb.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Invoice Number */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">ژمارەی پسوڵە</label>
+                    <input
+                      type="text"
+                      value={filterInvoiceNo}
+                      onChange={(e) => setFilterInvoiceNo(e.target.value)}
+                      placeholder="نموونە: 288"
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    />
+                  </div>
 
-                {/* Specific Invoice Number */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">ژمارەی پسوڵە</label>
-                  <input
-                    type="text"
-                    value={filterInvoiceNo}
-                    onChange={(e) => setFilterInvoiceNo(e.target.value)}
-                    placeholder="نموونە: 288"
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  />
-                </div>
+                  {/* Invoice Status */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">حاڵەتی پسوڵە</label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="active">تەنها چالاکەکان</option>
+                      <option value="all">ھەموو پسوڵەکان</option>
+                    </select>
+                  </div>
 
-                {/* Status */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">حاڵەتی پسوڵە</label>
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="active">تەنها چالاکەکان</option>
-                    <option value="all">ھەموو پسوڵەکان</option>
-                  </select>
-                </div>
+                  {/* Discount Filter */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">فلتەری داشکاندن</label>
+                    <select
+                      value={filterDiscountType}
+                      onChange={(e) => setFilterDiscountType(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو</option>
+                      <option value="discounted">تەنیا پسوڵەکانی خاوەن داشکاندن</option>
+                      <option value="none">تەنیا پسوڵەکانی بێ داشکاندن</option>
+                    </select>
+                  </div>
 
-                {/* Discount Filter */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">فلتەری داشکاندن</label>
-                  <select
-                    value={filterDiscountType}
-                    onChange={(e) => setFilterDiscountType(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">ھەموو</option>
-                    <option value="discounted">تەنیا پسوڵەکانی خاوەن داشکاندن</option>
-                    <option value="none">تەنیا پسوڵەکانی بێ داشکاندن</option>
-                  </select>
-                </div>
-
-                {/* Currency Filter */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-600 font-bold text-xs">دراوی پسوڵە</label>
-                  <select
-                    value={filterCurrencyId}
-                    onChange={(e) => setFilterCurrencyId(e.target.value)}
-                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold"
-                  >
-                    <option value="all">ھەموو دراوەکان</option>
-                    {currencies.map((c: any) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.symbol})
-                      </option>
-                    ))}
-                  </select>
+                  {/* Invoice Currency */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">دراوی پسوڵە</label>
+                    <select
+                      value={filterCurrencyId}
+                      onChange={(e) => setFilterCurrencyId(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو دراوەکان</option>
+                      {currencies.map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.symbol})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* General Search Input inside advanced filters */}
-              <div className="flex flex-col gap-1.5 pt-2">
-                <label className="text-slate-600 font-bold text-xs">تێبینی یان گەڕانی گشتی</label>
+              {/* Section 2: Account Info */}
+              <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+                <h3 className="text-xs font-black text-slate-500 mb-4 flex items-center gap-2 border-b border-slate-200/60 pb-2">
+                  <span className="text-sm">👤</span> زانیاری هەژمار
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Account Type */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">جۆری ھەژمار</label>
+                    <select
+                      value={filterAccountType}
+                      onChange={(e) => {
+                        setFilterAccountType(e.target.value);
+                        setFilterAccountId("all");
+                      }}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو</option>
+                      {accountTypes.map((type: any) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Specific Account */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">هەژمار</label>
+                    <select
+                      value={filterAccountId}
+                      onChange={(e) => setFilterAccountId(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو</option>
+                      {accounts
+                        .filter((acc: any) => filterAccountType === "all" || acc.accountTypeId === Number(filterAccountType))
+                        .map((acc: any) => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Cashbox */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">قاسە</label>
+                    <select
+                      value={filterCashboxId}
+                      onChange={(e) => setFilterCashboxId(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو</option>
+                      {cashboxes.map((cb: any) => (
+                        <option key={cb.id} value={cb.id}>
+                          {cb.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Collection */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">کۆلیکشن</label>
+                    <select
+                      disabled
+                      className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold bg-slate-50 text-slate-400 cursor-not-allowed"
+                    >
+                      <option value="">دیاری نەکراوە</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Location */}
+              <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+                <h3 className="text-xs font-black text-slate-500 mb-4 flex items-center gap-2 border-b border-slate-200/60 pb-2">
+                  <span className="text-sm">📍</span> شوێن
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* City */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">شار</label>
+                    <select
+                      value={filterCityName}
+                      onChange={(e) => {
+                        setFilterCityName(e.target.value);
+                        setFilterDistrictName("all");
+                      }}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو شارەکان</option>
+                      {cityOptions.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* District */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">گەڕەک / ناوچە</label>
+                    <select
+                      value={filterDistrictName}
+                      onChange={(e) => setFilterDistrictName(e.target.value)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                    >
+                      <option value="all">ھەموو گەڕەکەکان</option>
+                      {(() => {
+                        const filteredDistricts = accounts
+                          .filter((acc: any) => filterCityName === "all" || acc.city === filterCityName)
+                          .map((acc: any) => acc.district)
+                          .filter(Boolean);
+                        const uniqueDistricts = Array.from(new Set(filteredDistricts)) as string[];
+                        return uniqueDistricts.map((dist) => (
+                          <option key={dist} value={dist}>
+                            {dist}
+                          </option>
+                        ));
+                      })()}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Note / Search */}
+              <div className="flex flex-col gap-1 pt-2">
+                <label className="text-slate-600 font-bold text-[11px] mr-1">تێبینی یان گەڕانی گشتی</label>
                 <input
                   type="text"
                   value={generalSearch}
                   onChange={(e) => setGeneralSearch(e.target.value)}
                   placeholder="گەڕان بەدوای تێبینیەکان، ناو ناونیشان..."
-                  className="border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium bg-white"
                 />
               </div>
             </div>
@@ -2125,20 +2227,18 @@ function InvoiceReportContent() {
             {/* Footer */}
             <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center bg-slate-50 rounded-b-3xl">
               <button
-                onClick={clearFilters}
-                className="bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold px-5 py-2.5 rounded-xl transition-all cursor-pointer text-xs"
+                onClick={() => setShowFiltersModal(false)}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-6 py-2.5 rounded-xl transition-all cursor-pointer text-xs"
               >
-                🗑️ لادانی هەموو فلتەرەکان
+                پاشگەزبوونەوە
               </button>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowFiltersModal(false)}
-                  className="bg-[#0f172a] text-white hover:bg-slate-800 font-bold px-6 py-2.5 rounded-xl transition-all cursor-pointer text-xs"
-                >
-                  ✓ جێبەجێکردنی فلتەرەکان
-                </button>
-              </div>
+              <button
+                onClick={() => setShowFiltersModal(false)}
+                className="bg-[#03133f] text-white hover:bg-[#03133f]/90 font-bold px-6 py-2.5 rounded-xl transition-all cursor-pointer text-xs flex items-center gap-1.5"
+              >
+                <span>✓</span> جێبەجێکردنی فلتەرەکان
+              </button>
             </div>
           </div>
         </div>
