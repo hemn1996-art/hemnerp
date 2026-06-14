@@ -20,8 +20,16 @@ type DebtReportData = {
 };
 
 export default function DebtReportPage() {
+  const { accounts, accountTypes, fetchAccounts, fetchAccountTypes } = useStore();
   const [data, setData] = useState<DebtReportData[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAccounts();
+    fetchAccountTypes();
+  }, []);
+
+  const cityOptions = Array.from(new Set(accounts.map((a: any) => a.city).filter(Boolean))) as string[];
 
   const formatMoney = (val: number, curId: number) => {
     if (curId === 2) {
@@ -229,27 +237,79 @@ export default function DebtReportPage() {
                <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-gray-200 bg-transparent border-none text-xl cursor-pointer">×</button>
              </div>
              
-             <div className="p-6 overflow-y-auto space-y-6">
-               <div>
-                  <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2"><span className="text-lg">🗂️</span> وردەکاری قەرز</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div>
-                       <label className="block text-xs font-bold text-gray-600 mb-1">بەرواری پێش کۆتا پارەدان</label>
-                       <DateInput className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none" value={filterBeforeDate} onChange={val => setFilterBeforeDate(val)} />
-                     </div>
-                     <div>
-                       <label className="block text-xs font-bold text-gray-600 mb-1">جۆری قەرز</label>
-                       <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none" value={filterDebtType} onChange={e => setFilterDebtType(e.target.value)}>
-                         <option value="all">هەموو</option>
-                         <option value="people">قەرزی خەڵک</option>
-                         <option value="mine">قەرزی من</option>
-                       </select>
-                     </div>
-                  </div>
-               </div>
-             </div>
-             
-             <div className="p-4 border-t border-gray-100 flex gap-2">
+             <div className="p-6 overflow-y-auto space-y-6 text-right" dir="rtl">
+                {/* Section 1: Debt Details */}
+                <div>
+                   <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2 border-b border-gray-100 pb-2"><span className="text-lg">🗂️</span> وردەکاری قەرز</h3>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1">بەرواری پێش کۆتا پارەدان</label>
+                        <DateInput className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white" value={filterBeforeDate} onChange={val => setFilterBeforeDate(val)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1">جۆری قەرز</label>
+                        <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterDebtType} onChange={e => setFilterDebtType(e.target.value)}>
+                          <option value="all">هەموو</option>
+                          <option value="people">قەرزی خەڵک</option>
+                          <option value="mine">قەرزی من</option>
+                        </select>
+                      </div>
+                   </div>
+                </div>
+
+                {/* Section 2: Account Details */}
+                <div>
+                   <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2 border-b border-gray-100 pb-2"><span className="text-lg">👤</span> زانیاری هەژمار</h3>
+                   <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1">جۆری هەژمار</label>
+                        <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterAccountType} onChange={e => setFilterAccountType(e.target.value)}>
+                          <option value="all">هەموو</option>
+                          {accountTypes.map((type: any) => (
+                            <option key={type.id} value={type.id}>{type.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                   </div>
+                </div>
+
+                {/* Section 3: Location Details */}
+                <div>
+                   <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2 border-b border-gray-100 pb-2"><span className="text-lg">📍</span> شوێن</h3>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1">شار</label>
+                        <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterCity} onChange={e => {
+                          setFilterCity(e.target.value);
+                          setFilterDistrict("all");
+                        }}>
+                          <option value="all">هەموو شارەکان</option>
+                          {cityOptions.map((city) => (
+                            <option key={city} value={city}>{city}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1">گەڕەک / ناوچە</label>
+                        <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterDistrict} onChange={e => setFilterDistrict(e.target.value)}>
+                          <option value="all">هەموو گەڕەکەکان</option>
+                          {(() => {
+                            const filteredDistricts = accounts
+                              .filter((acc: any) => filterCity === "all" || acc.city === filterCity)
+                              .map((acc: any) => acc.district)
+                              .filter(Boolean);
+                            const uniqueDistricts = Array.from(new Set(filteredDistricts)) as string[];
+                            return uniqueDistricts.map((dist) => (
+                              <option key={dist} value={dist}>{dist}</option>
+                            ));
+                          })()}
+                        </select>
+                      </div>
+                   </div>
+                </div>
+              </div>
+              
+              <div className="p-4 border-t border-gray-100 flex gap-2">
                 <button onClick={() => {
                   setFilterAccountType("all");
                   setFilterCity("all");
