@@ -710,7 +710,7 @@ export default function WarehouseStockPage({ headerSelector, editId }: Props) {
         </div>
       )}
 
-      <div style={pageGrid}>
+      <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
           <Field label="کۆگا">
             <select
@@ -1438,7 +1438,7 @@ const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
 @media print {
-  @page { size: auto; margin: 8mm; }
+  @page { size: auto; margin: 0mm 8mm 8mm 8mm; }
 
   body * { visibility: hidden !important; }
 

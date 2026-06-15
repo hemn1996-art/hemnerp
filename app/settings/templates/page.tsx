@@ -317,7 +317,7 @@ export default function InvoiceTemplatesPage() {
                 >
                   {/* Top Header Image */}
                   {currentTemplate.headerImage ? (
-                    <img src={currentTemplate.headerImage} alt="Header" className="w-full h-[80px] object-cover" />
+                    <img src={currentTemplate.headerImage} alt="Header" className="w-full h-auto max-h-[140px] object-contain block mx-auto" />
                   ) : (
                     <div className="h-[80px] border-b border-slate-100 flex items-center justify-center text-slate-350 text-xs font-bold bg-slate-50/50">
                       وێنەی بەشی سەرەوە

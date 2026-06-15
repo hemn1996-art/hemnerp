@@ -683,7 +683,7 @@ function getShareholderBalanceAfter(baseMap: Record<string, number>) {
         </div>
       )}
 
-      <div style={pageGrid}>
+      <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
           <div style={{ position: "relative", marginBottom: 14 }}>
             <label style={labelStyle}>هەژماری خاوەن پشک</label>
@@ -1334,7 +1334,7 @@ const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
 @media print {
-  @page { size: auto; margin: 8mm; }
+  @page { size: auto; margin: 0mm 8mm 8mm 8mm; }
 
   body * { visibility: hidden !important; }
 
