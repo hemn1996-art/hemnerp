@@ -2193,7 +2193,7 @@ const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
 @media print {
-  @page { size: auto; margin: 0mm 8mm 8mm 8mm; }
+  @page { size: auto; margin: 0 !important; }
   body * { visibility: hidden !important; }
   #purchase-return-print-area, #purchase-return-print-area * { visibility: visible !important; }
   #purchase-return-print-area {

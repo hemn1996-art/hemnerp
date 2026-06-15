@@ -225,7 +225,7 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   /* Reset browser margin and page margins */
   @page {
     size: auto;
-    margin: 0mm 8mm 8mm 8mm !important;
+    margin: 0 !important;
   }
 
   /* Reset layout zoom and dimensions */
