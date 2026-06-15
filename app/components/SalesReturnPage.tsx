@@ -1336,7 +1336,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
         </div>
       )}
 
-      <div style={pageGrid}>
+      <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
           <div style={{ flex: 1, position: "relative" }}>
             <div style={customerInputWrap}>

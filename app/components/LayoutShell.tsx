@@ -177,6 +177,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
 
   return (
     <div
+      className="layout-shell-root"
       style={{
         display: "flex",
         flexDirection: "column",

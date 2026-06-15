@@ -118,7 +118,7 @@ const headerContainer: CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   direction: "rtl",
-  minHeight: "140px",
+  minHeight: "auto",
 };
 
 const leftCol: CSSProperties = {
@@ -156,7 +156,7 @@ const logoStyle: CSSProperties = {
 const headerImageContainer: CSSProperties = {
   width: "100%",
   height: "auto",
-  marginBottom: "16px",
+  marginBottom: "8px",
   overflow: "hidden",
   display: "block",
 };

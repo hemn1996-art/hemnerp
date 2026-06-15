@@ -291,4 +291,11 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     margin: 0 !important;
     padding: 0 !important;
   }
+
+  /* Reset layout root for printing */
+  .layout-shell-root {
+    min-width: 0 !important;
+    width: 100% !important;
+    background: white !important;
+  }
 }

@@ -1115,7 +1115,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
         </div>
       )}
 
-      <div style={pageGrid}>
+      <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
           <div style={{ position: "relative", marginBottom: 12 }}>
             <label style={labelStyle}>دابینکەر</label>
