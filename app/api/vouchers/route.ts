@@ -79,6 +79,7 @@ export async function GET(request: Request) {
             productId: true,
             qtyChange: true,
             unitCost: true,
+            warehouseId: true,
           },
         },
         ledgerEntries: {

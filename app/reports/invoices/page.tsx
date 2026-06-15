@@ -75,6 +75,7 @@ interface Cashbox {
 interface RawVoucher {
   id: number;
   type: string;
+  rawType?: string;
   referenceNo: string | null;
   date: string;
   createdAt: string;
@@ -122,11 +123,13 @@ function InvoiceReportContent() {
     cashboxes,
     currencies,
     products,
+    warehouses,
     fetchAccounts,
     fetchAccountTypes,
     fetchCashboxes,
     fetchCurrencies,
     fetchProducts,
+    fetchWarehouses,
   } = useStore();
 
   // Local state
@@ -159,18 +162,35 @@ function InvoiceReportContent() {
   const [showColumnsModal, setShowColumnsModal] = useState(false);
 
   const searchParams = useSearchParams();
-  const [filterInvoiceType, setFilterInvoiceType] = useState(searchParams.get("type") || "all");
+  const [filterInvoiceTypes, setFilterInvoiceTypes] = useState<string[]>(() => {
+    const t = searchParams.get("type");
+    return t ? [t] : [];
+  });
   const [filterPaymentStatus, setFilterPaymentStatus] = useState("all");
   const [filterStatus, setFilterStatus] = useState("active"); // active / all
-  const [filterAccountType, setFilterAccountType] = useState("all");
-  const [filterAccountId, setFilterAccountId] = useState("all");
-  const [filterCashboxId, setFilterCashboxId] = useState("all");
+  const [filterAccountTypeIds, setFilterAccountTypeIds] = useState<number[]>([]);
+  const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
+  const [filterCashboxIds, setFilterCashboxIds] = useState<number[]>([]);
+  const [filterWarehouseIds, setFilterWarehouseIds] = useState<number[]>([]);
   const [filterInvoiceNo, setFilterInvoiceNo] = useState("");
   const [filterDiscountType, setFilterDiscountType] = useState("all"); // all, discounted, none
-  const [filterEmployee, setFilterEmployee] = useState("all"); // employee filter
+  const [filterEmployees, setFilterEmployees] = useState<string[]>([]); // employee filter
   const [filterCurrencyId, setFilterCurrencyId] = useState("all"); // currency filter
   const [filterCityName, setFilterCityName] = useState("all");
   const [filterDistrictName, setFilterDistrictName] = useState("all");
+
+  // Multi-select dropdown flags
+  const [showInvoiceTypesDropdown, setShowInvoiceTypesDropdown] = useState(false);
+  const [showAccountTypesDropdown, setShowAccountTypesDropdown] = useState(false);
+  const [showAccountsDropdown, setShowAccountsDropdown] = useState(false);
+  const [showCashboxesDropdown, setShowCashboxesDropdown] = useState(false);
+  const [showWarehousesDropdown, setShowWarehousesDropdown] = useState(false);
+  const [showEmployeesDropdown, setShowEmployeesDropdown] = useState(false);
+
+  // Dropdown search inputs
+  const [accountSearch, setAccountSearch] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [warehouseSearch, setWarehouseSearch] = useState("");
 
   // Table Sorting
   const [sortField, setSortField] = useState<string>("id");
@@ -242,6 +262,7 @@ function InvoiceReportContent() {
     fetchCashboxes();
     fetchCurrencies();
     fetchProducts();
+    fetchWarehouses();
     loadVouchers();
   }, []);
 
@@ -692,9 +713,9 @@ function InvoiceReportContent() {
       });
     }
 
-    // Invoice Type Filter
-    if (filterInvoiceType !== "all") {
-      list = list.filter((v) => v.type === filterInvoiceType);
+    // Invoice Type Filter (multi-select)
+    if (filterInvoiceTypes.length > 0) {
+      list = list.filter((v) => (v.rawType ? filterInvoiceTypes.includes(v.rawType) : false) || filterInvoiceTypes.includes(v.type));
     }
 
     // Payment Status Filter
@@ -705,21 +726,28 @@ function InvoiceReportContent() {
       });
     }
 
-    // Account Type Filter
-    if (filterAccountType !== "all") {
+    // Account Type Filter (multi-select)
+    if (filterAccountTypeIds.length > 0) {
       list = list.filter(
-        (v) => v.account && v.account.accountTypeId === Number(filterAccountType)
+        (v) => v.account && filterAccountTypeIds.includes(v.account.accountTypeId)
       );
     }
 
-    // Specific Account Filter
-    if (filterAccountId !== "all") {
-      list = list.filter((v) => v.accountId === Number(filterAccountId));
+    // Specific Account Filter (multi-select)
+    if (filterAccountIds.length > 0) {
+      list = list.filter((v) => v.accountId && filterAccountIds.includes(v.accountId));
     }
 
-    // Specific Cashbox Filter
-    if (filterCashboxId !== "all") {
-      list = list.filter((v) => v.cashboxId === Number(filterCashboxId));
+    // Specific Cashbox Filter (multi-select)
+    if (filterCashboxIds.length > 0) {
+      list = list.filter((v) => v.cashboxId && filterCashboxIds.includes(v.cashboxId));
+    }
+
+    // Specific Warehouse Filter (multi-select)
+    if (filterWarehouseIds.length > 0) {
+      list = list.filter((v: any) =>
+        v.inventoryTransactions && v.inventoryTransactions.some((it: any) => filterWarehouseIds.includes(it.warehouseId))
+      );
     }
 
     // Specific Currency Filter
@@ -744,11 +772,11 @@ function InvoiceReportContent() {
       list = list.filter((v) => v.totalDiscount === 0);
     }
 
-    // Employee Filter
-    if (filterEmployee !== "all") {
+    // Employee Filter (multi-select)
+    if (filterEmployees.length > 0) {
       list = list.filter((v) => {
         const empName = v.employeeName || "کۆساری مەلا فەرهاد";
-        return empName === filterEmployee;
+        return filterEmployees.includes(empName);
       });
     }
 
@@ -794,14 +822,15 @@ function InvoiceReportContent() {
     filterInvoiceNo,
     searchTerm,
     generalSearch,
-    filterInvoiceType,
+    filterInvoiceTypes,
     filterPaymentStatus,
-    filterAccountType,
-    filterAccountId,
-    filterCashboxId,
+    filterAccountTypeIds,
+    filterAccountIds,
+    filterCashboxIds,
+    filterWarehouseIds,
     filterCurrencyId,
     filterDiscountType,
-    filterEmployee,
+    filterEmployees,
     sortField,
     sortDirection,
   ]);
@@ -935,18 +964,19 @@ function InvoiceReportContent() {
   };
 
   const clearFilters = () => {
-    setFilterInvoiceType("all");
+    setFilterInvoiceTypes([]);
     setFilterPaymentStatus("all");
     setFilterStatus("active");
-    setFilterAccountType("all");
-    setFilterAccountId("all");
-    setFilterCashboxId("all");
+    setFilterAccountTypeIds([]);
+    setFilterAccountIds([]);
+    setFilterCashboxIds([]);
+    setFilterWarehouseIds([]);
     setFilterCurrencyId("all");
     setFilterCityName("all");
     setFilterDistrictName("all");
     setFilterInvoiceNo("");
     setFilterDiscountType("all");
-    setFilterEmployee("all");
+    setFilterEmployees([]);
     setSearchTerm("");
     setGeneralSearch("");
     const d = new Date();
@@ -1250,7 +1280,7 @@ function InvoiceReportContent() {
               onClick={() => setShowFiltersModal(true)}
               className="bg-blue-600 text-white hover:bg-blue-700 font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-md"
             >
-              ⚙️ ئۆپشنەکانی فلتەرکردن
+              🎯 فلتەرەکان
             </button>
 
             <button
@@ -1359,7 +1389,7 @@ function InvoiceReportContent() {
 
         {/* ── Table Component ── */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto min-w-full">
+          <div className="overflow-x-auto min-w-full pb-36 min-h-[350px]">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-[#0f172a] text-white">
                 <tr>
@@ -1460,8 +1490,7 @@ function InvoiceReportContent() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedVouchers.map((voucher, index) => {
-                    const isNearBottom = index >= paginatedVouchers.length - 2 && paginatedVouchers.length > 2;
+                  paginatedVouchers.map((voucher) => {
                     const payStatus = getPaymentStatus(voucher);
                     const isExpanded = expandedRowId === voucher.id;
 
@@ -1635,9 +1664,7 @@ function InvoiceReportContent() {
                                   </button>
                                   
                                   {activeDropdownId === voucher.id && (
-                                    <div className={`absolute left-0 w-36 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-50 text-right ${
-                                      isNearBottom ? "bottom-full mb-1" : "top-full mt-1"
-                                    }`}>
+                                    <div className="absolute left-0 mt-1 w-36 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-50 text-right">
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1952,7 +1979,7 @@ function InvoiceReportContent() {
                 لابردنی هەموو
               </button>
               <h2 className="text-sm font-black m-0 flex items-center gap-2">
-                <span>⚙️ ئۆپشنەکانی فلتەرکردن</span>
+                <span>🎯 فلتەرەکان</span>
               </h2>
               <button
                 onClick={() => setShowFiltersModal(false)}
@@ -1971,26 +1998,64 @@ function InvoiceReportContent() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Invoice Type */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">جۆری پسوڵە</label>
-                    <select
-                      value={filterInvoiceType}
-                      onChange={(e) => setFilterInvoiceType(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">جۆری پسوڵە (یەک یا چەند)</label>
+                    <div
+                      onClick={() => setShowInvoiceTypesDropdown(!showInvoiceTypesDropdown)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white cursor-pointer flex justify-between items-center select-none"
                     >
-                      <option value="all">ھەموو</option>
-                      <option value="sales">فرۆشتن</option>
-                      <option value="purchase">کڕین</option>
-                      <option value="money_in">پارەی هاتوو</option>
-                      <option value="money_out">پارەی ڕۆشتوو</option>
-                      <option value="expense">خەرجی</option>
-                      <option value="sales_return">گەڕانەوەی فرۆشتن</option>
-                      <option value="purchase_return">گەڕانەوەی کڕین</option>
-                      <option value="shareholder_deposit">دانانی پارە</option>
-                      <option value="shareholder_withdrawal">کشانەوەی پارە</option>
-                      <option value="my_debt_discount">داشکاندن لە قەرزی من</option>
-                      <option value="people_debt_discount">داشکاندن لە قەرزی خەڵک</option>
-                    </select>
+                      <span>
+                        {filterInvoiceTypes.length === 0
+                          ? "ھەموو جۆرەکان"
+                          : `${filterInvoiceTypes.length} جۆر دیاریکراوە`}
+                      </span>
+                      <span className="text-gray-400 text-[10px]">
+                        {showInvoiceTypesDropdown ? "▲" : "▼"}
+                      </span>
+                    </div>
+
+                    {showInvoiceTypesDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => setShowInvoiceTypesDropdown(false)}
+                        />
+                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
+                          {[
+                            { code: "sales", label: "فرۆشتن" },
+                            { code: "purchase", label: "کڕین" },
+                            { code: "money_in", label: "پارەی هاتوو" },
+                            { code: "money_out", label: "پارەی ڕۆشتوو" },
+                            { code: "expense", label: "خەرجی" },
+                            { code: "sales_return", label: "گەڕانەوەی فرۆشتن" },
+                            { code: "purchase_return", label: "گەڕانەوەی کڕین" },
+                            { code: "shareholder_deposit", label: "دانانی پارە" },
+                            { code: "shareholder_withdrawal", label: "کشانەوەی پارە" },
+                            { code: "my_debt_discount", label: "داشکاندن لە قەرزی من" },
+                            { code: "people_debt_discount", label: "داشکاندن لە قەرزی خەڵک" }
+                          ].map((t) => {
+                            const isChecked = filterInvoiceTypes.includes(t.code);
+                            return (
+                              <label key={t.code} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setFilterInvoiceTypes(prev => prev.filter(c => c !== t.code));
+                                    } else {
+                                      setFilterInvoiceTypes(prev => [...prev, t.code]);
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span className="text-slate-700 select-none">{t.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Payment Status */}
@@ -2009,20 +2074,69 @@ function InvoiceReportContent() {
                   </div>
 
                   {/* Employee */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">لەلایەن (کارمەند)</label>
-                    <select
-                      value={filterEmployee}
-                      onChange={(e) => setFilterEmployee(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
-                    >
-                      <option value="all">ھەموو کارمەندەکان</option>
-                      {employeeOptions.map((emp) => (
-                        <option key={emp} value={emp}>
-                          {emp}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">لەلایەن کارمەند (یەک یا چەند)</label>
+                    <div className="relative mb-0.5">
+                      <input
+                        type="text"
+                        placeholder={filterEmployees.length === 0 ? "ھەموو کارمەندەکان" : `${filterEmployees.length} کارمەند دیاریکراوە`}
+                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white text-right cursor-pointer"
+                        value={employeeSearch}
+                        onChange={(e) => {
+                          setEmployeeSearch(e.target.value);
+                          setShowEmployeesDropdown(true);
+                        }}
+                        onFocus={() => setShowEmployeesDropdown(true)}
+                      />
+                      <span
+                        onClick={() => setShowEmployeesDropdown(!showEmployeesDropdown)}
+                        className="absolute left-3 top-2.5 text-gray-400 text-[10px] cursor-pointer"
+                      >
+                        {showEmployeesDropdown ? "▲" : "▼"}
+                      </span>
+                    </div>
+
+                    {showEmployeesDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => {
+                            setShowEmployeesDropdown(false);
+                            setEmployeeSearch("");
+                          }}
+                        />
+                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
+                          {(() => {
+                            const filtered = employeeOptions.filter((emp) =>
+                              !employeeSearch.trim() || emp.toLowerCase().includes(employeeSearch.toLowerCase())
+                            );
+                            if (filtered.length === 0) {
+                              return <div className="text-xs text-gray-400 py-2 text-center">هیچ کارمەندێک نەدۆزرایەوە</div>;
+                            }
+                            return filtered.map((emp) => {
+                              const isChecked = filterEmployees.includes(emp);
+                              return (
+                                <label key={emp} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      if (isChecked) {
+                                        setFilterEmployees(prev => prev.filter(e => e !== emp));
+                                      } else {
+                                        setFilterEmployees(prev => [...prev, emp]);
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span className="text-slate-700 select-none">{emp}</span>
+                                </label>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Invoice Number */}
@@ -2090,70 +2204,235 @@ function InvoiceReportContent() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {/* Account Type */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">جۆری ھەژمار</label>
-                    <select
-                      value={filterAccountType}
-                      onChange={(e) => {
-                        setFilterAccountType(e.target.value);
-                        setFilterAccountId("all");
-                      }}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">جۆری ھەژمار (یەک یا چەند)</label>
+                    <div
+                      onClick={() => setShowAccountTypesDropdown(!showAccountTypesDropdown)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white cursor-pointer flex justify-between items-center select-none"
                     >
-                      <option value="all">ھەموو</option>
-                      {accountTypes.map((type: any) => (
-                        <option key={type.id} value={type.id}>
-                          {type.name}
-                        </option>
-                      ))}
-                    </select>
+                      <span>
+                        {filterAccountTypeIds.length === 0
+                          ? "ھەموو جۆرەکان"
+                          : `${filterAccountTypeIds.length} جۆر دیاریکراوە`}
+                      </span>
+                      <span className="text-gray-400 text-[10px]">
+                        {showAccountTypesDropdown ? "▲" : "▼"}
+                      </span>
+                    </div>
+
+                    {showAccountTypesDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => setShowAccountTypesDropdown(false)}
+                        />
+                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
+                          {accountTypes.map((type: any) => {
+                            const isChecked = filterAccountTypeIds.includes(type.id);
+                            return (
+                              <label key={type.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setFilterAccountTypeIds(prev => prev.filter(id => id !== type.id));
+                                    } else {
+                                      setFilterAccountTypeIds(prev => [...prev, type.id]);
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span className="text-slate-700 select-none">{type.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Specific Account */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">هەژمار</label>
-                    <select
-                      value={filterAccountId}
-                      onChange={(e) => setFilterAccountId(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
-                    >
-                      <option value="all">ھەموو</option>
-                      {accounts
-                        .filter((acc: any) => filterAccountType === "all" || acc.accountTypeId === Number(filterAccountType))
-                        .map((acc: any) => (
-                          <option key={acc.id} value={acc.id}>
-                            {acc.name}
-                          </option>
-                        ))}
-                    </select>
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">هەژمار (یەک یا چەند)</label>
+                    <div className="relative mb-0.5">
+                      <input
+                        type="text"
+                        placeholder={filterAccountIds.length === 0 ? "ھەموو هەژمارەکان" : `${filterAccountIds.length} هەژمار دیاریکراوە`}
+                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white text-right cursor-pointer"
+                        value={accountSearch}
+                        onChange={(e) => {
+                          setAccountSearch(e.target.value);
+                          setShowAccountsDropdown(true);
+                        }}
+                        onFocus={() => setShowAccountsDropdown(true)}
+                      />
+                      <span
+                        onClick={() => setShowAccountsDropdown(!showAccountsDropdown)}
+                        className="absolute left-3 top-2.5 text-gray-400 text-[10px] cursor-pointer"
+                      >
+                        {showAccountsDropdown ? "▲" : "▼"}
+                      </span>
+                    </div>
+
+                    {showAccountsDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => {
+                            setShowAccountsDropdown(false);
+                            setAccountSearch("");
+                          }}
+                        />
+                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
+                          {(() => {
+                            const filtered = accounts.filter((acc: any) => {
+                              const matchesSearch = !accountSearch.trim() || acc.name.toLowerCase().includes(accountSearch.toLowerCase());
+                              const matchesType = filterAccountTypeIds.length === 0 || filterAccountTypeIds.includes(acc.accountTypeId);
+                              return matchesSearch && matchesType;
+                            });
+                            if (filtered.length === 0) {
+                              return <div className="text-xs text-gray-400 py-2 text-center">هیچ هەژمارێک نەدۆزرایەوە</div>;
+                            }
+                            return filtered.map((acc: any) => {
+                              const isChecked = filterAccountIds.includes(acc.id);
+                              return (
+                                <label key={acc.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      if (isChecked) {
+                                        setFilterAccountIds(prev => prev.filter(id => id !== acc.id));
+                                      } else {
+                                        setFilterAccountIds(prev => [...prev, acc.id]);
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span className="text-slate-700 select-none">{acc.name}</span>
+                                </label>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Cashbox */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">قاسە</label>
-                    <select
-                      value={filterCashboxId}
-                      onChange={(e) => setFilterCashboxId(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">قاسە (یەک یا چەند)</label>
+                    <div
+                      onClick={() => setShowCashboxesDropdown(!showCashboxesDropdown)}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white cursor-pointer flex justify-between items-center select-none"
                     >
-                      <option value="all">ھەموو</option>
-                      {cashboxes.map((cb: any) => (
-                        <option key={cb.id} value={cb.id}>
-                          {cb.name}
-                        </option>
-                      ))}
-                    </select>
+                      <span>
+                        {filterCashboxIds.length === 0
+                          ? "ھەموو قاسەکان"
+                          : `${filterCashboxIds.length} قاسە دیاریکراوە`}
+                      </span>
+                      <span className="text-gray-400 text-[10px]">
+                        {showCashboxesDropdown ? "▲" : "▼"}
+                      </span>
+                    </div>
+
+                    {showCashboxesDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => setShowCashboxesDropdown(false)}
+                        />
+                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
+                          {cashboxes.map((cb: any) => {
+                            const isChecked = filterCashboxIds.includes(cb.id);
+                            return (
+                              <label key={cb.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setFilterCashboxIds(prev => prev.filter(id => id !== cb.id));
+                                    } else {
+                                      setFilterCashboxIds(prev => [...prev, cb.id]);
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span className="text-slate-700 select-none">{cb.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Collection */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">کۆلیکشن</label>
-                    <select
-                      disabled
-                      className="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold bg-slate-50 text-slate-400 cursor-not-allowed"
-                    >
-                      <option value="">دیاری نەکراوە</option>
-                    </select>
+                  {/* Warehouse */}
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-slate-600 font-bold text-[11px] mr-1">کۆگا (یەک یا چەند)</label>
+                    <div className="relative mb-0.5">
+                      <input
+                        type="text"
+                        placeholder={filterWarehouseIds.length === 0 ? "ھەموو کۆگاکان" : `${filterWarehouseIds.length} کۆگا دیاریکراوە`}
+                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white text-right cursor-pointer"
+                        value={warehouseSearch}
+                        onChange={(e) => {
+                          setWarehouseSearch(e.target.value);
+                          setShowWarehousesDropdown(true);
+                        }}
+                        onFocus={() => setShowWarehousesDropdown(true)}
+                      />
+                      <span
+                        onClick={() => setShowWarehousesDropdown(!showWarehousesDropdown)}
+                        className="absolute left-3 top-2.5 text-gray-400 text-[10px] cursor-pointer"
+                      >
+                        {showWarehousesDropdown ? "▲" : "▼"}
+                      </span>
+                    </div>
+
+                    {showWarehousesDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => {
+                            setShowWarehousesDropdown(false);
+                            setWarehouseSearch("");
+                          }}
+                        />
+                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
+                          {(() => {
+                            const filtered = (warehouses || []).filter((wh: any) =>
+                              !warehouseSearch.trim() || wh.name.toLowerCase().includes(warehouseSearch.toLowerCase())
+                            );
+                            if (filtered.length === 0) {
+                              return <div className="text-xs text-gray-400 py-2 text-center">هیچ کۆگایەک نەدۆزرایەوە</div>;
+                            }
+                            return filtered.map((wh: any) => {
+                              const isChecked = filterWarehouseIds.includes(wh.id);
+                              return (
+                                <label key={wh.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      if (isChecked) {
+                                        setFilterWarehouseIds(prev => prev.filter(id => id !== wh.id));
+                                      } else {
+                                        setFilterWarehouseIds(prev => [...prev, wh.id]);
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                                  />
+                                  <span className="text-slate-700 select-none">{wh.name}</span>
+                                </label>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
