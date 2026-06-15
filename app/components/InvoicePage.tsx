@@ -1920,8 +1920,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
               {currencies.filter((c: any) => c.id === paidCurrencyId || (paidAmounts[c.id] && paidAmounts[c.id].trim() !== "" && parseFloat(paidAmounts[c.id]) !== 0)).map((currency: any) => {
                 const isCurrent = currency.id === paidCurrencyId;
-                return (
-                  <Field key={currency.id} label={isCurrent ? "پارەی دراو" : `پارەی دراو (${currency.name})`}>
+                const showRate = paidCurrencyId !== invoiceCurrencyId || getPaidCurrencies().some(x => x.currencyId !== invoiceCurrencyId);
+                const isConverted = showRate && currency.id !== invoiceCurrencyId;
+
+                const amountInput = (
+                  <Field label={isCurrent ? "پارەی دراو" : `پارەی دراو (${currency.name})`}>
                     <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
                       <FormattedNumberInput
                         value={paidAmounts[currency.id] || ""}
@@ -1945,6 +1948,33 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                     </div>
                   </Field>
                 );
+
+                const rateInput = isConverted ? (
+                  <Field label="نرخی گۆڕینەوە 1$">
+                    <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
+                      <FormattedNumberInput
+                        value={exchangeRate}
+                        disabled={isInvoiceLocked}
+                        onChange={(val) => {
+                          if (blockIfLocked()) return;
+                          setExchangeRate(val);
+                        }}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isInvoiceLocked ? "#f3f4f6" : "#fff", cursor: isInvoiceLocked ? "not-allowed" : "text" }}
+                      />
+                    </div>
+                  </Field>
+                ) : null;
+
+                return (
+                  <div key={currency.id} style={{ display: "flex", gap: 12, width: "100%" }}>
+                    <div style={{ flex: 1 }}>
+                      {amountInput}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      {rateInput}
+                    </div>
+                  </div>
+                );
               })}
             </div>
 
@@ -1966,19 +1996,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               </div>
             )}
 
-            {paidCurrencyId !== invoiceCurrencyId && (
-              <Field label="نرخی گۆڕینەوە 1$">
-                <FormattedNumberInput
-                  value={exchangeRate}
-                  disabled={isInvoiceLocked}
-                  onChange={(val) => {
-                    if (blockIfLocked()) return;
-                    setExchangeRate(val);
-                  }}
-                  style={{ ...input, ...lockedFieldStyle }}
-                />
-              </Field>
-            )}
+
 
             <div style={noteToggleBox}>
               <button
@@ -2601,13 +2619,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           } : {})
         }}>
           <PrintWatermark />
-          {activeTemplate?.headerImage ? (
-            <div style={{ width: "100%", height: "60mm", marginBottom: 12, overflow: "hidden" }}>
-              <img src={activeTemplate.headerImage} alt="Header" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            </div>
-          ) : (
-            <PrintHeader />
-          )}
+          <PrintHeader />
 
           {(printOptions.showInvoiceInfo || printOptions.showAccountInfo) && (
             <div style={printInfoGrid}>
@@ -2866,14 +2878,24 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 </div>
               )}
 
-              {printOptions.showNotes && printNote && (
-                <div style={{ marginTop: 8, borderTop: "1px solid #f1f5f9", paddingTop: 8 }}>
-                  <b>تێبینی چاپ:</b>
-                  <div style={{ marginTop: 4 }}>{printNote}</div>
-                </div>
-              )}
             </div>
           </div>
+
+          {printOptions.showNotes && printNote && (
+            <div style={{
+              marginTop: 12,
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              padding: "10px 14px",
+              background: "white",
+              fontSize: "12px",
+              width: "100%",
+              boxSizing: "border-box"
+            }}>
+              <b>تێبینی:</b>
+              <div style={{ marginTop: 4, whiteSpace: "pre-line" }}>{printNote}</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -3181,8 +3203,8 @@ function SummaryItem({
 
 function PrintInfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div style={printInfoRow}>
-      <b>{label}:</b>
+    <div style={{ ...printInfoRow, justifyContent: "flex-start", gap: "6px" }}>
+      <b style={{ marginLeft: "4px" }}>{label}:</b>
       <span>{value}</span>
     </div>
   );
@@ -3215,8 +3237,8 @@ function PrintSummaryLine({
   }
 
   return (
-    <div style={printSummaryLine}>
-      <span style={{ fontWeight: bold ? 900 : 700 }}>{label}</span>
+    <div style={{ ...printSummaryLine, justifyContent: "flex-start", gap: "8px" }}>
+      <span style={{ display: "inline-block", width: "135px", fontWeight: bold ? 900 : 700, textAlign: "right" }}>{label}</span>
       <span style={{ fontWeight: bold ? 900 : 500 }}>{value}</span>
     </div>
   );
@@ -3262,9 +3284,10 @@ const printCss = `
   #invoice-print-area {
     display: block !important;
     position: absolute !important;
-    left: 0 !important;
+    left: 2% !important;
+    right: 2% !important;
     top: 0 !important;
-    width: 100% !important;
+    width: 96% !important;
     background: white !important;
     z-index: 999999 !important;
   }

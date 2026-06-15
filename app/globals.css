@@ -215,3 +215,84 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     display: flex !important;
   }
 }
+
+/* ───────────────────────────────────────────────────────────
+   GLOBAL PRINT LAYOUT OVERRIDES
+   Ensures print view fits A4/A5 without clipping or sidebars.
+   Resets zoom, width, overflow and margins on print.
+─────────────────────────────────────────────────────────── */
+@media print {
+  /* Reset browser margin and page margins */
+  @page {
+    size: auto;
+    margin: 8mm !important;
+  }
+
+  /* Reset layout zoom and dimensions */
+  html {
+    zoom: 1 !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  body {
+    min-width: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: white !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide sidebar and navigation wrappers */
+  aside,
+  nav,
+  button,
+  input,
+  select,
+  textarea,
+  .sidebar,
+  .sidebar-toggle-btn,
+  header,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Unconstrain structural layout containers */
+  #main-content,
+  main,
+  #root,
+  #__next,
+  .main-layout,
+  [data-nextjs-scroll-focus-boundary] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    transform: none !important;
+  }
+
+  /* Clean up printing layout containers */
+  [id$="-print-area"],
+  [class*="print-area"] {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    background: white !important;
+    z-index: 999999 !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

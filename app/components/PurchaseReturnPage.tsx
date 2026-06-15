@@ -1885,6 +1885,22 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
               />
             </div>
           </div>
+
+          {printNote && printNote.trim() !== "" && (
+            <div style={{
+              marginTop: 12,
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              padding: "10px 14px",
+              background: "white",
+              fontSize: "12px",
+              width: "100%",
+              boxSizing: "border-box"
+            }}>
+              <b>تێبینی:</b>
+              <div style={{ marginTop: 4, whiteSpace: "pre-line" }}>{printNote}</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2152,8 +2168,8 @@ function PrintSummaryLine({
   }
 
   return (
-    <div style={printSummaryLine}>
-      <span style={{ fontWeight: bold ? 900 : 700 }}>{label}</span>
+    <div style={{ ...printSummaryLine, justifyContent: "flex-start", gap: "8px" }}>
+      <span style={{ display: "inline-block", width: "135px", fontWeight: bold ? 900 : 700, textAlign: "right" }}>{label}</span>
       <span style={{ fontWeight: bold ? 900 : 500 }}>{value}</span>
     </div>
   );
@@ -2178,7 +2194,9 @@ const printCss = `
   #purchase-return-print-area {
     display: block !important;
     position: absolute !important;
-    left: 0 !important; top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     min-height: auto !important;
     background: white !important;

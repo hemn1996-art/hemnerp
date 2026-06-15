@@ -1220,8 +1220,10 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
               {currencies.filter((c: any) => c.id === paidCurrencyId || (paidAmounts[c.id] && paidAmounts[c.id].trim() !== "" && parseFloat(paidAmounts[c.id]) !== 0)).map((currency: any) => {
                 const isCurrent = currency.id === paidCurrencyId;
-                return (
-                  <Field key={currency.id} label={isCurrent ? "پارەی دراو" : `پارەی دراو (${currency.name})`}>
+                const isConverted = showRate && currency.id !== activeTargetCurrencyId;
+
+                const amountInput = (
+                  <Field label={isCurrent ? "پارەی دراو" : `پارەی دراو (${currency.name})`}>
                     <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
                       <FormattedNumberInput
                         value={paidAmounts[currency.id] || ""}
@@ -1245,27 +1247,38 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                     </div>
                   </Field>
                 );
+
+                const rateInput = isConverted ? (
+                  <Field label="ڕەیتی 100 دۆلار بۆ پارەی دراو">
+                    <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
+                      <FormattedNumberInput
+                        value={exchangeRate}
+                        disabled={isLocked}
+                        onChange={(val) => {
+                          if (blockIfLocked()) return;
+                          setExchangeRate(val);
+                        }}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text" }}
+                      />
+                      <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", minWidth: "80px" }}>
+                        دینار
+                      </span>
+                    </div>
+                  </Field>
+                ) : null;
+
+                return (
+                  <div key={currency.id} style={{ display: "flex", gap: 12, width: "100%" }}>
+                    <div style={{ flex: 1 }}>
+                      {amountInput}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      {rateInput}
+                    </div>
+                  </div>
+                );
               })}
             </div>
-
-            {showRate && (
-              <Field label="ڕەیتی 100 دۆلار بۆ پارەی دراو">
-                <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
-                  <FormattedNumberInput
-                    value={exchangeRate}
-                    disabled={isLocked}
-                    onChange={(val) => {
-                      if (blockIfLocked()) return;
-                      setExchangeRate(val);
-                    }}
-                    style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text" }}
-                  />
-                  <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "8px 12px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", minWidth: "80px" }}>
-                    دینار
-                  </span>
-                </div>
-              </Field>
-            )}
 
             <Field label="بەروار">
               <DateInput
@@ -1486,13 +1499,25 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                 />
               )}
 
-              {printNote.trim() !== "" && (
-                <div style={printExpenseNoteBox}>
-                  <b>تێبینی:</b> {printNote}
-                </div>
-              )}
+              
             </div>
           </div>
+
+          {printNote && printNote.trim() !== "" && (
+            <div style={{
+              marginTop: 12,
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              padding: "10px 14px",
+              background: "white",
+              fontSize: "12px",
+              width: "100%",
+              boxSizing: "border-box"
+            }}>
+              <b>تێبینی:</b>
+              <div style={{ marginTop: 4, whiteSpace: "pre-line" }}>{printNote}</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1740,8 +1765,8 @@ function StatBox({
 
 function PrintInfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div style={printInfoRow}>
-      <b>{label}:</b>
+    <div style={{ ...printInfoRow, justifyContent: "flex-start", gap: "6px" }}>
+      <b style={{ marginLeft: "4px" }}>{label}:</b>
       <span>{value}</span>
     </div>
   );
@@ -1774,8 +1799,8 @@ function PrintSummaryLine({
   }
 
   return (
-    <div style={printSummaryLine}>
-      <span style={{ fontWeight: bold ? 900 : 700 }}>{label}</span>
+    <div style={{ ...printSummaryLine, justifyContent: "flex-start", gap: "8px" }}>
+      <span style={{ display: "inline-block", width: "135px", fontWeight: bold ? 900 : 700, textAlign: "right" }}>{label}</span>
       <span style={{ fontWeight: bold ? 900 : 500 }}>{value}</span>
     </div>
   );
@@ -1816,7 +1841,9 @@ const printCss = `
   #money-out-print-area {
     display: block !important;
     position: absolute !important;
-    left: 0 !important; top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     min-height: auto !important;
     background: white !important;

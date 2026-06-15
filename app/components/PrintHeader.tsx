@@ -20,6 +20,7 @@ export default function PrintHeader() {
     logo: "",
     hideZeroBalance: true,
   });
+  const [activeTemplate, setActiveTemplate] = useState<any>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("general_settings");
@@ -28,7 +29,29 @@ export default function PrintHeader() {
         setSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
       } catch (e) {}
     }
+
+    fetch("/api/invoice-templates")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const main = data.find((t: any) => t.isMain && t.isActive);
+          if (main) setActiveTemplate(main);
+        }
+      })
+      .catch((err) => console.error("Error loading template in PrintHeader:", err));
   }, []);
+
+  if (activeTemplate?.headerImage) {
+    return (
+      <div style={headerImageContainer}>
+        <img
+          src={activeTemplate.headerImage}
+          alt="Header"
+          style={headerImageStyle}
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={headerContainer}>
@@ -90,11 +113,12 @@ const headerContainer: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "flex-start",
   borderBottom: "2px solid #e5e7eb",
-  paddingBottom: "12px",
+  paddingBottom: "16px",
   marginBottom: "16px",
   width: "100%",
   boxSizing: "border-box",
   direction: "rtl",
+  minHeight: "140px",
 };
 
 const leftCol: CSSProperties = {
@@ -123,10 +147,24 @@ const centerCol: CSSProperties = {
 };
 
 const logoStyle: CSSProperties = {
-  maxHeight: "55px",
-  maxWidth: "110px",
+  maxHeight: "80px",
+  maxWidth: "160px",
   marginBottom: "4px",
   objectFit: "contain",
+};
+
+const headerImageContainer: CSSProperties = {
+  width: "100%",
+  height: "auto",
+  marginBottom: "16px",
+  overflow: "hidden",
+  display: "block",
+};
+
+const headerImageStyle: CSSProperties = {
+  width: "100%",
+  height: "auto",
+  display: "block",
 };
 
 const companyNameStyle: CSSProperties = {
