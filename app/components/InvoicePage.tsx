@@ -1950,8 +1950,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 );
 
                 const rateInput = isConverted ? (
-                  <Field label="نرخی گۆڕینەوە 1$">
-                    <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
+                  <Field label="ڕەیتی 100 دۆلار">
+                    <div style={{ display: "flex", border: "1px solid #93c5fd", borderRadius: 8, overflow: "hidden", background: "#f0f9ff" }}>
                       <FormattedNumberInput
                         value={exchangeRate}
                         disabled={isInvoiceLocked}
@@ -1959,19 +1959,22 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                           if (blockIfLocked()) return;
                           setExchangeRate(val);
                         }}
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isInvoiceLocked ? "#f3f4f6" : "#fff", cursor: isInvoiceLocked ? "not-allowed" : "text" }}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 10px", background: "transparent", cursor: isInvoiceLocked ? "not-allowed" : "text", color: "#1e40af", fontWeight: "bold" }}
                       />
+                      <span style={{ border: "none", borderRight: "1px solid #bfdbfe", background: "#e0f2fe", padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#0369a1", fontSize: "12px", minWidth: "45px" }}>
+                        دینار
+                      </span>
                     </div>
                   </Field>
                 ) : null;
 
                 return (
-                  <div key={currency.id} style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
-                    <div>
+                  <div key={currency.id} style={{ display: "flex", gap: 8, width: "100%", alignItems: "flex-end" }}>
+                    <div style={{ flex: 1 }}>
                       {amountInput}
                     </div>
                     {rateInput && (
-                      <div>
+                      <div style={{ width: 145, flexShrink: 0 }}>
                         {rateInput}
                       </div>
                     )}
