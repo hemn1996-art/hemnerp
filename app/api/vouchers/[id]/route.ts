@@ -53,25 +53,44 @@ export async function GET(
 
     let balanceBeforeByCurrency: Record<string, number> = {};
     if (voucher.accountId) {
-      const currentBalances = await prisma.ledgerEntry.groupBy({
-        by: ["currencyId"],
-        where: {
-          accountId: voucher.accountId,
-        },
-        _sum: { debit: true, credit: true }
-      });
-      for (const entry of currentBalances) {
-        balanceBeforeByCurrency[String(entry.currencyId)] = (entry._sum.debit || 0) - (entry._sum.credit || 0);
+      const currentVoucherEntries = voucher.ledgerEntries?.filter(le => le.accountId === voucher.accountId) || [];
+      const minLedgerId = currentVoucherEntries.length > 0 ? Math.min(...currentVoucherEntries.map(le => le.id)) : null;
+
+      let pastBalances;
+      if (minLedgerId !== null) {
+        pastBalances = await prisma.ledgerEntry.groupBy({
+          by: ["currencyId"],
+          where: {
+            accountId: voucher.accountId,
+            OR: [
+              { date: { lt: voucher.date } },
+              {
+                date: voucher.date,
+                id: { lt: minLedgerId }
+              }
+            ]
+          },
+          _sum: { debit: true, credit: true }
+        });
+      } else {
+        pastBalances = await prisma.ledgerEntry.groupBy({
+          by: ["currencyId"],
+          where: {
+            accountId: voucher.accountId,
+            OR: [
+              { date: { lt: voucher.date } },
+              {
+                date: voucher.date,
+                voucherId: { lt: voucher.id }
+              }
+            ]
+          },
+          _sum: { debit: true, credit: true }
+        });
       }
 
-      if (voucher.ledgerEntries) {
-        for (const le of voucher.ledgerEntries) {
-          if (le.accountId === voucher.accountId) {
-            const curIdStr = String(le.currencyId);
-            const change = (le.debit || 0) - (le.credit || 0);
-            balanceBeforeByCurrency[curIdStr] = (balanceBeforeByCurrency[curIdStr] || 0) - change;
-          }
-        }
+      for (const entry of pastBalances) {
+        balanceBeforeByCurrency[String(entry.currencyId)] = (entry._sum.debit || 0) - (entry._sum.credit || 0);
       }
     }
 

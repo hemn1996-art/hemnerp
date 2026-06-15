@@ -188,7 +188,14 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   useEffect(() => {
     if (accountId && accounts.length > 0) {
       const acc = accounts.find((a: any) => a.id === accountId);
-      if (acc) setAccountSearch(acc.name);
+      if (acc) {
+        setAccountSearch(acc.name);
+        const balanceMap = getAccountBalanceBeforeMap(acc);
+        const activeCurKeys = Object.keys(balanceMap).filter(key => Math.abs(balanceMap[key]) > 0.01);
+        if (activeCurKeys.length === 1) {
+          setPaidCurrencyId(Number(activeCurKeys[0]));
+        }
+      }
     }
   }, [accountId, accounts]);
 
@@ -250,6 +257,27 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       });
     }
 
+    return computedBefore;
+  }, [selectedAccount, editId, originalVoucher, accountId]);
+
+  const screenAccountBalanceBeforeByCurrency = useMemo(() => {
+    const currentBalMap = getAccountBalanceBeforeMap(selectedAccount);
+    if (!editId || !originalVoucher || !selectedAccount) {
+      return currentBalMap;
+    }
+    if (Number(accountId) !== originalVoucher.accountId) {
+      return currentBalMap;
+    }
+    const computedBefore = { ...currentBalMap };
+    if (originalVoucher.ledgerEntries) {
+      originalVoucher.ledgerEntries.forEach((le: any) => {
+        if (le.accountId === Number(accountId)) {
+          const curIdText = String(le.currencyId);
+          const change = le.debit - le.credit;
+          computedBefore[curIdText] = (computedBefore[curIdText] || 0) - change;
+        }
+      });
+    }
     return computedBefore;
   }, [selectedAccount, editId, originalVoucher, accountId]);
 
@@ -318,6 +346,29 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
     return result.balanceAfterByCurrency;
   }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency]);
+
+  const screenAccountBalanceAfterByCurrency = useMemo(() => {
+    if (!selectedAccount) return {};
+    const before = screenAccountBalanceBeforeByCurrency;
+    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
+    const rate = toNumber(exchangeRate) / 100;
+
+    const result = calculateLedgerEntries({
+      type: "money_in",
+      netAmount: 0,
+      currencyId: activeTargetCurrencyId,
+      exchangeRate: rate,
+      paidAmounts: getPaidCurrencies().map((p: any) => ({
+        currencyId: p.currencyId,
+        amount: p.amount,
+        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+      })),
+      extraPaymentHandling: null,
+      balanceBeforeByCurrency: before
+    });
+
+    return result.balanceAfterByCurrency;
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency]);
 
   const currentSnapshot = useMemo(() => {
     return JSON.stringify({
@@ -1124,10 +1175,10 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                 {selectedAccount.address || "-"}
               </InfoRow>
               <InfoRow label="قەرزی پێشوو">
-                {formatCurrencyMapWithColors(accountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
               </InfoRow>
               <InfoRow label="کۆی گشتی ماوە">
-                {formatCurrencyMapWithColors(accountBalanceAfterByCurrency)}
+                {formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
               </InfoRow>
             </div>
           )}
@@ -1137,7 +1188,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
               <StatBox title="پارەی دراو" value={getPaidSummaryText()} color="#16a34a" />
               <StatBox
                 title="کۆی گشتی ماوە"
-                value={formatCurrencyMapWithColors(accountBalanceAfterByCurrency)}
+                value={formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
               />
             </div>
 
@@ -1186,7 +1237,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                         disabled={isLocked}
                         onChange={(val) => updatePaidAmount(currency.id, val)}
                         placeholder="0"
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "right" }}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "left" }}
                       />
 
                       <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>

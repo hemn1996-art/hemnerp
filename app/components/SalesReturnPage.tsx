@@ -312,6 +312,16 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
   }, [accounts]);
 
   const customer = accounts.find((a: any) => a.id === customerId);
+
+  useEffect(() => {
+    if (customer) {
+      const balanceMap = getAccountBalanceBeforeMap(customer);
+      const activeCurKeys = Object.keys(balanceMap).filter(key => Math.abs(balanceMap[key]) > 0.01);
+      if (activeCurKeys.length === 1) {
+        setPaidCurrencyId(Number(activeCurKeys[0]));
+      }
+    }
+  }, [customerId, customer]);
   const selectedCashbox = cashboxes.find((c: any) => c.id === cashboxId);
 
   function getAccountBalanceBeforeMap(account?: AccountLike) {
@@ -410,6 +420,27 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     return computedBefore;
   }, [customer, editId, originalVoucher, customerId]);
 
+  const screenAccountBalanceBeforeByCurrency = useMemo(() => {
+    const currentBalMap = getAccountBalanceBeforeMap(customer);
+    if (!editId || !originalVoucher || !customer) {
+      return currentBalMap;
+    }
+    if (Number(customerId) !== originalVoucher.accountId) {
+      return currentBalMap;
+    }
+    const computedBefore = { ...currentBalMap };
+    if (originalVoucher.ledgerEntries) {
+      originalVoucher.ledgerEntries.forEach((le: any) => {
+        if (le.accountId === Number(customerId)) {
+          const curIdText = String(le.currencyId);
+          const change = le.debit - le.credit;
+          computedBefore[curIdText] = (computedBefore[curIdText] || 0) - change;
+        }
+      });
+    }
+    return computedBefore;
+  }, [customer, editId, originalVoucher, customerId]);
+
   const activeBalances = useMemo(() => {
     return Object.entries(accountBalanceBeforeByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount)) > 0.01);
@@ -454,6 +485,29 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
     return result.balanceAfterByCurrency;
   }, [customer, paidAmounts, targetCurrencyId, exchangeRate, accountBalanceBeforeByCurrency, totalReturnInBase, returnCurrencyId]);
+
+  const screenAccountBalanceAfterByCurrency = useMemo(() => {
+    if (!customer) return {};
+    const before = screenAccountBalanceBeforeByCurrency;
+    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(customer);
+    const rate = toNumber(exchangeRate) / 100;
+
+    const result = calculateLedgerEntries({
+      type: "sales_return",
+      netAmount: totalReturnInBase,
+      currencyId: returnCurrencyId,
+      exchangeRate: rate,
+      paidAmounts: getPaidCurrencies().map((p: any) => ({
+        currencyId: p.currencyId,
+        amount: p.amount,
+        exchangeRate: (p.currencyId === returnCurrencyId) ? 1 : rate
+      })),
+      extraPaymentHandling: null,
+      balanceBeforeByCurrency: before
+    });
+
+    return result.balanceAfterByCurrency;
+  }, [customer, paidAmounts, targetCurrencyId, exchangeRate, screenAccountBalanceBeforeByCurrency, totalReturnInBase, returnCurrencyId]);
 
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.trim().toLowerCase();
@@ -1435,7 +1489,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
               </InfoRow>
 
               <InfoRow label="باڵانس">
-                {formatCurrencyMapWithColors(accountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
               </InfoRow>
             </div>
           )}
@@ -1509,7 +1563,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                         disabled={isLocked}
                         onChange={(val) => updatePaidAmount(currency.id, val)}
                         placeholder="0"
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "right" }}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "left" }}
                       />
 
                       <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>

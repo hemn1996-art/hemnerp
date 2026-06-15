@@ -147,6 +147,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
         .then((res) => res.json())
         .then((voucher) => {
           if (voucher) {
+            setOriginalVoucher(voucher);
             setInvoiceNumber(voucher.referenceNo || String(voucher.id));
             setInvoiceDate(voucher.date.slice(0, 10));
             const d = new Date(voucher.date);
@@ -238,6 +239,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   const [showNewInvoiceConfirm, setShowNewInvoiceConfirm] = useState(false);
 
   const [savedSnapshot, setSavedSnapshot] = useState("");
+  const [originalVoucher, setOriginalVoucher] = useState<any>(null);
   const [isLocked, setIsLocked] = useState(false);
 
   const [tableColumns, setTableColumns] = useState<TableColumns>({
@@ -275,6 +277,16 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   }, [accounts]);
 
   const supplier = accounts.find((a: any) => a.id === supplierId);
+
+  useEffect(() => {
+    if (supplier) {
+      const balanceMap = getAccountBalanceBeforeMap(supplier);
+      const activeCurKeys = Object.keys(balanceMap).filter(key => Math.abs(balanceMap[key]) > 0.01);
+      if (activeCurKeys.length === 1) {
+        setPaidCurrencyId(Number(activeCurKeys[0]));
+      }
+    }
+  }, [supplierId, supplier]);
   const selectedCashbox = cashboxes.find((c: any) => c.id === cashboxId);
 
   const filteredSuppliers = useMemo(() => {
@@ -339,7 +351,57 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   const paidByCurrency = getPaidAmountsByCurrency();
   const supplierBalanceReductionByCurrency = getSupplierBalanceReductionByCurrency();
 
-  const accountBalanceBeforeByCurrency = getAccountBalanceBeforeMap(supplier);
+  const accountBalanceBeforeByCurrency = useMemo(() => {
+    const currentBalMap = getAccountBalanceBeforeMap(supplier);
+    if (!editId || !originalVoucher || !supplier) {
+      return currentBalMap;
+    }
+    if (Number(supplierId) !== originalVoucher.accountId) {
+      return currentBalMap;
+    }
+    if (originalVoucher.historicalBalanceBefore) {
+      return originalVoucher.historicalBalanceBefore;
+    }
+    const computedBefore = { ...currentBalMap };
+    if (originalVoucher.ledgerEntries) {
+      originalVoucher.ledgerEntries.forEach((le: any) => {
+        if (le.accountId === Number(supplierId)) {
+          const curIdText = String(le.currencyId);
+          const change = le.debit - le.credit;
+          computedBefore[curIdText] = (computedBefore[curIdText] || 0) - change;
+        }
+      });
+    }
+    return computedBefore;
+  }, [supplier, editId, originalVoucher, supplierId]);
+
+  const screenAccountBalanceBeforeByCurrency = useMemo(() => {
+    const currentBalMap = getAccountBalanceBeforeMap(supplier);
+    if (!editId || !originalVoucher || !supplier) {
+      return currentBalMap;
+    }
+    if (Number(supplierId) !== originalVoucher.accountId) {
+      return currentBalMap;
+    }
+    const computedBefore = { ...currentBalMap };
+    if (originalVoucher.ledgerEntries) {
+      originalVoucher.ledgerEntries.forEach((le: any) => {
+        if (le.accountId === Number(supplierId)) {
+          const curIdText = String(le.currencyId);
+          const change = le.debit - le.credit;
+          computedBefore[curIdText] = (computedBefore[curIdText] || 0) - change;
+        }
+      });
+    }
+    return computedBefore;
+  }, [supplier, editId, originalVoucher, supplierId]);
+
+  const screenAccountBalanceAfterByCurrency = useMemo(() => {
+    return subtractMoneyMap(
+      screenAccountBalanceBeforeByCurrency,
+      supplierBalanceReductionByCurrency
+    );
+  }, [screenAccountBalanceBeforeByCurrency, supplierBalanceReductionByCurrency]);
   const accountBalanceAfterByCurrency = subtractMoneyMap(
     accountBalanceBeforeByCurrency,
     supplierBalanceReductionByCurrency
@@ -1224,7 +1286,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                     fontWeight: 900,
                   }}
                 >
-                  {formatCurrencyMap(accountBalanceBeforeByCurrency)}
+                  {formatCurrencyMap(screenAccountBalanceBeforeByCurrency)}
                 </span>
               </InfoRow>
             </div>
@@ -1299,7 +1361,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                         disabled={isLocked}
                         onChange={(val) => updatePaidAmount(currency.id, val)}
                         placeholder="0"
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "right" }}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "left" }}
                       />
 
                       <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>

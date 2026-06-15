@@ -490,6 +490,27 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     return computedBefore;
   }, [supplier, editId, originalVoucher, supplierId]);
 
+  const screenAccountBalanceBeforeByCurrency = useMemo(() => {
+    const currentBalMap = getAccountBalanceBeforeMap(supplier);
+    if (!editId || !originalVoucher || !supplier) {
+      return currentBalMap;
+    }
+    if (Number(supplierId) !== originalVoucher.accountId) {
+      return currentBalMap;
+    }
+    const computedBefore = { ...currentBalMap };
+    if (originalVoucher.ledgerEntries) {
+      originalVoucher.ledgerEntries.forEach((le: any) => {
+        if (le.accountId === Number(supplierId)) {
+          const curIdText = String(le.currencyId);
+          const change = le.debit - le.credit;
+          computedBefore[curIdText] = (computedBefore[curIdText] || 0) - change;
+        }
+      });
+    }
+    return computedBefore;
+  }, [supplier, editId, originalVoucher, supplierId]);
+
   const activeBalances = useMemo(() => {
     return Object.entries(accountBalanceBeforeByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount)) > 0.01);
@@ -507,6 +528,16 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       }
     }
   }, [supplierId, paidCurrencyId, activeBalances, supplier]);
+
+  useEffect(() => {
+    if (supplier) {
+      const balanceMap = getAccountBalanceBeforeMap(supplier);
+      const activeCurKeys = Object.keys(balanceMap).filter(key => Math.abs(balanceMap[key]) > 0.01);
+      if (activeCurKeys.length === 1) {
+        setPaidCurrencyId(Number(activeCurKeys[0]));
+      }
+    }
+  }, [supplierId, supplier]);
 
   const itemsSubtotalInBase = rows.reduce((sum, row) => sum + getRowTotal(row), 0);
 
@@ -533,6 +564,30 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
     return result.balanceAfterByCurrency;
   }, [supplier, paidAmounts, targetCurrencyId, exchangeRate, accountBalanceBeforeByCurrency, itemsSubtotalInBase, purchaseCurrencyId, editId, isLocked]);
+
+  const screenAccountBalanceAfterByCurrency = useMemo(() => {
+    if (!supplier) return {};
+    const before = screenAccountBalanceBeforeByCurrency;
+
+    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(supplier);
+    const rate = toNumber(exchangeRate) / 100;
+
+    const result = calculateLedgerEntries({
+      type: "purchase",
+      netAmount: itemsSubtotalInBase,
+      currencyId: purchaseCurrencyId || defaultCurrency?.id || 5,
+      exchangeRate: rate,
+      paidAmounts: getPaidCurrencies().map((p: any) => ({
+        currencyId: p.currencyId,
+        amount: p.amount,
+        exchangeRate: (p.currencyId === purchaseCurrencyId) ? 1 : rate
+      })),
+      extraPaymentHandling: null,
+      balanceBeforeByCurrency: before
+    });
+
+    return result.balanceAfterByCurrency;
+  }, [supplier, paidAmounts, targetCurrencyId, exchangeRate, screenAccountBalanceBeforeByCurrency, itemsSubtotalInBase, purchaseCurrencyId]);
 
   const selectedCashbox = cashboxes.find((c: any) => c.id === cashboxId);
 
@@ -1721,11 +1776,11 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               </InfoRow>
 
               <InfoRow label="قەرزی پێشوو">
-                {formatCurrencyMapWithColors(accountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
               </InfoRow>
 
               <InfoRow label="کۆی گشتی ماوە">
-                {formatCurrencyMapWithColors(accountBalanceAfterByCurrency)}
+                {formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
               </InfoRow>
             </div>
           )}
@@ -1798,7 +1853,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                         disabled={isLocked}
                         onChange={(val) => updatePaidAmount(currency.id, val)}
                         placeholder="0"
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "right" }}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "left" }}
                       />
 
                       <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>

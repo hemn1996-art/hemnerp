@@ -519,6 +519,27 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     return computedBefore;
   }, [selectedAccount, editId, originalVoucher, accountId]);
 
+  const screenAccountBalanceBeforeByCurrency = useMemo(() => {
+    const currentBalMap = getAccountBalanceBeforeMap(selectedAccount);
+    if (!editId || !originalVoucher || !selectedAccount) {
+      return currentBalMap;
+    }
+    if (Number(accountId) !== originalVoucher.accountId) {
+      return currentBalMap;
+    }
+    const computedBefore = { ...currentBalMap };
+    if (originalVoucher.ledgerEntries) {
+      originalVoucher.ledgerEntries.forEach((le: any) => {
+        if (le.accountId === Number(accountId)) {
+          const curIdText = String(le.currencyId);
+          const change = le.debit - le.credit;
+          computedBefore[curIdText] = (computedBefore[curIdText] || 0) - change;
+        }
+      });
+    }
+    return computedBefore;
+  }, [selectedAccount, editId, originalVoucher, accountId]);
+
   const activeBalances = useMemo(() => {
     return Object.entries(accountBalanceBeforeByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount)) > 0.01);
@@ -583,6 +604,36 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     return result.balanceAfterByCurrency;
   }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, accountBalanceBeforeByCurrency, total, invoiceCurrencyId, invoiceType, editId, isInvoiceLocked]);
+
+  const screenAccountBalanceAfterByCurrency = useMemo(() => {
+    if (!selectedAccount) return {};
+    const before = screenAccountBalanceBeforeByCurrency;
+
+    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
+    const rate = toNumber(exchangeRate) / 100;
+
+    let mappedType = "sales";
+    if (invoiceType === "کڕین") mappedType = "purchase";
+    else if (invoiceType === "گەڕانەوەی فرۆشتن") mappedType = "sales_return";
+    else if (invoiceType === "گەڕانەوەی کڕین") mappedType = "purchase_return";
+    else if (invoiceType === "نرخاندن") mappedType = "quotation";
+
+    const result = calculateLedgerEntries({
+      type: mappedType,
+      netAmount: total,
+      currencyId: invoiceCurrencyId,
+      exchangeRate: rate,
+      paidAmounts: getPaidCurrencies().map((p: any) => ({
+        currencyId: p.currencyId,
+        amount: p.amount,
+        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
+      })),
+      extraPaymentHandling: null,
+      balanceBeforeByCurrency: before
+    });
+
+    return result.balanceAfterByCurrency;
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, screenAccountBalanceBeforeByCurrency, total, invoiceCurrencyId, invoiceType]);
   const selectedCashbox = cashboxes.find((c: any) => c.id === cashboxId);
   const invoiceCurrency = currencies.find((c: any) => c.id === invoiceCurrencyId);
   const invoiceSymbol = invoiceCurrency?.symbol || "$";
@@ -1804,11 +1855,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               </InfoRow>
 
               <InfoRow label="قەرزی پێشوو">
-                {formatCurrencyMapWithColors(accountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
               </InfoRow>
 
               <InfoRow label="کۆی گشتی ماوە">
-                {formatCurrencyMapWithColors(accountBalanceAfterByCurrency)}
+                {formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
               </InfoRow>
 
               <InfoRow label="ئاگاداری دواکەوتن">
@@ -1944,7 +1995,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         disabled={isInvoiceLocked}
                         onChange={(val) => updatePaidAmount(currency.id, val)}
                         placeholder="0"
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isInvoiceLocked ? "#f3f4f6" : "#fff", cursor: isInvoiceLocked ? "not-allowed" : "text", textAlign: "right" }}
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isInvoiceLocked ? "#f3f4f6" : "#fff", cursor: isInvoiceLocked ? "not-allowed" : "text", textAlign: "left" }}
                       />
 
                       <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>
