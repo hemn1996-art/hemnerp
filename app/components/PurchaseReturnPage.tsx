@@ -1280,19 +1280,12 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                 const isCurrent = currency.id === paidCurrencyId;
                 return (
                   <Field key={currency.id} label={isCurrent ? "پارەی دراو" : `پارەی دراو (${currency.name})`}>
-                    <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
-                      <FormattedNumberInput
-                        value={paidAmounts[currency.id] || ""}
-                        disabled={isLocked}
-                        onChange={(val) => updatePaidAmount(currency.id, val)}
-                        placeholder="0"
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text" }}
-                      />
+                    <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden", width: "100%" }}>
                       <select
                         value={currency.id}
                         disabled={isLocked}
                         onChange={(e) => setPaidCurrencyId(Number(e.target.value))}
-                        style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 12px", outline: "none", fontWeight: "bold", color: "#1e293b", cursor: isLocked ? "not-allowed" : "pointer", minWidth: "100px" }}
+                        style={{ border: "none", borderLeft: "1px solid #d1d5db", background: "#f8fafc", padding: "0 12px", outline: "none", fontWeight: "bold", color: "#1e293b", cursor: isLocked ? "not-allowed" : "pointer", minWidth: "90px" }}
                       >
                         {currencies.map((curr: any) => (
                           <option key={curr.id} value={curr.id}>
@@ -1300,6 +1293,18 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                           </option>
                         ))}
                       </select>
+
+                      <FormattedNumberInput
+                        value={paidAmounts[currency.id] || ""}
+                        disabled={isLocked}
+                        onChange={(val) => updatePaidAmount(currency.id, val)}
+                        placeholder="0"
+                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isLocked ? "#f3f4f6" : "#fff", cursor: isLocked ? "not-allowed" : "text", textAlign: "right" }}
+                      />
+
+                      <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>
+                        {currency.symbol || getCurrencySymbol(currency.id)}
+                      </span>
                     </div>
                   </Field>
                 );
