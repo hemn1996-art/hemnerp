@@ -39,6 +39,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const [chartYear, setChartYear] = useState<number>(2026);
   const [chartCurrency, setChartCurrency] = useState<"all" | "USD" | "IQD">("all");
 
+  const [mounted, setMounted] = useState(false);
+  const [kpiPeriod, setKpiPeriod] = useState<string>("today");
+  const [donutPeriod, setDonutPeriod] = useState<string>("today");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     const load = () => {
       try {
@@ -81,12 +89,55 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     return `${cur?.symbol || "$"}${val.toLocaleString()}`;
   };
 
+  const getFilteredInvoices = (period: string) => {
+    if (!mounted) return invoices;
+
+    const now = new Date();
+    // Iraq / local calendar day
+    const todayStr = now.toLocaleDateString("en-CA"); // YYYY-MM-DD
+    
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const yesterdayStr = yesterday.toLocaleDateString("en-CA");
+
+    // Week boundaries (last 7 days, including today)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    return invoices.filter((inv: any) => {
+      if (!inv.date) return false;
+      const invDate = new Date(inv.date);
+      const invDateStr = invDate.toLocaleDateString("en-CA");
+
+      if (period === "today") {
+        return invDateStr === todayStr;
+      }
+      if (period === "yesterday") {
+        return invDateStr === yesterdayStr;
+      }
+      if (period === "week") {
+        return invDate >= sevenDaysAgo && invDate <= now;
+      }
+      if (period === "month") {
+        return invDate.getMonth() === currentMonth && invDate.getFullYear() === currentYear;
+      }
+      if (period === "year") {
+        return invDate.getFullYear() === currentYear;
+      }
+      return true; // "all"
+    });
+  };
+
   // Helper to calculate separate USD and IQD totals by voucher types
-  const getTotals = (filterType: string, sumField: "total" | "paid" = "total") => {
+  const getTotals = (filteredInvs: any[], filterType: string, sumField: "total" | "paid" = "total") => {
     let usd = 0;
     let iqd = 0;
 
-    invoices.forEach((inv: any) => {
+    filteredInvs.forEach((inv: any) => {
       if (inv.type === filterType) {
         if (sumField === "total") {
           // Use voucher's main currency
@@ -123,11 +174,12 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     return { usd, iqd };
   };
 
-  const salesTotals = getTotals("فرۆشتن", "total");
-  const purchaseTotals = getTotals("کڕین", "total");
-  const expenseTotals = getTotals("خەرجی", "total");
-  const moneyInTotals = getTotals("پارەی هاتوو", "paid");
-  const moneyOutTotals = getTotals("پارەی ڕۆشتوو", "paid");
+  const kpiInvoices = getFilteredInvoices(kpiPeriod);
+  const salesTotals = getTotals(kpiInvoices, "فرۆشتن", "total");
+  const purchaseTotals = getTotals(kpiInvoices, "کڕین", "total");
+  const expenseTotals = getTotals(kpiInvoices, "خەرجی", "total");
+  const moneyInTotals = getTotals(kpiInvoices, "پارەی هاتوو", "paid");
+  const moneyOutTotals = getTotals(kpiInvoices, "پارەی ڕۆشتوو", "paid");
 
   const barData = [
     { name: "January", usd: 0, iqd: 0 },
@@ -166,12 +218,13 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const chartSumIqd = barData.reduce((sum, item) => sum + item.iqd, 0);
 
   // 3. Chart Data: Vouchers Donut
+  const donutInvoices = getFilteredInvoices(donutPeriod);
   const pieData = [
-    { name: "فرۆشتن", typeKey: "sales", value: invoices.filter((x: any) => x.type === "فرۆشتن").length, color: "#ef4444" },
-    { name: "کڕین", typeKey: "purchase", value: invoices.filter((x: any) => x.type === "کڕین").length, color: "#10b981" },
-    { name: "پارەی هاتوو", typeKey: "money_in", value: invoices.filter((x: any) => x.type === "پارەی هاتوو").length, color: "#8b5cf6" },
-    { name: "پارەی ڕۆشتوو", typeKey: "money_out", value: invoices.filter((x: any) => x.type === "پارەی ڕۆشتوو").length, color: "#14b8a6" },
-    { name: "خەرجی", typeKey: "expense", value: invoices.filter((x: any) => x.type === "خەرجی").length, color: "#f59e0b" },
+    { name: "فرۆشتن", typeKey: "sales", value: donutInvoices.filter((x: any) => x.type === "فرۆشتن").length, color: "#ef4444" },
+    { name: "کڕین", typeKey: "purchase", value: donutInvoices.filter((x: any) => x.type === "کڕین").length, color: "#10b981" },
+    { name: "پارەی هاتوو", typeKey: "money_in", value: donutInvoices.filter((x: any) => x.type === "پارەی هاتوو").length, color: "#8b5cf6" },
+    { name: "پارەی ڕۆشتوو", typeKey: "money_out", value: donutInvoices.filter((x: any) => x.type === "پارەی ڕۆشتوو").length, color: "#14b8a6" },
+    { name: "خەرجی", typeKey: "expense", value: donutInvoices.filter((x: any) => x.type === "خەرجی").length, color: "#f59e0b" },
   ];
 
   // Colors for styling
@@ -408,6 +461,23 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         </div>
       </div>
 
+      {/* KPI Section Header */}
+      <div className="bg-white rounded-2xl p-4 mb-4 border border-gray-200 shadow-sm flex justify-between items-center z-10">
+        <span className="font-bold text-gray-800 text-base">تێڕوانینی پسوولە</span>
+        <select
+          value={kpiPeriod}
+          onChange={(e) => setKpiPeriod(e.target.value)}
+          className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none cursor-pointer"
+        >
+          <option value="today">ئەمڕۆ</option>
+          <option value="yesterday">دوێنێ</option>
+          <option value="week">ئەم هەفتەیە</option>
+          <option value="month">ئەم مانگە</option>
+          <option value="year">ئەمساڵ</option>
+          <option value="all">هەموو کات</option>
+        </select>
+      </div>
+
       {/* 2. Stats Row (5 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         
@@ -558,8 +628,17 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 flex flex-col justify-between">
           <div className="flex justify-between items-center mb-4">
             <span className="font-bold text-gray-800 text-base">پسوولە دروستکراوەکان</span>
-            <select className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none cursor-pointer">
-              <option>ئەمڕۆ</option>
+            <select
+              value={donutPeriod}
+              onChange={(e) => setDonutPeriod(e.target.value)}
+              className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none cursor-pointer"
+            >
+              <option value="today">ئەمڕۆ</option>
+              <option value="yesterday">دوێنێ</option>
+              <option value="week">ئەم هەفتەیە</option>
+              <option value="month">ئەم مانگە</option>
+              <option value="year">ئەمساڵ</option>
+              <option value="all">هەمووی</option>
             </select>
           </div>
           
