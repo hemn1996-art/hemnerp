@@ -284,13 +284,9 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   [id$="-print-area"],
   [class*="print-area"] {
     display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    right: 0 !important;
-    top: 0 !important;
+    position: relative !important;
     width: 100% !important;
     background: white !important;
-    z-index: 999999 !important;
     box-sizing: border-box !important;
     margin: 0 !important;
     padding: 0 !important;

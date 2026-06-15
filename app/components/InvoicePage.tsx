@@ -3288,11 +3288,8 @@ const printCss = `
 
   #invoice-print-area {
     display: block !important;
-    position: absolute !important;
-    left: 2% !important;
-    right: 2% !important;
-    top: 0 !important;
-    width: 96% !important;
+    position: relative !important;
+    width: 100% !important;
     background: white !important;
     z-index: 999999 !important;
   }

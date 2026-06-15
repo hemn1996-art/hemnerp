@@ -1600,10 +1600,7 @@ const printCss = `
 
   #warehouse-damage-print-area {
     display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    right: 0 !important;
-    top: 0 !important;
+    position: relative !important;
     width: 100% !important;
     min-height: auto !important;
     background: white !important;
