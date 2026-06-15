@@ -1966,13 +1966,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 ) : null;
 
                 return (
-                  <div key={currency.id} style={{ display: "flex", gap: 12, width: "100%" }}>
-                    <div style={{ flex: 1 }}>
+                  <div key={currency.id} style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
+                    <div>
                       {amountInput}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      {rateInput}
-                    </div>
+                    {rateInput && (
+                      <div>
+                        {rateInput}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -2624,7 +2626,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           {(printOptions.showInvoiceInfo || printOptions.showAccountInfo) && (
             <div style={printInfoGrid}>
               {printOptions.showInvoiceInfo && (
-                <div style={printInfoBox}>
+                <div style={{ ...printInfoBox, width: "fit-content", marginLeft: "auto", minWidth: "220px" }}>
                   {printOptions.showInvoiceType && (
                     <PrintInfoLine label="جۆری پسوڵە" value={invoiceType} />
                   )}
@@ -2654,7 +2656,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               )}
 
               {printOptions.showAccountInfo && (
-                <div style={printInfoBox}>
+                <div style={{ ...printInfoBox, width: "fit-content", marginRight: "auto", minWidth: "220px" }}>
                   {printOptions.showAccountName && (
                     <PrintInfoLine
                       label={isTemporaryCustomer ? "کڕیار" : "هەژمار"}

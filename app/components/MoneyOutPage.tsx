@@ -1268,13 +1268,15 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                 ) : null;
 
                 return (
-                  <div key={currency.id} style={{ display: "flex", gap: 12, width: "100%" }}>
-                    <div style={{ flex: 1 }}>
+                  <div key={currency.id} style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
+                    <div>
                       {amountInput}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      {rateInput}
-                    </div>
+                    {rateInput && (
+                      <div>
+                        {rateInput}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1404,7 +1406,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
           <div style={printInfoGrid}>
             {printOptions.showAccountInfo && (
-              <div style={printInfoBox}>
+              <div style={{ ...printInfoBox, width: "fit-content", marginLeft: "auto", minWidth: "220px" }}>
                 {printOptions.showAccountName && (
                   <PrintInfoLine
                     label="هەژمار"
@@ -1433,7 +1435,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
             )}
 
             {printOptions.showReceiptInfo && (
-              <div style={printInfoBox}>
+              <div style={{ ...printInfoBox, width: "fit-content", marginRight: "auto", minWidth: "220px" }}>
                 <PrintInfoLine label="جۆری پسوڵە" value="پارەی ڕۆشتوو" />
 
                 {printOptions.showReceiptNumber && (

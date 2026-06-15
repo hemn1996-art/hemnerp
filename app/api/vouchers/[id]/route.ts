@@ -53,19 +53,25 @@ export async function GET(
 
     let balanceBeforeByCurrency: Record<string, number> = {};
     if (voucher.accountId) {
-      const priorEntries = await prisma.ledgerEntry.groupBy({
+      const currentBalances = await prisma.ledgerEntry.groupBy({
         by: ["currencyId"],
         where: {
           accountId: voucher.accountId,
-          OR: [
-            { date: { lt: voucher.date } },
-            { date: voucher.date, id: { lt: voucherId } }
-          ]
         },
         _sum: { debit: true, credit: true }
       });
-      for (const entry of priorEntries) {
+      for (const entry of currentBalances) {
         balanceBeforeByCurrency[String(entry.currencyId)] = (entry._sum.debit || 0) - (entry._sum.credit || 0);
+      }
+
+      if (voucher.ledgerEntries) {
+        for (const le of voucher.ledgerEntries) {
+          if (le.accountId === voucher.accountId) {
+            const curIdStr = String(le.currencyId);
+            const change = (le.debit || 0) - (le.credit || 0);
+            balanceBeforeByCurrency[curIdStr] = (balanceBeforeByCurrency[curIdStr] || 0) - change;
+          }
+        }
       }
     }
 
