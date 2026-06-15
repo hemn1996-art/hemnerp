@@ -607,20 +607,24 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
           </div>
           
           <div className="h-64 w-full" dir="ltr">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} margin={{ top: 10, right: 0, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} width={75} tickFormatter={(val) => chartCurrency === "IQD" ? val.toLocaleString() + ' د.ع' : '$' + val.toLocaleString()} />
-                <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }} />
-                {(chartCurrency === "all" || chartCurrency === "USD") && (
-                  <Bar dataKey="usd" name="$" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={chartCurrency === "all" ? 16 : 22} />
-                )}
-                {(chartCurrency === "all" || chartCurrency === "IQD") && (
-                  <Bar dataKey="iqd" name="دینار" fill="#22c55e" radius={[6, 6, 0, 0]} barSize={chartCurrency === "all" ? 16 : 22} />
-                )}
-              </BarChart>
-            </ResponsiveContainer>
+            {mounted ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData} margin={{ top: 10, right: 0, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} width={75} tickFormatter={(val) => chartCurrency === "IQD" ? val.toLocaleString() + ' د.ع' : '$' + val.toLocaleString()} />
+                  <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }} />
+                  {(chartCurrency === "all" || chartCurrency === "USD") && (
+                    <Bar dataKey="usd" name="$" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={chartCurrency === "all" ? 16 : 22} />
+                  )}
+                  {(chartCurrency === "all" || chartCurrency === "IQD") && (
+                    <Bar dataKey="iqd" name="دینار" fill="#22c55e" radius={[6, 6, 0, 0]} barSize={chartCurrency === "all" ? 16 : 22} />
+                  )}
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">باردەکرێت...</div>
+            )}
           </div>
         </div>
 
@@ -643,25 +647,29 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
           </div>
           
           <div className="h-44 w-full flex justify-center items-center relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={75}
-                  paddingAngle={4}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
-              </PieChart>
-            </ResponsiveContainer>
+            {mounted ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={75}
+                    paddingAngle={4}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">باردەکرێت...</div>
+            )}
           </div>
           
           <div className="grid grid-cols-2 gap-2 mt-4">

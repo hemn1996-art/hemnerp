@@ -1,6 +1,7 @@
 "use client";
 import DateInput from "./DateInput";
 import FormattedNumberInput from "./FormattedNumberInput";
+import PrintHeader, { PrintWatermark } from "./PrintHeader";
 
 import {
   useEffect,
@@ -1321,14 +1322,8 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
       <div id="money-in-print-area" style={printArea}>
         <div style={printPage}>
-          <div style={printHeaderArea}>
-            <div style={printSmallTop}>{new Date().toLocaleString("en-US")}</div>
-            <div style={printInvoiceCode}>Inv-MoneyIn-{receiptNumber}-{receiptDate}</div>
-            <h1 style={printCompanyTitle}>سەنتەری کارەبای لەندەن</h1>
-            <div style={printCompanySub}>بۆ دابینکردنی ئامێرەکارەباییەکان بە جوملە</div>
-            <div style={printCompanyInfo}>ناونیشان: سلێمانی - کۆگاکانی شۆڕی بازڕگانی</div>
-            <div style={printPhoneLine}>0770 140 3038 &nbsp;&nbsp; 0750 173 4006</div>
-          </div>
+          <PrintWatermark />
+          <PrintHeader />
 
           <div style={printInfoGrid}>
             {printOptions.showAccountInfo && (
@@ -1635,7 +1630,32 @@ function PrintInfoLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PrintSummaryLine({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+function PrintSummaryLine({
+  label,
+  value,
+  bold,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+}) {
+  let hideZero = false;
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        hideZero = !!JSON.parse(saved).hideZeroBalance;
+      } catch (e) {}
+    }
+  }
+
+  if (hideZero) {
+    const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
+    if (clean === "0" || clean === "" || Number(clean) === 0) {
+      return null;
+    }
+  }
+
   return (
     <div style={printSummaryLine}>
       <span style={{ fontWeight: bold ? 900 : 700 }}>{label}</span>
@@ -1657,15 +1677,15 @@ const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
 @media print {
-  @page { size: A4; margin: 0; }
+  @page { size: auto; margin: 8mm; }
   body * { visibility: hidden !important; }
   #money-in-print-area, #money-in-print-area * { visibility: visible !important; }
   #money-in-print-area {
     display: block !important;
     position: absolute !important;
-    inset: 0 !important;
-    width: 210mm !important;
-    min-height: 297mm !important;
+    left: 0 !important; top: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
     background: white !important;
     z-index: 999999 !important;
   }
@@ -1715,7 +1735,7 @@ const headerCard: CSSProperties = { background: "white", border: "1px solid #e5e
 const emptyMainCard: CSSProperties = { minHeight: 160, background: "#f3f4f6", borderRadius: 14, padding: 30, textAlign: "right" };
 const viewBtn: CSSProperties = { border: 0, background: "#dbeafe", color: "#2563eb", borderRadius: 8, padding: "10px 18px", fontWeight: 800 };
 const printArea: CSSProperties = { display: "none" };
-const printPage: CSSProperties = { width: "210mm", minHeight: "297mm", background: "white", padding: "8mm 12mm 16mm 12mm", boxSizing: "border-box", direction: "rtl", fontFamily: appFont, color: "#111827", position: "relative" };
+const printPage: CSSProperties = { width: "100%", minHeight: "auto", background: "white", padding: "8mm 12mm 16mm 12mm", boxSizing: "border-box", direction: "rtl", fontFamily: appFont, color: "#111827", position: "relative" };
 const printHeaderArea: CSSProperties = { textAlign: "center", marginBottom: 8, position: "relative" };
 const printSmallTop: CSSProperties = { position: "absolute", left: 0, top: 0, fontSize: 9 };
 const printInvoiceCode: CSSProperties = { position: "absolute", right: 0, top: 0, fontSize: 9 };

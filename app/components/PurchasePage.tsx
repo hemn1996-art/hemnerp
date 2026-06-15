@@ -1,5 +1,6 @@
 "use client";
 import FormattedNumberInput from "./FormattedNumberInput";
+import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";
 
 import {
@@ -2545,7 +2546,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
       <div id="purchase-print-area" style={printArea}>
         <div style={printPage}>
-          <div style={printHeaderBlankSpace}></div>
+          <PrintWatermark />
+          <PrintHeader />
 
           {(printOptions.showInvoiceInfo || printOptions.showSupplierInfo) && (
             <div style={printInfoGrid}>
@@ -3171,6 +3173,23 @@ function PrintSummaryLine({
   value: string;
   bold?: boolean;
 }) {
+  let hideZero = false;
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        hideZero = !!JSON.parse(saved).hideZeroBalance;
+      } catch (e) {}
+    }
+  }
+
+  if (hideZero) {
+    const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
+    if (clean === "0" || clean === "" || Number(clean) === 0) {
+      return null;
+    }
+  }
+
   return (
     <div style={printSummaryLine}>
       <span style={{ fontWeight: bold ? 900 : 700 }}>{label}</span>
@@ -3203,8 +3222,7 @@ const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 const printCss = `
 @media print {
   @page {
-    size: A4;
-    margin: 0;
+    size: auto; margin: 8mm;
   }
 
   body * {
@@ -3219,9 +3237,9 @@ const printCss = `
   #purchase-print-area {
     display: block !important;
     position: absolute !important;
-    inset: 0 !important;
-    width: 210mm !important;
-    min-height: 297mm !important;
+    left: 0 !important; top: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
     background: white !important;
     z-index: 999999 !important;
   }
@@ -3931,10 +3949,10 @@ const printArea: CSSProperties = {
 };
 
 const printPage: CSSProperties = {
-  width: "210mm",
-  minHeight: "297mm",
+  width: "100%",
+  minHeight: "auto",
   background: "white",
-  padding: "0 14mm 16mm 14mm",
+  padding: "0 4mm 4mm 4mm",
   boxSizing: "border-box",
   direction: "rtl",
   fontFamily: appFont,

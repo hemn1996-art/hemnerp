@@ -1,7 +1,7 @@
 "use client";
 import DateInput from "./DateInput";
 import FormattedNumberInput from "./FormattedNumberInput";
-
+import PrintHeader, { PrintWatermark } from "./PrintHeader";
 
 import {
   useEffect,
@@ -1470,6 +1470,45 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     ...(activeTemplate?.tableHeaderColor ? { color: activeTemplate.tableHeaderColor } : {}),
   };
 
+  let hideZero = false;
+  let primaryCode = "USD";
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        hideZero = !!parsed.hideZeroBalance;
+        if (parsed.primaryCurrency) primaryCode = parsed.primaryCurrency;
+      } catch (e) {}
+    }
+  }
+
+  const getCurrencyBalancesList = (balanceMap: Record<string, number>) => {
+    const list = Object.entries(balanceMap || {}).map(([curIdText, val]) => {
+      const curId = Number(curIdText);
+      const currency = currencies.find((c: any) => c.id === curId);
+      const code = currency?.code || "USD";
+      const formatted = formatCurrencyAmount(val, curId);
+      return { val, code, formatted };
+    });
+
+    const filtered = list.filter(item => !hideZero || Math.abs(item.val) > 0.01);
+
+    if (filtered.length === 0) {
+      const primaryCurId = currencies.find((c: any) => c.code === primaryCode)?.id || 1;
+      filtered.push({
+        val: 0,
+        code: primaryCode,
+        formatted: formatCurrencyAmount(0, primaryCurId)
+      });
+    }
+
+    return filtered;
+  };
+
+  const prevBalances = getCurrencyBalancesList(accountBalanceBeforeByCurrency);
+  const newBalances = getCurrencyBalancesList(accountBalanceAfterByCurrency);
+
   return (
     <div style={page}>
       {isEditLoading && (
@@ -2561,12 +2600,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             backgroundRepeat: "no-repeat",
           } : {})
         }}>
+          <PrintWatermark />
           {activeTemplate?.headerImage ? (
             <div style={{ width: "100%", height: "60mm", marginBottom: 12, overflow: "hidden" }}>
               <img src={activeTemplate.headerImage} alt="Header" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
           ) : (
-            <div style={printHeaderBlankSpace}></div>
+            <PrintHeader />
           )}
 
           {(printOptions.showInvoiceInfo || printOptions.showAccountInfo) && (
@@ -2717,8 +2757,70 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           </table>
 
           <div style={printBottomGrid}>
-            <div style={printSummaryBox}>
-              <PrintSummaryLine label="کۆی کەرەستەکان" value={`${itemCount}`} />
+            {/* Left Box: Account Balances */}
+            {printOptions.showPrintBalance && !isTemporaryCustomer && selectedAccount && (
+              <div style={{
+                border: "1px solid #cbd5e1",
+                borderRadius: "8px",
+                padding: "10px 14px",
+                background: "white",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                boxSizing: "border-box",
+                justifyContent: "space-between",
+                fontSize: "12px"
+              }}>
+                {/* Previous Debt (قەرزی پێشوو) */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                  {/* Left: Stack of currency values */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left", fontWeight: "bold" }}>
+                    {prevBalances.map((b, i) => (
+                      <span key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b", fontFamily: "monospace" }}>
+                        {b.formatted}
+                      </span>
+                    ))}
+                  </div>
+                  {/* Right: Label */}
+                  <span style={{ fontWeight: "bold", color: "#374151" }}>قەرزی پێشوو</span>
+                </div>
+
+                <hr style={{ border: 0, borderTop: "1px solid #e2e8f0", margin: 0 }} />
+
+                {/* New Debt (کۆی گشتی قەرز) */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                  {/* Left: Stack of currency values */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left", fontWeight: "bold" }}>
+                    {newBalances.map((b, i) => (
+                      <span key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b", fontFamily: "monospace" }}>
+                        {b.formatted}
+                      </span>
+                    ))}
+                  </div>
+                  {/* Right: Label */}
+                  <span style={{ fontWeight: "bold", color: "#374151" }}>کۆی گشتی قەرز</span>
+                </div>
+              </div>
+            )}
+
+            {/* Right Box: Invoice Totals */}
+            <div style={{
+              border: "1px solid #cbd5e1",
+              borderRadius: "8px",
+              padding: "10px 14px",
+              background: "white",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              boxSizing: "border-box",
+              fontSize: "12px",
+              justifyContent: "center"
+            }}>
+              <PrintSummaryLine
+                label="کۆی گشتی"
+                value={formatMoney(total)}
+                bold
+              />
 
               {invoiceDiscountAmount > 0 && (
                 <PrintSummaryLine
@@ -2727,57 +2829,28 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 />
               )}
 
-              {hasDelivery &&
-                printOptions.showDelivery &&
-                deliveryFeeAmount > 0 && (
-                  <PrintSummaryLine
-                    label="کرێی دلیڤەری"
-                    value={formatMoney(deliveryFeeAmount)}
-                  />
-                )}
-            </div>
-
-            <div style={printSummaryBox}>
-              {printOptions.showPrintBalance && (
-                <>
-                  <PrintSummaryLine
-                    label="کۆی گشتی پسوڵە"
-                    value={formatMoney(total)}
-                    bold
-                  />
-                  <PrintSummaryLine
-                    label="پارەی دراو"
-                    value={getPaidSummaryText()}
-                  />
-
-                  {isMixedCurrencyPaid() && (
-                    <PrintSummaryLine
-                      label="رەیتی 1 دۆلار"
-                      value={`${Number(exchangeRate || 0).toLocaleString(
-                        "en-US"
-                      )} دینار`}
-                    />
-                  )}
-
-                  <PrintSummaryLine
-                    label="ماوەی ئەم پسوڵە"
-                    value={formatMoney(remaining)}
-                    bold
-                  />
-                  <PrintSummaryLine
-                    label="قەرزی کۆن"
-                    value={formatCurrencyMap(accountBalanceBeforeByCurrency)}
-                  />
-                  <PrintSummaryLine
-                    label="کۆی قەرزی نوێ"
-                    value={formatCurrencyMap(accountBalanceAfterByCurrency)}
-                    bold
-                  />
-                </>
+              {hasDelivery && printOptions.showDelivery && deliveryFeeAmount > 0 && (
+                <PrintSummaryLine
+                  label="کرێی دلیڤەری"
+                  value={formatMoney(deliveryFeeAmount)}
+                />
               )}
 
+              {getPaidSummaryText() !== "0" && (
+                <PrintSummaryLine
+                  label="پارەی دراو"
+                  value={getPaidSummaryText()}
+                />
+              )}
+
+              <PrintSummaryLine
+                label="ماوە"
+                value={formatMoney(remaining)}
+                bold
+              />
+
               {printOptions.showDelivery && hasDelivery && (
-                <div style={printSectionSmall}>
+                <div style={{ marginTop: 8, borderTop: "1px solid #f1f5f9", paddingTop: 8 }}>
                   <PrintSummaryLine
                     label="ناوی دلیڤەری"
                     value={deliveryName || "-"}
@@ -2794,9 +2867,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               )}
 
               {printOptions.showNotes && printNote && (
-                <div style={printNoteBox}>
+                <div style={{ marginTop: 8, borderTop: "1px solid #f1f5f9", paddingTop: 8 }}>
                   <b>تێبینی چاپ:</b>
-                  <div>{printNote}</div>
+                  <div style={{ marginTop: 4 }}>{printNote}</div>
                 </div>
               )}
             </div>
@@ -3124,6 +3197,23 @@ function PrintSummaryLine({
   value: string;
   bold?: boolean;
 }) {
+  let hideZero = false;
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        hideZero = !!JSON.parse(saved).hideZeroBalance;
+      } catch (e) {}
+    }
+  }
+
+  if (hideZero) {
+    const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
+    if (clean === "0" || clean === "" || Number(clean) === 0) {
+      return null;
+    }
+  }
+
   return (
     <div style={printSummaryLine}>
       <span style={{ fontWeight: bold ? 900 : 700 }}>{label}</span>
@@ -3156,8 +3246,8 @@ const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 const printCss = `
 @media print {
   @page {
-    size: A4;
-    margin: 0;
+    size: auto;
+    margin: 8mm;
   }
 
   body * {
@@ -3172,9 +3262,9 @@ const printCss = `
   #invoice-print-area {
     display: block !important;
     position: absolute !important;
-    inset: 0 !important;
-    width: 210mm !important;
-    min-height: 297mm !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
     background: white !important;
     z-index: 999999 !important;
   }
@@ -3926,10 +4016,10 @@ const printArea: CSSProperties = {
 };
 
 const printPage: CSSProperties = {
-  width: "210mm",
-  minHeight: "297mm",
+  width: "100%",
+  minHeight: "auto",
   background: "white",
-  padding: "0 14mm 16mm 14mm",
+  padding: "0 4mm 4mm 4mm",
   boxSizing: "border-box",
   direction: "rtl",
   fontFamily: appFont,

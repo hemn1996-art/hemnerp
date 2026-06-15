@@ -1,5 +1,6 @@
 "use client";
 import FormattedNumberInput from "./FormattedNumberInput";
+import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";
 
 import {
@@ -1733,7 +1734,8 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
 
       <div id="purchase-return-print-area" style={printArea}>
         <div style={printPage}>
-          <div style={printHeaderBlankSpace}></div>
+          <PrintWatermark />
+          <PrintHeader />
 
           {(printOptions.showInvoiceInfo || printOptions.showSupplierInfo) && (
             <div style={printInfoGrid}>
@@ -2123,7 +2125,32 @@ function PrintInfoLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PrintSummaryLine({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+function PrintSummaryLine({
+  label,
+  value,
+  bold,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+}) {
+  let hideZero = false;
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        hideZero = !!JSON.parse(saved).hideZeroBalance;
+      } catch (e) {}
+    }
+  }
+
+  if (hideZero) {
+    const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
+    if (clean === "0" || clean === "" || Number(clean) === 0) {
+      return null;
+    }
+  }
+
   return (
     <div style={printSummaryLine}>
       <span style={{ fontWeight: bold ? 900 : 700 }}>{label}</span>
@@ -2145,15 +2172,15 @@ const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
 @media print {
-  @page { size: A4; margin: 0; }
+  @page { size: auto; margin: 8mm; }
   body * { visibility: hidden !important; }
   #purchase-return-print-area, #purchase-return-print-area * { visibility: visible !important; }
   #purchase-return-print-area {
     display: block !important;
     position: absolute !important;
-    inset: 0 !important;
-    width: 210mm !important;
-    min-height: 297mm !important;
+    left: 0 !important; top: 0 !important;
+    width: 100% !important;
+    min-height: auto !important;
     background: white !important;
     z-index: 999999 !important;
   }
@@ -2226,7 +2253,7 @@ const blueSaveBtn: CSSProperties = { background: "#2563eb", color: "white", bord
 const summaryCard: CSSProperties = { background: "white", border: "1px solid #e5e7eb", borderRadius: 16, padding: 14, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 };
 const summaryItem: CSSProperties = { border: "1px solid #e5e7eb", background: "#fafafa", borderRadius: 14, padding: 14 };
 const printArea: CSSProperties = { display: "none" };
-const printPage: CSSProperties = { width: "210mm", minHeight: "297mm", background: "white", padding: "0 14mm 16mm 14mm", boxSizing: "border-box", direction: "rtl", fontFamily: appFont, color: "#111827", position: "relative" };
+const printPage: CSSProperties = { width: "100%", minHeight: "auto", background: "white", padding: "0 4mm 4mm 4mm", boxSizing: "border-box", direction: "rtl", fontFamily: appFont, color: "#111827", position: "relative" };
 const printHeaderBlankSpace: CSSProperties = { height: "60mm", borderBottom: "1px solid #e5e7eb", marginBottom: 8 };
 const printInfoGrid: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 8, marginBottom: 8 };
 const printInfoBox: CSSProperties = { border: "1px solid #e5e7eb", padding: 8, fontSize: 11, minHeight: 54 };
