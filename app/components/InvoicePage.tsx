@@ -407,6 +407,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }
   }, [editId, accounts]);
 
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      if (iqd && iqd.rate) {
+        setExchangeRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
+
   const [printOptions, setPrintOptions] = useState<PrintOptions>({
     showInvoiceInfo: true,
     showInvoiceType: true,
@@ -1513,7 +1522,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       return;
     }
 
-    if (!isInvoiceSaved) {
+    if (!editId && !isInvoiceSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }

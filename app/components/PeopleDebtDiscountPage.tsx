@@ -204,6 +204,9 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
   const [activeTemplate, setActiveTemplate] = useState<any>(null);
 
   useEffect(() => {
+    if (storeCurrencies.length === 0 && fetchCurrencies) {
+      fetchCurrencies();
+    }
     fetch("/api/invoice-templates")
       .then((res) => res.json())
       .then((data) => {
@@ -306,6 +309,15 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
       setSavedSnapshot(currentSnapshot);
     }
   }, [editId, isEditLoading, currentSnapshot, savedSnapshot]);
+
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      if (iqd && iqd.rate) {
+        setExchangeRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
 
   const isSaved = savedSnapshot !== "" && savedSnapshot === currentSnapshot;
 
@@ -681,7 +693,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
   }
 
   function handlePrint() {
-    if (!isLocked && !isSaved) {
+    if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }

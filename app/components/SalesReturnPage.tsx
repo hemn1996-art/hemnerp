@@ -259,6 +259,15 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     }
   }, [editId, accounts]);
 
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      if (iqd && iqd.rate) {
+        setExchangeRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
+
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerId, setCustomerId] = useState<number | undefined>();
   const [showCustomerList, setShowCustomerList] = useState(false);
@@ -1168,12 +1177,12 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
       return;
     }
 
-    if (!isLocked && !isSaved) {
+    if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }
 
-    window.print();
+    setTimeout(() => window.print(), 100);
   }
 
   function togglePrintOption(key: keyof PrintOptions) {

@@ -279,6 +279,21 @@ export default function MyDebtPage({ headerSelector, editId }: Props) {
     }
   }, [editId, isEditLoading, currentSnapshot, savedSnapshot]);
 
+  useEffect(() => {
+    if (storeCurrencies.length === 0 && fetchCurrencies) {
+      fetchCurrencies();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      if (iqd && iqd.rate) {
+        setExchangeRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
+
   const isSaved = savedSnapshot !== "" && savedSnapshot === currentSnapshot;
 
   function showToast(message: string, type: ToastType = "error") {
@@ -657,7 +672,7 @@ export default function MyDebtPage({ headerSelector, editId }: Props) {
   }
 
   function handlePrint() {
-    if (!isLocked && !isSaved) {
+    if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }

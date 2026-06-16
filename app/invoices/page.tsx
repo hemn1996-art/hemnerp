@@ -92,6 +92,10 @@ function InvoicesRouteContent() {
     }
     return "sales";
   });
+  const [dbVoucherType, setDbVoucherType] = useState<string | null>(() => {
+    if (urlType && typeMap[urlType]) return typeMap[urlType];
+    return null;
+  });
   const [isOpen, setIsOpen]       = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -109,19 +113,22 @@ function InvoicesRouteContent() {
   }, [urlType]);
 
   useEffect(() => {
-    if (editId && !urlType) {
-      // Fallback: fetch from API if type not in URL
+    if (editId) {
+      // Fetch voucher from database to know its actual type
       fetch(`/api/vouchers/${editId}`)
         .then((res) => res.json())
         .then((voucher) => {
           if (voucher && voucher.type) {
-            const tab = typeMap[voucher.type] || voucher.type;
-            setActiveTab(tab);
+            const dbType = typeMap[voucher.type] || voucher.type;
+            setDbVoucherType(dbType);
+            setActiveTab(dbType);
           }
         })
         .catch((err) => console.error("Error fetching edit voucher:", err));
+    } else {
+      setDbVoucherType(null);
     }
-  }, [editId, urlType]);
+  }, [editId]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -136,7 +143,7 @@ function InvoicesRouteContent() {
   const activeItem = menuItems.find((m) => m.value === activeTab) ?? menuItems[0];
 
   const renderActiveComponent = () => {
-    const editIdProp = editId || undefined;
+    const editIdProp = (editId && dbVoucherType === activeTab) ? editId : undefined;
     switch (activeTab) {
       case "sales":               return <InvoicePage invoiceType="فرۆشتن" editId={editIdProp} />;
       case "purchase":            return <PurchasePage editId={editIdProp} />;
@@ -224,9 +231,10 @@ function InvoicesRouteContent() {
                   onClick={() => {
                     setActiveTab(item.value);
                     setIsOpen(false);
-                    // If we're in edit mode, clear editId from URL when switching types
                     if (editId) {
-                      clearEditId(item.value);
+                      router.push(`/invoices?editId=${editId}&type=${item.value}`);
+                    } else {
+                      router.push(`/invoices?type=${item.value}`);
                     }
                   }}
                   style={{

@@ -608,7 +608,7 @@ function getShareholderBalanceAfter(baseMap: Record<string, number>) {
   }
 
   function handlePrint() {
-    if (!isLocked && !isSaved) {
+    if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }

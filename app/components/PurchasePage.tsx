@@ -309,6 +309,15 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     }
   }, [editId, accounts]);
 
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      if (iqd && iqd.rate) {
+        setExchangeRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
+
   const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierId, setSupplierId] = useState<number | undefined>();
   const [showSupplierList, setShowSupplierList] = useState(false);
@@ -1568,7 +1577,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       return;
     }
 
-    if (!isLocked && !isSaved) {
+    if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }

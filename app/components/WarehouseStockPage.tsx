@@ -635,7 +635,7 @@ export default function WarehouseStockPage({ headerSelector, editId }: Props) {
   }
 
   function handlePrint() {
-    if (!isLocked && !isSaved) {
+    if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }

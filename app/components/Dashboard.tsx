@@ -732,18 +732,62 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
                   return (
                     <tr key={inv.id || idx} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3.5 text-center text-blue-600 font-bold font-mono">{inv.id}</td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const raw = inv.rawType || inv.type;
+                            const mappedType = (
+                              raw === "sales" || raw === "فرۆشتن" ? "sales" :
+                              raw === "purchase" || raw === "کڕین" ? "purchase" :
+                              raw === "expense" || raw === "خەرجی" ? "expense" :
+                              raw === "money_in" || raw === "پارەی هاتوو" ? "money_in" :
+                              raw === "money_out" || raw === "پارەی ڕۆشتوو" ? "money_out" :
+                              raw === "sales_return" || raw === "گەڕانەوەی فرۆشتن" ? "sales_return" :
+                              raw === "purchase_return" || raw === "گەڕانەوەی کڕین" ? "purchase_return" :
+                              raw === "my_debt" || raw === "قەرزی من" ? "my_debt" :
+                              raw === "people_debt" || raw === "قەرزی خەڵک" ? "people_debt" :
+                              raw === "my_debt_discount" || raw === "داشکاندن لە قەرزی من" ? "my_debt_discount" :
+                              raw === "people_debt_discount" || raw === "داشکاندن لە قەرزی خەڵک" ? "people_debt_discount" :
+                              raw === "shareholder_deposit" || raw === "دانانی پارە" || raw === "deposit" ? "deposit" :
+                              raw === "shareholder_withdrawal" || raw === "کشانەوەی پارە" || raw === "withdrawal" ? "withdrawal" :
+                              raw === "product_transfer" || raw === "گواستنەوەی کەرەستە" ? "product_transfer" :
+                              raw === "material_issue" || raw === "سەرفی مەواد" ? "material_issue" :
+                              raw === "warehouse_damage" || raw === "زیانی کۆگا" ? "warehouse_damage" :
+                              raw === "warehouse_stock" || raw === "جەردی کۆگا" ? "warehouse_stock" : raw
+                            );
+                            router.push(`/invoices?editId=${inv.id}&type=${mappedType}`);
+                          }}
+                          title="دەستکاریکردنی پسوڵە"
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-black text-lg px-6 py-2 rounded-xl cursor-pointer shadow-md transition-all inline-block hover:scale-105"
+                        >
+                          {inv.id}
+                        </span>
+                      </td>
                       <td className="px-4 py-3.5 text-center">
                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold inline-block ${badgeClass}`}>
                           {inv.type}
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold border ${payStatus.color}`}>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-extrabold border ${payStatus.color}`}
+                        >
                           {payStatus.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-right text-gray-700 font-semibold">{inv.accountName || "-"}</td>
+                      <td className="px-4 py-3.5 text-right font-bold">
+                        {inv.accountId ? (
+                          <span
+                            onClick={() => router.push(`/reports/account-statement?accountId=${inv.accountId}`)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-bold"
+                          >
+                            {inv.accountName}
+                          </span>
+                        ) : (
+                          inv.accountName || "-"
+                        )}
+                      </td>
                       <td className="px-4 py-3.5 text-center font-bold font-mono text-gray-800">
                         {formatInvoiceCurrency(inv.total, currencyCode)}
                       </td>

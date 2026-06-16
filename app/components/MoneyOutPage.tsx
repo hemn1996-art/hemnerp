@@ -183,6 +183,15 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     }
   }, [editId]);
 
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      if (iqd && iqd.rate) {
+        setExchangeRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
+
   const [accountSearch, setAccountSearch] = useState("");
   const [accountId, setAccountId] = useState<number | undefined>();
   const [showAccountList, setShowAccountList] = useState(false);
@@ -1019,7 +1028,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   }
 
   function handlePrint() {
-    if (!isLocked && !isSaved) {
+    if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }

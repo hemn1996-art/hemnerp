@@ -174,6 +174,15 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
     }
   }, [editId, accounts]);
 
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      if (iqd && iqd.rate) {
+        setExchangeRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
+
   const [accountSearch, setAccountSearch] = useState("");
   const [accountId, setAccountId] = useState<number | undefined>();
   const [showAccountList, setShowAccountList] = useState(false);
