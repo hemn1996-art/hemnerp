@@ -162,8 +162,15 @@ export async function GET(request: Request) {
       }
     });
 
+    const shareholderAccounts = await prisma.account.findMany({
+      where: { isShareholder: true },
+      select: { id: true }
+    });
+    const shareholderIds = new Set(shareholderAccounts.map(a => a.id));
+
     const accountNetBalances: Record<number, number> = {};
     ledgerAggs.forEach((agg: any) => {
+      if (shareholderIds.has(agg.accountId)) return; // Exclude shareholder accounts
       const cur = currencies.find(c => c.id === agg.currencyId);
       const rate = cur ? cur.rate : 1.0;
       const amount = (agg._sum.debit || 0) - (agg._sum.credit || 0);

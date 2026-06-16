@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const beforeDate = searchParams.get("beforeDate");
     const debtType = searchParams.get("debtType");
 
-    const whereClause: any = { isActive: true };
+    const whereClause: any = { isActive: true, isShareholder: false };
 
     if (search) {
       whereClause.OR = [

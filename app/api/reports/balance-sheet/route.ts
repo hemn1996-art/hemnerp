@@ -109,11 +109,24 @@ export async function GET(request: Request) {
     const warehouseValue = totalWarehouseValueInUsd * targetRate;
 
     // 3. Accounts receivable / payable
+    let totalShareholderWithdrawals = 0;
+    const shareholderAccounts = await prisma.account.findMany({
+      where: { isShareholder: true },
+      select: { id: true }
+    });
+    const shareholderIds = new Set(shareholderAccounts.map(a => a.id));
+
     const accountNetBalances: Record<number, number> = {};
+    const shareholderBalances: Record<number, number> = {};
+
     ledgerAggs.forEach((agg) => {
       const netRaw = (agg._sum.debit || 0) - (agg._sum.credit || 0);
       const netConverted = convertToTarget(netRaw, agg.currencyId);
-      accountNetBalances[agg.accountId] = (accountNetBalances[agg.accountId] || 0) + netConverted;
+      if (shareholderIds.has(agg.accountId)) {
+        shareholderBalances[agg.accountId] = (shareholderBalances[agg.accountId] || 0) + netConverted;
+      } else {
+        accountNetBalances[agg.accountId] = (accountNetBalances[agg.accountId] || 0) + netConverted;
+      }
     });
 
     let accountsReceivable = 0;
@@ -123,6 +136,12 @@ export async function GET(request: Request) {
         accountsReceivable += balance;
       } else if (balance < -0.01) {
         accountsPayable += Math.abs(balance);
+      }
+    });
+
+    Object.values(shareholderBalances).forEach(balance => {
+      if (balance > 0.01) {
+        totalShareholderWithdrawals += balance;
       }
     });
 
@@ -192,7 +211,7 @@ export async function GET(request: Request) {
     const annualProfit = salesProfit + totalMyDebtDiscount - totalExpenses - totalGifts - totalPeopleDebtDiscount - totalLosses;
 
     const currentLiabilities = accountsPayable;
-    const withdrawals = 0;
+    const withdrawals = totalShareholderWithdrawals;
     const capital = totalAssets - currentLiabilities - annualProfit + withdrawals;
     const totalLiabilitiesEquity = currentLiabilities + capital + annualProfit + withdrawals;
 
