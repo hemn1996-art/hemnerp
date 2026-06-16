@@ -104,6 +104,8 @@ type PrintOptions = {
   showSupplierPhone: boolean;
   showSupplierAddress: boolean;
   showEmployeeInfo: boolean;
+  showEmployeeName: boolean;
+  showEmployeePhone: boolean;
   showNotes: boolean;
   showBalance: boolean;
   showPaymentStatus: boolean;
@@ -121,11 +123,12 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const fetchAccounts = useStore((s) => s.fetchAccounts);
   const fetchCashboxes = useStore((s) => s.fetchCashboxes);
   const warehousesFromStore = useStore((s) => s.warehouses) || [];
-  const fetchWarehouses = useStore((s) => s.fetchWarehouses);
+  const fetchWarehouses = useStore((s: any) => s.fetchWarehouses);
   const accountTypesStore = useStore((s) => s.accountTypes) || [];
   const fetchAccountTypes = useStore((s) => s.fetchAccountTypes);
   const storeCurrencies = useStore((s) => s.currencies) || [];
-  const fetchCurrencies = useStore((s) => s.fetchCurrencies);
+  const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
+  const currentUser = useStore((s) => s.currentUser);
 
   const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
 
@@ -189,13 +192,21 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       );
       setInvoiceDate(new Date().toISOString().slice(0, 10));
     }
-    setEmployeeName(
-      loggedInUser.name || loggedInUser.fullName || loggedInUser.username || ""
-    );
-    setEmployeePhone(
-      loggedInUser.phone || loggedInUser.mobile || loggedInUser.phoneNumber || ""
-    );
   }, [editId]);
+
+  useEffect(() => {
+    if (currentUser) {
+      setEmployeeName(currentUser.name || currentUser.username || "");
+      setEmployeePhone(currentUser.phone || "");
+    } else if (loggedInUser) {
+      setEmployeeName(
+        loggedInUser.name || loggedInUser.fullName || loggedInUser.username || ""
+      );
+      setEmployeePhone(
+        loggedInUser.phone || loggedInUser.mobile || loggedInUser.phoneNumber || ""
+      );
+    }
+  }, [currentUser, loggedInUser]);
 
   useEffect(() => {
     if (editId) {
@@ -274,6 +285,12 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             
             if (voucher.exchangeRate) {
               setExchangeRate(String(voucher.exchangeRate * 100));
+            }
+            if (voucher.employeeName) {
+              setEmployeeName(voucher.employeeName);
+            }
+            if (voucher.employeePhone) {
+              setEmployeePhone(voucher.employeePhone);
             }
             if (voucher.currencyId) {
               setPurchaseCurrencyId(voucher.currencyId);
@@ -377,6 +394,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     showSupplierPhone: true,
     showSupplierAddress: true,
     showEmployeeInfo: true,
+    showEmployeeName: true,
+    showEmployeePhone: true,
     showNotes: true,
     showBalance: true,
     showPaymentStatus: true,
@@ -1857,7 +1876,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       />
 
                       <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>
-                        {currency.symbol || getCurrencySymbol(currency.id)}
+                        {currency.name}
                       </span>
                     </div>
                   </Field>
@@ -2638,17 +2657,17 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       value={getAutoPaymentStatusLabel()}
                     />
                   )}
-                  {printOptions.showEmployeeInfo && (
-                    <>
-                      <PrintInfoLine
-                        label="کارمەند"
-                        value={employeeName || "-"}
-                      />
-                      <PrintInfoLine
-                        label="مۆبایل"
-                        value={employeePhone || "-"}
-                      />
-                    </>
+                  {printOptions.showEmployeeName && employeeName && (
+                    <PrintInfoLine
+                      label="ناوی کارمەند"
+                      value={employeeName}
+                    />
+                  )}
+                  {printOptions.showEmployeePhone && employeePhone && (
+                    <PrintInfoLine
+                      label="ژمارەی کارمەند"
+                      value={employeePhone}
+                    />
                   )}
                 </div>
               )}
@@ -3118,6 +3137,16 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                     label="باڵانسی پسوڵە پیشان بدرێت"
                     checked={printOptions.showBalance}
                     onChange={() => togglePrintOption("showBalance")}
+                  />
+                  <SettingCheck
+                    label="ناوی کارمەند"
+                    checked={printOptions.showEmployeeName}
+                    onChange={() => togglePrintOption("showEmployeeName")}
+                  />
+                  <SettingCheck
+                    label="ژمارەی کارمەند"
+                    checked={printOptions.showEmployeePhone}
+                    onChange={() => togglePrintOption("showEmployeePhone")}
                   />
                 </div>
               </div>

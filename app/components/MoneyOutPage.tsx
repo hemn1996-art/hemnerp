@@ -51,6 +51,8 @@ type PrintOptions = {
   showAccountName: boolean;
   showAccountPhone: boolean;
   showAccountAddress: boolean;
+  showEmployeeName: boolean;
+  showEmployeePhone: boolean;
 };
 
 type Props = {
@@ -78,6 +80,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
   const fetchAccounts = useStore((state) => state.fetchAccounts);
   const fetchCashboxes = useStore((state) => state.fetchCashboxes);
+  const currentUser = useStore((state) => state.currentUser);
 
   const defaultCurrency =
     currencies[0] ||
@@ -89,7 +92,16 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const [receiptNumber, setReceiptNumber] = useState("");
   const [createdTime, setCreatedTime] = useState("");
   const [receiptDate, setReceiptDate] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeePhone, setEmployeePhone] = useState("");
   const [isLoading, setIsLoading] = useState(editId ? true : false);
+
+  useEffect(() => {
+    if (currentUser) {
+      setEmployeeName(currentUser.name || currentUser.username || "");
+      setEmployeePhone(currentUser.phone || "");
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     if (!editId) {
@@ -151,6 +163,12 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
             if (voucher.exchangeRate) {
               setExchangeRate(String(voucher.exchangeRate * 100));
+            }
+            if (voucher.employeeName) {
+              setEmployeeName(voucher.employeeName);
+            }
+            if (voucher.employeePhone) {
+              setEmployeePhone(voucher.employeePhone);
             }
             if (voucher.currencyId) {
               setTargetCurrencyId(voucher.currencyId);
@@ -215,6 +233,8 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     showAccountName: true,
     showAccountPhone: true,
     showAccountAddress: true,
+    showEmployeeName: true,
+    showEmployeePhone: true,
   });
 
   const [targetCurrencyId, setTargetCurrencyId] = useState<number | undefined>();
@@ -1515,6 +1535,20 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                     value={selectedCashbox?.name || "-"}
                   />
                 )}
+
+                {printOptions.showEmployeeName && employeeName && (
+                  <PrintInfoLine
+                    label="ناوی کارمەند"
+                    value={employeeName}
+                  />
+                )}
+
+                {printOptions.showEmployeePhone && employeePhone && (
+                  <PrintInfoLine
+                    label="ژمارەی کارمەند"
+                    value={employeePhone}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -1725,6 +1759,18 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                     label="قاسە"
                     checked={printOptions.showCashbox}
                     onChange={() => togglePrintOption("showCashbox")}
+                  />
+
+                  <SettingCheck
+                    label="ناوی کارمەند"
+                    checked={printOptions.showEmployeeName}
+                    onChange={() => togglePrintOption("showEmployeeName")}
+                  />
+
+                  <SettingCheck
+                    label="ژمارەی کارمەند"
+                    checked={printOptions.showEmployeePhone}
+                    onChange={() => togglePrintOption("showEmployeePhone")}
                   />
 
                   <SettingCheck

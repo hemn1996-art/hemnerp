@@ -115,6 +115,8 @@ type PrintOptions = {
   showDelivery: boolean;
   showPriceType: boolean;
   showPrintBalance: boolean;
+  showEmployeeName: boolean;
+  showEmployeePhone: boolean;
 };
 
 const fallbackWarehouses = [
@@ -391,6 +393,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             if (voucher.exchangeRate) {
               setExchangeRate(String(voucher.exchangeRate * 100));
             }
+            if (voucher.employeeName) {
+              setEmployeeName(voucher.employeeName);
+            }
+            if (voucher.employeePhone) {
+              setEmployeePhone(voucher.employeePhone);
+            }
             setOriginalVoucher(voucher);
             setIsInvoiceLocked(false);
           }
@@ -419,6 +427,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     showPriceType: true,
 
     showPrintBalance: false,
+    showEmployeeName: true,
+    showEmployeePhone: true,
   });
 
   const selectedAccount = accounts.find((a: any) => a.id === accountId);
@@ -1999,7 +2009,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       />
 
                       <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>
-                        {currency.symbol || getCurrencySymbol(currency.id)}
+                        {currency.name}
                       </span>
                     </div>
                   </Field>
@@ -2711,6 +2721,20 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       value={selectedCashbox?.name || "-"}
                     />
                   )}
+
+                  {printOptions.showEmployeeName && employeeName && (
+                    <PrintInfoLine
+                      label="ناوی کارمەند"
+                      value={employeeName}
+                    />
+                  )}
+
+                  {printOptions.showEmployeePhone && employeePhone && (
+                    <PrintInfoLine
+                      label="ژمارەی کارمەند"
+                      value={employeePhone}
+                    />
+                  )}
                 </div>
               )}
 
@@ -3030,6 +3054,16 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                     label="قاسە"
                     checked={printOptions.showCashbox}
                     onChange={() => togglePrintOption("showCashbox")}
+                  />
+                  <SettingCheck
+                    label="ناوی کارمەند"
+                    checked={printOptions.showEmployeeName}
+                    onChange={() => togglePrintOption("showEmployeeName")}
+                  />
+                  <SettingCheck
+                    label="ژمارەی کارمەند"
+                    checked={printOptions.showEmployeePhone}
+                    onChange={() => togglePrintOption("showEmployeePhone")}
                   />
                   <SettingCheck
                     label="زانیاری هەژمار دەرکەوێت"

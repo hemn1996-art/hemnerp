@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { store } from "../store/store";
+import { store, useStore } from "../store/store";
 import { saveInvoice } from "../utils/invoiceLogic";
 import { currencies as mockCurrencies } from "../data/mockData";
 
@@ -84,6 +84,8 @@ type PrintOptions = {
   showSupplierAddress: boolean;
   showAccountBalance: boolean;
   showBalance: boolean;
+  showEmployeeName: boolean;
+  showEmployeePhone: boolean;
 };
 
 const warehouses = [
@@ -111,6 +113,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   const products = (store.products || []) as ProductLike[];
   const storeCurrencies = (store as any).currencies || [];
   const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
+  const currentUser = useStore((s) => s.currentUser);
 
   const defaultCurrency =
     currencies[0] ||
@@ -127,6 +130,15 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [createdTime, setCreatedTime] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeePhone, setEmployeePhone] = useState("");
+
+  useEffect(() => {
+    if (currentUser) {
+      setEmployeeName(currentUser.name || currentUser.username || "");
+      setEmployeePhone(currentUser.phone || "");
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     if (!editId) {
@@ -198,6 +210,12 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
             if (voucher.exchangeRate) {
               setExchangeRate(String(voucher.exchangeRate * 100));
             }
+            if (voucher.employeeName) {
+              setEmployeeName(voucher.employeeName);
+            }
+            if (voucher.employeePhone) {
+              setEmployeePhone(voucher.employeePhone);
+            }
 
             setIsLocked(false);
           }
@@ -264,6 +282,8 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     showSupplierAddress: true,
     showAccountBalance: true,
     showBalance: true,
+    showEmployeeName: true,
+    showEmployeePhone: true,
   });
 
   const purchaseAccounts = useMemo(() => {
@@ -1821,6 +1841,12 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                   {printOptions.showCashbox && (
                     <PrintInfoLine label="قاسە" value={selectedCashbox?.name || "-"} />
                   )}
+                  {printOptions.showEmployeeName && employeeName && (
+                    <PrintInfoLine label="ناوی کارمەند" value={employeeName} />
+                  )}
+                  {printOptions.showEmployeePhone && employeePhone && (
+                    <PrintInfoLine label="ژمارەی کارمەند" value={employeePhone} />
+                  )}
                 </div>
               )}
 
@@ -2118,6 +2144,16 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                     label="باڵانسی پسوڵە پیشان بدرێت"
                     checked={printOptions.showBalance}
                     onChange={() => togglePrintOption("showBalance")}
+                  />
+                  <SettingCheck
+                    label="ناوی کارمەند"
+                    checked={printOptions.showEmployeeName}
+                    onChange={() => togglePrintOption("showEmployeeName")}
+                  />
+                  <SettingCheck
+                    label="ژمارەی کارمەند"
+                    checked={printOptions.showEmployeePhone}
+                    onChange={() => togglePrintOption("showEmployeePhone")}
                   />
                 </div>
               </div>

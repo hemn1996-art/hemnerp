@@ -83,6 +83,8 @@ type PrintOptions = {
   showCustomerPhone: boolean;
   showCustomerAddress: boolean;
   showBalance: boolean;
+  showEmployeeName: boolean;
+  showEmployeePhone: boolean;
 };
 
 const fallbackWarehouses = [
@@ -109,6 +111,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
   const storeCurrencies = useStore((s: any) => s.currencies) || [];
   const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
   const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
+  const currentUser = useStore((s) => s.currentUser);
   const cashboxes = useStore((s) => s.cashboxes) || [];
   const products = useStore((s) => s.products) || [];
   const addVoucher = useStore((s) => s.addVoucher);
@@ -132,7 +135,22 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     (store as any).user ||
     (store as any).authUser ||
     {};
-  const employeeName = loggedInUser.fullName || loggedInUser.name || loggedInUser.username || "کۆساری مەلا فەرهاد";
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeePhone, setEmployeePhone] = useState("");
+
+  useEffect(() => {
+    if (currentUser) {
+      setEmployeeName(currentUser.name || currentUser.username || "");
+      setEmployeePhone(currentUser.phone || "");
+    } else if (loggedInUser) {
+      setEmployeeName(
+        loggedInUser.fullName || loggedInUser.name || loggedInUser.username || ""
+      );
+      setEmployeePhone(
+        loggedInUser.phone || loggedInUser.mobile || loggedInUser.phoneNumber || ""
+      );
+    }
+  }, [currentUser, loggedInUser]);
 
   const defaultCurrency =
     currencies[0] ||
@@ -227,6 +245,12 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
             if (voucher.exchangeRate) {
               setExchangeRate(String(voucher.exchangeRate * 100));
             }
+            if (voucher.employeeName) {
+              setEmployeeName(voucher.employeeName);
+            }
+            if (voucher.employeePhone) {
+              setEmployeePhone(voucher.employeePhone);
+            }
             setOriginalVoucher(voucher);
             setIsLocked(false);
           }
@@ -299,6 +323,8 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     showCustomerPhone: true,
     showCustomerAddress: true,
     showBalance: true,
+    showEmployeeName: true,
+    showEmployeePhone: true,
   });
 
   const salesAccounts = useMemo(() => {
@@ -2039,6 +2065,18 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                       value={selectedCashbox?.name || "-"}
                     />
                   )}
+                  {printOptions.showEmployeeName && employeeName && (
+                    <PrintInfoLine
+                      label="ناوی کارمەند"
+                      value={employeeName}
+                    />
+                  )}
+                  {printOptions.showEmployeePhone && employeePhone && (
+                    <PrintInfoLine
+                      label="ژمارەی کارمەند"
+                      value={employeePhone}
+                    />
+                  )}
                 </div>
               )}
 
@@ -2409,6 +2447,16 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                     label="باڵانسی پسوڵە پیشان بدرێت"
                     checked={printOptions.showBalance}
                     onChange={() => togglePrintOption("showBalance")}
+                  />
+                  <SettingCheck
+                    label="ناوی کارمەند"
+                    checked={printOptions.showEmployeeName}
+                    onChange={() => togglePrintOption("showEmployeeName")}
+                  />
+                  <SettingCheck
+                    label="ژمارەی کارمەند"
+                    checked={printOptions.showEmployeePhone}
+                    onChange={() => togglePrintOption("showEmployeePhone")}
                   />
                 </div>
               </div>

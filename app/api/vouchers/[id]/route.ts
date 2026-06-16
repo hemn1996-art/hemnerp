@@ -94,9 +94,26 @@ export async function GET(
       }
     }
 
+    let employeePhone: string | null = null;
+    if (voucher.employeeName) {
+      const creator = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { name: voucher.employeeName },
+            { username: voucher.employeeName }
+          ]
+        },
+        select: { phone: true }
+      });
+      if (creator) {
+        employeePhone = creator.phone;
+      }
+    }
+
     return NextResponse.json({
       ...voucher,
-      historicalBalanceBefore: balanceBeforeByCurrency
+      historicalBalanceBefore: balanceBeforeByCurrency,
+      employeePhone: employeePhone
     });
   } catch (error) {
     console.error("Error fetching voucher:", error);
