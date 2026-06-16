@@ -173,6 +173,7 @@ export default function AccountsPage() {
     const q = search.trim().toLowerCase();
 
     const list = accountsState.filter((account: any) => {
+      if (account.isShareholder === true) return false;
       const accountTypeName = account.isShareholder
         ? "خاوەن پشک"
         : getAccountTypeName(account.accountTypeId);

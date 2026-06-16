@@ -412,6 +412,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   const purchaseAccounts = useMemo(() => {
     return accounts.filter((account: any) => {
+      if (account.isShareholder === true) return false;
       const show = account.accountType?.showsInPurch ?? account.showInPurchase;
       if (typeof show === "boolean") {
         return show;
@@ -2494,7 +2495,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                             style={{ ...input, marginTop: 8, ...lockedFieldStyle }}
                           >
                             <option value="">هەژمار هەڵبژێرە</option>
-                            {accounts.map((account: any) => (
+                            {accounts.filter((a: any) => a.isActive !== false && a.isShareholder !== true).map((account: any) => (
                               <option key={account.id} value={account.id}>
                                 {account.name}
                               </option>

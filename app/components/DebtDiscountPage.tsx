@@ -177,7 +177,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
   const filteredAccounts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
     const activeAccounts = accounts.filter(
-      (account: any) => account.isActive !== false
+      (account: any) => account.isActive !== false && account.isShareholder !== true
     );
 
     if (!q) return activeAccounts;

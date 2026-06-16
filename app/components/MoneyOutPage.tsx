@@ -348,7 +348,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     const uniqueAccounts = Array.from(uniqueMap.values());
 
     const activeAccounts = uniqueAccounts.filter(
-      (account: any) => account.isActive !== false
+      (account: any) => account.isActive !== false && account.isShareholder !== true
     );
 
     if (!q) return activeAccounts;

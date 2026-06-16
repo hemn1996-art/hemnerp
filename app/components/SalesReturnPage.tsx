@@ -338,6 +338,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
   const salesAccounts = useMemo(() => {
     return accounts.filter((account: any) => {
+      if (account.isShareholder === true) return false;
       const show = account.accountType?.showsInSales ?? account.showInSales;
       if (typeof show === "boolean") {
         return show;

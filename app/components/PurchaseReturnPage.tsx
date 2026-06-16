@@ -297,6 +297,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
 
   const purchaseAccounts = useMemo(() => {
     return accounts.filter((account: any) => {
+      if (account.isShareholder === true) return false;
       const show = account.accountType?.showsInPurch ?? account.showInPurchase;
       if (typeof show === "boolean") {
         return show;

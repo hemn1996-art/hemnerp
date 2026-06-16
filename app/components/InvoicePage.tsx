@@ -725,6 +725,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const salesAccounts = useMemo(() => {
     return accounts.filter((account: any) => {
+      if (account.isShareholder === true) return false;
       const show = account.accountType?.showsInSales ?? account.showInSales;
       if (typeof show === "boolean") {
         return show;
