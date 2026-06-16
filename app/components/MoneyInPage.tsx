@@ -1425,17 +1425,28 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
           <PrintWatermark />
           <PrintHeader />
 
-          <div style={printInfoGrid}>
-            {printOptions.showAccountInfo && (
-              <div style={{ ...printInfoBox, width: "fit-content", marginLeft: "auto", minWidth: "220px" }}>
-                {printOptions.showAccountName && (
-                  <PrintInfoLine label="هەژمار" value={selectedAccount?.name || "-"} />
-                )}
-                {printOptions.showAccountPhone && (
-                  <PrintInfoLine label="ژمارەی تەلەفۆن" value={selectedAccount?.phone || "-"} />
-                )}
-                {printOptions.showAccountAddress && (
-                  <PrintInfoLine
+                    {(printOptions.showReceiptInfo || printOptions.showAccountInfo) && (
+            <div style={printInfoGrid}>
+              {/* Right Column: Invoice Info Box */}
+              {printOptions.showReceiptInfo ? (
+                <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                  <PrintInfoLine label="جۆری پسوڵە" value="پارەی هاتوو" />
+                  <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber} />
+                  <PrintInfoLine label="بەروار" value={formatDate(receiptDate)} />
+                  <PrintInfoLine label="کاتژمێر" value={createdTime} />
+                  <PrintInfoLine label="قاسە" value={selectedCashbox?.name || "-"} />
+                </div>
+              ) : (
+                <div />
+              )}
+
+              {/* Left Column: Stack of Account Info & Employee Info */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                {printOptions.showAccountInfo && (
+                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                    <PrintInfoLine label="هەژمار" value={selectedAccount?.name || "-"} />
+                    <PrintInfoLine label="ژمارەی تەلەفۆن" value={selectedAccount?.phone || "-"} />
+                    <PrintInfoLine
                     label="ناونیشان"
                     value={
                       [selectedAccount?.city, selectedAccount?.address]
@@ -1443,34 +1454,19 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                         .join(" - ") || "-"
                     }
                   />
+                  </div>
                 )}
-              </div>
-            )}
 
-            {printOptions.showReceiptInfo && (
-              <div style={{ ...printInfoBox, width: "fit-content", marginRight: "auto", minWidth: "220px" }}>
-                <PrintInfoLine label="جۆری پسوڵە" value="پارەی هاتوو" />
-                {printOptions.showReceiptNumber && (
-                  <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber} />
-                )}
-                {printOptions.showReceiptDate && (
-                  <PrintInfoLine label="بەروار" value={formatDate(receiptDate)} />
-                )}
-                {printOptions.showCreatedTime && (
-                  <PrintInfoLine label="کاتژمێر" value={createdTime} />
-                )}
-                {printOptions.showCashbox && (
-                  <PrintInfoLine label="قاسە" value={selectedCashbox?.name || "-"} />
-                )}
-                {printOptions.showEmployeeName && employeeName && (
-                  <PrintInfoLine label="ناوی کارمەند" value={employeeName} />
-                )}
-                {printOptions.showEmployeePhone && employeePhone && (
-                  <PrintInfoLine label="ژمارەی کارمەند" value={employeePhone} />
+                {/* Employee Info Box */}
+                {printOptions.showEmployeeName || printOptions.showEmployeePhone && (employeeName || employeePhone) && (
+                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                    <PrintInfoLine label="کارمەند" value={employeeName} />
+                    <PrintInfoLine label="ژمارەی تەلەفۆن" value={employeePhone} />
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <div style={printMoneyBox}>
             <PrintSummaryLine label="پارەی دراو" value={getPaidSummaryText()} bold />
@@ -1624,69 +1620,85 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             </div>
 
             <div style={settingsStack}>
-              <div style={settingsSection}>
-                <h3 style={settingsTitle}>زانیاریەکانی بەشی سەرەوە</h3>
-                <div style={settingGrid2}>
-                  <SettingCheck
+                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                    <SettingCheck
                     label="زانیاری پسوڵە دەرکەوێت"
                     checked={printOptions.showReceiptInfo}
                     onChange={() => togglePrintOption("showReceiptInfo")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ژمارەی پسوڵە"
                     checked={printOptions.showReceiptNumber}
                     onChange={() => togglePrintOption("showReceiptNumber")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="بەروار"
                     checked={printOptions.showReceiptDate}
                     onChange={() => togglePrintOption("showReceiptDate")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="کاتژمێری دروستکردن"
                     checked={printOptions.showCreatedTime}
                     onChange={() => togglePrintOption("showCreatedTime")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="قاسە"
                     checked={printOptions.showCashbox}
                     onChange={() => togglePrintOption("showCashbox")}
                   />
-                  <SettingCheck
-                    label="ناوی کارمەند"
-                    checked={printOptions.showEmployeeName}
-                    onChange={() => togglePrintOption("showEmployeeName")}
-                  />
-                  <SettingCheck
-                    label="ژمارەی کارمەند"
-                    checked={printOptions.showEmployeePhone}
-                    onChange={() => togglePrintOption("showEmployeePhone")}
-                  />
-                  <SettingCheck
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری هەژمار</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                    <SettingCheck
                     label="زانیاری هەژمار دەرکەوێت"
                     checked={printOptions.showAccountInfo}
                     onChange={() => togglePrintOption("showAccountInfo")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ناوی هەژمار"
                     checked={printOptions.showAccountName}
                     onChange={() => togglePrintOption("showAccountName")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ژمارەی هەژمار"
                     checked={printOptions.showAccountPhone}
                     onChange={() => togglePrintOption("showAccountPhone")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ناونیشانی هەژمار"
                     checked={printOptions.showAccountAddress}
                     onChange={() => togglePrintOption("showAccountAddress")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="باڵانسی هەژمار"
                     checked={printOptions.showAccountBalance}
                     onChange={() => togglePrintOption("showAccountBalance")}
                   />
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری کارمەند</h4>
+                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, backgroundColor: "#f9fafb", display: "flex", flexDirection: "column", gap: 12 }}>
+                    
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <SettingCheck
+                    label="ناوی کارمەند"
+                    checked={printOptions.showEmployeeName}
+                    onChange={() => togglePrintOption("showEmployeeName")}
+                  />
+                      <SettingCheck
+                    label="ژمارەی کارمەند"
+                    checked={printOptions.showEmployeePhone}
+                    onChange={() => togglePrintOption("showEmployeePhone")}
+                  />
+                    </div>
+                    
+                  </div>
                 </div>
               </div>
 
@@ -1871,7 +1883,17 @@ const printCompanySub: CSSProperties = { fontSize: 14, marginBottom: 4 };
 const printCompanyInfo: CSSProperties = { fontSize: 13, marginBottom: 2 };
 const printPhoneLine: CSSProperties = { fontSize: 13, marginBottom: 8 };
 const printInfoGrid: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 8, marginBottom: 8 };
-const printInfoBox: CSSProperties = { border: "1px solid #e5e7eb", padding: 8, fontSize: 11, minHeight: 54 };
+const printInfoBox: CSSProperties = {
+  border: "1px solid #d1d5db",
+  padding: 8,
+  fontSize: 11,
+  minHeight: 54,
+  backgroundColor: "#f9fafb",
+  borderRadius: 4,
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+};
 const printInfoRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, lineHeight: 1.8 };
 const printMoneyBox: CSSProperties = { border: "1px solid #e5e7eb", padding: 8, minHeight: 45, marginBottom: 8, fontSize: 11 };
 const printBottomGrid: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 8, marginTop: 8 };

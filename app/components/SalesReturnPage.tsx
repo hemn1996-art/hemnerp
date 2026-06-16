@@ -2048,57 +2048,28 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
           <PrintWatermark />
           <PrintHeader />
 
-          {(printOptions.showInvoiceInfo || printOptions.showCustomerInfo) && (
+                    {(printOptions.showInvoiceInfo || printOptions.showCustomerInfo) && (
             <div style={printInfoGrid}>
-              {printOptions.showInvoiceInfo && (
-                <div style={printInfoBox}>
+              {/* Right Column: Invoice Info Box */}
+              {printOptions.showInvoiceInfo ? (
+                <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
                   <PrintInfoLine
                     label="جۆری پسوڵە"
                     value="گەڕانەوەی فرۆشتن"
                   />
-                  {printOptions.showInvoiceNumber && (
-                    <PrintInfoLine label="ژمارەی پسوڵە" value={invoiceNumber} />
-                  )}
-                  {printOptions.showInvoiceDate && (
-                    <PrintInfoLine
+                  <PrintInfoLine label="ژمارەی پسوڵە" value={invoiceNumber} />
+                  <PrintInfoLine
                       label="بەروار"
                       value={formatDate(invoiceDate)}
                     />
-                  )}
-                  {printOptions.showCreatedTime && (
-                    <PrintInfoLine label="کاتژمێر" value={createdTime} />
-                  )}
-                  {printOptions.showCashbox && (
-                    <PrintInfoLine
+                  <PrintInfoLine label="کاتژمێر" value={createdTime} />
+                  <PrintInfoLine
                       label="قاسە"
                       value={selectedCashbox?.name || "-"}
                     />
-                  )}
-                  {printOptions.showEmployeeName && employeeName && (
-                    <PrintInfoLine
-                      label="ناوی کارمەند"
-                      value={employeeName}
-                    />
-                  )}
-                  {printOptions.showEmployeePhone && employeePhone && (
-                    <PrintInfoLine
-                      label="ژمارەی کارمەند"
-                      value={employeePhone}
-                    />
-                  )}
-                </div>
-              )}
-
-              {printOptions.showCustomerInfo && (
-                <div style={printInfoBox}>
-                  {printOptions.showCustomerName && (
-                    <PrintInfoLine label="کریار" value={customer?.name || "-"} />
-                  )}
-                  {printOptions.showCustomerPhone && (
-                    <PrintInfoLine label="ژمارە" value={customer?.phone || "-"} />
-                  )}
-                  {printOptions.showCustomerAddress && (
-                    <PrintInfoLine
+                  <PrintInfoLine label="کریار" value={customer?.name || "-"} />
+                  <PrintInfoLine label="ژمارە" value={customer?.phone || "-"} />
+                  <PrintInfoLine
                       label="ناونیشان"
                       value={
                         [customer?.city, customer?.address]
@@ -2106,9 +2077,33 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                           .join(" - ") || "-"
                       }
                     />
-                  )}
                 </div>
+              ) : (
+                <div />
               )}
+
+              {/* Left Column: Stack of Account Info & Employee Info */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                {printOptions.showCustomerInfo && (
+                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                    
+                  </div>
+                )}
+
+                {/* Employee Info Box */}
+                {printOptions.showEmployeeName || printOptions.showEmployeePhone && (employeeName || employeePhone) && (
+                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                    <PrintInfoLine
+                      label="کارمەند"
+                      value={employeeName}
+                    />
+                    <PrintInfoLine
+                      label="ژمارەی تەلەفۆن"
+                      value={employeePhone}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -2354,55 +2349,61 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
             </div>
 
             <div style={settingsStack}>
-              <div style={settingsSection}>
-                <h3 style={settingsTitle}>زانیاریەکانی بەشی سەرەوە</h3>
-
-                <div style={settingGrid2}>
-                  <SettingCheck
+                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                    <SettingCheck
                     label="زانیاری پسوڵە دەرکەوێت"
                     checked={printOptions.showInvoiceInfo}
                     onChange={() => togglePrintOption("showInvoiceInfo")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ژمارەی پسوڵە"
                     checked={printOptions.showInvoiceNumber}
                     onChange={() => togglePrintOption("showInvoiceNumber")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="بەروار"
                     checked={printOptions.showInvoiceDate}
                     onChange={() => togglePrintOption("showInvoiceDate")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="کاتژمێری دروستکردن"
                     checked={printOptions.showCreatedTime}
                     onChange={() => togglePrintOption("showCreatedTime")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="قاسە"
                     checked={printOptions.showCashbox}
                     onChange={() => togglePrintOption("showCashbox")}
                   />
-                  <SettingCheck
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری کڕیار</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                    <SettingCheck
                     label="زانیاری کریار دەرکەوێت"
                     checked={printOptions.showCustomerInfo}
                     onChange={() => togglePrintOption("showCustomerInfo")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ناوی کریار"
                     checked={printOptions.showCustomerName}
                     onChange={() => togglePrintOption("showCustomerName")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ژمارەی کریار"
                     checked={printOptions.showCustomerPhone}
                     onChange={() => togglePrintOption("showCustomerPhone")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ناونیشانی کریار"
                     checked={printOptions.showCustomerAddress}
                     onChange={() => togglePrintOption("showCustomerAddress")}
                   />
+                  </div>
                 </div>
               </div>
 
@@ -3243,10 +3244,15 @@ const printInfoGrid: CSSProperties = {
 };
 
 const printInfoBox: CSSProperties = {
-  border: "1px solid #e5e7eb",
+  border: "1px solid #d1d5db",
   padding: 8,
   fontSize: 11,
   minHeight: 54,
+  backgroundColor: "#f9fafb",
+  borderRadius: 4,
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
 };
 
 const printInfoRow: CSSProperties = {

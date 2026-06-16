@@ -1105,56 +1105,53 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
           <PrintWatermark />
           <PrintHeader />
 
-          <div style={printInfoGrid}>
-            {printOptions.showQuotationNotice && (
-              <div style={printInfoBox}>
-                <div style={printNoticeText}>
-                  ئەم پسوڵە تەنها بۆ نرخاندنە
-                </div>
-              </div>
-            )}
-
-            {printOptions.showReceiptInfo && (
-              <div style={printInfoBox}>
-                <PrintInfoLine label="جۆری پسوڵە" value="نرخاندن" />
-
-                {printOptions.showReceiptNumber && (
+                    {(printOptions.showReceiptInfo || printOptions.showQuotationNotice) && (
+            <div style={printInfoGrid}>
+              {/* Right Column: Invoice Info Box */}
+              {printOptions.showReceiptInfo ? (
+                <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                  <PrintInfoLine label="جۆری پسوڵە" value="نرخاندن" />
                   <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber} />
-                )}
-
-                {printOptions.showReceiptDate && (
                   <PrintInfoLine
                     label="بەروار"
                     value={formatDate(receiptDate)}
                   />
-                )}
-
-                {printOptions.showCreatedTime && (
                   <PrintInfoLine label="کاتژمێر" value={createdTime} />
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              ) : (
+                <div />
+              )}
 
-          {printOptions.showEmployeeInfo &&
-            (employeeNameFromLogin.trim() !== "" ||
-              employeePhoneFromLogin.trim() !== "") && (
-              <div style={printEmployeeBox}>
-                {employeeNameFromLogin.trim() !== "" && (
-                  <PrintInfoLine
-                    label="کارمەند"
-                    value={employeeNameFromLogin}
-                  />
+              {/* Left Column: Stack of Account Info & Employee Info */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                {printOptions.showQuotationNotice && (
+                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                    
+                  </div>
                 )}
 
-                {employeePhoneFromLogin.trim() !== "" && (
-                  <PrintInfoLine
-                    label="مۆبایل"
-                    value={employeePhoneFromLogin}
-                  />
+                {/* Employee Info Box */}
+                {printOptions.showEmployeeInfo && (employeeNameFromLogin?.trim() !== "" || employeePhoneFromLogin?.trim() !== "") && (
+                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                                        {employeeNameFromLogin?.trim() !== "" && (
+                      <PrintInfoLine
+                        label="کارمەند"
+                        value={employeeNameFromLogin}
+                      />
+                    )}
+                    {employeePhoneFromLogin?.trim() !== "" && (
+                      <PrintInfoLine
+                        label="مۆبایل"
+                        value={employeePhoneFromLogin}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </div>
+          )}
+
+          
 
           {printOptions.showRows && (
             <table style={printTable}>
@@ -1313,39 +1310,41 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
             </div>
 
             <div style={settingsStack}>
-              <div style={settingsSection}>
-                <h3 style={settingsTitle}>زانیاریەکانی بەشی سەرەوە</h3>
-
-                <div style={settingGrid2}>
-                  <SettingCheck
+                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                    <SettingCheck
                     label="زانیاری پسوڵە دەرکەوێت"
                     checked={printOptions.showReceiptInfo}
                     onChange={() => togglePrintOption("showReceiptInfo")}
                   />
-
-                  <SettingCheck
+                    <SettingCheck
                     label="ژمارەی پسوڵە"
                     checked={printOptions.showReceiptNumber}
                     onChange={() => togglePrintOption("showReceiptNumber")}
                   />
-
-                  <SettingCheck
+                    <SettingCheck
                     label="بەروار"
                     checked={printOptions.showReceiptDate}
                     onChange={() => togglePrintOption("showReceiptDate")}
                   />
-
-                  <SettingCheck
+                    <SettingCheck
                     label="کاتژمێری دروستکردن"
                     checked={printOptions.showCreatedTime}
                     onChange={() => togglePrintOption("showCreatedTime")}
                   />
-
-                  <SettingCheck
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری هەژمار</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                    <SettingCheck
                     label="نووسینی نرخاندن دەرکەوێت"
                     checked={printOptions.showQuotationNotice}
                     onChange={() => togglePrintOption("showQuotationNotice")}
                   />
+                  </div>
                 </div>
               </div>
 
@@ -2025,10 +2024,15 @@ const printInfoGrid: CSSProperties = {
 };
 
 const printInfoBox: CSSProperties = {
-  border: "1px solid #e5e7eb",
+  border: "1px solid #d1d5db",
   padding: 8,
   fontSize: 11,
   minHeight: 54,
+  backgroundColor: "#f9fafb",
+  borderRadius: 4,
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
 };
 
 const printNoticeText: CSSProperties = {

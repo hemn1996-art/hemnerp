@@ -2637,59 +2637,47 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           <PrintWatermark />
           <PrintHeader />
 
-          {(printOptions.showInvoiceInfo || printOptions.showSupplierInfo) && (
+                    {(printOptions.showInvoiceInfo || printOptions.showSupplierInfo) && (
             <div style={printInfoGrid}>
-              {printOptions.showInvoiceInfo && (
-                <div style={printInfoBox}>
+              {/* Right Column: Invoice Info Box */}
+              {printOptions.showInvoiceInfo ? (
+                <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
                   <PrintInfoLine label="جۆری پسوڵە" value="کڕین" />
-                  {printOptions.showInvoiceNumber && (
-                    <PrintInfoLine label="ژمارەی پسوڵە" value={invoiceNumber} />
-                  )}
-                  {printOptions.showInvoiceDate && (
-                    <PrintInfoLine
+                  <PrintInfoLine label="ژمارەی پسوڵە" value={invoiceNumber} />
+                  <PrintInfoLine
                       label="بەروار"
                       value={formatDate(invoiceDate)}
                     />
-                  )}
-                  {printOptions.showCreatedTime && (
-                    <PrintInfoLine label="کاتژمێر" value={createdTime} />
-                  )}
-                  {printOptions.showCashbox && (
-                    <PrintInfoLine
+                  <PrintInfoLine label="کاتژمێر" value={createdTime} />
+                  <PrintInfoLine
                       label="قاسە"
                       value={selectedCashbox?.name || "-"}
                     />
-                  )}
-                  {printOptions.showPaymentStatus && (
-                    <PrintInfoLine
+                  <PrintInfoLine
                       label="دۆخی پارەدان"
                       value={getAutoPaymentStatusLabel()}
                     />
-                  )}
-                  {printOptions.showEmployeeName && employeeName && (
-                    <PrintInfoLine
-                      label="ناوی کارمەند"
-                      value={employeeName}
+                  <PrintInfoLine label="دابینکەر" value={supplier?.name || "-"} />
+                  <PrintInfoLine label="ژمارە" value={supplier?.phone || "-"} />
+                  <PrintInfoLine
+                      label="ناونیشان"
+                      value={
+                        [supplier?.city, supplier?.address]
+                          .filter(Boolean)
+                          .join(" - ") || "-"
+                      }
                     />
-                  )}
-                  {printOptions.showEmployeePhone && employeePhone && (
-                    <PrintInfoLine
-                      label="ژمارەی کارمەند"
-                      value={employeePhone}
-                    />
-                  )}
                 </div>
+              ) : (
+                <div />
               )}
 
-              {printOptions.showSupplierInfo && (
-                <div style={printInfoBox}>
-                  {printOptions.showSupplierName && (
+              {/* Left Column: Stack of Account Info & Employee Info */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                {printOptions.showSupplierInfo && (
+                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
                     <PrintInfoLine label="دابینکەر" value={supplier?.name || "-"} />
-                  )}
-                  {printOptions.showSupplierPhone && (
                     <PrintInfoLine label="ژمارە" value={supplier?.phone || "-"} />
-                  )}
-                  {printOptions.showSupplierAddress && (
                     <PrintInfoLine
                       label="ناونیشان"
                       value={
@@ -2698,9 +2686,23 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                           .join(" - ") || "-"
                       }
                     />
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+
+                {/* Employee Info Box */}
+                {printOptions.showEmployeeName || printOptions.showEmployeePhone && (employeeName || employeePhone) && (
+                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
+                    <PrintInfoLine
+                      label="کارمەند"
+                      value={employeeName}
+                    />
+                    <PrintInfoLine
+                      label="ژمارەی تەلەفۆن"
+                      value={employeePhone}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -2990,68 +2992,81 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             </div>
 
             <div style={settingsStack}>
-              <div style={settingsSection}>
-                <h3 style={settingsTitle}>زانیاریەکانی بەشی سەرەوە</h3>
-
-                <div style={settingGrid2}>
-                  <SettingCheck
+                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                    <SettingCheck
                     label="زانیاری پسوڵە دەرکەوێت"
                     checked={printOptions.showInvoiceInfo}
                     onChange={() => togglePrintOption("showInvoiceInfo")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ژمارەی پسوڵە"
                     checked={printOptions.showInvoiceNumber}
                     onChange={() => togglePrintOption("showInvoiceNumber")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="بەروار"
                     checked={printOptions.showInvoiceDate}
                     onChange={() => togglePrintOption("showInvoiceDate")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="کاتژمێری دروستکردن"
                     checked={printOptions.showCreatedTime}
                     onChange={() => togglePrintOption("showCreatedTime")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="قاسە"
                     checked={printOptions.showCashbox}
                     onChange={() => togglePrintOption("showCashbox")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="دۆخی پارەدان"
                     checked={printOptions.showPaymentStatus}
                     onChange={() => togglePrintOption("showPaymentStatus")}
                   />
-                  <SettingCheck
-                    label="زانیاری کارمەند"
-                    checked={printOptions.showEmployeeInfo}
-                    onChange={() => togglePrintOption("showEmployeeInfo")}
-                  />
-                  <SettingCheck
+                  </div>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری دابینکەر</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                    <SettingCheck
                     label="زانیاری دابینکەر دەرکەوێت"
                     checked={printOptions.showSupplierInfo}
                     onChange={() => togglePrintOption("showSupplierInfo")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ناوی دابینکەر"
                     checked={printOptions.showSupplierName}
                     onChange={() => togglePrintOption("showSupplierName")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ژمارەی دابینکەر"
                     checked={printOptions.showSupplierPhone}
                     onChange={() => togglePrintOption("showSupplierPhone")}
                   />
-                  <SettingCheck
+                    <SettingCheck
                     label="ناونیشانی دابینکەر"
                     checked={printOptions.showSupplierAddress}
                     onChange={() => togglePrintOption("showSupplierAddress")}
                   />
+                  </div>
                 </div>
-
-                <div style={settingFormGrid}>
+                <div>
+                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری کارمەند</h4>
+                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, backgroundColor: "#f9fafb", display: "flex", flexDirection: "column", gap: 12 }}>
+                    
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <SettingCheck
+                    label="زانیاری کارمەند"
+                    checked={printOptions.showEmployeeInfo}
+                    onChange={() => togglePrintOption("showEmployeeInfo")}
+                  />
+                    </div>
+                    
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      
                   <Field label="ناوی کارمەند">
                     <input
                       value={employeeName}
@@ -3074,6 +3089,9 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       style={input}
                     />
                   </Field>
+                
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -4086,10 +4104,15 @@ const printInfoGrid: CSSProperties = {
 };
 
 const printInfoBox: CSSProperties = {
-  border: "1px solid #e5e7eb",
+  border: "1px solid #d1d5db",
   padding: 8,
   fontSize: 11,
   minHeight: 54,
+  backgroundColor: "#f9fafb",
+  borderRadius: 4,
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
 };
 
 const printInfoRow: CSSProperties = {
