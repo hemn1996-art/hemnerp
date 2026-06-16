@@ -1344,12 +1344,12 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                 ) : null;
 
                 return (
-                  <div key={currency.id} style={{ display: "flex", gap: 8, width: "100%", alignItems: "flex-end" }}>
-                    <div style={{ flex: 1 }}>
+                  <div key={currency.id} style={{ display: "flex", flexWrap: "wrap", gap: 8, width: "100%", alignItems: "flex-end" }}>
+                    <div style={{ flex: "1 1 200px" }}>
                       {amountInput}
                     </div>
                     {rateInput && (
-                      <div style={{ width: 145, flexShrink: 0 }}>
+                      <div style={{ flex: "1 1 145px", minWidth: "145px" }}>
                         {rateInput}
                       </div>
                     )}
