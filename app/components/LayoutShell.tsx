@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./Sidebar";
+import NegativeCashboxWarning from "./NegativeCashboxWarning";
 import { useStore } from "../store/store";
 
 /* ─── Eastern-Arabic / Persian digits → Western (English) ─── */
@@ -221,6 +222,9 @@ export default function LayoutShell({ children }: LayoutShellProps) {
           </div>
         </div>
       )}
+
+      {/* Negative Cashbox Balance Alert Banner */}
+      {!isLoginPage && currentUser && <NegativeCashboxWarning />}
 
       {/* Mobile Top Bar - hidden on desktop */}
       {!isLoginPage && (

@@ -85,6 +85,54 @@ export function calculateLedgerEntries({
   
   const ledgerEntries: LedgerEntryPayload[] = [];
 
+  if (type === "shareholder_deposit") {
+    const payments = paidAmounts.map(p => ({
+      currencyId: p.currencyId,
+      amount: p.amount,
+      exchangeRate: p.exchangeRate || exchangeRate || 1
+    })).filter(p => p.amount > 0);
+
+    for (const payment of payments) {
+      ledgerEntries.push({
+        currencyId: payment.currencyId,
+        debit: 0,
+        credit: payment.amount,
+        exchangeRate: payment.exchangeRate
+      });
+      tempBalance[String(payment.currencyId)] = (tempBalance[String(payment.currencyId)] || 0) - payment.amount;
+    }
+
+    return {
+      ledgerEntries,
+      balanceAfterByCurrency: tempBalance,
+      excess: { exists: false, amount: 0, targetCurrencyId: currencyId, otherCurrencyId: getOtherCurrencyId(currencyId, currencies) }
+    };
+  }
+
+  if (type === "shareholder_withdrawal") {
+    const payments = paidAmounts.map(p => ({
+      currencyId: p.currencyId,
+      amount: p.amount,
+      exchangeRate: p.exchangeRate || exchangeRate || 1
+    })).filter(p => p.amount > 0);
+
+    for (const payment of payments) {
+      ledgerEntries.push({
+        currencyId: payment.currencyId,
+        debit: payment.amount,
+        credit: 0,
+        exchangeRate: payment.exchangeRate
+      });
+      tempBalance[String(payment.currencyId)] = (tempBalance[String(payment.currencyId)] || 0) + payment.amount;
+    }
+
+    return {
+      ledgerEntries,
+      balanceAfterByCurrency: tempBalance,
+      excess: { exists: false, amount: 0, targetCurrencyId: currencyId, otherCurrencyId: getOtherCurrencyId(currencyId, currencies) }
+    };
+  }
+
   // 1. Transaction (invoice) balance impact (before payment)
   if (type === "sales" || type === "purchase_return" || type === "people_debt" || type === "قەرزم لای خەڵکە" || type === "my_debt_discount" || type === "داشکاندن لە قەرزی من") {
     // Debit effect: increases what they owe us

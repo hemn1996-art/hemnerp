@@ -496,8 +496,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
         const cashboxAmt = bal ? Number(bal.amount || 0) : 0;
         if (Number(amount) > cashboxAmt) {
           const sym = getCurrencySymbol(currencyId);
-          showToast(`باڵانسی پێویست لە دراوی (${sym}) لە قاسەکەدا نییە.`);
-          return false;
+          showToast(`ئاگاداری: باڵانسی قاسە لە دراوی (${sym}) دەچێتە ژێر سفر!`, "info");
         }
       }
     }

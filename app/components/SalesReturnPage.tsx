@@ -1038,8 +1038,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
         }
         if (paid.amount > cashboxAmt) {
           const sym = getCurrencySymbol(paid.currencyId);
-          showToast(`باڵانسی پێویست لە دراوی (${sym}) لە قاسەکەدا نییە.`);
-          return false;
+          showToast(`ئاگاداری: باڵانسی قاسە لە دراوی (${sym}) دەچێتە ژێر سفر!`, "info");
         }
       }
     }

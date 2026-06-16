@@ -744,8 +744,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
         const cashboxAmt = bal ? Number(bal.amount || 0) : 0;
         if (paid.amount > cashboxAmt) {
           const sym = getCurrencySymbol(paid.currencyId);
-          showToast(`باڵانسی پێویست لە دراوی (${sym}) لە قاسەکەدا نییە.`);
-          return false;
+          showToast(`ئاگاداری: باڵانسی قاسە لە دراوی (${sym}) دەچێتە ژێر سفر!`, "info");
         }
       }
     }

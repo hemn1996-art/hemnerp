@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { store } from "../store/store";
+import { useStore } from "../store/store";
 import { saveInvoice } from "../utils/invoiceLogic";
 import { currencies as mockCurrencies } from "../data/mockData";
 
@@ -68,6 +68,15 @@ type Props = {
 
 export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchAccounts = useStore((s: any) => s.fetchAccounts);
+  const fetchCashboxes = useStore((s: any) => s.fetchCashboxes);
+
+  useEffect(() => {
+    fetchAccounts();
+    fetchCashboxes();
+  }, [fetchAccounts, fetchCashboxes]);
 
   useEffect(() => {
     setIsEditLoading(!!editId);
@@ -76,16 +85,14 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
     }
   }, [editId]);
 
-  const accounts = (store.accounts || []) as AccountLike[];
-  const cashboxes = (store.cashboxes || []) as CashboxLike[];
-  const storeCurrencies = (store as any).currencies || [];
+  const accounts = useStore((s: any) => s.accounts || []) as AccountLike[];
+  const cashboxes = useStore((s: any) => s.cashboxes || []) as CashboxLike[];
+  const storeCurrencies = useStore((s: any) => s.currencies) || [];
   const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
+  const addVoucher = useStore((s: any) => s.addVoucher);
+  const updateVoucher = useStore((s: any) => s.updateVoucher);
 
-  const currentUser =
-    ((store as any).currentUser ||
-      (store as any).loggedInUser ||
-      (store as any).user ||
-      {}) as UserLike;
+  const currentUser = useStore((s: any) => s.currentUser || {}) as UserLike;
 
   const employeeNameFromLogin = currentUser.fullName || currentUser.name || "";
   const employeePhoneFromLogin =
@@ -137,7 +144,8 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
             }
             if (voucher.cashboxId) setCashboxId(voucher.cashboxId);
             
-            if (voucher.amount) setAmount(String(voucher.amount));
+            const amt = voucher.totalAmount ?? voucher.amount;
+            if (amt) setAmount(String(amt));
             if (voucher.currencyId) setCurrencyId(voucher.currencyId);
 
             setReceiptNote(voucher.internalNote || "");
@@ -408,8 +416,7 @@ function getShareholderBalanceAfter(baseMap: Record<string, number>) {
       const cashboxAmt = bal ? Number(bal.amount || 0) : 0;
       if (toNumber(amount) > cashboxAmt) {
         const sym = getCurrencySymbol(currencyId);
-        showToast(`باڵانسی پێویست لە دراوی (${sym}) لە قاسەکەدا نییە.`);
-        return false;
+        showToast(`ئاگاداری: باڵانسی قاسە لە دراوی (${sym}) دەچێتە ژێر سفر!`, "info");
       }
     }
 
@@ -538,73 +545,91 @@ function getShareholderBalanceAfter(baseMap: Record<string, number>) {
     const shareholderBalanceAfterAtSave = {
       ...shareholderBalanceBeforeAtSave,
       [String(currencyId)]:
-        Number(shareholderBalanceBeforeAtSave[String(currencyId)] || 0) -
-        toNumber(amount),
+        Number(shareholderBalanceBeforeAtSave[String(currencyId)] || 0) - toNumber(amount),
     };
 
-    saveInvoice({
-      id: Number(receiptNumber || Date.now().toString().slice(-6)),
-      type: "پسوڵەی کشانەوەی پارە",
+    const combineDateAndTime = (dateStr: string, timeStr: string) => {
+      try {
+        if (!dateStr) return new Date().toISOString();
+        let cleanTime = (timeStr || "").trim();
+        const ampmMatch = cleanTime.match(/^(1[0-2]|0?[1-9]):([0-5][0-9])\s*(AM|PM)$/i);
+        if (ampmMatch) {
+          let hours = parseInt(ampmMatch[1], 10);
+          const minutes = ampmMatch[2];
+          const ampm = ampmMatch[3].toUpperCase();
+          if (ampm === "PM" && hours < 12) hours += 12;
+          if (ampm === "AM" && hours === 12) hours = 0;
+          cleanTime = `${String(hours).padStart(2, "0")}:${minutes}`;
+        }
+        const hhmmMatch = cleanTime.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])/);
+        if (hhmmMatch) {
+          const hours = hhmmMatch[1].padStart(2, "0");
+          const minutes = hhmmMatch[2];
+          return new Date(`${dateStr}T${hours}:${minutes}:00Z`).toISOString();
+        }
+        const fallback = new Date(`${dateStr} ${cleanTime}`);
+        if (!isNaN(fallback.getTime())) return fallback.toISOString();
+        const fallbackDate = new Date(dateStr);
+        if (!isNaN(fallbackDate.getTime())) return fallbackDate.toISOString();
+      } catch (e) {
+        console.error("Error combining date and time:", e);
+      }
+      return new Date().toISOString();
+    };
 
-      accountId,
-      shareholderAccountId: accountId,
-      shareholderName: selectedAccount?.name || "",
-
-      cashboxId,
-      cashboxName: selectedCashbox?.name || "",
-
-      amount: toNumber(amount),
-      currencyId,
-
-      amountByCurrency: {
-        [String(currencyId)]: toNumber(amount),
-      },
-
-      cashboxEffect: -toNumber(amount),
-      cashboxEffectByCurrency: {
-        [String(currencyId)]: -toNumber(amount),
-      },
-
-      shareholderBalanceBeforeByCurrency: shareholderBalanceBeforeAtSave,
-      shareholderBalanceChangeByCurrency: shareholderBalanceChangeAtSave,
-      shareholderBalanceAfterByCurrency: shareholderBalanceAfterAtSave,
-
-      accountEffect: 0,
-      accountBalanceEffect: 0,
-      profitEffect: 0,
-      warehouseEffect: 0,
-
-      reportScope: "cashbox-receipt-only",
-      shareholderReportOnly: true,
-      affectsDebtReport: false,
-      affectsAccountBalance: false,
-      affectsProfitReport: false,
-      affectsWarehouse: false,
-      affectsSalesReport: false,
-      affectsPurchaseReport: false,
-
-      note: receiptNote,
+    const payload = {
+      type: "shareholder_withdrawal",
+      referenceNo: receiptNumber,
+      date: combineDateAndTime(receiptDate, createdTime),
+      accountId: accountId ? Number(accountId) : null,
+      cashboxId: cashboxId ? Number(cashboxId) : null,
+      currencyId: Number(currencyId),
+      exchangeRate: 1,
+      totalAmount: toNumber(amount),
+      netAmount: 0,
+      internalNote: receiptNote,
       printNote,
-
+      paidAmounts: [
+        {
+          currencyId: Number(currencyId),
+          amount: toNumber(amount),
+          exchangeRate: 1
+        }
+      ],
       employeeName: employeeNameFromLogin,
-      employeePhone: employeePhoneFromLogin,
-      showEmployeeInfo: printOptions.showEmployeeInfo,
+    };
 
-      createdAt: new Date().toISOString(),
-      date: receiptDate,
-      createdTime,
-    } as any);
+    setIsSaving(true);
+    const savePromise = editId
+      ? updateVoucher(Number(editId), payload)
+      : addVoucher(payload);
 
-    applyCashboxDecrease();
-    applyShareholderBalanceDecrease();
-
-    setLockedShareholderBalanceBefore(shareholderBalanceBeforeAtSave);
-    setLockedShareholderBalanceAfter(shareholderBalanceAfterAtSave);
-
-    setSavedSnapshot(currentSnapshot);
-    setIsLocked(true);
-
-    showToast("پسوڵەی کشانەوەی پارە خەزن کرا ✅", "success");
+    savePromise
+      .then((res: any) => {
+        if (res) {
+          if (!editId) {
+            applyCashboxDecrease();
+            applyShareholderBalanceDecrease();
+            setIsLocked(true);
+          }
+          setSavedSnapshot(currentSnapshot);
+          showToast(
+            editId
+              ? "پسوڵەکە بە سەرکەوتوویی نوێکرایەوە ✅"
+              : "پسوڵەی کشانەوەی پارە خەزن کرا ✅",
+            "success"
+          );
+        } else {
+          showToast("تکایە دووبارە هەوڵ بدەرەوە ❌");
+        }
+      })
+      .catch((err: any) => {
+        console.error("Save error:", err);
+        showToast("پەیوەندی لەکارکەوت، تکایە دووبارە هەوڵ بدەرەوە ❌");
+      })
+      .finally(() => {
+        setIsSaving(false);
+      });
   }
 
   function handlePrint() {
@@ -914,13 +939,13 @@ function getShareholderBalanceAfter(baseMap: Record<string, number>) {
             <button
               style={{
                 ...primaryBtn,
-                opacity: (isLocked || (!!editId && isSaved)) ? 0.55 : 1,
-                cursor: (isLocked || (!!editId && isSaved)) ? "not-allowed" : "pointer",
+                opacity: (isLocked || (!!editId && isSaved) || isSaving) ? 0.55 : 1,
+                cursor: (isLocked || (!!editId && isSaved) || isSaving) ? "not-allowed" : "pointer",
               }}
               onClick={handleSave}
-              disabled={isLocked || (!!editId && isSaved)}
+              disabled={isLocked || (!!editId && isSaved) || isSaving}
             >
-              {isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
+              {isSaving ? "چاوەڕوانبە..." : isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
 
             <button style={outlineBlueBtn} onClick={() => setShowSettings(true)}>

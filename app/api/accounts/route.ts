@@ -80,6 +80,13 @@ export async function GET(request: Request) {
         }
       }
 
+      const shareholderBalanceByCurrency: Record<string, number> = {};
+      if (account.isShareholder) {
+        for (const [curIdText, amount] of Object.entries(balanceByCurrency)) {
+          shareholderBalanceByCurrency[curIdText] = -amount;
+        }
+      }
+
       return {
         ...account,
         country: account.country?.name || null,
@@ -87,6 +94,8 @@ export async function GET(request: Request) {
         district: account.district?.name || null,
         balanceByCurrency,
         balance: totalBalance,
+        shareholderBalanceByCurrency: account.isShareholder ? shareholderBalanceByCurrency : undefined,
+        shareholderBalance: account.isShareholder ? -totalBalance : undefined,
       };
     });
 
