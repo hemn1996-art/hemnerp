@@ -1,3 +1,4 @@
+import { useStore } from "../../store/store";
 import { CashboxLike, CurrencyLike } from "./types";
 
 type Props = {
@@ -19,6 +20,59 @@ export default function CashboxTable({
   openStatement,
   cashboxMovements,
 }: Props) {
+  const allCurrencies = useStore((state) => state.currencies) as CurrencyLike[];
+
+  function getCurrency(currencyId: number) {
+    return allCurrencies.find((c: any) => c.id === currencyId);
+  }
+
+  function renderBalances(cashbox: CashboxLike) {
+    const activeBalances = (cashbox.balances || []).filter(
+      (b) => Math.abs(Number(b.amount || 0)) > 0.0001
+    );
+
+    if (activeBalances.length === 0) {
+      return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    }
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
+        {activeBalances.map((b) => {
+          const currency = getCurrency(b.currencyId);
+          const symbol = currency?.symbol || "$";
+          const amount = Number(b.amount || 0);
+          const isNegative = amount < -0.01;
+          const absAmountText = Math.abs(amount).toLocaleString("en-US", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+          });
+
+          const formattedText = currency?.code === "IQD"
+            ? `${isNegative ? "-" : ""}${absAmountText} دینار`
+            : `${isNegative ? "-" : ""}${symbol}${absAmountText}`;
+
+          return (
+            <span
+              key={b.currencyId}
+              dir="ltr"
+              style={{
+                color: isNegative ? "#dc2626" : "#111827",
+                fontWeight: 900,
+                fontSize: 14,
+                display: "inline-block",
+                padding: "2px 8px",
+                borderRadius: "6px",
+                background: isNegative ? "rgba(220, 38, 38, 0.08)" : "transparent",
+                border: isNegative ? "1px solid rgba(220, 38, 38, 0.15)" : "none",
+              }}
+            >
+              {formattedText}
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
   const filtered = cashboxesState.filter(
     (c: any) => c.name.includes(search) || c.id.toString() === search
   );
@@ -91,8 +145,8 @@ export default function CashboxTable({
                       </span>
                     )}
                   </td>
-                  <td className="p-4 text-center font-black text-gray-900 ltr align-middle tracking-tight">
-                    {formatAllBalances(cashbox)}
+                  <td className="p-4 text-center align-middle">
+                    {renderBalances(cashbox)}
                   </td>
                   <td className="p-4 text-center align-middle">
                     {cashbox.isActive ? (
