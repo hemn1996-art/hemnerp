@@ -92,7 +92,7 @@ function AccountStatementContent() {
       case "purchase_return": return "گەڕانەوەی کڕین";
       case "cashbox_transfer": return "گواستنەوەی پارە";
       case "cashbox_exchange": return "گۆڕینەوەی پارە";
-      case "shareholder_deposit": return "سپاردنی پارە";
+      case "shareholder_deposit": return "دانانی پارە";
       case "shareholder_withdrawal": return "کشانەوەی پارە";
       case "my_debt_discount": return "داشکاندن لە قەرزی من";
       case "people_debt_discount":

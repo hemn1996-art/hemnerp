@@ -91,7 +91,8 @@ export default function StatementModal({
     if (type === "purchase_return") return "گەڕانەوەی کڕین";
     if (type === "cashbox_exchange") return "گۆڕینەوەی دراو";
     if (type === "cashbox_transfer") return "گواستنەوەی دراو";
-    if (type === "shareholder_deposit") return "سپاردنی پارە";
+    if (type === "shareholder_deposit") return "دانانی پارە";
+    if (type === "shareholder_withdrawal") return "کشانەوەی پارە";
     if (type === "cashbox_withdrawal") return "کشانەوەی پارە";
     if (type === "my_debt_discount") return "داشکاندن لە قەرزی من";
     if (type === "people_debt_discount") return "داشکاندن لە قەرزی خەڵک";
