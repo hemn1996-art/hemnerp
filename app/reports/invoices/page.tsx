@@ -115,6 +115,7 @@ interface RawVoucher {
 
 function InvoiceReportContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Store items
   const {
@@ -165,7 +166,6 @@ function InvoiceReportContent() {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showColumnsModal, setShowColumnsModal] = useState(false);
 
-  const searchParams = useSearchParams();
   const [filterInvoiceTypes, setFilterInvoiceTypes] = useState<string[]>(() => {
     const t = searchParams.get("type");
     return t ? t.split(",") : [];
