@@ -1,15 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "../../components/DateInput";
 import { useStore } from "../../store/store";
 
 export default function ProfitReportPage() {
   const router = useRouter();
-  const { currencies, fetchCurrencies } = useStore() as any;
-  const [selectedCurrencyId, setSelectedCurrencyId] = useState<number>(1);
   
+  const {
+    accounts, fetchAccounts,
+    products, fetchProducts,
+    accountTypes, fetchAccountTypes,
+    currencies, fetchCurrencies,
+    warehouses, fetchWarehouses,
+    invoices, fetchInvoices
+  } = useStore() as any;
+
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState<number>(1);
+  const [accountId, setAccountId] = useState("all");
+  const [accountTypeId, setAccountTypeId] = useState("all");
+  const [brand, setBrand] = useState("all");
+  const [category, setCategory] = useState("all");
+  const [productId, setProductId] = useState("all");
+  const [warehouseId, setWarehouseId] = useState("all");
+  const [createdBy, setCreatedBy] = useState("all");
+
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
+  const [brandsList, setBrandsList] = useState<any[]>([]);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
   const [data, setData] = useState({
     sales: 0,
     cogs: 0,
@@ -37,6 +57,7 @@ export default function ProfitReportPage() {
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   });
+  
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -45,6 +66,46 @@ export default function ProfitReportPage() {
     return `${y}-${m}-${day}`;
   });
 
+  useEffect(() => {
+    fetchAccounts?.();
+    fetchProducts?.();
+    fetchAccountTypes?.();
+    fetchCurrencies?.();
+    fetchWarehouses?.();
+    fetchInvoices?.();
+
+    if (typeof window !== "undefined") {
+      try {
+        const rawCat = localStorage.getItem("__erp_categories");
+        if (rawCat) setCategoriesList(JSON.parse(rawCat));
+      } catch (e) { console.error(e); }
+
+      try {
+        const rawBrand = localStorage.getItem("__erp_brands");
+        if (rawBrand) setBrandsList(JSON.parse(rawBrand));
+      } catch (e) { console.error(e); }
+    }
+  }, [fetchAccounts, fetchProducts, fetchAccountTypes, fetchCurrencies, fetchWarehouses, fetchInvoices]);
+
+  const employeeOptions = useMemo(() => {
+    if (!invoices) return [];
+    const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
+    return Array.from(new Set([...defaults, ...fromVouchers]));
+  }, [invoices]);
+
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (accountId !== "all") count++;
+    if (accountTypeId !== "all") count++;
+    if (brand !== "all") count++;
+    if (category !== "all") count++;
+    if (productId !== "all") count++;
+    if (warehouseId !== "all") count++;
+    if (createdBy !== "all") count++;
+    return count;
+  }, [accountId, accountTypeId, brand, category, productId, warehouseId, createdBy]);
+
   const fetchReport = async () => {
     setLoading(true);
     try {
@@ -52,6 +113,14 @@ export default function ProfitReportPage() {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
       params.append("currencyId", String(selectedCurrencyId));
+
+      if (accountId !== "all") params.append("accountId", accountId);
+      if (accountTypeId !== "all") params.append("accountTypeId", accountTypeId);
+      if (brand !== "all") params.append("brand", brand);
+      if (category !== "all") params.append("category", category);
+      if (productId !== "all") params.append("productId", productId);
+      if (warehouseId !== "all") params.append("warehouseId", warehouseId);
+      if (createdBy !== "all") params.append("createdBy", createdBy);
 
       const res = await fetch(`/api/reports/profit?${params.toString()}`);
       const json = await res.json();
@@ -64,12 +133,24 @@ export default function ProfitReportPage() {
   };
 
   useEffect(() => {
-    fetchCurrencies();
-  }, []);
-
-  useEffect(() => {
     fetchReport();
-  }, [startDate, endDate, selectedCurrencyId]);
+  }, [startDate, endDate, selectedCurrencyId, accountId, accountTypeId, brand, category, productId, warehouseId, createdBy]);
+
+  const handleResetFilters = () => {
+    setAccountId("all");
+    setAccountTypeId("all");
+    setBrand("all");
+    setCategory("all");
+    setProductId("all");
+    setWarehouseId("all");
+    setCreatedBy("all");
+    
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    setStartDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    const today = new Date();
+    setEndDate(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
+  };
 
   const handleCardClick = (type: string) => {
     if (type === "sales") {
@@ -77,7 +158,6 @@ export default function ProfitReportPage() {
     }
   };
 
-  // Format currency helper
   const formatCur = (num: number) => {
     const symbol = data.currencySymbol || "$";
     const formatted = Math.abs(num).toLocaleString("en-US", {minimumFractionDigits: 0, maximumFractionDigits: 2});
@@ -97,8 +177,7 @@ export default function ProfitReportPage() {
     <div className="p-4 md:p-6 bg-slate-50 h-full overflow-y-auto">
       
       {/* HEADER SECTION */}
-      <div className="bg-gradient-to-l from-[#061f5f] to-[#03133f] rounded-3xl shadow-xl mb-8 p-6 lg:p-8 text-white relative overflow-hidden">
-        {/* Decorative background shapes */}
+      <div className="bg-gradient-to-l from-[#061f5f] to-[#03133f] rounded-3xl shadow-xl mb-6 p-6 lg:p-8 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-5 blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-blue-400 opacity-10 blur-2xl pointer-events-none"></div>
 
@@ -119,46 +198,71 @@ export default function ProfitReportPage() {
               <p className="text-blue-200 mt-1 text-sm md:text-base font-medium">پوختەی دارایی و قازانجی پاکی سیستەمەکە لەماوەی دیاریکراودا</p>
             </div>
           </div>
-          
-          <div className="flex flex-wrap gap-4 items-center bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10 shadow-inner w-full lg:w-auto">
-            <div className="flex flex-1 md:flex-none items-center gap-3 bg-black/20 rounded-xl p-2 px-3 border border-white/5 min-w-[120px]">
-              <label className="text-sm font-bold text-blue-100 whitespace-nowrap">دراو:</label>
-              <select
-                value={selectedCurrencyId}
-                onChange={(e) => setSelectedCurrencyId(Number(e.target.value))}
-                className="bg-transparent text-white border-none focus:outline-none focus:ring-0 font-bold cursor-pointer w-full text-sm outline-none"
-                style={{ colorScheme: "dark" }}
-              >
-                {currencies && currencies.map((c: any) => (
-                  <option key={c.id} value={c.id} className="text-slate-800">
-                    {c.name} ({c.symbol})
-                  </option>
-                ))}
-              </select>
-            </div>
+        </div>
+      </div>
 
-            <div className="flex flex-1 md:flex-none items-center gap-3 bg-black/20 rounded-xl p-2 px-3 border border-white/5 min-w-[140px]">
-              <label className="text-sm font-bold text-blue-100 whitespace-nowrap">لە:</label>
-              <DateInput
-                className="bg-transparent text-white border-none focus:outline-none focus:ring-0 font-bold cursor-pointer w-full text-sm"
-                style={{ colorScheme: "dark" }}
-                value={startDate}
-                onChange={(val) => setStartDate(val)}
-              />
-            </div>
-            
-            <div className="hidden md:block text-blue-300 font-bold">»</div>
-            
-            <div className="flex flex-1 md:flex-none items-center gap-3 bg-black/20 rounded-xl p-2 px-3 border border-white/5 min-w-[140px]">
-              <label className="text-sm font-bold text-blue-100 whitespace-nowrap">تا:</label>
-              <DateInput
-                className="bg-transparent text-white border-none focus:outline-none focus:ring-0 font-bold cursor-pointer w-full text-sm"
-                style={{ colorScheme: "dark" }}
-                value={endDate}
-                onChange={(val) => setEndDate(val)}
-              />
-            </div>
+      {/* TOOLBAR SECTION */}
+      <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center justify-between gap-3 no-print">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500">لە بەرواری:</span>
+            <DateInput
+              value={startDate}
+              onChange={(val) => setStartDate(val)}
+              className="border border-slate-300 p-1.5 text-xs rounded-xl font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+            />
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500">تا بەرواری:</span>
+            <DateInput
+              value={endDate}
+              onChange={(val) => setEndDate(val)}
+              className="border border-slate-300 p-1.5 text-xs rounded-xl font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2 border-r border-slate-200 pr-4">
+            <span className="text-[11px] font-bold text-slate-500">دراو:</span>
+            <select
+              value={selectedCurrencyId}
+              onChange={(e) => setSelectedCurrencyId(Number(e.target.value))}
+              className="border border-slate-300 p-1.5 text-xs rounded-xl font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+            >
+              {currencies && currencies.map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.symbol})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowFilterModal(true)}
+            className="flex items-center gap-2 bg-[#061f5f] text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-[#03133f] transition shadow-md cursor-pointer border-none outline-none"
+          >
+            <span>☰ فلتەرەکان</span>
+            {activeFiltersCount > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={handleResetFilters}
+            className="flex items-center gap-1 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
+          >
+            ✖️ ڕێکخستنەوە
+          </button>
+
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-md cursor-pointer border-none outline-none"
+          >
+            🖨️ پرێنتکردن
+          </button>
         </div>
       </div>
 
@@ -220,7 +324,7 @@ export default function ProfitReportPage() {
           {/* BOTTOM ROW - 4 cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
 
-            {/* خەرجی - Expenses (combined: expenses + warehouse damage + material) */}
+            {/* خەرجی - Expenses */}
             <div className="bg-rose-50 p-5 rounded-2xl border border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-400 transition-all">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-rose-900 font-black text-lg m-0">خەرجی</h3>
@@ -229,7 +333,6 @@ export default function ProfitReportPage() {
               <div className="text-2xl font-black text-rose-800 mb-2" dir="ltr">{formatCur(data.expenses + data.losses)}</div>
               <p className="text-xs text-rose-500 font-medium m-0">کۆی گشتی (خەرجی، خەسارەی کۆگا، سەرفی مەواد)</p>
             </div>
-
 
             {/* داشکاندن لە قەرزی خەڵک - People Debt Discount */}
             <div className="bg-rose-50 p-5 rounded-2xl border border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-400 transition-all">
@@ -254,6 +357,155 @@ export default function ProfitReportPage() {
 
         </div>
       )}
+
+      {/* Filters Modal */}
+      {showFilterModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 no-print">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-[#061f5f] p-4 flex items-center justify-between text-white">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-slate-300 border-none bg-transparent cursor-pointer text-lg font-bold">✕</button>
+                <h2 className="font-black text-lg m-0">ئۆپشنەکانی فلتەرکردن</h2>
+              </div>
+              <button 
+                onClick={handleResetFilters}
+                className="text-white hover:text-slate-300 flex items-center gap-2 text-sm border-none bg-transparent cursor-pointer font-bold"
+              >
+                <span>لابردنی هەموو</span> 🗑️
+              </button>
+            </div>
+
+            <div className="p-6 max-h-[70vh] overflow-y-auto bg-white text-right space-y-6">
+              <style dangerouslySetInnerHTML={{__html: `
+                .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 14px; background: white; transition: border-color 0.2s; }
+                .mui-outline:focus-within { border-color: #3b82f6; }
+                .mui-outline label { position: absolute; top: -10px; right: 12px; background: white; padding: 0 6px; color: #475569; font-size: 11px; font-weight: bold; }
+                .mui-outline select { width: 100%; border: none; outline: none; background: transparent; font-size: 13px; color: #1e293b; font-weight: bold; cursor: pointer; }
+                .section-title { display: flex; align-items: center; gap: 8px; color: #0f172a; font-weight: 900; font-size: 13px; margin-bottom: 16px; }
+                .section-title::before { content: ""; flex: 1; height: 1px; background: #e2e8f0; }
+              `}} />
+
+              {/* Section: Dates */}
+              <div>
+                <div className="section-title flex-row-reverse">مەودای بەروار <span>📅</span></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="mui-outline">
+                    <label>بەرواری دەستپێک</label>
+                    <input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={e => setStartDate(e.target.value)} 
+                      className="w-full border-none outline-none text-[13px] font-bold text-slate-800"
+                    />
+                  </div>
+                  <div className="mui-outline">
+                    <label>بەرواری کۆتایی</label>
+                    <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={e => setEndDate(e.target.value)} 
+                      className="w-full border-none outline-none text-[13px] font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Account Info */}
+              <div>
+                <div className="section-title flex-row-reverse">زانیاری هەژمار <span>👤</span></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="mui-outline">
+                    <label>جۆری هەژمار</label>
+                    <select value={accountTypeId} onChange={e => setAccountTypeId(e.target.value)}>
+                      <option value="all">هەموو</option>
+                      {accountTypes?.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="mui-outline">
+                    <label>هەژمار</label>
+                    <select value={accountId} onChange={e => setAccountId(e.target.value)}>
+                      <option value="all">هەموو</option>
+                      {accounts?.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Item Filter */}
+              <div>
+                <div className="section-title flex-row-reverse">فلتەری کەرەستە <span>📦</span></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="mui-outline">
+                    <label>براند</label>
+                    <select value={brand} onChange={e => setBrand(e.target.value)}>
+                      <option value="all">هەموو</option>
+                      {brandsList.map((b: any) => (
+                        <option key={b.id} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mui-outline">
+                    <label>کاتێگۆری</label>
+                    <select value={category} onChange={e => setCategory(e.target.value)}>
+                      <option value="all">هەموو</option>
+                      {categoriesList.map((c: any) => (
+                        <option key={c.id} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mui-outline md:col-span-2">
+                    <label>کەرەستە</label>
+                    <select value={productId} onChange={e => setProductId(e.target.value)}>
+                      <option value="all">هەموو</option>
+                      {products?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Secondary Filters */}
+              <div>
+                <div className="section-title flex-row-reverse">فلتەرە لاوەکییەکان <span>⚙️</span></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="mui-outline">
+                    <label>کۆگا</label>
+                    <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)}>
+                      <option value="all">هەموو</option>
+                      {warehouses?.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="mui-outline">
+                    <label>له‌ لایه‌ن</label>
+                    <select value={createdBy} onChange={e => setCreatedBy(e.target.value)}>
+                      <option value="all">هەموو</option>
+                      {employeeOptions.map((emp: string) => <option key={emp} value={emp}>{emp}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-start gap-4">
+              <button 
+                onClick={() => setShowFilterModal(false)} 
+                className="px-6 py-2.5 bg-[#061f5f] hover:bg-[#03133f] text-white rounded-xl text-sm font-black transition cursor-pointer shadow-md flex items-center gap-2 border-none"
+              >
+                جێبەجێکردنی فلتەرەکان ✔️
+              </button>
+              <button 
+                onClick={() => setShowFilterModal(false)} 
+                className="text-slate-600 hover:text-slate-900 text-sm font-bold border-none bg-transparent cursor-pointer"
+              >
+                پاشگەزبوونەوە
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
