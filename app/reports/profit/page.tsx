@@ -9,7 +9,6 @@ interface Option {
   value: string | number;
   label: string;
 }
-
 function MultiSelectDropdown({
   label,
   options,
@@ -26,11 +25,13 @@ function MultiSelectDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setSearchTerm("");
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -50,57 +51,78 @@ function MultiSelectDropdown({
     } else {
       onChange([...selectedValues, val]);
     }
+    inputRef.current?.focus();
   };
 
   const handleClearAll = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange([]);
+    setSearchTerm("");
+    inputRef.current?.focus();
   };
 
   const handleRemoveValue = (e: React.MouseEvent, val: any) => {
     e.stopPropagation();
     onChange(selectedValues.filter(v => v !== val));
+    inputRef.current?.focus();
   };
 
   return (
     <div ref={containerRef} className="relative w-full text-right" dir="rtl">
       <div 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(true);
+          inputRef.current?.focus();
+        }}
         className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[46px] ${
           isOpen ? "border-[#061f5f] ring-2 ring-[#061f5f]/10" : ""
         }`}
       >
         <label className="select-none pointer-events-none">{label}</label>
 
-        {/* Selected chips list (first child, renders on the right in RTL) */}
+        {/* Selected chips list + Search input inline (first child, renders on the right in RTL) */}
         <div className="flex-1 flex flex-wrap gap-1.5 items-center justify-start overflow-hidden py-1">
-          {selectedValues.length === 0 ? (
-            <span className="text-slate-400 font-bold text-xs pr-1">هەموو</span>
-          ) : (
-            selectedValues.map(val => {
-              const opt = options.find(o => o.value === val);
-              const name = opt ? opt.label : String(val);
-              return (
-                <div
-                  key={val}
-                  className="bg-slate-100 border border-slate-200 text-slate-800 rounded-full flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 text-[11px] font-black hover:bg-slate-200 transition-colors shadow-sm"
+          {selectedValues.map(val => {
+            const opt = options.find(o => o.value === val);
+            const name = opt ? opt.label : String(val);
+            return (
+              <div
+                key={val}
+                className="bg-slate-100 border border-slate-200 text-slate-800 rounded-full flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 text-[11px] font-black hover:bg-slate-200 transition-colors shadow-sm"
+              >
+                <button
+                  onClick={(e) => handleRemoveValue(e, val)}
+                  className="w-4 h-4 rounded-full bg-slate-300 text-slate-600 hover:bg-slate-400 hover:text-slate-800 flex items-center justify-center text-[10px] font-black border-none cursor-pointer shrink-0 transition-colors"
                 >
-                  <button
-                    onClick={(e) => handleRemoveValue(e, val)}
-                    className="w-4 h-4 rounded-full bg-slate-300 text-slate-600 hover:bg-slate-400 hover:text-slate-800 flex items-center justify-center text-[10px] font-black border-none cursor-pointer shrink-0 transition-colors"
-                  >
-                    ✕
-                  </button>
-                  <span className="truncate max-w-[120px] select-none">{name}</span>
-                </div>
-              );
-            })
+                  ✕
+                </button>
+                <span className="truncate max-w-[120px] select-none">{name}</span>
+              </div>
+            );
+          })}
+
+          {searchable ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder={selectedValues.length === 0 ? "هەموو" : ""}
+              className="flex-1 min-w-[60px] max-w-full border-none outline-none text-xs font-black text-slate-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
+              dir="rtl"
+              onClick={e => e.stopPropagation()}
+              onFocus={() => setIsOpen(true)}
+            />
+          ) : (
+            selectedValues.length === 0 && (
+              <span className="text-slate-400 font-bold text-xs pr-1">هەموو</span>
+            )
           )}
         </div>
 
         {/* Action icons (second child, renders on the left in RTL) */}
         <div className="flex items-center gap-2 text-slate-500 shrink-0 pl-1 border-r border-slate-200 pr-2">
-          {selectedValues.length > 0 && (
+          {(selectedValues.length > 0 || searchTerm) && (
             <button
               onClick={handleClearAll}
               className="text-slate-400 hover:text-slate-700 bg-transparent border-none cursor-pointer text-sm font-bold flex items-center justify-center w-5 h-5"
@@ -117,23 +139,12 @@ function MultiSelectDropdown({
 
       {isOpen && (
         <div className="absolute z-[1050] mt-1 right-0 left-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 max-h-72 overflow-y-auto flex flex-col text-right">
-          {searchable && (
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="گەڕان..."
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 mb-2 text-xs font-bold text-slate-700 outline-none focus:border-[#061f5f] focus:ring-1 focus:ring-[#061f5f]/20"
-              dir="rtl"
-              onClick={e => e.stopPropagation()}
-            />
-          )}
-
-          <div className="overflow-y-auto flex-1 space-y-1 pr-1" style={{ maxHeight: "180px" }}>
+          <div className="overflow-y-auto flex-1 space-y-1 pr-1" style={{ maxHeight: "220px" }}>
             <div
               onClick={() => {
                 onChange([]);
                 setSearchTerm("");
+                inputRef.current?.focus();
               }}
               className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
                 selectedValues.length === 0
