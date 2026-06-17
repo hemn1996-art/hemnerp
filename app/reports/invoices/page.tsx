@@ -322,6 +322,8 @@ function InvoiceReportContent() {
         return "پارەی ڕۆشتوو";
       case "expense":
         return "خەرجی";
+      case "quotation":
+        return "نرخاندن";
       case "sales_return":
         return "گەڕانەوەی فرۆشتن";
       case "purchase_return":
@@ -1765,6 +1767,7 @@ function InvoiceReportContent() {
                                         money_in: { bg: "from-emerald-50 to-teal-50", border: "border-emerald-200", icon: "💰", desc: "پارەیەک هاتووەتە ناو ئەم هەژمارە" },
                                         money_out: { bg: "from-rose-50 to-pink-50", border: "border-rose-200", icon: "💸", desc: "پارەیەک لەم هەژمارە دەرچووە" },
                                         expense: { bg: "from-purple-50 to-violet-50", border: "border-purple-200", icon: "🧾", desc: "خەرجییەک تۆمار کراوە" },
+                                        quotation: { bg: "from-amber-50 to-orange-50", border: "border-amber-200", icon: "📄", desc: "پسوڵەی نرخاندن تۆمار کراوە" },
                                         cashbox_transfer: { bg: "from-blue-50 to-cyan-50", border: "border-blue-200", icon: "🔄", desc: "پارە لە قاسەیەکەوە گوازراوەتەوە بۆ قاسەیەکی تر" },
                                         cashbox_exchange: { bg: "from-amber-50 to-yellow-50", border: "border-amber-200", icon: "💱", desc: "گۆڕینەوەی دراو ئەنجام دراوە" },
                                         shareholder_deposit: { bg: "from-emerald-50 to-green-50", border: "border-emerald-200", icon: "🏦", desc: "پارە دانراوە لەلایەن هاوبەش" },
@@ -2027,6 +2030,7 @@ function InvoiceReportContent() {
                             { code: "money_in", label: "پارەی هاتوو" },
                             { code: "money_out", label: "پارەی ڕۆشتوو" },
                             { code: "expense", label: "خەرجی" },
+                            { code: "quotation", label: "نرخاندن" },
                             { code: "sales_return", label: "گەڕانەوەی فرۆشتن" },
                             { code: "purchase_return", label: "گەڕانەوەی کڕین" },
                             { code: "shareholder_deposit", label: "دانانی پارە" },

@@ -190,7 +190,7 @@ export async function PUT(
       }
 
       // 2. Reverse previous cashbox balances
-      if (existingVoucher.cashboxId || existingVoucher.type === "cashbox_transfer") {
+      if ((existingVoucher.cashboxId || existingVoucher.type === "cashbox_transfer") && existingVoucher.type !== "quotation") {
         for (const pa of existingVoucher.paidAmounts) {
           if (existingVoucher.type === "cashbox_transfer" && existingVoucher.fromCashboxId && existingVoucher.toCashboxId) {
             // Revert transfer (increment from, decrement to)
@@ -263,6 +263,7 @@ export async function PUT(
               discountAmount: Number(line.discountAmount || 0),
               lineTotal: Number(line.lineTotal),
               note: line.note,
+              currencyId: line.currencyId ? Number(line.currencyId) : null,
             },
           });
 
@@ -343,7 +344,7 @@ export async function PUT(
               update: { amount: { increment: Number(pa.amount) } },
               create: { cashboxId: updated.toCashboxId, currencyId: Number(pa.currencyId), amount: Number(pa.amount) },
             });
-          } else if (updated.cashboxId) {
+          } else if (updated.cashboxId && updated.type !== "quotation") {
             // For sales / money_in / exchange: increment cashbox balance
             // For purchase / money_out / expense: decrement cashbox balance
             const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange"].includes(updated.type);
@@ -370,7 +371,7 @@ export async function PUT(
       }
 
       // 8. Create Ledger Entry for Customer/Supplier Account Debt Tracking
-      if (updated.accountId) {
+      if (updated.accountId && !["quotation", "expense"].includes(updated.type)) {
         if (data.ledgerEntries && Array.isArray(data.ledgerEntries)) {
           for (const le of data.ledgerEntries) {
             await tx.ledgerEntry.create({
@@ -532,7 +533,7 @@ export async function DELETE(
       }
 
       // 2. Reverse previous cashbox balances
-      if (existingVoucher.cashboxId || existingVoucher.type === "cashbox_transfer") {
+      if ((existingVoucher.cashboxId || existingVoucher.type === "cashbox_transfer") && existingVoucher.type !== "quotation") {
         for (const pa of existingVoucher.paidAmounts) {
           if (existingVoucher.type === "cashbox_transfer" && existingVoucher.fromCashboxId && existingVoucher.toCashboxId) {
             // Revert transfer (increment from, decrement to)

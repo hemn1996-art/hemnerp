@@ -224,6 +224,7 @@ export const useStore = create<StoreState>((set, get) => ({
           else if (v.type === "money_in") uiType = "پارەی هاتوو";
           else if (v.type === "money_out") uiType = "پارەی ڕۆشتوو";
           else if (v.type === "expense") uiType = "خەرجی";
+          else if (v.type === "quotation") uiType = "نرخاندن";
           else if (v.type === "sales_return") uiType = "گەڕانەوەی فرۆشتن";
           else if (v.type === "purchase_return") uiType = "گەڕانەوەی کڕین";
           return {

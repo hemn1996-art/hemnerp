@@ -11,8 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { store } from "../store/store";
-import { saveInvoice } from "../utils/invoiceLogic";
+import { store, useStore } from "../store/store";
 import { currencies as mockCurrencies } from "../data/mockData";
 
 type ToastType = "error" | "success" | "info";
@@ -95,11 +94,16 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     }
   }, [editId]);
 
-  const accounts = (store.accounts || []) as AccountLike[];
-  const cashboxes = (store.cashboxes || []) as CashboxLike[];
-  const products = (store.products || []) as ProductLike[];
-  const storeCurrencies = (store as any).currencies || [];
+  const accounts = useStore((s: any) => s.accounts || []) as AccountLike[];
+  const cashboxes = useStore((s: any) => s.cashboxes || []) as CashboxLike[];
+  const products = useStore((s: any) => s.products || []) as ProductLike[];
+  const storeCurrencies = useStore((s: any) => s.currencies || []);
   const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
+
+  const addVoucher = useStore((s: any) => s.addVoucher);
+  const updateVoucher = useStore((s: any) => s.updateVoucher);
+  const currentUser = useStore((s: any) => s.currentUser || {});
+  const employeeNameFromLogin = currentUser.fullName || currentUser.name || "کۆساری مەلا فەرهاد";
 
   const defaultCurrency =
     currencies[0] ||
@@ -170,7 +174,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
             setIsLocked(false);
           }
         })
-        .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
+        .catch((err: any) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
     }
   }, [editId, accounts]);
 
@@ -595,48 +599,94 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
 
     if (!validateBeforeSave()) return;
 
-    const items = rows.map((row: any) => ({
-      productId: row.productId,
-      name: row.productName,
-      code: row.code,
-      amount: toNumber(row.amount),
-      currencyId: row.currencyId,
-      note: row.note,
-      isExpense: true,
-    }));
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
 
-    saveInvoice({
-      id: Number(receiptNumber || Date.now().toString().slice(-6)),
-      type: "خەرجی",
-      accountId,
-      cashboxId,
+    const paidList = Object.entries(getPaidAmountsFromRows())
+      .map(([currencyIdText, amountText]) => ({
+        currencyId: Number(currencyIdText),
+        amount: toNumber(amountText),
+      }))
+      .filter((x: any) => x.amount > 0);
 
-      total: totalExpenseInDefaultCurrency,
-      totalByCurrency: expenseTotalsByCurrency,
+    const combineDateAndTime = (dateStr: string, timeStr: string) => {
+      try {
+        if (!dateStr) return new Date().toISOString();
+        let cleanTime = (timeStr || "").trim();
+        const ampmMatch = cleanTime.match(/^(1[0-2]|0?[1-9]):([0-5][0-9])\s*(AM|PM)$/i);
+        if (ampmMatch) {
+          let hours = parseInt(ampmMatch[1], 10);
+          const minutes = ampmMatch[2];
+          const ampm = ampmMatch[3].toUpperCase();
+          if (ampm === "PM" && hours < 12) hours += 12;
+          if (ampm === "AM" && hours === 12) hours = 0;
+          cleanTime = `${hours.toString().padStart(2, "0")}:${minutes}`;
+        }
+        const hhmmMatch = cleanTime.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])/);
+        if (hhmmMatch) {
+          const hours = hhmmMatch[1].padStart(2, "0");
+          const minutes = hhmmMatch[2];
+          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+        }
+        const fallback = new Date(dateStr + " " + cleanTime);
+        if (!isNaN(fallback.getTime())) return fallback.toISOString();
+        const fallbackDate = new Date(dateStr);
+        if (!isNaN(fallbackDate.getTime())) return fallbackDate.toISOString();
+      } catch (e) {
+        console.error("Error combining date and time:", e);
+      }
+      return new Date().toISOString();
+    };
 
-      paid: totalExpenseInDefaultCurrency,
-      paidAmounts: getPaidAmountsFromRows(),
-      paidByCurrency: expenseTotalsByCurrency,
+    const payload = {
+      type: "expense",
+      referenceNo: String(receiptNumber),
+      date: combineDateAndTime(receiptDate, createdTime),
+      accountId: accountId || null,
+      cashboxId: cashboxId || null,
+      currencyId: defaultCurrency.id,
+      exchangeRate: rate,
+      totalAmount: totalExpenseInDefaultCurrency,
+      totalDiscount: 0,
+      netAmount: totalExpenseInDefaultCurrency,
+      internalNote: receiptNote,
+      printNote: printNote,
+      employeeName: employeeNameFromLogin,
+      lines: rows.map((row: any) => ({
+        productId: row.productId,
+        qty: 1,
+        unitPrice: toNumber(row.amount),
+        lineTotal: toNumber(row.amount),
+        note: row.note || "",
+        currencyId: row.currencyId,
+      })),
+      paidAmounts: paidList.map((p: any) => ({
+        currencyId: p.currencyId,
+        amount: p.amount,
+        exchangeRate: (p.currencyId === defaultCurrency.id) ? 1 : rate
+      })),
+      ledgerEntries: []
+    };
 
-      expenseByCurrency: expenseTotalsByCurrency,
-      profitEffect: -totalExpenseInDefaultCurrency,
+    const savePromise = editId
+      ? updateVoucher(Number(editId), payload)
+      : addVoucher(payload);
 
-      items,
-      note: receiptNote,
-      printNote,
-
-      createdAt: new Date().toISOString(),
-      date: receiptDate,
-      createdTime,
-      exchangeRate,
-    } as any);
-
-    applyCashboxDecrease();
-
-    setSavedSnapshot(currentSnapshot);
-    setIsLocked(true);
-
-    showToast("پسوڵەی خەرجی خەزن کرا ✅", "success");
+    savePromise.then((res: any) => {
+      if (res) {
+        setSavedSnapshot(currentSnapshot);
+        if (editId) {
+          showToast("پسوڵەی خەرجی نوێکرایەوە ✅", "success");
+        } else {
+          setIsLocked(true);
+          showToast("پسوڵەی خەرجی خەزن کرا ✅ قاسە و ڕاپۆرتەکان نوێکرانەوە.", "success");
+        }
+      } else {
+        showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
+      }
+    }).catch((err: any) => {
+      console.error("Save error:", err);
+      showToast("هەڵەی نەتۆرک! تکایە دووبارە هەوڵ بدەوە.", "error");
+    });
   }
 
   function handlePrint() {

@@ -71,6 +71,7 @@ export async function GET(request: Request) {
             discountAmount: true,
             lineTotal: true,
             note: true,
+            currencyId: true,
             product: { select: { id: true, name: true, code: true } },
           },
         },
@@ -192,6 +193,7 @@ export async function POST(request: Request) {
               discountAmount: Number(line.discountAmount || 0),
               lineTotal: Number(line.lineTotal),
               note: line.note,
+              currencyId: line.currencyId ? Number(line.currencyId) : null,
             },
           });
 
@@ -267,7 +269,7 @@ export async function POST(request: Request) {
               update: { amount: { increment: Number(pa.amount) } },
               create: { cashboxId: createdVoucher.toCashboxId, currencyId: Number(pa.currencyId), amount: Number(pa.amount) },
             });
-          } else if (createdVoucher.cashboxId) {
+          } else if (createdVoucher.cashboxId && createdVoucher.type !== "quotation") {
             const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange"].includes(createdVoucher.type);
             const amountChange = isIncoming ? Number(pa.amount) : -Number(pa.amount);
 
@@ -291,7 +293,7 @@ export async function POST(request: Request) {
         }
       }
 
-      if (createdVoucher.accountId) {
+      if (createdVoucher.accountId && !["quotation", "expense"].includes(createdVoucher.type)) {
         if (data.ledgerEntries && Array.isArray(data.ledgerEntries)) {
           for (const le of data.ledgerEntries) {
             await tx.ledgerEntry.create({

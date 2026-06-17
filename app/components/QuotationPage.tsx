@@ -11,8 +11,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { store } from "../store/store";
-import { saveInvoice } from "../utils/invoiceLogic";
+import { store, useStore } from "../store/store";
+import { convertCurrency } from "../utils/ledgerHelper";
 import { currencies as mockCurrencies } from "../data/mockData";
 
 type ToastType = "error" | "success" | "info";
@@ -83,18 +83,19 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
     }
   }, [editId]);
 
-  const products = (store.products || []) as ProductLike[];
-  const storeCurrencies = (store as any).currencies || [];
+  const products = useStore((s: any) => s.products || []) as ProductLike[];
+  const storeCurrencies = useStore((s: any) => s.currencies || []);
   const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
+  const accounts = useStore((s: any) => s.accounts || []) as any[];
 
-  const currentUser =
-    ((store as any).currentUser ||
-      (store as any).loggedInUser ||
-      (store as any).user ||
-      {}) as UserLike;
+  const addVoucher = useStore((s: any) => s.addVoucher);
+  const updateVoucher = useStore((s: any) => s.updateVoucher);
+  const fetchInvoices = useStore((s: any) => s.fetchInvoices);
+
+  const currentUser = useStore((s: any) => s.currentUser || {}) as UserLike;
 
   const employeeNameFromLogin =
-    currentUser.fullName || currentUser.name || "";
+    currentUser.fullName || currentUser.name || "کۆساری مەلا فەرهاد";
 
   const employeePhoneFromLogin =
     currentUser.mobileNumber || currentUser.mobile || currentUser.phone || "";
@@ -169,7 +170,7 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
             setIsLocked(false);
           }
         })
-        .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
+        .catch((err: any) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
     }
   }, [editId]);
 
@@ -566,58 +567,98 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
 
     if (!validateBeforeSave()) return;
 
-    const items = rows.map((row: any) => ({
-      productId: row.productId,
-      name: row.productName,
-      code: row.code,
-      quantity: toNumber(row.quantity),
-      price: toNumber(row.price),
-      currencyId: row.currencyId,
-      subtotal: getRowSubtotal(row),
-      discountValue: toNumber(row.discountValue),
-      discountType: row.discountType,
-      discountAmount: getRowDiscount(row),
-      total: getRowTotal(row),
-      note: row.note,
-    }));
+    const iqd = currencies.find((c: any) => c.code === "IQD");
+    const rate = iqd ? iqd.rate : 1500;
 
-    saveInvoice({
-      id: Number(receiptNumber || Date.now().toString().slice(-6)),
-      type: "نرخاندن",
+    const totalDiscountAmount = Object.entries(invoiceDiscountByCurrency || {}).reduce((sum, [currencyIdText, amount]) => {
+      return sum + convertCurrency(Number(amount), Number(currencyIdText), defaultCurrency.id, rate, currencies);
+    }, 0);
 
-      quotationOnly: true,
+    const getGrandTotalInDefaultCurrency = () => {
+      return Object.entries(grandTotalByCurrency).reduce((sum, [currencyIdText, amount]) => {
+        return sum + convertCurrency(Number(amount), Number(currencyIdText), defaultCurrency.id, rate, currencies);
+      }, 0);
+    };
 
-      items,
-      totalQuantity,
-      subtotalByCurrency,
-      itemDiscountByCurrency,
-      invoiceDiscountValue: toNumber(invoiceDiscountValue),
-      invoiceDiscountType,
-      invoiceDiscountByCurrency,
-      grandTotalByCurrency,
+    const grandTotalInBase = getGrandTotalInDefaultCurrency();
 
-      cashboxEffect: 0,
-      accountEffect: 0,
-      warehouseEffect: 0,
-      profitEffect: 0,
-      reportScope: "quotation-only",
+    const combineDateAndTime = (dateStr: string, timeStr: string) => {
+      try {
+        if (!dateStr) return new Date().toISOString();
+        let cleanTime = (timeStr || "").trim();
+        const ampmMatch = cleanTime.match(/^(1[0-2]|0?[1-9]):([0-5][0-9])\s*(AM|PM)$/i);
+        if (ampmMatch) {
+          let hours = parseInt(ampmMatch[1], 10);
+          const minutes = ampmMatch[2];
+          const ampm = ampmMatch[3].toUpperCase();
+          if (ampm === "PM" && hours < 12) hours += 12;
+          if (ampm === "AM" && hours === 12) hours = 0;
+          cleanTime = `${hours.toString().padStart(2, "0")}:${minutes}`;
+        }
+        const hhmmMatch = cleanTime.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])/);
+        if (hhmmMatch) {
+          const hours = hhmmMatch[1].padStart(2, "0");
+          const minutes = hhmmMatch[2];
+          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+        }
+        const fallback = new Date(dateStr + " " + cleanTime);
+        if (!isNaN(fallback.getTime())) return fallback.toISOString();
+        const fallbackDate = new Date(dateStr);
+        if (!isNaN(fallbackDate.getTime())) return fallbackDate.toISOString();
+      } catch (e) {
+        console.error("Error combining date and time:", e);
+      }
+      return new Date().toISOString();
+    };
 
-      note: receiptNote,
-      printNote,
-
+    const payload = {
+      type: "quotation",
+      referenceNo: String(receiptNumber),
+      date: combineDateAndTime(receiptDate, createdTime),
+      accountId: null,
+      cashboxId: null,
+      currencyId: defaultCurrency.id,
+      exchangeRate: rate,
+      totalAmount: grandTotalInBase + totalDiscountAmount,
+      totalDiscount: totalDiscountAmount,
+      netAmount: grandTotalInBase,
+      internalNote: receiptNote,
+      printNote: printNote,
       employeeName: employeeNameFromLogin,
-      employeePhone: employeePhoneFromLogin,
-      showEmployeeInfo: printOptions.showEmployeeInfo,
+      lines: rows.map((row: any) => ({
+        productId: row.productId,
+        qty: toNumber(row.quantity),
+        unitPrice: toNumber(row.price),
+        discountPercent: row.discountType === "percent" ? toNumber(row.discountValue) : 0,
+        discountAmount: getRowDiscount(row),
+        lineTotal: getRowTotal(row),
+        note: row.note || "",
+        currencyId: row.currencyId,
+      })),
+      paidAmounts: [],
+      ledgerEntries: []
+    };
 
-      createdAt: new Date().toISOString(),
-      date: receiptDate,
-      createdTime,
-    } as any);
+    const savePromise = editId
+      ? updateVoucher(Number(editId), payload)
+      : addVoucher(payload);
 
-    setSavedSnapshot(currentSnapshot);
-    setIsLocked(true);
-
-    showToast("پسوڵەی نرخاندن خەزن کرا ✅", "success");
+    savePromise.then((res: any) => {
+      if (res) {
+        setSavedSnapshot(currentSnapshot);
+        if (editId) {
+          showToast("پسوڵەی نرخاندن نوێکرایەوە ✅", "success");
+        } else {
+          setIsLocked(true);
+          showToast("پسوڵەی نرخاندن خەزن کرا ✅ ڕاپۆرتەکان نوێکرانەوە.", "success");
+        }
+      } else {
+        showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
+      }
+    }).catch((err: any) => {
+      console.error("Save error:", err);
+      showToast("هەڵەی نەتۆرک! تکایە دووبارە هەوڵ بدەوە.", "error");
+    });
   }
 
   function handlePrint() {

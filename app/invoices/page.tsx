@@ -78,6 +78,7 @@ function InvoicesRouteContent() {
     "خەرجی": "expense",
     "گەڕانەوەی فرۆشتن": "sales_return",
     "گەڕانەوەی کڕین": "purchase_return",
+    "نرخاندن": "quotation",
     "قەرزی من": "my_debt",
     "قەرزی خەڵک": "people_debt",
     "داشکاندن لە قەرزی من": "my_debt_discount",
@@ -192,7 +193,7 @@ function InvoicesRouteContent() {
         >
           <span>
             {activeItem.label}
-            {editId && (
+            {editId && dbVoucherType === activeTab && (
               <span className="text-sm font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 mr-2">
                 (دەستکاریکردن)
               </span>
@@ -231,7 +232,7 @@ function InvoicesRouteContent() {
                   onClick={() => {
                     setActiveTab(item.value);
                     setIsOpen(false);
-                    if (editId) {
+                    if (editId && dbVoucherType === item.value) {
                       router.push(`/invoices?editId=${editId}&type=${item.value}`);
                     } else {
                       router.push(`/invoices?type=${item.value}`);
