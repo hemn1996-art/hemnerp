@@ -1544,7 +1544,7 @@ const toastCloseBtn: CSSProperties = {
 };
 const pageGrid: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "var(--page-grid-cols-no-items, 1000px 1fr)",
+  gridTemplateColumns: "var(--page-grid-cols, 380px 1fr)",
   gap: 18,
   alignItems: "stretch",
 };
