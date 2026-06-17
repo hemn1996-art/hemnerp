@@ -1,9 +1,189 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "../../components/DateInput";
 import { useStore } from "../../store/store";
+
+interface Option {
+  value: string | number;
+  label: string;
+}
+
+function MultiSelectDropdown({
+  label,
+  options,
+  selectedValues,
+  onChange,
+  searchable = false
+}: {
+  label: string;
+  options: Option[];
+  selectedValues: any[];
+  onChange: (values: any[]) => void;
+  searchable?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm) return options;
+    return options.filter(opt =>
+      opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [options, searchTerm]);
+
+  const toggleOption = (val: any) => {
+    if (selectedValues.includes(val)) {
+      onChange(selectedValues.filter(v => v !== val));
+    } else {
+      onChange([...selectedValues, val]);
+    }
+  };
+
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  const handleRemoveValue = (e: React.MouseEvent, val: any) => {
+    e.stopPropagation();
+    onChange(selectedValues.filter(v => v !== val));
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full text-right" dir="rtl">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[46px] ${
+          isOpen ? "border-[#061f5f] ring-2 ring-[#061f5f]/10" : ""
+        }`}
+      >
+        <label className="select-none pointer-events-none">{label}</label>
+
+        {/* Selected chips list (first child, renders on the right in RTL) */}
+        <div className="flex-1 flex flex-wrap gap-1.5 items-center justify-start overflow-hidden py-1">
+          {selectedValues.length === 0 ? (
+            <span className="text-slate-400 font-bold text-xs pr-1">هەموو</span>
+          ) : (
+            selectedValues.map(val => {
+              const opt = options.find(o => o.value === val);
+              const name = opt ? opt.label : String(val);
+              return (
+                <div
+                  key={val}
+                  className="bg-slate-100 border border-slate-200 text-slate-800 rounded-full flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 text-[11px] font-black hover:bg-slate-200 transition-colors shadow-sm"
+                >
+                  <button
+                    onClick={(e) => handleRemoveValue(e, val)}
+                    className="w-4 h-4 rounded-full bg-slate-300 text-slate-600 hover:bg-slate-400 hover:text-slate-800 flex items-center justify-center text-[10px] font-black border-none cursor-pointer shrink-0 transition-colors"
+                  >
+                    ✕
+                  </button>
+                  <span className="truncate max-w-[120px] select-none">{name}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Action icons (second child, renders on the left in RTL) */}
+        <div className="flex items-center gap-2 text-slate-500 shrink-0 pl-1 border-r border-slate-200 pr-2">
+          {selectedValues.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              className="text-slate-400 hover:text-slate-700 bg-transparent border-none cursor-pointer text-sm font-bold flex items-center justify-center w-5 h-5"
+              title="پاککردنەوەی هەموو"
+            >
+              ✕
+            </button>
+          )}
+          <span className="text-[10px] select-none text-slate-400">
+            {isOpen ? "▲" : "▼"}
+          </span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-[1050] mt-1 right-0 left-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 max-h-72 overflow-y-auto flex flex-col text-right">
+          {searchable && (
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="گەڕان..."
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 mb-2 text-xs font-bold text-slate-700 outline-none focus:border-[#061f5f] focus:ring-1 focus:ring-[#061f5f]/20"
+              dir="rtl"
+              onClick={e => e.stopPropagation()}
+            />
+          )}
+
+          <div className="overflow-y-auto flex-1 space-y-1 pr-1" style={{ maxHeight: "180px" }}>
+            <div
+              onClick={() => {
+                onChange([]);
+                setSearchTerm("");
+              }}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
+                selectedValues.length === 0
+                  ? "bg-slate-100 text-[#061f5f]"
+                  : "text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="select-none">هەموو (کۆی گشتی)</span>
+              <input
+                type="checkbox"
+                checked={selectedValues.length === 0}
+                readOnly
+                className="w-4 h-4 rounded border-slate-300 text-[#061f5f] focus:ring-[#061f5f] accent-[#061f5f] cursor-pointer"
+              />
+            </div>
+
+            {filteredOptions.map(opt => {
+              const isChecked = selectedValues.includes(opt.value);
+              return (
+                <div
+                  key={opt.value}
+                  onClick={() => toggleOption(opt.value)}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
+                    isChecked
+                      ? "bg-slate-100 text-[#061f5f]"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="truncate max-w-[85%] select-none">{opt.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    readOnly
+                    className="w-4 h-4 rounded border-slate-300 text-[#061f5f] focus:ring-[#061f5f] accent-[#061f5f] cursor-pointer"
+                  />
+                </div>
+              );
+            })}
+
+            {filteredOptions.length === 0 && (
+              <div className="text-center text-slate-400 py-3 text-xs select-none">
+                هیچ ئەنجامێک نەدۆزرایەوە
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ProfitReportPage() {
   const router = useRouter();
@@ -18,13 +198,13 @@ export default function ProfitReportPage() {
   } = useStore() as any;
 
   const [selectedCurrencyId, setSelectedCurrencyId] = useState<number>(1);
-  const [accountId, setAccountId] = useState("all");
-  const [accountTypeId, setAccountTypeId] = useState("all");
-  const [brand, setBrand] = useState("all");
-  const [category, setCategory] = useState("all");
-  const [productId, setProductId] = useState("all");
-  const [warehouseId, setWarehouseId] = useState("all");
-  const [createdBy, setCreatedBy] = useState("all");
+  const [accountIds, setAccountIds] = useState<number[]>([]);
+  const [accountTypeIds, setAccountTypeIds] = useState<number[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [productIds, setProductIds] = useState<number[]>([]);
+  const [warehouseIds, setWarehouseIds] = useState<number[]>([]);
+  const [createdBys, setCreatedBys] = useState<string[]>([]);
 
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [brandsList, setBrandsList] = useState<any[]>([]);
@@ -96,15 +276,15 @@ export default function ProfitReportPage() {
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
-    if (accountId !== "all") count++;
-    if (accountTypeId !== "all") count++;
-    if (brand !== "all") count++;
-    if (category !== "all") count++;
-    if (productId !== "all") count++;
-    if (warehouseId !== "all") count++;
-    if (createdBy !== "all") count++;
+    if (accountIds.length > 0) count++;
+    if (accountTypeIds.length > 0) count++;
+    if (brands.length > 0) count++;
+    if (categories.length > 0) count++;
+    if (productIds.length > 0) count++;
+    if (warehouseIds.length > 0) count++;
+    if (createdBys.length > 0) count++;
     return count;
-  }, [accountId, accountTypeId, brand, category, productId, warehouseId, createdBy]);
+  }, [accountIds, accountTypeIds, brands, categories, productIds, warehouseIds, createdBys]);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -114,13 +294,13 @@ export default function ProfitReportPage() {
       if (endDate) params.append("endDate", endDate);
       params.append("currencyId", String(selectedCurrencyId));
 
-      if (accountId !== "all") params.append("accountId", accountId);
-      if (accountTypeId !== "all") params.append("accountTypeId", accountTypeId);
-      if (brand !== "all") params.append("brand", brand);
-      if (category !== "all") params.append("category", category);
-      if (productId !== "all") params.append("productId", productId);
-      if (warehouseId !== "all") params.append("warehouseId", warehouseId);
-      if (createdBy !== "all") params.append("createdBy", createdBy);
+      if (accountIds.length > 0) params.append("accountId", accountIds.join(","));
+      if (accountTypeIds.length > 0) params.append("accountTypeId", accountTypeIds.join(","));
+      if (brands.length > 0) params.append("brand", brands.join(","));
+      if (categories.length > 0) params.append("category", categories.join(","));
+      if (productIds.length > 0) params.append("productId", productIds.join(","));
+      if (warehouseIds.length > 0) params.append("warehouseId", warehouseIds.join(","));
+      if (createdBys.length > 0) params.append("createdBy", createdBys.join(","));
 
       const res = await fetch(`/api/reports/profit?${params.toString()}`);
       const json = await res.json();
@@ -134,16 +314,27 @@ export default function ProfitReportPage() {
 
   useEffect(() => {
     fetchReport();
-  }, [startDate, endDate, selectedCurrencyId, accountId, accountTypeId, brand, category, productId, warehouseId, createdBy]);
+  }, [
+    startDate,
+    endDate,
+    selectedCurrencyId,
+    accountIds.join(","),
+    accountTypeIds.join(","),
+    brands.join(","),
+    categories.join(","),
+    productIds.join(","),
+    warehouseIds.join(","),
+    createdBys.join(",")
+  ]);
 
   const handleResetFilters = () => {
-    setAccountId("all");
-    setAccountTypeId("all");
-    setBrand("all");
-    setCategory("all");
-    setProductId("all");
-    setWarehouseId("all");
-    setCreatedBy("all");
+    setAccountIds([]);
+    setAccountTypeIds([]);
+    setBrands([]);
+    setCategories([]);
+    setProductIds([]);
+    setWarehouseIds([]);
+    setCreatedBys([]);
     
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
@@ -415,20 +606,20 @@ export default function ProfitReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">زانیاری هەژمار <span>👤</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>جۆری هەژمار</label>
-                    <select value={accountTypeId} onChange={e => setAccountTypeId(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {accountTypes?.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="mui-outline">
-                    <label>هەژمار</label>
-                    <select value={accountId} onChange={e => setAccountId(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {accounts?.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
-                  </div>
+                  <MultiSelectDropdown
+                    label="جۆری هەژمار"
+                    options={accountTypes?.map((a: any) => ({ value: a.id, label: a.name })) || []}
+                    selectedValues={accountTypeIds}
+                    onChange={setAccountTypeIds}
+                    searchable
+                  />
+                  <MultiSelectDropdown
+                    label="هەژمار"
+                    options={accounts?.map((a: any) => ({ value: a.id, label: a.name })) || []}
+                    selectedValues={accountIds}
+                    onChange={setAccountIds}
+                    searchable
+                  />
                 </div>
               </div>
 
@@ -436,30 +627,28 @@ export default function ProfitReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">فلتەری کەرەستە <span>📦</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>براند</label>
-                    <select value={brand} onChange={e => setBrand(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {brandsList.map((b: any) => (
-                        <option key={b.id} value={b.name}>{b.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mui-outline">
-                    <label>کاتێگۆری</label>
-                    <select value={category} onChange={e => setCategory(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {categoriesList.map((c: any) => (
-                        <option key={c.id} value={c.name}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mui-outline md:col-span-2">
-                    <label>کەرەستە</label>
-                    <select value={productId} onChange={e => setProductId(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {products?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                  <MultiSelectDropdown
+                    label="براند"
+                    options={brandsList.map((b: any) => ({ value: b.name, label: b.name }))}
+                    selectedValues={brands}
+                    onChange={setBrands}
+                    searchable
+                  />
+                  <MultiSelectDropdown
+                    label="کاتێگۆری"
+                    options={categoriesList.map((c: any) => ({ value: c.name, label: c.name }))}
+                    selectedValues={categories}
+                    onChange={setCategories}
+                    searchable
+                  />
+                  <div className="md:col-span-2">
+                    <MultiSelectDropdown
+                      label="کەرەستە"
+                      options={products?.map((p: any) => ({ value: p.id, label: p.name })) || []}
+                      selectedValues={productIds}
+                      onChange={setProductIds}
+                      searchable
+                    />
                   </div>
                 </div>
               </div>
@@ -468,20 +657,20 @@ export default function ProfitReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">فلتەرە لاوەکییەکان <span>⚙️</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>کۆگا</label>
-                    <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {warehouses?.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="mui-outline">
-                    <label>له‌ لایه‌ن</label>
-                    <select value={createdBy} onChange={e => setCreatedBy(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {employeeOptions.map((emp: string) => <option key={emp} value={emp}>{emp}</option>)}
-                    </select>
-                  </div>
+                  <MultiSelectDropdown
+                    label="کۆگا"
+                    options={warehouses?.map((w: any) => ({ value: w.id, label: w.name })) || []}
+                    selectedValues={warehouseIds}
+                    onChange={setWarehouseIds}
+                    searchable
+                  />
+                  <MultiSelectDropdown
+                    label="له‌ لایه‌ن"
+                    options={employeeOptions.map((emp: string) => ({ value: emp, label: emp }))}
+                    selectedValues={createdBys}
+                    onChange={setCreatedBys}
+                    searchable
+                  />
                 </div>
               </div>
 

@@ -9,14 +9,24 @@ export async function GET(request: Request) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     
-    // Parse filters
-    const accountId = searchParams.get("accountId") && searchParams.get("accountId") !== "all" ? Number(searchParams.get("accountId")) : null;
-    const accountTypeId = searchParams.get("accountTypeId") && searchParams.get("accountTypeId") !== "all" ? Number(searchParams.get("accountTypeId")) : null;
-    const brand = searchParams.get("brand") && searchParams.get("brand") !== "all" ? searchParams.get("brand") : null;
-    const category = searchParams.get("category") && searchParams.get("category") !== "all" ? searchParams.get("category") : null;
-    const productId = searchParams.get("productId") && searchParams.get("productId") !== "all" ? Number(searchParams.get("productId")) : null;
-    const warehouseId = searchParams.get("warehouseId") && searchParams.get("warehouseId") !== "all" ? Number(searchParams.get("warehouseId")) : null;
-    const createdBy = searchParams.get("createdBy") && searchParams.get("createdBy") !== "all" ? searchParams.get("createdBy") : null;
+    // Parse filters as comma-separated lists
+    const parseCommaSeparatedNumbers = (val: string | null): number[] | null => {
+      if (!val || val === "all") return null;
+      return val.split(",").map(v => Number(v.trim())).filter(n => !isNaN(n));
+    };
+
+    const parseCommaSeparatedStrings = (val: string | null): string[] | null => {
+      if (!val || val === "all") return null;
+      return val.split(",").map(v => v.trim()).filter(Boolean);
+    };
+
+    const accountIds = parseCommaSeparatedNumbers(searchParams.get("accountId"));
+    const accountTypeIds = parseCommaSeparatedNumbers(searchParams.get("accountTypeId"));
+    const brands = parseCommaSeparatedStrings(searchParams.get("brand"));
+    const categories = parseCommaSeparatedStrings(searchParams.get("category"));
+    const productIds = parseCommaSeparatedNumbers(searchParams.get("productId"));
+    const warehouseIds = parseCommaSeparatedNumbers(searchParams.get("warehouseId"));
+    const createdBys = parseCommaSeparatedStrings(searchParams.get("createdBy"));
 
     const dateFilter: any = {};
     if (startDate) {
@@ -110,9 +120,9 @@ export async function GET(request: Request) {
 
     const matchesProductFilters = (prodId: number) => {
       const prod = productMap.get(prodId);
-      if (productId && prodId !== productId) return false;
-      if (category && (!prod || prod.category !== category)) return false;
-      if (brand && (!prod || prod.brand !== brand)) return false;
+      if (productIds && !productIds.includes(prodId)) return false;
+      if (categories && (!prod || !prod.category || !categories.includes(prod.category))) return false;
+      if (brands && (!prod || !prod.brand || !brands.includes(prod.brand))) return false;
       return true;
     };
 
@@ -127,7 +137,7 @@ export async function GET(request: Request) {
     // Calculate the latest purchase cost for every product
     const productCosts: Record<number, number> = {};
     inventoryTrans.forEach((t) => {
-      const matchesWarehouse = !warehouseId || t.warehouseId === warehouseId;
+      const matchesWarehouse = !warehouseIds || warehouseIds.includes(t.warehouseId);
       const matchesProduct = matchesProductFilters(t.productId);
       
       if (matchesWarehouse && matchesProduct && t.qtyChange > 0 && t.unitCost > 0) {
@@ -137,17 +147,17 @@ export async function GET(request: Request) {
 
     vouchers.forEach((v: any) => {
       // Apply voucher-level filters
-      if (createdBy && v.employeeName !== createdBy) return;
-      if (accountId && v.accountId !== accountId) return;
-      if (accountTypeId && (!v.account || v.account.accountTypeId !== accountTypeId)) return;
+      if (createdBys && !createdBys.includes(v.employeeName)) return;
+      if (accountIds && !accountIds.includes(v.accountId)) return;
+      if (accountTypeIds && (!v.account || !accountTypeIds.includes(v.account.accountTypeId))) return;
 
       const amount = convertVoucherToTarget(v.netAmount, v.currencyId || usdId, v.exchangeRate);
 
       if (v.type === "sales") {
         let voucherSalesAmount = 0;
         let cogs = 0;
-        const hasProductFilter = productId || category || brand;
-        const hasWarehouseFilter = warehouseId !== null;
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
+        const hasWarehouseFilter = warehouseIds !== null;
 
         if (hasProductFilter || hasWarehouseFilter) {
           const discountFactor = v.totalAmount > 0 ? (v.netAmount / v.totalAmount) : 1;
@@ -156,7 +166,7 @@ export async function GET(request: Request) {
             v.lines.forEach((line: any) => {
               if (matchesProductFilters(line.productId)) {
                 if (hasWarehouseFilter) {
-                  const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && tx.warehouseId === warehouseId);
+                  const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && warehouseIds!.includes(tx.warehouseId));
                   if (!hasTxInWarehouse) return;
                 }
                 voucherSalesAmount += line.lineTotal * discountFactor;
@@ -167,7 +177,7 @@ export async function GET(request: Request) {
           if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
             v.inventoryTransactions.forEach((tx: any) => {
               if (matchesProductFilters(tx.productId)) {
-                if (!hasWarehouseFilter || tx.warehouseId === warehouseId) {
+                if (!hasWarehouseFilter || warehouseIds!.includes(tx.warehouseId)) {
                   cogs += Math.abs(tx.qtyChange) * tx.unitCost;
                 }
               }
@@ -176,7 +186,7 @@ export async function GET(request: Request) {
             v.lines.forEach((line: any) => {
               if (matchesProductFilters(line.productId)) {
                 if (hasWarehouseFilter) {
-                  const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && tx.warehouseId === warehouseId);
+                  const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && warehouseIds!.includes(tx.warehouseId));
                   if (!hasTxInWarehouse) return;
                 }
                 const cost = productCosts[line.productId] || 0;
@@ -204,8 +214,8 @@ export async function GET(request: Request) {
       } else if (v.type === "sales_return") {
         let voucherSalesAmount = 0;
         let cogs = 0;
-        const hasProductFilter = productId || category || brand;
-        const hasWarehouseFilter = warehouseId !== null;
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
+        const hasWarehouseFilter = warehouseIds !== null;
 
         if (hasProductFilter || hasWarehouseFilter) {
           const discountFactor = v.totalAmount > 0 ? (v.netAmount / v.totalAmount) : 1;
@@ -214,7 +224,7 @@ export async function GET(request: Request) {
             v.lines.forEach((line: any) => {
               if (matchesProductFilters(line.productId)) {
                 if (hasWarehouseFilter) {
-                  const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && tx.warehouseId === warehouseId);
+                  const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && warehouseIds!.includes(tx.warehouseId));
                   if (!hasTxInWarehouse) return;
                 }
                 voucherSalesAmount += line.lineTotal * discountFactor;
@@ -225,7 +235,7 @@ export async function GET(request: Request) {
           if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
             v.inventoryTransactions.forEach((tx: any) => {
               if (matchesProductFilters(tx.productId)) {
-                if (!hasWarehouseFilter || tx.warehouseId === warehouseId) {
+                if (!hasWarehouseFilter || warehouseIds!.includes(tx.warehouseId)) {
                   cogs += Math.abs(tx.qtyChange) * tx.unitCost;
                 }
               }
@@ -234,7 +244,7 @@ export async function GET(request: Request) {
             v.lines.forEach((line: any) => {
               if (matchesProductFilters(line.productId)) {
                 if (hasWarehouseFilter) {
-                  const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && tx.warehouseId === warehouseId);
+                  const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && warehouseIds!.includes(tx.warehouseId));
                   if (!hasTxInWarehouse) return;
                 }
                 const cost = productCosts[line.productId] || 0;
@@ -260,19 +270,19 @@ export async function GET(request: Request) {
           totalCOGS -= convertToTarget(cogs, usdId);
         }
       } else if (v.type === "my_debt_discount") {
-        const hasProductFilter = productId || category || brand;
-        const hasWarehouseFilter = warehouseId !== null;
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
+        const hasWarehouseFilter = warehouseIds !== null;
         if (!hasProductFilter && !hasWarehouseFilter) {
           totalMyDebtDiscount += amount;
         }
       } else if (v.type === "people_debt_discount") {
-        const hasProductFilter = productId || category || brand;
-        const hasWarehouseFilter = warehouseId !== null;
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
+        const hasWarehouseFilter = warehouseIds !== null;
         if (!hasProductFilter && !hasWarehouseFilter) {
           totalPeopleDebtDiscount += amount;
         }
       } else if (v.type === "expense") {
-        if (productId || category || brand) {
+        if (productIds !== null || categories !== null || brands !== null) {
           let matchedAmount = 0;
           if (v.lines) {
             const discountFactor = v.totalAmount > 0 ? (v.netAmount / v.totalAmount) : 1;
@@ -287,20 +297,20 @@ export async function GET(request: Request) {
           totalExpenses += amount;
         }
       } else if (v.type === "gift") {
-        const hasProductFilter = productId || category || brand;
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
         if (!hasProductFilter) {
           totalGifts += amount;
         }
       } else if (v.type === "warehouse_damage" || v.type === "خەسارەی کۆگا") {
         let losses = 0;
-        const hasProductFilter = productId || category || brand;
-        const hasWarehouseFilter = warehouseId !== null;
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
+        const hasWarehouseFilter = warehouseIds !== null;
         
         if (hasProductFilter || hasWarehouseFilter) {
           if (v.inventoryTransactions) {
             v.inventoryTransactions.forEach((tx: any) => {
               if (matchesProductFilters(tx.productId)) {
-                if (!hasWarehouseFilter || tx.warehouseId === warehouseId) {
+                if (!hasWarehouseFilter || warehouseIds!.includes(tx.warehouseId)) {
                   losses += Math.abs(tx.qtyChange) * tx.unitCost;
                 }
               }
@@ -340,8 +350,8 @@ export async function GET(request: Request) {
       if (acc.isShareholder) return; // Exclude shareholder accounts
 
       // Apply account filters
-      if (accountId && agg.accountId !== accountId) return;
-      if (accountTypeId && acc.accountTypeId !== accountTypeId) return;
+      if (accountIds && !accountIds.includes(agg.accountId)) return;
+      if (accountTypeIds && !accountTypeIds.includes(acc.accountTypeId)) return;
 
       const cur = currencies.find(c => c.id === agg.currencyId);
       const rate = cur ? cur.rate : 1.0;
@@ -362,7 +372,7 @@ export async function GET(request: Request) {
 
     const productStock: Record<number, number> = {};
     inventoryTrans.forEach(t => {
-      const matchesWarehouse = !warehouseId || t.warehouseId === warehouseId;
+      const matchesWarehouse = !warehouseIds || warehouseIds.includes(t.warehouseId);
       const matchesProduct = matchesProductFilters(t.productId);
       if (matchesWarehouse && matchesProduct) {
         productStock[t.productId] = (productStock[t.productId] || 0) + t.qtyChange * t.unitCost;
