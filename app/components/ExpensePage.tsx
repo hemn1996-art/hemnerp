@@ -582,14 +582,14 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     );
   }
 
-  function handleNewReceipt() {
+  const handleNewReceipt = () => {
     if (hasUnsavedData() && !isSaved && !isLocked) {
       setShowNewReceiptConfirm(true);
       return;
     }
 
     resetReceipt();
-  }
+  };
 
   function handleSave() {
     if (isLocked) {
