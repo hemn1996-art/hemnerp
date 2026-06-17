@@ -148,12 +148,16 @@ function InvoiceReportContent() {
 
   // Date Filters (default: 6 months ago → today)
   const [startDate, setStartDate] = useState(() => {
+    const s = searchParams.get("startDate");
+    if (s) return s;
     const d = new Date();
     d.setMonth(d.getMonth() - 6);
     d.setDate(1);
     return d.toISOString().slice(0, 10);
   });
   const [endDate, setEndDate] = useState(() => {
+    const e = searchParams.get("endDate");
+    if (e) return e;
     return new Date().toISOString().slice(0, 10);
   });
 
@@ -164,7 +168,7 @@ function InvoiceReportContent() {
   const searchParams = useSearchParams();
   const [filterInvoiceTypes, setFilterInvoiceTypes] = useState<string[]>(() => {
     const t = searchParams.get("type");
-    return t ? [t] : [];
+    return t ? t.split(",") : [];
   });
   const [filterPaymentStatus, setFilterPaymentStatus] = useState("all");
   const [filterStatus, setFilterStatus] = useState("active"); // active / all

@@ -355,9 +355,35 @@ export default function ProfitReportPage() {
   };
 
   const handleCardClick = (type: string) => {
-    if (type === "sales") {
-      router.push("/reports/invoices?type=sales");
+    let typeParam = "";
+    switch (type) {
+      case "sales":
+      case "cogs":
+      case "sales_profit":
+        typeParam = "sales,sales_return";
+        break;
+      case "my_debt_discount":
+        typeParam = "my_debt_discount";
+        break;
+      case "expenses":
+        typeParam = "expense,warehouse_damage,خەسارەی کۆگا";
+        break;
+      case "people_debt_discount":
+        typeParam = "people_debt_discount";
+        break;
+      case "final_profit":
+        typeParam = "sales,sales_return,my_debt_discount,people_debt_discount,expense,warehouse_damage,خەسارەی کۆگا";
+        break;
+      default:
+        return;
     }
+
+    const params = new URLSearchParams();
+    params.append("type", typeParam);
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+
+    router.push(`/reports/invoices?${params.toString()}`);
   };
 
   const formatCur = (num: number) => {
@@ -493,7 +519,10 @@ export default function ProfitReportPage() {
             </div>
 
             {/* دەسمایە - COGS */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-slate-300 transition-all">
+            <div
+              onClick={() => handleCardClick("cogs")}
+              className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-slate-300 transition-all cursor-pointer"
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-slate-800 font-black text-lg m-0">دەسمایە</h3>
                 <div className="w-11 h-11 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center text-xl shadow-inner">📦</div>
@@ -503,7 +532,10 @@ export default function ProfitReportPage() {
             </div>
 
             {/* قازانجی فرۆش - Sales Profit */}
-            <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all">
+            <div
+              onClick={() => handleCardClick("sales_profit")}
+              className="bg-emerald-50 p-5 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all cursor-pointer"
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-emerald-900 font-black text-lg m-0">قازانجی فرۆش</h3>
                 <div className="w-11 h-11 bg-emerald-200 text-emerald-700 rounded-xl flex items-center justify-center text-xl shadow-inner">📈</div>
@@ -513,7 +545,10 @@ export default function ProfitReportPage() {
             </div>
 
             {/* داشکاندن لە قەرزی من - My Debt Discount */}
-            <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all">
+            <div
+              onClick={() => handleCardClick("my_debt_discount")}
+              className="bg-emerald-50 p-5 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all cursor-pointer"
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-emerald-900 font-black text-lg m-0">داشکاندن لە قەرزی من</h3>
                 <div className="w-11 h-11 bg-emerald-200 text-emerald-700 rounded-xl flex items-center justify-center text-xl shadow-inner">💲</div>
@@ -527,7 +562,10 @@ export default function ProfitReportPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
 
             {/* خەرجی - Expenses */}
-            <div className="bg-rose-50 p-5 rounded-2xl border border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-400 transition-all">
+            <div
+              onClick={() => handleCardClick("expenses")}
+              className="bg-rose-50 p-5 rounded-2xl border border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-400 transition-all cursor-pointer"
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-rose-900 font-black text-lg m-0">خەرجی</h3>
                 <div className="w-11 h-11 bg-rose-200 text-rose-700 rounded-xl flex items-center justify-center text-xl shadow-inner">💸</div>
@@ -537,7 +575,10 @@ export default function ProfitReportPage() {
             </div>
 
             {/* داشکاندن لە قەرزی خەڵک - People Debt Discount */}
-            <div className="bg-rose-50 p-5 rounded-2xl border border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-400 transition-all">
+            <div
+              onClick={() => handleCardClick("people_debt_discount")}
+              className="bg-rose-50 p-5 rounded-2xl border border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-400 transition-all cursor-pointer"
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-rose-900 font-black text-lg m-0">داشکاندن لە قەرزی خەڵک</h3>
                 <div className="w-11 h-11 bg-rose-200 text-rose-700 rounded-xl flex items-center justify-center text-xl shadow-inner">✂️</div>
@@ -547,7 +588,10 @@ export default function ProfitReportPage() {
             </div>
 
             {/* قازانجی کۆتایی - Final Profit */}
-            <div className={`p-5 rounded-2xl border shadow-sm hover:shadow-lg transition-all ${data.finalProfit >= 0 ? "bg-emerald-50 border-emerald-200 hover:border-emerald-400" : "bg-rose-50 border-rose-200 hover:border-rose-400"}`}>
+            <div
+              onClick={() => handleCardClick("final_profit")}
+              className={`p-5 rounded-2xl border shadow-sm hover:shadow-lg transition-all cursor-pointer ${data.finalProfit >= 0 ? "bg-emerald-50 border-emerald-200 hover:border-emerald-400" : "bg-rose-50 border-rose-200 hover:border-rose-400"}`}
+            >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-slate-800 font-black text-lg m-0">قازانجی کۆتایی</h3>
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shadow-inner ${data.finalProfit >= 0 ? "bg-emerald-200 text-emerald-700" : "bg-rose-200 text-rose-700"}`}>{data.finalProfit >= 0 ? "📈" : "📉"}</div>
