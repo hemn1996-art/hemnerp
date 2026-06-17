@@ -109,6 +109,7 @@ export async function GET(request: Request) {
     const warehouseValue = totalWarehouseValueInUsd * targetRate;
 
     // 3. Accounts receivable / payable
+    let totalShareholderDeposits = 0;
     let totalShareholderWithdrawals = 0;
     const shareholderAccounts = await prisma.account.findMany({
       where: { isShareholder: true },
@@ -124,6 +125,10 @@ export async function GET(request: Request) {
       const netConverted = convertToTarget(netRaw, agg.currencyId);
       if (shareholderIds.has(agg.accountId)) {
         shareholderBalances[agg.accountId] = (shareholderBalances[agg.accountId] || 0) + netConverted;
+        const creditConverted = convertToTarget(agg._sum.credit || 0, agg.currencyId);
+        const debitConverted = convertToTarget(agg._sum.debit || 0, agg.currencyId);
+        totalShareholderDeposits += creditConverted;
+        totalShareholderWithdrawals += debitConverted;
       } else {
         accountNetBalances[agg.accountId] = (accountNetBalances[agg.accountId] || 0) + netConverted;
       }
@@ -211,8 +216,9 @@ export async function GET(request: Request) {
     const annualProfit = salesProfit + totalMyDebtDiscount - totalExpenses - totalGifts - totalPeopleDebtDiscount - totalLosses;
 
     const currentLiabilities = accountsPayable;
-    const withdrawals = totalShareholderWithdrawals;
-    const capital = totalAssets - currentLiabilities - annualProfit + withdrawals;
+    const withdrawals = 0;
+    const capital = totalShareholderDeposits - totalShareholderWithdrawals;
+    const startingCapital = 0;
     const totalLiabilitiesEquity = currentLiabilities + capital + annualProfit + withdrawals;
 
     return NextResponse.json({
@@ -230,6 +236,7 @@ export async function GET(request: Request) {
         currentLiabilities,
         myDebts: accountsPayable,
         capital,
+        startingCapital,
         annualProfit,
         withdrawals,
         total: totalLiabilitiesEquity,

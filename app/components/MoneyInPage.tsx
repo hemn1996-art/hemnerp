@@ -922,6 +922,16 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             applyAccountBalanceReduction(action);
             applyCashboxIncrease();
             setIsLocked(true);
+          } else {
+            // Refetch to sync historicalBalanceBefore and ledgerEntries
+            fetch(`/api/vouchers/${editId}`)
+              .then((r) => r.json())
+              .then((updatedVoucher) => {
+                if (updatedVoucher) {
+                  setOriginalVoucher(updatedVoucher);
+                }
+              })
+              .catch((err) => console.error("Error refetching updated voucher:", err));
           }
           setSavedSnapshot(currentSnapshot);
           showToast(

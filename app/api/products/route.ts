@@ -80,11 +80,11 @@ export async function POST(request: Request) {
 
     const product = await prisma.product.create({
       data: {
-        name: data.name,
-        code: data.code,
-        category: data.category,
-        brand: data.brand,
-        packaging: data.packaging,
+        name: data.name?.trim(),
+        code: data.code?.trim() || null,
+        category: data.category?.trim() || null,
+        brand: data.brand?.trim() || null,
+        packaging: data.packaging?.trim() || null,
         isMultiBatch: data.isMultiBatch || false,
         isExpense: data.isExpense || false,
         isService: data.isService || false,
@@ -109,11 +109,11 @@ export async function PUT(request: Request) {
     const updatedProduct = await prisma.product.update({
       where: { id: Number(data.id) },
       data: {
-        name: data.name,
-        code: data.code,
-        category: data.category,
-        brand: data.brand,
-        packaging: data.packaging,
+        name: data.name?.trim(),
+        code: data.code?.trim() || null,
+        category: data.category?.trim() || null,
+        brand: data.brand?.trim() || null,
+        packaging: data.packaging?.trim() || null,
         isMultiBatch: data.isMultiBatch,
         isExpense: data.isExpense,
         isService: data.isService,

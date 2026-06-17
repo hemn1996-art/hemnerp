@@ -473,43 +473,41 @@ function AddItemForm({
       return;
     }
 
-    if (!code.trim()) {
-      showAlert("warning", "ئاگاداری", "کۆدی کەرەستە پڕ بکەرەوە");
-      return;
-    }
-
-    if (!category) {
-      showAlert("warning", "ئاگاداری", "تکایە کاتێگۆری دیاری بکە");
-      return;
-    }
-
-    if (!brand) {
-      showAlert("warning", "ئاگاداری", "تکایە براند دیاری بکە");
-      return;
-    }
-
-    const firstPackage = packages[0];
-    if (!firstPackage || !firstPackage.name) {
-      showAlert("warning", "ئاگاداری", "تکایە پێچانەوە دیاری بکە");
-      return;
-    }
-
-    if (!firstPackage.quantity || Number(firstPackage.quantity) <= 0) {
-      showAlert("warning", "ئاگاداری", "تکایە ژمارەی ناو پێچانەوە بە دروستی بنووسە");
-      return;
-    }
-
     const isExpense = itemKind === "expense";
     const isService = itemKind === "service";
     const isInventory = itemKind === "inventory";
 
+    // For non-expense items, category, brand, and packaging are mandatory.
+    if (!isExpense) {
+      if (!category) {
+        showAlert("warning", "ئاگاداری", "تکایە کاتێگۆری دیاری بکە");
+        return;
+      }
+
+      if (!brand) {
+        showAlert("warning", "ئاگاداری", "تکایە براند دیاری بکە");
+        return;
+      }
+
+      const firstPackage = packages[0];
+      if (!firstPackage || !firstPackage.name) {
+        showAlert("warning", "ئاگاداری", "تکایە پێچانەوە دیاری بکە");
+        return;
+      }
+
+      if (!firstPackage.quantity || Number(firstPackage.quantity) <= 0) {
+        showAlert("warning", "ئاگاداری", "تکایە ژمارەی ناو پێچانەوە بە دروستی بنووسە");
+        return;
+      }
+    }
+
     const productData = {
       id: productToEdit?.id,
       name: name.trim(),
-      code: code.trim() || undefined,
-      category,
-      brand,
-      packaging: firstPackage.name,
+      code: code.trim() || null,
+      category: isExpense ? null : category,
+      brand: isExpense ? null : brand,
+      packaging: isExpense ? null : (packages[0]?.name || null),
       isMultiBatch: isInventory ? isMultiBatch : false,
       isExpense,
       isService,
@@ -574,7 +572,7 @@ function AddItemForm({
         </div>
 
         <div style={grid3}>
-          <Field label="* کۆد">
+          <Field label="کۆد">
             <input
               value={code}
               onChange={(e) => setCode(e.target.value)}
@@ -592,7 +590,7 @@ function AddItemForm({
             />
           </Field>
 
-          <Field label="* براند">
+          <Field label={itemKind === "expense" ? "براند" : "* براند"}>
             <select
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
@@ -609,7 +607,7 @@ function AddItemForm({
         </div>
 
         <div style={grid3}>
-          <Field label="* کاتێگۆری">
+          <Field label={itemKind === "expense" ? "کاتێگۆری" : "* کاتێگۆری"}>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -673,140 +671,144 @@ function AddItemForm({
         </div>
       </Section>
 
-      <Section title="نرخی فرۆشتن" icon="$">
-        {salePrices.map((row, index) => (
-          <div
-            key={index}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr auto",
-              gap: 12,
-              alignItems: "end",
-              marginBottom: 12,
-            }}
-          >
-            <Field label="دراو">
-              <select
-                value={row.currencyId}
-                onChange={(e) =>
-                  updateSalePrice(index, "currencyId", e.target.value)
-                }
-                style={input}
-              >
-                <option value="">دراو دیاری بکە...</option>
-                {currencies
-                  .filter((x: any) => x.isActive !== false)
-                  .map((currency: any) => (
-                    <option key={currency.id} value={currency.id}>
-                      {currency.name} - {currency.symbol}
+      {itemKind !== "expense" && (
+        <Section title="نرخی فرۆشتن" icon="$">
+          {salePrices.map((row, index) => (
+            <div
+              key={index}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr auto",
+                gap: 12,
+                alignItems: "end",
+                marginBottom: 12,
+              }}
+            >
+              <Field label="دراو">
+                <select
+                  value={row.currencyId}
+                  onChange={(e) =>
+                    updateSalePrice(index, "currencyId", e.target.value)
+                  }
+                  style={input}
+                >
+                  <option value="">دراو دیاری بکە...</option>
+                  {currencies
+                    .filter((x: any) => x.isActive !== false)
+                    .map((currency: any) => (
+                      <option key={currency.id} value={currency.id}>
+                        {currency.name} - {currency.symbol}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+
+              <Field label="جۆری نرخ">
+                <select
+                  value={row.priceType}
+                  onChange={(e) =>
+                    updateSalePrice(index, "priceType", e.target.value)
+                  }
+                  style={input}
+                >
+                  <option value="">جۆری نرخ دیاری بکە...</option>
+                  {priceTypes.map((pt) => (
+                    <option key={pt.id} value={pt.name}>
+                      {pt.name}
                     </option>
                   ))}
-              </select>
-            </Field>
+                </select>
+              </Field>
 
-            <Field label="جۆری نرخ">
-              <select
-                value={row.priceType}
-                onChange={(e) =>
-                  updateSalePrice(index, "priceType", e.target.value)
-                }
-                style={input}
+              <Field label="نرخ">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  lang="en"
+                  dir="ltr"
+                  value={row.amount}
+                  onChange={(e) =>
+                    updateSalePrice(index, "amount", e.target.value)
+                  }
+                  style={numericInput}
+                  placeholder="170"
+                />
+              </Field>
+
+              <button
+                onClick={() => removeSalePriceRow(index)}
+                style={{ ...backBtn, color: "#b91c1c", height: 45 }}
+                disabled={salePrices.length === 1}
               >
-                <option value="">جۆری نرخ دیاری بکە...</option>
-                {priceTypes.map((pt) => (
-                  <option key={pt.id} value={pt.name}>
-                    {pt.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                لابردن
+              </button>
+            </div>
+          ))}
 
-            <Field label="نرخ">
-              <input
-                type="text"
-                inputMode="decimal"
-                lang="en"
-                dir="ltr"
-                value={row.amount}
-                onChange={(e) =>
-                  updateSalePrice(index, "amount", e.target.value)
-                }
-                style={numericInput}
-                placeholder="170"
-              />
-            </Field>
+          <button onClick={addSalePriceRow} style={outlineBtn}>
+            + زیادکردنی نرخی تر
+          </button>
+        </Section>
+      )}
 
-            <button
-              onClick={() => removeSalePriceRow(index)}
-              style={{ ...backBtn, color: "#b91c1c", height: 45 }}
-              disabled={salePrices.length === 1}
+      {itemKind !== "expense" && (
+        <Section title="پێچانەوە" icon="📦">
+          {packages.map((row, index) => (
+            <div
+              key={index}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr auto",
+                gap: 12,
+                alignItems: "end",
+                marginBottom: 12,
+              }}
             >
-              لابردن
-            </button>
-          </div>
-        ))}
+              <Field label="* پێچانەوە">
+                <select
+                  value={row.name}
+                  onChange={(e) => updatePackage(index, "name", e.target.value)}
+                  style={input}
+                >
+                  <option value="">پێچانەوە دیاری بکە...</option>
+                  {packagings.map((pkg) => (
+                    <option key={pkg.id} value={pkg.name}>
+                      {pkg.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-        <button onClick={addSalePriceRow} style={outlineBtn}>
-          + زیادکردنی نرخی تر
-        </button>
-      </Section>
+              <Field label="* ژمارەی ناو پێچانەوە">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  lang="en"
+                  dir="ltr"
+                  value={row.quantity}
+                  onChange={(e) =>
+                    updatePackage(index, "quantity", e.target.value)
+                  }
+                  style={numericInput}
+                  placeholder="ژمارە بنووسە"
+                />
+              </Field>
 
-      <Section title="پێچانەوە" icon="📦">
-        {packages.map((row, index) => (
-          <div
-            key={index}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr auto",
-              gap: 12,
-              alignItems: "end",
-              marginBottom: 12,
-            }}
-          >
-            <Field label="* پێچانەوە">
-              <select
-                value={row.name}
-                onChange={(e) => updatePackage(index, "name", e.target.value)}
-                style={input}
+              <button
+                onClick={() => removePackageRow(index)}
+                style={{ ...backBtn, color: "#b91c1c", height: 45 }}
+                disabled={packages.length === 1}
               >
-                <option value="">پێچانەوە دیاری بکە...</option>
-                {packagings.map((pkg) => (
-                  <option key={pkg.id} value={pkg.name}>
-                    {pkg.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+                لابردن
+              </button>
+            </div>
+          ))}
 
-            <Field label="* ژمارەی ناو پێچانەوە">
-              <input
-                type="text"
-                inputMode="numeric"
-                lang="en"
-                dir="ltr"
-                value={row.quantity}
-                onChange={(e) =>
-                  updatePackage(index, "quantity", e.target.value)
-                }
-                style={numericInput}
-                placeholder="ژمارە بنووسە"
-              />
-            </Field>
-
-            <button
-              onClick={() => removePackageRow(index)}
-              style={{ ...backBtn, color: "#b91c1c", height: 45 }}
-              disabled={packages.length === 1}
-            >
-              لابردن
-            </button>
-          </div>
-        ))}
-
-        <button onClick={addPackageRow} style={outlineBtn}>
-          + زیادکردنی پێچانەوەی تر
-        </button>
-      </Section>
+          <button onClick={addPackageRow} style={outlineBtn}>
+            + زیادکردنی پێچانەوەی تر
+          </button>
+        </Section>
+      )}
 
       {itemKind === "inventory" && (
         <Section title="ڕێکخستنەکانی کۆگا و ئاگاداری" icon="▥">

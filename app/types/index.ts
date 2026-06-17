@@ -62,7 +62,7 @@ export interface ProductPackage {
 export interface Product {
   id: number;
   name: string;
-  code: string;
+  code: string | null;
 
   // بۆ compatibility ـی کۆدەکانی ئێستا
   // کۆست لە بەشی کەرەستە داغڵ ناکرێت؛ لە پسوڵەی کڕین دیاری دەکرێت

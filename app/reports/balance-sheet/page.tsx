@@ -167,7 +167,7 @@ export default function BalanceSheetPage() {
             <div className="flex items-center justify-between p-3 pr-8 border-b border-slate-100 hover:bg-slate-50 transition">
               <span className="text-sm font-bold text-slate-800">{fmt(data.liabilitiesEquity.capital)}</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm text-slate-500">سەرمایە</span>
+                <span className="text-sm text-slate-500">سەرمایەی خاوەن پشکەکان</span>
                 <span className="text-slate-400 text-xs">💰</span>
               </div>
             </div>
