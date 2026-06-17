@@ -10,11 +10,16 @@ export async function GET(request: Request) {
     const type = searchParams.get("type");
     const accountId = searchParams.get("accountId");
     const cashboxId = searchParams.get("cashboxId");
+    const includeDeleted = searchParams.get("includeDeleted");
 
     const where: any = {};
     if (type) where.type = type;
     if (accountId) where.accountId = Number(accountId);
     if (cashboxId) where.cashboxId = Number(cashboxId);
+    
+    if (includeDeleted !== "true") {
+      where.isDeleted = false;
+    }
 
     const vouchers = await prisma.voucher.findMany({
       where,

@@ -557,14 +557,17 @@ export async function DELETE(
         }
       }
 
-      // 3. Delete related records
+      // 3. Delete related records to reverse balances/actions but keep lines for history
       await tx.voucherPaidAmount.deleteMany({ where: { voucherId } });
-      await tx.voucherLine.deleteMany({ where: { voucherId } });
       await tx.voucherExpense.deleteMany({ where: { voucherId } });
       await tx.ledgerEntry.deleteMany({ where: { voucherId } });
+      await tx.inventoryTransaction.deleteMany({ where: { voucherId } });
 
-      // 4. Delete the main Voucher record
-      await tx.voucher.delete({ where: { id: voucherId } });
+      // 4. Soft-delete the main Voucher record by setting isDeleted to true
+      await tx.voucher.update({
+        where: { id: voucherId },
+        data: { isDeleted: true },
+      });
     });
 
     return new NextResponse(null, { status: 204 });

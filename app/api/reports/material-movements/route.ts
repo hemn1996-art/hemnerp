@@ -21,6 +21,23 @@ export async function GET(request: Request) {
 
     const profitStatus = searchParams.get("profitStatus");
 
+    const parseNumberArray = (val: string | null) => {
+      if (!val || val === "all" || val === "") return undefined;
+      if (val.includes(",")) {
+        return { in: val.split(",").map(id => parseInt(id)).filter(id => !isNaN(id)) };
+      }
+      const parsed = parseInt(val);
+      return isNaN(parsed) ? undefined : parsed;
+    };
+
+    const parseStringArray = (val: string | null) => {
+      if (!val || val === "all" || val === "") return undefined;
+      if (val.includes(",")) {
+        return { in: val.split(",") };
+      }
+      return val;
+    };
+
     // Build where clause
     const where: any = { voucher: {} };
     
@@ -35,35 +52,47 @@ export async function GET(request: Request) {
     }
 
     if (accountId && accountId !== "all") {
-      where.voucher.accountId = parseInt(accountId);
+      const parsed = parseNumberArray(accountId);
+      if (parsed) where.voucher.accountId = parsed;
     }
     
     if (accountTypeId && accountTypeId !== "all") {
-      where.voucher.account = { accountTypeId: parseInt(accountTypeId) };
+      const parsed = parseNumberArray(accountTypeId);
+      if (parsed) where.voucher.account = { accountTypeId: parsed };
     }
 
     if (voucherType && voucherType !== "all") {
-      where.voucher.type = voucherType;
+      const parsed = parseStringArray(voucherType);
+      if (parsed) where.voucher.type = parsed;
     }
     
     if (voucherReference) {
-      where.voucher.referenceNo = { contains: voucherReference, mode: "insensitive" };
+      const parsedId = parseInt(voucherReference);
+      where.voucher.OR = [
+        { referenceNo: { contains: voucherReference, mode: "insensitive" } },
+        ...(!isNaN(parsedId) ? [{ id: parsedId }] : []),
+      ];
     }
 
     if (productId && productId !== "all") {
-      where.productId = parseInt(productId);
+      const parsed = parseNumberArray(productId);
+      if (parsed) where.productId = parsed;
     }
     
     if (currencyId && currencyId !== "all") {
-      where.voucher.currencyId = parseInt(currencyId);
+      const parsed = parseNumberArray(currencyId);
+      if (parsed) where.voucher.currencyId = parsed;
     }
 
     if (warehouseId && warehouseId !== "all") {
-      where.voucher.inventoryTransactions = {
-        some: {
-          warehouseId: parseInt(warehouseId)
-        }
-      };
+      const parsed = parseNumberArray(warehouseId);
+      if (parsed) {
+        where.voucher.inventoryTransactions = {
+          some: {
+            warehouseId: parsed
+          }
+        };
+      }
     }
     
     if (Object.keys(where.voucher).length === 0) {
@@ -121,7 +150,7 @@ export async function GET(request: Request) {
       return {
         id: line.id,
         voucherId: line.voucherId,
-        voucherReference: line.voucher.referenceNo || line.voucherId.toString(),
+        voucherReference: line.voucherId.toString(),
         voucherType: line.voucher.type,
         productId: line.productId,
         productName: line.product.name,

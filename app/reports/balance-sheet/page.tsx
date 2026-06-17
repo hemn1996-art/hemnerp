@@ -25,12 +25,31 @@ export default function BalanceSheetPage() {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const activeFiltersCount = React.useMemo(() => {
+    let count = 0;
+    if (currencyId !== "all") count++;
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (asOfDate !== todayStr) count++;
+    return count;
+  }, [currencyId, asOfDate]);
+
+  const handleResetFilters = () => {
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    setAsOfDate(todayStr);
+    setCurrencyId("all");
+    setCurrencyLabel("دینار");
+    fetchData(todayStr, "all");
+  };
+
+  const fetchData = async (customAsOfDate?: string, customCurrencyId?: string) => {
     try {
       setLoading(true);
       const query = new URLSearchParams();
-      query.append("asOfDate", asOfDate);
-      if (currencyId !== "all") query.append("currencyId", currencyId);
+      query.append("asOfDate", customAsOfDate !== undefined ? customAsOfDate : asOfDate);
+      const activeCurr = customCurrencyId !== undefined ? customCurrencyId : currencyId;
+      if (activeCurr !== "all") query.append("currencyId", activeCurr);
 
       const res = await fetch(`/api/reports/balance-sheet?${query.toString()}`);
       if (res.ok) {
@@ -61,14 +80,25 @@ export default function BalanceSheetPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center justify-end gap-2">
+      <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center justify-end gap-2 no-print">
         <button onClick={() => setShowFilterModal(true)}
-          className="flex items-center gap-1 bg-blue-600 text-white px-4 py-1.5 rounded text-xs hover:bg-blue-700 transition font-bold">
-          ☰ فلتەرەکان
+          className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
+          <span>فلتەرەکان ☰</span>
+          {activeFiltersCount > 0 && (
+            <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+              {activeFiltersCount}
+            </span>
+          )}
         </button>
+        {activeFiltersCount > 0 && (
+          <button onClick={handleResetFilters}
+            className="flex items-center justify-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 font-bold px-4 py-2.5 rounded-md hover:bg-rose-200 transition-colors cursor-pointer text-sm shadow-sm">
+            🔄 ڕێکخستنەوە
+          </button>
+        )}
         <button onClick={() => window.print()}
-          className="flex items-center gap-1 bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs hover:bg-slate-200 transition">
-          🖨 پرینت
+          className="flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 font-bold px-4 py-2.5 rounded-md hover:bg-slate-50 transition-colors cursor-pointer text-sm shadow-sm">
+          پرینت 🖨️
         </button>
       </div>
 
@@ -205,22 +235,23 @@ export default function BalanceSheetPage() {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="bg-[#0b1f50] p-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
                 <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-slate-300">✕</button>
                 <h2 className="font-bold text-lg">ئۆپشنەکانی فلتەرکردن</h2>
               </div>
-              <button className="text-white hover:text-slate-300 flex items-center gap-2 text-sm">
+              <button onClick={handleResetFilters} className="text-white hover:text-slate-300 flex items-center gap-2 text-sm font-bold">
                 <span>لابردنی هەموو</span> 🗑
               </button>
             </div>
 
             <div className="p-6 bg-white text-right space-y-8">
               <style dangerouslySetInnerHTML={{__html: `
-                .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 4px; padding: 10px 14px; background: white; }
-                .mui-outline label { position: absolute; top: -10px; right: 10px; background: white; padding: 0 6px; color: #64748b; font-size: 11px; }
-                .mui-outline input, .mui-outline select { width: 100%; outline: none; background: transparent; font-size: 14px; color: #334155; }
+                .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 12px; padding: 13px 16px; background: white; transition: border-color 0.2s; min-height: 48px; }
+                .mui-outline:focus-within { border-color: #0b1f50; }
+                .mui-outline label { position: absolute; top: -10px; right: 12px; background: white; padding: 0 6px; color: #0b1f50; font-size: 12px; font-weight: bold; }
+                .mui-outline input, .mui-outline select { width: 100%; outline: none; background: transparent; font-size: 14px; font-weight: bold; color: #334155; }
                 .section-title { display: flex; align-items: center; gap: 8px; color: #475569; font-weight: bold; font-size: 13px; margin-bottom: 16px; }
                 .section-title::before { content: ""; flex: 1; height: 1px; background: #e2e8f0; }
               `}} />
@@ -252,7 +283,7 @@ export default function BalanceSheetPage() {
             </div>
 
             <div className="p-4 bg-white border-t border-slate-200 flex items-center justify-start gap-4">
-              <button onClick={applyFilters} className="px-6 py-2 bg-[#0b1f50] text-white rounded text-sm font-bold hover:bg-slate-800 transition flex items-center gap-2">
+              <button onClick={applyFilters} className="px-6 py-2 bg-[#0b1f50] text-white rounded-lg text-sm font-bold hover:bg-slate-800 transition flex items-center gap-2">
                 جێبەجێکردنی فلتەرەکان <span>✔</span>
               </button>
               <button onClick={() => setShowFilterModal(false)} className="text-slate-600 hover:text-slate-900 text-sm font-medium">پاشگەزبوونەوە</button>

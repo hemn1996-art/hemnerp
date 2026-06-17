@@ -4,17 +4,204 @@ import React, { useEffect, useState, useRef } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 
+interface DropdownOption {
+  value: string | number;
+  label: string;
+}
+
+function MultiSelectDropdown({
+  label,
+  options,
+  selectedValues,
+  onChange,
+  searchable = false
+}: {
+  label: string;
+  options: DropdownOption[];
+  selectedValues: any[];
+  onChange: (values: any[]) => void;
+  searchable?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!searchTerm) return options;
+    return options.filter(opt =>
+      opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [options, searchTerm]);
+
+  const toggleOption = (val: any) => {
+    if (selectedValues.includes(val)) {
+      onChange(selectedValues.filter(v => v !== val));
+    } else {
+      onChange([...selectedValues, val]);
+    }
+    inputRef.current?.focus();
+  };
+
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange([]);
+    setSearchTerm("");
+    inputRef.current?.focus();
+  };
+
+  const handleRemoveValue = (e: React.MouseEvent, val: any) => {
+    e.stopPropagation();
+    onChange(selectedValues.filter(v => v !== val));
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full text-right" dir="rtl">
+      <div 
+        onClick={() => {
+          setIsOpen(true);
+          inputRef.current?.focus();
+        }}
+        className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[52px] ${
+          isOpen ? "border-[#0b1f50] ring-2 ring-[#0b1f50]/10" : ""
+        }`}
+      >
+        <label className="select-none pointer-events-none">{label}</label>
+
+        {/* Selected chips list + Search input inline */}
+        <div className="flex-1 flex flex-wrap gap-1.5 items-center justify-start overflow-hidden py-1">
+          {selectedValues.map(val => {
+            const opt = options.find(o => o.value === val);
+            const name = opt ? opt.label : String(val);
+            return (
+              <div
+                key={val}
+                className="bg-slate-100 border border-slate-200 text-slate-800 rounded-full flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 text-[11px] font-black hover:bg-slate-200 transition-colors shadow-sm animate-in fade-in-50 duration-150"
+              >
+                <button
+                  type="button"
+                  onClick={(e) => handleRemoveValue(e, val)}
+                  className="w-4 h-4 rounded-full bg-slate-300 text-slate-600 hover:bg-slate-400 hover:text-slate-800 flex items-center justify-center text-[10px] font-black border-none cursor-pointer shrink-0 transition-colors"
+                >
+                  ✕
+                </button>
+                <span className="truncate max-w-[120px] select-none">{name}</span>
+              </div>
+            );
+          })}
+
+          {searchable ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder={selectedValues.length === 0 ? "هەموو" : ""}
+              className="flex-1 min-w-[60px] max-w-full border-none outline-none text-xs font-black text-slate-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
+              dir="rtl"
+              onClick={e => e.stopPropagation()}
+              onFocus={() => setIsOpen(true)}
+            />
+          ) : (
+            selectedValues.length === 0 && (
+              <span className="text-slate-400 font-bold text-xs pr-1">هەموو</span>
+            )
+          )}
+        </div>
+
+        {/* Action icons */}
+        <div className="flex items-center gap-2 text-slate-500 shrink-0 pl-1 border-r border-slate-200 pr-2">
+          {(selectedValues.length > 0 || searchTerm) && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-slate-400 hover:text-slate-700 bg-transparent border-none cursor-pointer text-sm font-bold flex items-center justify-center w-5 h-5"
+              title="پاککردنەوەی هەموو"
+            >
+              ✕
+            </button>
+          )}
+          <span className="text-[10px] select-none text-slate-400">
+            {isOpen ? "▲" : "▼"}
+          </span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-[1050] mt-1 right-0 left-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 max-h-72 overflow-y-auto flex flex-col text-right">
+          <div className="overflow-y-auto flex-1 space-y-1 pr-1" style={{ maxHeight: "220px" }}>
+            <div
+              onClick={() => {
+                onChange([]);
+                setSearchTerm("");
+                inputRef.current?.focus();
+              }}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
+                selectedValues.length === 0
+                  ? "bg-slate-100 text-[#0b1f50]"
+                  : "text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="select-none">هەموو (کۆی گشتی)</span>
+              <input
+                type="checkbox"
+                checked={selectedValues.length === 0}
+                readOnly
+                className="w-4 h-4 rounded border-slate-300 text-[#0b1f50] focus:ring-[#0b1f50] accent-[#0b1f50] cursor-pointer"
+              />
+            </div>
+
+            {filteredOptions.map(opt => {
+              const isChecked = selectedValues.includes(opt.value);
+              return (
+                <div
+                  key={opt.value}
+                  onClick={() => toggleOption(opt.value)}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
+                    isChecked
+                      ? "bg-slate-100 text-[#0b1f50]"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="truncate max-w-[85%] select-none">{opt.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    readOnly
+                    className="w-4 h-4 rounded border-slate-300 text-[#0b1f50] focus:ring-[#0b1f50] accent-[#0b1f50] cursor-pointer"
+                  />
+                </div>
+              );
+            })}
+
+            {filteredOptions.length === 0 && (
+              <div className="text-center text-slate-400 py-3 text-xs select-none">
+                هیچ ئەنجامێک نەدۆزرایەوە
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ItemsReportPage() {
   const router = useRouter();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const { 
-    accounts, fetchAccounts, 
-    products, fetchProducts,
-    accountTypes, fetchAccountTypes,
-    currencies, fetchCurrencies
-  } = useStore() as any;
 
   // Date Filters
   const [startDate, setStartDate] = useState(() => {
@@ -28,25 +215,25 @@ export default function ItemsReportPage() {
   });
 
   // Voucher Details
-  const [voucherType, setVoucherType] = useState("all");
+  const [filterVoucherTypes, setFilterVoucherTypes] = useState<string[]>([]);
   const [voucherReference, setVoucherReference] = useState("");
 
   // Item Filters
-  const [productId, setProductId] = useState("all");
+  const [filterProductIds, setFilterProductIds] = useState<number[]>([]);
   const [category, setCategory] = useState("all");
   const [brand, setBrand] = useState("all");
   const [itemCode, setItemCode] = useState("");
   const [batchCode, setBatchCode] = useState("");
 
   // Account Filters
-  const [accountId, setAccountId] = useState("all");
-  const [accountTypeId, setAccountTypeId] = useState("all");
+  const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
+  const [filterAccountTypeIds, setFilterAccountTypeIds] = useState<number[]>([]);
 
   // Secondary Filters
   const [currencyId, setCurrencyId] = useState("all");
-  const [warehouseId, setWarehouseId] = useState("all");
+  const [filterWarehouseIds, setFilterWarehouseIds] = useState<number[]>([]);
   const [label, setLabel] = useState("all");
-  const [createdBy, setCreatedBy] = useState("all");
+  const [filterCreatedBys, setFilterCreatedBys] = useState<string[]>([]);
 
   // Display Options
   const [profitStatus, setProfitStatus] = useState("all");
@@ -97,12 +284,30 @@ export default function ItemsReportPage() {
     }
   }, [visibleColumns]);
 
+  const { 
+    accounts, fetchAccounts, 
+    products, fetchProducts,
+    accountTypes, fetchAccountTypes,
+    currencies, fetchCurrencies,
+    warehouses, fetchWarehouses,
+    invoices, fetchInvoices
+  } = useStore() as any;
+
   useEffect(() => {
     fetchAccounts?.();
     fetchProducts?.();
     fetchAccountTypes?.();
     fetchCurrencies?.();
-  }, [fetchAccounts, fetchProducts, fetchAccountTypes, fetchCurrencies]);
+    fetchWarehouses?.();
+    fetchInvoices?.();
+  }, [fetchAccounts, fetchProducts, fetchAccountTypes, fetchCurrencies, fetchWarehouses, fetchInvoices]);
+
+  const employeeOptions = React.useMemo(() => {
+    if (!invoices) return [];
+    const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
+    return Array.from(new Set([...defaults, ...fromVouchers]));
+  }, [invoices]);
 
   useEffect(() => {
     fetchItems();
@@ -115,32 +320,88 @@ export default function ItemsReportPage() {
       if (startDate) query.append("startDate", startDate);
       if (endDate) query.append("endDate", endDate);
       
-      if (voucherType !== "all") query.append("voucherType", voucherType);
       if (voucherReference) query.append("voucherReference", voucherReference);
       
-      if (productId !== "all") query.append("productId", productId);
+      if (filterProductIds.length > 0) query.append("productId", filterProductIds.join(","));
       if (category !== "all") query.append("category", category);
       if (brand !== "all") query.append("brand", brand);
       if (batchCode) query.append("batchCode", batchCode);
 
-      if (accountId !== "all") query.append("accountId", accountId);
-      if (accountTypeId !== "all") query.append("accountTypeId", accountTypeId);
+      if (filterAccountIds.length > 0) query.append("accountId", filterAccountIds.join(","));
+      if (filterAccountTypeIds.length > 0) query.append("accountTypeId", filterAccountTypeIds.join(","));
 
       if (currencyId !== "all") query.append("currencyId", currencyId);
-      if (warehouseId !== "all") query.append("warehouseId", warehouseId);
+      if (filterWarehouseIds.length > 0) query.append("warehouseId", filterWarehouseIds.join(","));
+      if (filterCreatedBys.length > 0) query.append("createdBy", filterCreatedBys.join(","));
       
       if (profitStatus !== "all") query.append("profitStatus", profitStatus);
       if (isGift !== "all") query.append("isGift", isGift);
 
       const res = await fetch(`/api/reports/material-movements?${query.toString()}`);
       if (res.ok) {
-        setItems(await res.json());
+        const data = await res.json();
+        const mapped = data.map((item: any) => {
+          const sign = (item.voucherType === "sales_return" || item.voucherType === "purchase_return") ? -1 : 1;
+          return {
+            ...item,
+            quantity: (item.quantity || 0) * sign,
+            lineTotal: (item.lineTotal || 0) * sign,
+          };
+        });
+        setItems(mapped);
       }
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
+  };
+
+  const activeFiltersCount = React.useMemo(() => {
+    let count = 0;
+    if (filterVoucherTypes.length > 0) count++;
+    if (voucherReference) count++;
+    if (filterProductIds.length > 0) count++;
+    if (category !== "all" && category !== "") count++;
+    if (brand !== "all" && brand !== "") count++;
+    if (itemCode) count++;
+    if (batchCode) count++;
+    if (filterAccountIds.length > 0) count++;
+    if (filterAccountTypeIds.length > 0) count++;
+    if (currencyId !== "all") count++;
+    if (filterWarehouseIds.length > 0) count++;
+    if (label !== "all" && label !== "") count++;
+    if (filterCreatedBys.length > 0) count++;
+    if (profitStatus !== "all") count++;
+    if (isGift !== "all") count++;
+    if (groupReverse !== "all") count++;
+    return count;
+  }, [
+    filterVoucherTypes, voucherReference, filterProductIds, category, brand, itemCode, batchCode,
+    filterAccountIds, filterAccountTypeIds, currencyId, filterWarehouseIds, label, filterCreatedBys,
+    profitStatus, isGift, groupReverse
+  ]);
+
+  const handleResetFilters = () => {
+    setFilterVoucherTypes([]);
+    setVoucherReference("");
+    setFilterProductIds([]);
+    setCategory("all");
+    setBrand("all");
+    setItemCode("");
+    setBatchCode("");
+    setFilterAccountIds([]);
+    setFilterAccountTypeIds([]);
+    setCurrencyId("all");
+    setFilterWarehouseIds([]);
+    setLabel("all");
+    setFilterCreatedBys([]);
+    setProfitStatus("all");
+    setIsGift("all");
+    setGroupReverse("all");
+    setTimeout(() => {
+      fetchItems();
+    }, 0);
   };
 
   const applyFilters = () => {
@@ -158,6 +419,36 @@ export default function ItemsReportPage() {
       case "inventory_out": return "چوونەدەرەوە";
       default: return type;
     }
+  };
+
+  const showSalesReturnNotice = React.useMemo(() => {
+    return filterVoucherTypes.length === 1 && filterVoucherTypes[0] === "sales" && items.some((item: any) => item.voucherType === "sales_return");
+  }, [filterVoucherTypes, items]);
+
+  const showPurchaseReturnNotice = React.useMemo(() => {
+    return filterVoucherTypes.length === 1 && filterVoucherTypes[0] === "purchase" && items.some((item: any) => item.voucherType === "purchase_return");
+  }, [filterVoucherTypes, items]);
+
+  const filteredItems = React.useMemo(() => {
+    let result = items;
+    if (filterVoucherTypes.length > 0) {
+      result = result.filter((item: any) => filterVoucherTypes.includes(item.voucherType));
+    }
+    return result;
+  }, [items, filterVoucherTypes]);
+
+  const getQtyCardLabel = () => {
+    const hasSales = filterVoucherTypes.includes("sales") || filterVoucherTypes.includes("sales_return");
+    const hasPurchases = filterVoucherTypes.includes("purchase") || filterVoucherTypes.includes("purchase_return");
+    const hasOthers = filterVoucherTypes.some(t => t !== "sales" && t !== "sales_return" && t !== "purchase" && t !== "purchase_return");
+
+    if (filterVoucherTypes.length > 0 && hasSales && !hasPurchases && !hasOthers) {
+      return "کۆی گشتی دەرچوو لە کۆگا";
+    }
+    if (filterVoucherTypes.length > 0 && hasPurchases && !hasSales && !hasOthers) {
+      return "کۆی گشتی هاتوو بۆ کۆگا";
+    }
+    return "کۆی گشتی کەرەستە";
   };
 
   const formatDate = (dateStr: string) => {
@@ -187,8 +478,20 @@ export default function ItemsReportPage() {
           </div>
 
           <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-xs hover:bg-slate-700 transition">
-            <span className="text-sm">🔍</span> فلتەرەکان
+            <span className="text-sm">🔍</span>
+            <span>فلتەرەکان</span>
+            {activeFiltersCount > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
+          
+          {activeFiltersCount > 0 && (
+            <button onClick={handleResetFilters} className="flex items-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 px-4 py-2 rounded-lg text-xs hover:bg-rose-200 transition">
+              🔄 ڕێکخستنەوە
+            </button>
+          )}
           
           <button onClick={() => setShowColumnsModal(true)} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg text-xs hover:bg-blue-100 transition">
             <span className="text-sm">⚙️</span> کۆڵۆمەکان
@@ -199,14 +502,51 @@ export default function ItemsReportPage() {
       {/* Summary Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-blue-500 flex flex-col justify-center items-center">
-          <p className="text-2xl font-bold text-slate-800">{items.reduce((s, i) => s + i.quantity, 0).toLocaleString("en-US")} عدد</p>
-          <p className="text-xs text-slate-500 mt-1">کۆی گشتی کەرەستە</p>
+          <p className="text-2xl font-bold text-slate-800">{filteredItems.reduce((s, i) => s + i.quantity, 0).toLocaleString("en-US")} عدد</p>
+          <p className="text-xs text-slate-500 mt-1">{getQtyCardLabel()}</p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-green-500 flex flex-col justify-center items-center">
-          <p className="text-2xl font-bold text-green-600">{items.reduce((s, i) => s + (i.profit || 0), 0).toLocaleString("en-US")} $</p>
+          <p className="text-2xl font-bold text-green-600">{filteredItems.reduce((s, i) => s + (i.profit || 0), 0).toLocaleString("en-US")} $</p>
           <p className="text-xs text-slate-500 mt-1">کۆی قازانج</p>
         </div>
       </div>
+
+      {/* Notice Banners */}
+      {showSalesReturnNotice && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm no-print text-right mb-4" dir="rtl">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <h4 className="font-black text-sm text-amber-950 m-0">تێبینی: پسووڵەی گەڕانەوەی فرۆشتن هەیە لەم ماوەیەدا بۆ کەرەستەکان</h4>
+              <p className="text-xs text-amber-800 m-0 mt-1 font-bold">بۆ پیشاندانی پسووڵەکانی گەڕانەوەی فرۆشتن لەگەڵ فرۆشتنەکان، کلیک لەسەر دوگمەی بەرامبەر بکە.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setFilterVoucherTypes(["sales", "sales_return"])}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-black text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer transition-all shadow-sm shrink-0"
+          >
+            پیشاندانی گەڕانەوەی فرۆشتن 🔄
+          </button>
+        </div>
+      )}
+
+      {showPurchaseReturnNotice && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm no-print text-right mb-4" dir="rtl">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <h4 className="font-black text-sm text-amber-950 m-0">تێبینی: پسووڵەی گەڕانەوەی کڕین هەیە لەم ماوەیەدا بۆ کەرەستەکان</h4>
+              <p className="text-xs text-amber-800 m-0 mt-1 font-bold">بۆ پیشاندانی پسووڵەکانی گەڕانەوەی کڕین لەگەڵ کڕینەکان، کلیک لەسەر دوگمەی بەرامبەر بکە.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setFilterVoucherTypes(["purchase", "purchase_return"])}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-black text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer transition-all shadow-sm shrink-0"
+          >
+            پیشاندانی گەڕانەوەی کڕین 🔄
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white shadow-sm border border-slate-200 overflow-hidden">
@@ -234,10 +574,10 @@ export default function ItemsReportPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={15} className="p-8 text-center text-slate-500 text-sm">خەریکی هێنانی داتاکانە...</td></tr>
-              ) : items.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <tr><td colSpan={15} className="p-8 text-center text-slate-500 text-sm">هیچ داتایەک نەدۆزرایەوە بەپێی ئەم فلتەرانە.</td></tr>
               ) : (
-                items.map((item, i) => (
+                filteredItems.map((item, i) => (
                   <tr key={item.id} className={`border-b border-slate-200 hover:bg-slate-100 transition ${i % 2 === 0 ? 'bg-white' : 'bg-[#f8fafc]'}`}>
                     {visibleColumns.voucherReference && (
                       <td className="p-2 border-r border-slate-200 text-center">
@@ -257,12 +597,24 @@ export default function ItemsReportPage() {
                     {visibleColumns.brand && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
                     {visibleColumns.warehouseName && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.warehouseName}</td>}
                     {visibleColumns.cost && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">${Number(item.cost).toLocaleString()}</td>}
-                    {visibleColumns.quantity && <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-700">{item.quantity} دانە</td>}
+                    {visibleColumns.quantity && (
+                      <td className={`p-2 border-r border-slate-200 text-center font-bold ${item.quantity < 0 ? "text-rose-600" : "text-slate-700"}`}>
+                        {item.quantity.toLocaleString("en-US")} دانە
+                      </td>
+                    )}
                     {visibleColumns.price && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">${Number(item.price).toLocaleString()}</td>}
                     {visibleColumns.offers && <td className="p-2 border-r border-slate-200 text-center text-slate-400">-</td>}
                     {visibleColumns.discount && <td className="p-2 border-r border-slate-200 text-center text-slate-600">{item.discount > 0 ? `$${item.discount}` : '-'}</td>}
-                    {visibleColumns.lineTotal && <td className="p-2 border-r border-slate-200 text-center bg-slate-50 font-bold text-slate-800">${Number(item.lineTotal).toLocaleString()}</td>}
-                    {visibleColumns.profit && <td className="p-2 border-r border-slate-200 text-center bg-green-50 font-bold text-green-700">${Number(item.profit).toLocaleString()}</td>}
+                    {visibleColumns.lineTotal && (
+                      <td className={`p-2 border-r border-slate-200 text-center bg-slate-50 font-bold ${item.lineTotal < 0 ? "text-rose-600" : "text-slate-800"}`}>
+                        ${Number(item.lineTotal).toLocaleString()}
+                      </td>
+                    )}
+                    {visibleColumns.profit && (
+                      <td className={`p-2 border-r border-slate-200 text-center bg-green-50 font-bold ${item.profit < 0 ? "text-rose-600" : "text-green-700"}`}>
+                        ${Number(item.profit).toLocaleString()}
+                      </td>
+                    )}
                     {visibleColumns.date && <td className="p-2 border-r border-slate-200 text-center text-slate-500 text-[10px]">{formatDate(item.date)}</td>}
                   </tr>
                 ))
@@ -320,7 +672,7 @@ export default function ItemsReportPage() {
       {/* Filters Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="bg-[#0b1f50] p-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
@@ -337,10 +689,11 @@ export default function ItemsReportPage() {
               
               {/* Custom CSS for Material Outline inputs */}
               <style dangerouslySetInnerHTML={{__html: `
-                .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 12px; background: white; }
-                .mui-outline label { position: absolute; top: -10px; right: 10px; background: white; padding: 0 4px; color: #64748b; font-size: 11px; }
-                .mui-outline input, .mui-outline select { width: 100%; outline: none; background: transparent; font-size: 13px; color: #334155; }
-                .section-title { display: flex; align-items: center; gap: 8px; color: #475569; font-weight: bold; font-size: 13px; margin-bottom: 16px; }
+                .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 12px; padding: 13px 16px; background: white; transition: border-color 0.2s; }
+                .mui-outline:focus-within { border-color: #3b82f6; }
+                .mui-outline label { position: absolute; top: -10px; right: 12px; background: white; padding: 0 6px; color: #475569; font-size: 11px; font-weight: bold; }
+                .mui-outline input, .mui-outline select { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; color: #1e293b; font-weight: bold; cursor: pointer; }
+                .section-title { display: flex; align-items: center; gap: 8px; color: #0f172a; font-weight: 900; font-size: 13px; margin-bottom: 16px; }
                 .section-title::before { content: ""; flex: 1; height: 1px; background: #e2e8f0; }
               `}} />
 
@@ -363,15 +716,20 @@ export default function ItemsReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">وردەکاری پسووڵە <span className="text-lg">📄</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline md:col-span-2">
-                    <label>پسووڵە</label>
-                    <select value={voucherType} onChange={e => setVoucherType(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      <option value="sales">فرۆشتن</option>
-                      <option value="purchase">کڕین</option>
-                      <option value="sales_return">گەڕانەوەی فرۆشتن</option>
-                      <option value="purchase_return">گەڕانەوەی کڕین</option>
-                    </select>
+                  <div className="md:col-span-2">
+                    <MultiSelectDropdown
+                      label="پسووڵە"
+                      options={[
+                        { value: "sales", label: "فرۆشتن" },
+                        { value: "purchase", label: "کڕین" },
+                        { value: "sales_return", label: "گەڕانەوەی فرۆشتن" },
+                        { value: "purchase_return", label: "گەڕانەوەی کڕین" },
+                        { value: "inventory_in", label: "هاتنەناوەوە" },
+                        { value: "inventory_out", label: "چوونەدەرەوە" },
+                      ]}
+                      selectedValues={filterVoucherTypes}
+                      onChange={setFilterVoucherTypes}
+                    />
                   </div>
                 </div>
               </div>
@@ -396,12 +754,14 @@ export default function ItemsReportPage() {
                     <label>کۆد</label>
                     <input type="text" value={itemCode} onChange={e => setItemCode(e.target.value)} />
                   </div>
-                  <div className="mui-outline">
-                    <label>کەرەستە</label>
-                    <select value={productId} onChange={e => setProductId(e.target.value)}>
-                      <option value="all"></option>
-                      {products?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                  <div>
+                    <MultiSelectDropdown
+                      label="کەرەستە"
+                      options={products?.map((p: any) => ({ value: p.id, label: p.name })) || []}
+                      selectedValues={filterProductIds}
+                      onChange={setFilterProductIds}
+                      searchable
+                    />
                   </div>
                   <div className="mui-outline md:col-span-2">
                     <label>کۆدی وەجبە</label>
@@ -414,19 +774,23 @@ export default function ItemsReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">زانیاری هەژمار <span className="text-lg">👤</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>جۆری هەژمار</label>
-                    <select value={accountTypeId} onChange={e => setAccountTypeId(e.target.value)}>
-                      <option value="all"></option>
-                      {accountTypes?.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
+                  <div>
+                    <MultiSelectDropdown
+                      label="جۆری هەژمار"
+                      options={accountTypes?.map((a: any) => ({ value: a.id, label: a.name })) || []}
+                      selectedValues={filterAccountTypeIds}
+                      onChange={setFilterAccountTypeIds}
+                      searchable
+                    />
                   </div>
-                  <div className="mui-outline">
-                    <label>هەژمار</label>
-                    <select value={accountId} onChange={e => setAccountId(e.target.value)}>
-                      <option value="all"></option>
-                      {accounts?.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
+                  <div>
+                    <MultiSelectDropdown
+                      label="هەژمار"
+                      options={accounts?.filter((acc: any) => filterAccountTypeIds.length === 0 || filterAccountTypeIds.includes(acc.accountTypeId)).map((a: any) => ({ value: a.id, label: a.name })) || []}
+                      selectedValues={filterAccountIds}
+                      onChange={setFilterAccountIds}
+                      searchable
+                    />
                   </div>
                 </div>
               </div>
@@ -441,18 +805,23 @@ export default function ItemsReportPage() {
                       <option value="all"></option>
                     </select>
                   </div>
-                  <div className="mui-outline">
-                    <label>کۆگا</label>
-                    <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)}>
-                      <option value="all"></option>
-                      <option value="1">کۆگای سەرەکی</option>
-                    </select>
+                  <div>
+                    <MultiSelectDropdown
+                      label="کۆگا"
+                      options={warehouses?.map((w: any) => ({ value: w.id, label: w.name })) || []}
+                      selectedValues={filterWarehouseIds}
+                      onChange={setFilterWarehouseIds}
+                      searchable
+                    />
                   </div>
-                  <div className="mui-outline md:col-span-2">
-                    <label>لە لایەن</label>
-                    <select value={createdBy} onChange={e => setCreatedBy(e.target.value)}>
-                      <option value="all"></option>
-                    </select>
+                  <div className="md:col-span-2">
+                    <MultiSelectDropdown
+                      label="لە لایەن"
+                      options={employeeOptions.map(emp => ({ value: emp, label: emp }))}
+                      selectedValues={filterCreatedBys}
+                      onChange={setFilterCreatedBys}
+                      searchable
+                    />
                   </div>
                 </div>
               </div>

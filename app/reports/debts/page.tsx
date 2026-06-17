@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { store, useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
 
@@ -18,6 +18,200 @@ type DebtReportData = {
   lastPaymentDate: string | null;
   debtBeforeLastPaymentByCurrency: Record<string, number>;
 };
+
+interface Option {
+  value: string | number;
+  label: string;
+}
+
+function MultiSelectDropdown({
+  label,
+  options,
+  selectedValues,
+  onChange,
+  searchable = false
+}: {
+  label: string;
+  options: Option[];
+  selectedValues: any[];
+  onChange: (values: any[]) => void;
+  searchable?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm) return options;
+    return options.filter(opt =>
+      opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [options, searchTerm]);
+
+  const toggleOption = (val: any) => {
+    if (selectedValues.includes(val)) {
+      onChange(selectedValues.filter(v => v !== val));
+    } else {
+      onChange([...selectedValues, val]);
+    }
+    inputRef.current?.focus();
+  };
+
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange([]);
+    setSearchTerm("");
+    inputRef.current?.focus();
+  };
+
+  const handleRemoveValue = (e: React.MouseEvent, val: any) => {
+    e.stopPropagation();
+    onChange(selectedValues.filter(v => v !== val));
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full text-right" dir="rtl">
+      <div 
+        onClick={() => {
+          setIsOpen(true);
+          inputRef.current?.focus();
+        }}
+        className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[52px] ${
+          isOpen ? "border-[#0b1f50] ring-2 ring-[#0b1f50]/10" : ""
+        }`}
+      >
+        <label className="select-none pointer-events-none">{label}</label>
+
+        {/* Selected chips list + Search input inline */}
+        <div className="flex-1 flex flex-wrap gap-1.5 items-center justify-start overflow-hidden py-1">
+          {selectedValues.map(val => {
+            const opt = options.find(o => o.value === val);
+            const name = opt ? opt.label : String(val);
+            return (
+              <div
+                key={val}
+                className="bg-slate-100 border border-slate-200 text-slate-800 rounded-full flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 text-[11px] font-black hover:bg-slate-200 transition-colors shadow-sm animate-in fade-in-50 duration-150"
+              >
+                <button
+                  type="button"
+                  onClick={(e) => handleRemoveValue(e, val)}
+                  className="w-4 h-4 rounded-full bg-slate-300 text-slate-600 hover:bg-slate-400 hover:text-slate-800 flex items-center justify-center text-[10px] font-black border-none cursor-pointer shrink-0 transition-colors"
+                >
+                  ✕
+                </button>
+                <span className="truncate max-w-[120px] select-none">{name}</span>
+              </div>
+            );
+          })}
+
+          {searchable ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder={selectedValues.length === 0 ? "هەموو" : ""}
+              className="flex-1 min-w-[60px] max-w-full border-none outline-none text-xs font-black text-slate-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
+              dir="rtl"
+              onClick={e => e.stopPropagation()}
+              onFocus={() => setIsOpen(true)}
+            />
+          ) : (
+            selectedValues.length === 0 && (
+              <span className="text-slate-400 font-bold text-xs pr-1">هەموو</span>
+            )
+          )}
+        </div>
+
+        {/* Action icons */}
+        <div className="flex items-center gap-2 text-slate-500 shrink-0 pl-1 border-r border-slate-200 pr-2">
+          {(selectedValues.length > 0 || searchTerm) && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-slate-400 hover:text-slate-700 bg-transparent border-none cursor-pointer text-sm font-bold flex items-center justify-center w-5 h-5"
+              title="پاککردنەوەی هەموو"
+            >
+              ✕
+            </button>
+          )}
+          <span className="text-[10px] select-none text-slate-400">
+            {isOpen ? "▲" : "▼"}
+          </span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-[1050] mt-1 right-0 left-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 max-h-72 overflow-y-auto flex flex-col text-right">
+          <div className="overflow-y-auto flex-1 space-y-1 pr-1" style={{ maxHeight: "220px" }}>
+            <div
+              onClick={() => {
+                onChange([]);
+                setSearchTerm("");
+                inputRef.current?.focus();
+              }}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
+                selectedValues.length === 0
+                  ? "bg-slate-100 text-[#0b1f50]"
+                  : "text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="select-none">هەموو (کۆی گشتی)</span>
+              <input
+                type="checkbox"
+                checked={selectedValues.length === 0}
+                readOnly
+                className="w-4 h-4 rounded border-slate-300 text-[#0b1f50] focus:ring-[#0b1f50] accent-[#0b1f50] cursor-pointer"
+              />
+            </div>
+
+            {filteredOptions.map(opt => {
+              const isChecked = selectedValues.includes(opt.value);
+              return (
+                <div
+                  key={opt.value}
+                  onClick={() => toggleOption(opt.value)}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
+                    isChecked
+                      ? "bg-slate-100 text-[#0b1f50]"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="truncate max-w-[85%] select-none">{opt.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    readOnly
+                    className="w-4 h-4 rounded border-slate-300 text-[#0b1f50] focus:ring-[#0b1f50] accent-[#0b1f50] cursor-pointer"
+                  />
+                </div>
+              );
+            })}
+
+            {filteredOptions.length === 0 && (
+              <div className="text-center text-slate-400 py-3 text-xs select-none">
+                هیچ ئەنجامێک نەدۆزرایەوە
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DebtReportPage() {
   const { accounts, accountTypes, fetchAccounts, fetchAccountTypes } = useStore();
@@ -62,8 +256,6 @@ export default function DebtReportPage() {
   
   const [filterAccountType, setFilterAccountType] = useState("all");
   const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
-  const [accountSearch, setAccountSearch] = useState("");
-  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [filterCity, setFilterCity] = useState("all");
   const [filterDistrict, setFilterDistrict] = useState("all");
   const [filterBeforeDate, setFilterBeforeDate] = useState("");
@@ -103,6 +295,14 @@ export default function DebtReportPage() {
       console.error(e);
     }
   }, [visibleColumns]);
+
+  const activeFiltersCount = [
+    filterAccountType !== "all",
+    filterAccountIds.length > 0,
+    filterCity !== "all",
+    filterDistrict !== "all",
+    filterBeforeDate !== "",
+  ].filter(Boolean).length;
 
   const fetchReport = async () => {
     setLoading(true);
@@ -155,12 +355,31 @@ export default function DebtReportPage() {
           >
              کۆڵۆمەکان
           </button>
-          <button
+           <button
             onClick={() => setShowFilterModal(true)}
-            className="px-4 py-2 bg-[#061f5f] hover:bg-[#03133f] text-white rounded-lg text-sm font-bold transition-colors border-none cursor-pointer"
+            className="px-4 py-2 bg-[#061f5f] hover:bg-[#03133f] text-white rounded-lg text-sm font-bold transition-colors border-none cursor-pointer flex items-center gap-1.5"
           >
-             فلترەکان
+             <span>فلترەکان</span>
+             {activeFiltersCount > 0 && (
+               <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                 {activeFiltersCount}
+               </span>
+             )}
           </button>
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={() => {
+                setFilterAccountType("all");
+                setFilterAccountIds([]);
+                setFilterCity("all");
+                setFilterDistrict("all");
+                setFilterBeforeDate("");
+              }}
+              className="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-sm font-bold transition-colors border-none cursor-pointer"
+            >
+               ڕێکخستنەوە
+            </button>
+          )}
           <input
             type="text"
             placeholder="گەڕان بەدوای ناو، ژمارە تەلەفۆن..."
@@ -234,25 +453,49 @@ export default function DebtReportPage() {
       </div>
 
       {showFilterModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-[#061f5f] text-white rounded-t-xl">
-               <h2 className="m-0 text-lg font-bold">تایبەتمەندیەکانی فلتەرکردن</h2>
-               <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-gray-200 bg-transparent border-none text-xl cursor-pointer">×</button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+             <div className="p-4 flex justify-between items-center bg-[#061f5f] text-white">
+               <div className="flex items-center gap-3">
+                 <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-slate-300 border-none bg-transparent cursor-pointer text-lg font-bold">✕</button>
+                 <h2 className="m-0 text-sm font-black">تایبەتمەندیەکانی فلتەرکردن</h2>
+               </div>
+               <button 
+                 onClick={() => {
+                   setFilterAccountType("all");
+                   setFilterAccountIds([]);
+                   setFilterCity("all");
+                   setFilterDistrict("all");
+                   setFilterBeforeDate("");
+                   setFilterDebtType("all");
+                 }} 
+                 className="text-white hover:text-slate-300 bg-transparent border-none text-sm font-bold cursor-pointer"
+               >
+                 لابردنی هەموو 🗑️
+               </button>
              </div>
              
-             <div className="p-6 overflow-y-auto space-y-6 text-right" dir="rtl">
+             <div className="p-6 overflow-y-auto space-y-6 text-right flex-1" dir="rtl">
+               <style dangerouslySetInnerHTML={{__html: `
+                 .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 12px; padding: 13px 16px; background: white; transition: border-color 0.2s; }
+                 .mui-outline:focus-within { border-color: #0b1f50; }
+                 .mui-outline label { position: absolute; top: -10px; right: 12px; background: white; padding: 0 6px; color: #475569; font-size: 11px; font-weight: bold; }
+                 .mui-outline select, .mui-outline input { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; color: #1e293b; font-weight: bold; cursor: pointer; }
+                 .section-title { display: flex; align-items: center; gap: 8px; color: #0f172a; font-weight: 900; font-size: 13px; margin-bottom: 16px; }
+                 .section-title::before { content: ""; flex: 1; height: 1px; background: #e2e8f0; }
+               `}} />
+
                 {/* Section 1: Debt Details */}
                 <div>
-                   <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2 border-b border-gray-100 pb-2"><span className="text-lg">🗂️</span> وردەکاری قەرز</h3>
-                   <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">بەرواری پێش کۆتا پارەدان</label>
-                        <DateInput className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white" value={filterBeforeDate} onChange={val => setFilterBeforeDate(val)} />
+                   <h3 className="section-title flex-row-reverse">وردەکاری قەرز <span>🗂️</span></h3>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="mui-outline">
+                        <label>بەرواری پێش کۆتا پارەدان</label>
+                        <DateInput className="w-full border-none outline-none text-[13px] font-bold text-slate-800 bg-transparent" value={filterBeforeDate} onChange={val => setFilterBeforeDate(val)} />
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">جۆری قەرز</label>
-                        <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterDebtType} onChange={e => setFilterDebtType(e.target.value)}>
+                      <div className="mui-outline">
+                        <label>جۆری قەرز</label>
+                        <select className="w-full border-none outline-none bg-transparent font-bold cursor-pointer text-sm text-slate-800" value={filterDebtType} onChange={e => setFilterDebtType(e.target.value)}>
                           <option value="all">هەموو</option>
                           <option value="people">قەرزی خەڵک</option>
                           <option value="mine">قەرزی من</option>
@@ -263,125 +506,52 @@ export default function DebtReportPage() {
 
                 {/* Section 2: Account Details */}
                 <div>
-                   <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2 border-b border-gray-100 pb-2"><span className="text-lg">👤</span> زانیاری هەژمار</h3>
-                   <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">جۆری هەژمار</label>
-                        <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterAccountType} onChange={e => setFilterAccountType(e.target.value)}>
+                   <h3 className="section-title flex-row-reverse">زانیاری هەژمار <span>👤</span></h3>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="mui-outline">
+                        <label>جۆری هەژمار</label>
+                        <select className="w-full border-none outline-none bg-transparent font-bold cursor-pointer text-sm text-slate-800" value={filterAccountType} onChange={e => setFilterAccountType(e.target.value)}>
                           <option value="all">هەموو</option>
                           {accountTypes.map((type: any) => (
                             <option key={type.id} value={type.id}>{type.name}</option>
                           ))}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">کۆلێکشن</label>
+                      <div className="mui-outline opacity-60">
+                        <label>کۆلێکشن</label>
                         <select
                           disabled
-                          className="w-full border border-gray-200 rounded-lg p-2 text-sm font-bold bg-gray-50 text-gray-400 cursor-not-allowed"
+                          className="w-full border-none outline-none bg-transparent font-bold text-sm text-slate-400 cursor-not-allowed"
                         >
                           <option value="">دیاری نەکراوە</option>
                         </select>
                       </div>
-                    </div>
-                    <div className="mt-2 relative">
-                      <label className="block text-xs font-bold text-gray-600 mb-1">هەژمارەکان (دیاریکردنی یەک یان زیاتر)</label>
-                      <div className="relative mb-2">
-                        <input
-                          type="text"
-                          placeholder={filterAccountIds.length === 0 ? "گەڕان بەدوای هەژمار..." : `${filterAccountIds.length} هەژمار دیاریکراوە`}
-                          className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold text-right cursor-pointer"
-                          value={accountSearch}
-                          onChange={e => {
-                            setAccountSearch(e.target.value);
-                            setShowAccountDropdown(true);
-                          }}
-                          onFocus={() => setShowAccountDropdown(true)}
+                      <div className="md:col-span-2">
+                        <MultiSelectDropdown
+                          label="هەژمارەکان"
+                          options={accounts
+                            .filter((acc: any) => {
+                              if (filterAccountType !== "all" && acc.accountTypeId !== Number(filterAccountType)) return false;
+                              if (filterCity !== "all" && acc.city !== filterCity) return false;
+                              if (filterDistrict !== "all" && acc.district !== filterDistrict) return false;
+                              return true;
+                            })
+                            .map((acc: any) => ({ value: acc.id, label: acc.name }))}
+                          selectedValues={filterAccountIds}
+                          onChange={setFilterAccountIds}
+                          searchable
                         />
-                        <span className="absolute left-3 top-2.5 text-gray-400 text-xs pointer-events-none">
-                          {showAccountDropdown ? "▲" : "▼"}
-                        </span>
                       </div>
-
-                      {showAccountDropdown && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40 bg-transparent"
-                            onClick={() => {
-                              setShowAccountDropdown(false);
-                              setAccountSearch("");
-                            }}
-                          />
-                          <div className="absolute left-0 right-0 mt-1 border border-gray-200 bg-white rounded-lg shadow-lg z-50 p-2 max-h-60 overflow-y-auto space-y-1 pr-1 font-bold text-right" dir="rtl">
-                            {(() => {
-                              const filtered = accounts.filter((acc: any) => {
-                                if (filterAccountType !== "all" && acc.accountTypeId !== Number(filterAccountType)) return false;
-                                if (filterCity !== "all" && acc.city !== filterCity) return false;
-                                if (filterDistrict !== "all" && acc.district !== filterDistrict) return false;
-                                if (accountSearch.trim()) {
-                                  const s = accountSearch.toLowerCase();
-                                  return acc.name.toLowerCase().includes(s) || (acc.phone && acc.phone.includes(s));
-                                }
-                                return true;
-                              });
-                              if (filtered.length === 0) {
-                                return <div className="text-xs text-gray-400 py-2 text-center font-bold">هیچ هەژمارێک نەدۆزرایەوە</div>;
-                              }
-                              return filtered.map((acc: any) => {
-                                const isChecked = filterAccountIds.includes(acc.id);
-                                return (
-                                  <label key={acc.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer text-xs transition-colors">
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={() => {
-                                        if (isChecked) {
-                                          setFilterAccountIds(prev => prev.filter(id => id !== acc.id));
-                                        } else {
-                                          setFilterAccountIds(prev => [...prev, acc.id]);
-                                        }
-                                      }}
-                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                    />
-                                    <span className="text-gray-700 select-none">{acc.name}</span>
-                                  </label>
-                                );
-                              });
-                            })()}
-                          </div>
-                        </>
-                      )}
-
-                      {filterAccountIds.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {filterAccountIds.map(id => {
-                            const acc = accounts.find((a: any) => a.id === id);
-                            if (!acc) return null;
-                            return (
-                              <span key={id} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-bold">
-                                {acc.name}
-                                <button
-                                  type="button"
-                                  onClick={() => setFilterAccountIds(prev => prev.filter(item => item !== id))}
-                                  className="text-blue-500 hover:text-red-500 font-bold bg-transparent border-none p-0 cursor-pointer text-sm leading-none"
-                                >
-                                  &times;
-                                </button>
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
                     </div>
                 </div>
 
                 {/* Section 3: Location Details */}
                 <div>
-                   <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2 border-b border-gray-100 pb-2"><span className="text-lg">📍</span> شوێن</h3>
-                   <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">شار</label>
-                        <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterCity} onChange={e => {
+                   <h3 className="section-title flex-row-reverse">شوێن <span>📍</span></h3>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="mui-outline">
+                        <label>شار</label>
+                        <select className="w-full border-none outline-none bg-transparent font-bold cursor-pointer text-sm text-slate-800" value={filterCity} onChange={e => {
                           setFilterCity(e.target.value);
                           setFilterDistrict("all");
                         }}>
@@ -391,9 +561,9 @@ export default function DebtReportPage() {
                           ))}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">گەڕەک / ناوچە</label>
-                        <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:border-blue-500 focus:outline-none bg-white font-bold" value={filterDistrict} onChange={e => setFilterDistrict(e.target.value)}>
+                      <div className="mui-outline">
+                        <label>گەڕەک / ناوچە</label>
+                        <select className="w-full border-none outline-none bg-transparent font-bold cursor-pointer text-sm text-slate-800" value={filterDistrict} onChange={e => setFilterDistrict(e.target.value)}>
                           <option value="all">هەموو گەڕەکەکان</option>
                           {(() => {
                             const filteredDistricts = accounts
@@ -409,21 +579,21 @@ export default function DebtReportPage() {
                       </div>
                    </div>
                 </div>
-              </div>
-              
-              <div className="p-4 border-t border-gray-100 flex gap-2">
-                <button onClick={() => {
-                  setFilterAccountType("all");
-                  setFilterAccountIds([]);
-                  setAccountSearch("");
-                  setShowAccountDropdown(false);
-                  setFilterCity("all");
-                  setFilterDistrict("all");
-                  setFilterBeforeDate("");
-                  setFilterDebtType("all");
-                  setShowFilterModal(false);
-                }} className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg border-none cursor-pointer transition-colors flex-1">لابردنی هەموو</button>
-                <button onClick={() => setShowFilterModal(false)} className="px-6 py-2 bg-[#061f5f] hover:bg-[#03133f] text-white font-bold rounded-lg border-none cursor-pointer transition-colors flex-1">جێبەجێکردن</button>
+             </div>
+             
+             <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-start gap-4">
+                <button 
+                  onClick={() => setShowFilterModal(false)} 
+                  className="px-6 py-2.5 bg-[#061f5f] hover:bg-[#03133f] text-white rounded-xl text-sm font-black transition cursor-pointer shadow-md border-none"
+                >
+                  جێبەجێکردن ✔️
+                </button>
+                <button 
+                  onClick={() => setShowFilterModal(false)} 
+                  className="text-slate-600 hover:text-slate-900 text-sm font-bold border-none bg-transparent cursor-pointer"
+                >
+                  پاشگەزبوونەوە
+                </button>
              </div>
           </div>
         </div>

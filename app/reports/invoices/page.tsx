@@ -105,12 +105,207 @@ interface RawVoucher {
   expenses: VoucherExpense[];
   ledgerEntries: LedgerEntry[];
   employeeName: string | null;
+  isDeleted?: boolean;
   versions?: any[];
   inventoryTransactions?: Array<{
     productId: number;
     qtyChange: number;
     unitCost: number;
   }>;
+}
+
+interface Option {
+  value: string | number;
+  label: string;
+}
+
+function MultiSelectDropdown({
+  label,
+  options,
+  selectedValues,
+  onChange,
+  searchable = false
+}: {
+  label: string;
+  options: Option[];
+  selectedValues: any[];
+  onChange: (values: any[]) => void;
+  searchable?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearchTerm("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm) return options;
+    return options.filter(opt =>
+      opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [options, searchTerm]);
+
+  const toggleOption = (val: any) => {
+    if (selectedValues.includes(val)) {
+      onChange(selectedValues.filter(v => v !== val));
+    } else {
+      onChange([...selectedValues, val]);
+    }
+    inputRef.current?.focus();
+  };
+
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange([]);
+    setSearchTerm("");
+    inputRef.current?.focus();
+  };
+
+  const handleRemoveValue = (e: React.MouseEvent, val: any) => {
+    e.stopPropagation();
+    onChange(selectedValues.filter(v => v !== val));
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full text-right" dir="rtl">
+      <div 
+        onClick={() => {
+          setIsOpen(true);
+          inputRef.current?.focus();
+        }}
+        className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[52px] ${
+          isOpen ? "border-[#0b1f50] ring-2 ring-[#0b1f50]/10" : ""
+        }`}
+      >
+        <label className="select-none pointer-events-none">{label}</label>
+
+        {/* Selected chips list + Search input inline */}
+        <div className="flex-1 flex flex-wrap gap-1.5 items-center justify-start overflow-hidden py-1">
+          {selectedValues.map(val => {
+            const opt = options.find(o => o.value === val);
+            const name = opt ? opt.label : String(val);
+            return (
+              <div
+                key={val}
+                className="bg-slate-100 border border-slate-200 text-slate-800 rounded-full flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 text-[11px] font-black hover:bg-slate-200 transition-colors shadow-sm animate-in fade-in-50 duration-150"
+              >
+                <button
+                  type="button"
+                  onClick={(e) => handleRemoveValue(e, val)}
+                  className="w-4 h-4 rounded-full bg-slate-300 text-slate-600 hover:bg-slate-400 hover:text-slate-800 flex items-center justify-center text-[10px] font-black border-none cursor-pointer shrink-0 transition-colors"
+                >
+                  ✕
+                </button>
+                <span className="truncate max-w-[120px] select-none">{name}</span>
+              </div>
+            );
+          })}
+
+          {searchable ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder={selectedValues.length === 0 ? "هەموو" : ""}
+              className="flex-1 min-w-[60px] max-w-full border-none outline-none text-xs font-black text-slate-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
+              dir="rtl"
+              onClick={e => e.stopPropagation()}
+              onFocus={() => setIsOpen(true)}
+            />
+          ) : (
+            selectedValues.length === 0 && (
+              <span className="text-slate-400 font-bold text-xs pr-1">هەموو</span>
+            )
+          )}
+        </div>
+
+        {/* Action icons */}
+        <div className="flex items-center gap-2 text-slate-500 shrink-0 pl-1 border-r border-slate-200 pr-2">
+          {(selectedValues.length > 0 || searchTerm) && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-slate-400 hover:text-slate-700 bg-transparent border-none cursor-pointer text-sm font-bold flex items-center justify-center w-5 h-5"
+              title="پاککردنەوەی هەموو"
+            >
+              ✕
+            </button>
+          )}
+          <span className="text-[10px] select-none text-slate-400">
+            {isOpen ? "▲" : "▼"}
+          </span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-[1050] mt-1 right-0 left-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 max-h-72 overflow-y-auto flex flex-col text-right">
+          <div className="overflow-y-auto flex-1 space-y-1 pr-1" style={{ maxHeight: "220px" }}>
+            <div
+              onClick={() => {
+                onChange([]);
+                setSearchTerm("");
+                inputRef.current?.focus();
+              }}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
+                selectedValues.length === 0
+                  ? "bg-slate-100 text-[#0b1f50]"
+                  : "text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="select-none">هەموو (کۆی گشتی)</span>
+              <input
+                type="checkbox"
+                checked={selectedValues.length === 0}
+                readOnly
+                className="w-4 h-4 rounded border-slate-300 text-[#0b1f50] focus:ring-[#0b1f50] accent-[#0b1f50] cursor-pointer"
+              />
+            </div>
+
+            {filteredOptions.map(opt => {
+              const isChecked = selectedValues.includes(opt.value);
+              return (
+                <div
+                  key={opt.value}
+                  onClick={() => toggleOption(opt.value)}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
+                    isChecked
+                      ? "bg-slate-100 text-[#0b1f50]"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="truncate max-w-[85%] select-none">{opt.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    readOnly
+                    className="w-4 h-4 rounded border-slate-300 text-[#0b1f50] focus:ring-[#0b1f50] accent-[#0b1f50] cursor-pointer"
+                  />
+                </div>
+              );
+            })}
+
+            {filteredOptions.length === 0 && (
+              <div className="text-center text-slate-400 py-3 text-xs select-none">
+                هیچ ئەنجامێک نەدۆزرایەوە
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function InvoiceReportContent() {
@@ -183,18 +378,7 @@ function InvoiceReportContent() {
   const [filterCityName, setFilterCityName] = useState("all");
   const [filterDistrictName, setFilterDistrictName] = useState("all");
 
-  // Multi-select dropdown flags
-  const [showInvoiceTypesDropdown, setShowInvoiceTypesDropdown] = useState(false);
-  const [showAccountTypesDropdown, setShowAccountTypesDropdown] = useState(false);
-  const [showAccountsDropdown, setShowAccountsDropdown] = useState(false);
-  const [showCashboxesDropdown, setShowCashboxesDropdown] = useState(false);
-  const [showWarehousesDropdown, setShowWarehousesDropdown] = useState(false);
-  const [showEmployeesDropdown, setShowEmployeesDropdown] = useState(false);
 
-  // Dropdown search inputs
-  const [accountSearch, setAccountSearch] = useState("");
-  const [employeeSearch, setEmployeeSearch] = useState("");
-  const [warehouseSearch, setWarehouseSearch] = useState("");
 
   // Table Sorting
   const [sortField, setSortField] = useState<string>("id");
@@ -283,7 +467,7 @@ function InvoiceReportContent() {
   const loadVouchers = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/vouchers");
+      const res = await fetch("/api/vouchers?includeDeleted=true");
       if (res.ok) {
         const data = await res.json();
         const filtered = (data || []).filter((v: any) => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange" && v.rawType !== "cashbox_transfer" && v.rawType !== "cashbox_exchange");
@@ -301,7 +485,7 @@ function InvoiceReportContent() {
     try {
       const res = await fetch(`/api/vouchers/${deleteVoucherId}`, { method: 'DELETE' });
       if (res.ok) {
-        setVouchers(vouchers.filter((v) => v.id !== deleteVoucherId));
+        setVouchers(vouchers.map((v) => v.id === deleteVoucherId ? { ...v, isDeleted: true } : v));
         setDeleteVoucherId(null);
       } else {
         alert("سڕینەوە سەرکەوتوو نەبوو!");
@@ -513,15 +697,12 @@ function InvoiceReportContent() {
 
   // Helper: Calculate cost of goods sold (COGS) in USD
   const getVoucherCostUSD = (voucher: RawVoucher) => {
-    if (voucher.type !== "sales") return 0;
+    if (voucher.type !== "sales" && voucher.type !== "sales_return") return 0;
 
     // Use transaction unitCost if available
     if (voucher.inventoryTransactions && voucher.inventoryTransactions.length > 0) {
       return voucher.inventoryTransactions.reduce((sum, tx) => {
-        if (tx.qtyChange < 0) {
-          return sum + Math.abs(tx.qtyChange) * (tx.unitCost || 0);
-        }
-        return sum;
+        return sum + Math.abs(tx.qtyChange) * (tx.unitCost || 0);
       }, 0);
     }
 
@@ -535,7 +716,7 @@ function InvoiceReportContent() {
 
   // Helper: Calculate net profit in base currency
   const getVoucherProfitBase = (voucher: RawVoucher) => {
-    if (voucher.type !== "sales") return 0;
+    if (voucher.type !== "sales" && voucher.type !== "sales_return") return 0;
     
     const baseCurrency = getBaseCurrency();
     const netUSD = convertAmount(voucher.netAmount, voucher.currencyId, "USD", voucher.exchangeRate);
@@ -543,6 +724,10 @@ function InvoiceReportContent() {
     
     const costUSD = getVoucherCostUSD(voucher);
     const costBase = convertAmount(costUSD, currencies.find((c: any) => c.code === "USD")?.id || 1, baseCurrency.code, voucher.exchangeRate);
+    
+    if (voucher.type === "sales_return") {
+      return -Math.max(netBase - costBase, 0);
+    }
     
     return Math.max(netBase - costBase, 0);
   };
@@ -675,12 +860,173 @@ function InvoiceReportContent() {
     return Array.from(new Set(accounts.map((a: any) => a.city).filter(Boolean))) as string[];
   }, [accounts]);
 
+  // Helper to check if there are returns matching active filters (ignoring invoice type)
+  const hasReturnsMatchingFilters = (returnType: "sales_return" | "purchase_return") => {
+    return vouchers.some((v) => {
+      if (v.type !== returnType) return false;
+
+      // Status
+      if (filterStatus === "active") {
+        if (v.isDeleted) return false;
+      } else if (filterStatus === "modified") {
+        if (v.isDeleted || !v.versions || v.versions.length <= 1) return false;
+      } else if (filterStatus === "deleted") {
+        if (!v.isDeleted) return false;
+      }
+
+      // Dates
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (new Date(v.date) < start) return false;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (new Date(v.date) > end) return false;
+      }
+
+      // Invoice ID
+      if (filterInvoiceNo) {
+        if (!v.id.toString().includes(filterInvoiceNo) && (!v.referenceNo || !v.referenceNo.includes(filterInvoiceNo))) {
+          return false;
+        }
+      }
+
+      // General Search
+      const search = (searchTerm || generalSearch).trim().toLowerCase();
+      if (search) {
+        const empName = v.employeeName || "کۆساری مەلا فەرهاد";
+        const match =
+          v.id.toString().includes(search) ||
+          (v.referenceNo && v.referenceNo.toLowerCase().includes(search)) ||
+          (v.account && v.account.name.toLowerCase().includes(search)) ||
+          (v.cashbox && v.cashbox.name.toLowerCase().includes(search)) ||
+          empName.toLowerCase().includes(search) ||
+          (v.internalNote && v.internalNote.toLowerCase().includes(search));
+        if (!match) return false;
+      }
+
+      // Payment Status
+      if (filterPaymentStatus !== "all") {
+        const ps = getPaymentStatus(v);
+        if (ps.label !== filterPaymentStatus) return false;
+      }
+
+      // Account Type
+      if (filterAccountTypeIds.length > 0) {
+        if (!v.account || !filterAccountTypeIds.includes(v.account.accountTypeId)) return false;
+      }
+
+      // Specific Account
+      if (filterAccountIds.length > 0) {
+        if (!v.accountId || !filterAccountIds.includes(v.accountId)) return false;
+      }
+
+      // Cashbox
+      if (filterCashboxIds.length > 0) {
+        if (!v.cashboxId || !filterCashboxIds.includes(v.cashboxId)) return false;
+      }
+
+      // Warehouse
+      if (filterWarehouseIds.length > 0) {
+        const matchWh = v.inventoryTransactions && v.inventoryTransactions.some((it: any) => filterWarehouseIds.includes(it.warehouseId));
+        if (!matchWh) return false;
+      }
+
+      // Currency
+      if (filterCurrencyId !== "all") {
+        if (v.currencyId !== Number(filterCurrencyId)) return false;
+      }
+
+      // City
+      if (filterCityName !== "all") {
+        if (v.account?.city?.name !== filterCityName) return false;
+      }
+
+      // District
+      if (filterDistrictName !== "all") {
+        if (v.account?.district?.name !== filterDistrictName) return false;
+      }
+
+      // Discount
+      if (filterDiscountType === "discounted") {
+        if (v.totalDiscount === 0) return false;
+      } else if (filterDiscountType === "none") {
+        if (v.totalDiscount > 0) return false;
+      }
+
+      // Employee
+      if (filterEmployees.length > 0) {
+        const empName = v.employeeName || "کۆساری مەلا فەرهاد";
+        if (!filterEmployees.includes(empName)) return false;
+      }
+
+      return true;
+    });
+  };
+
+  const showSalesReturnNotice = useMemo(() => {
+    return filterInvoiceTypes.length === 1 && filterInvoiceTypes[0] === "sales" && hasReturnsMatchingFilters("sales_return");
+  }, [
+    filterInvoiceTypes,
+    vouchers,
+    filterStatus,
+    startDate,
+    endDate,
+    filterInvoiceNo,
+    searchTerm,
+    generalSearch,
+    filterPaymentStatus,
+    filterAccountTypeIds,
+    filterAccountIds,
+    filterCashboxIds,
+    filterWarehouseIds,
+    filterCurrencyId,
+    filterCityName,
+    filterDistrictName,
+    filterDiscountType,
+    filterEmployees
+  ]);
+
+  const showPurchaseReturnNotice = useMemo(() => {
+    return filterInvoiceTypes.length === 1 && filterInvoiceTypes[0] === "purchase" && hasReturnsMatchingFilters("purchase_return");
+  }, [
+    filterInvoiceTypes,
+    vouchers,
+    filterStatus,
+    startDate,
+    endDate,
+    filterInvoiceNo,
+    searchTerm,
+    generalSearch,
+    filterPaymentStatus,
+    filterAccountTypeIds,
+    filterAccountIds,
+    filterCashboxIds,
+    filterWarehouseIds,
+    filterCurrencyId,
+    filterCityName,
+    filterDistrictName,
+    filterDiscountType,
+    filterEmployees
+  ]);
+
   // Sorting & Filtering logic
   const processedVouchers = useMemo(() => {
     let list = [...vouchers];
     
     // Exclude cashbox transfers and exchanges from invoices report
     list = list.filter(v => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange");
+
+    // Invoice Status Filter (active, modified, deleted)
+    if (filterStatus === "active") {
+      list = list.filter((v) => !v.isDeleted);
+    } else if (filterStatus === "modified") {
+      list = list.filter((v) => !v.isDeleted && v.versions && v.versions.length > 1);
+    } else if (filterStatus === "deleted") {
+      list = list.filter((v) => v.isDeleted === true);
+    }
 
     // Date Filters
     if (startDate) {
@@ -830,6 +1176,7 @@ function InvoiceReportContent() {
     generalSearch,
     filterInvoiceTypes,
     filterPaymentStatus,
+    filterStatus,
     filterAccountTypeIds,
     filterAccountIds,
     filterCashboxIds,
@@ -968,6 +1315,38 @@ function InvoiceReportContent() {
       [key]: !prev[key],
     }));
   };
+
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filterInvoiceTypes.length > 0) count++;
+    if (filterPaymentStatus !== "all") count++;
+    if (filterStatus !== "active") count++;
+    if (filterAccountTypeIds.length > 0) count++;
+    if (filterAccountIds.length > 0) count++;
+    if (filterCashboxIds.length > 0) count++;
+    if (filterWarehouseIds.length > 0) count++;
+    if (filterCurrencyId !== "all") count++;
+    if (filterCityName !== "all") count++;
+    if (filterDistrictName !== "all") count++;
+    if (filterInvoiceNo) count++;
+    if (filterDiscountType !== "all") count++;
+    if (filterEmployees.length > 0) count++;
+    return count;
+  }, [
+    filterInvoiceTypes,
+    filterPaymentStatus,
+    filterStatus,
+    filterAccountTypeIds,
+    filterAccountIds,
+    filterCashboxIds,
+    filterWarehouseIds,
+    filterCurrencyId,
+    filterCityName,
+    filterDistrictName,
+    filterInvoiceNo,
+    filterDiscountType,
+    filterEmployees,
+  ]);
 
   const clearFilters = () => {
     setFilterInvoiceTypes([]);
@@ -1284,10 +1663,24 @@ function InvoiceReportContent() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowFiltersModal(true)}
-              className="bg-blue-600 text-white hover:bg-blue-700 font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-md"
+              className="bg-blue-600 text-white hover:bg-blue-700 font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-md animate-transition"
             >
-              🎯 فلتەرەکان
+              <span>🎯 فلتەرەکان</span>
+              {activeFiltersCount > 0 && (
+                <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                  {activeFiltersCount}
+                </span>
+              )}
             </button>
+
+            {activeFiltersCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-300 font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-sm"
+              >
+                🔄 ڕێکخستنەوە
+              </button>
+            )}
 
             <button
               onClick={() => setShowColumnsModal(true)}
@@ -1392,6 +1785,42 @@ function InvoiceReportContent() {
             </span>
           </div>
         </div>
+
+        {showSalesReturnNotice && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm no-print text-right" dir="rtl">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <h4 className="font-black text-sm text-amber-950 m-0">تێبینی: پسووڵەی گەڕانەوەی فرۆشتن هەیە لەم ماوەیەدا</h4>
+                <p className="text-xs text-amber-800 m-0 mt-1 font-bold">بۆ پیشاندانی پسووڵەکانی گەڕانەوەی فرۆشتن لەگەڵ فرۆشتنەکان، کلیک لەسەر دوگمەی بەرامبەر بکە.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setFilterInvoiceTypes(["sales", "sales_return"])}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-black text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer transition-all shadow-sm shrink-0"
+            >
+              پیشاندانی گەڕانەوەی فرۆشتن 🔄
+            </button>
+          </div>
+        )}
+
+        {showPurchaseReturnNotice && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm no-print text-right" dir="rtl">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <h4 className="font-black text-sm text-amber-950 m-0">تێبینی: پسووڵەی گەڕانەوەی کڕین هەیە لەم ماوەیەدا</h4>
+                <p className="text-xs text-amber-800 m-0 mt-1 font-bold">بۆ پیشاندانی پسووڵەکانی گەڕانەوەی کڕین لەگەڵ کڕینەکان، کلیک لەسەر دوگمەی بەرامبەر بکە.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setFilterInvoiceTypes(["purchase", "purchase_return"])}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-black text-xs px-4 py-2.5 rounded-xl border-none cursor-pointer transition-all shadow-sm shrink-0"
+            >
+              پیشاندانی گەڕانەوەی کڕین 🔄
+            </button>
+          </div>
+        )}
 
         {/* ── Table Component ── */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1614,8 +2043,8 @@ function InvoiceReportContent() {
                             </td>
                           )}
                           {visibleColumns.profit && (
-                            <td className="px-4 py-3.5 text-center text-amber-700 font-bold">
-                              {voucher.type === "sales" ? formatBaseCurrency(profitVal) : "-"}
+                            <td className={`px-4 py-3.5 text-center font-bold ${(voucher.type === "sales" || voucher.type === "sales_return") && profitVal < 0 ? "text-rose-600" : "text-amber-700"}`}>
+                              {(voucher.type === "sales" || voucher.type === "sales_return") ? formatBaseCurrency(profitVal) : "-"}
                             </td>
                           )}
                           {visibleColumns.cashbox && (
@@ -1976,7 +2405,7 @@ function InvoiceReportContent() {
       {/* ── Modal: Filtering Options (ئۆپشنەکانی فلتەرکردن) ── */}
       {showFiltersModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 select-text">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
+          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#03133f] text-white">
               <button
@@ -1998,73 +2427,40 @@ function InvoiceReportContent() {
 
             {/* Content */}
             <div className="p-6 space-y-6 flex-1 text-sm font-semibold text-right" dir="rtl">
+              <style dangerouslySetInnerHTML={{__html: `
+                .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 12px; padding: 13px 16px; background: white; transition: border-color 0.2s; }
+                .mui-outline:focus-within { border-color: #0b1f50; }
+                .mui-outline label { position: absolute; top: -10px; right: 12px; background: white; padding: 0 6px; color: #475569; font-size: 11px; font-weight: bold; }
+                .mui-outline select, .mui-outline input { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; color: #1e293b; font-weight: bold; cursor: pointer; }
+                .section-title { display: flex; align-items: center; gap: 8px; color: #0f172a; font-weight: 900; font-size: 13px; margin-bottom: 16px; }
+                .section-title::before { content: ""; flex: 1; height: 1px; background: #e2e8f0; }
+              `}} />
               {/* Section 1: Invoice Details */}
               <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
                 <h3 className="text-xs font-black text-slate-500 mb-4 flex items-center gap-2 border-b border-slate-200/60 pb-2">
                   <span className="text-sm">📝</span> وردەکاری پسوڵە
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                   {/* Invoice Type */}
-                  <div className="flex flex-col gap-1 relative">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">جۆری پسوڵە (یەک یا چەند)</label>
-                    <div
-                      onClick={() => setShowInvoiceTypesDropdown(!showInvoiceTypesDropdown)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white cursor-pointer flex justify-between items-center select-none"
-                    >
-                      <span>
-                        {filterInvoiceTypes.length === 0
-                          ? "ھەموو جۆرەکان"
-                          : `${filterInvoiceTypes.length} جۆر دیاریکراوە`}
-                      </span>
-                      <span className="text-gray-400 text-[10px]">
-                        {showInvoiceTypesDropdown ? "▲" : "▼"}
-                      </span>
-                    </div>
-
-                    {showInvoiceTypesDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={() => setShowInvoiceTypesDropdown(false)}
-                        />
-                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
-                          {[
-                            { code: "sales", label: "فرۆشتن" },
-                            { code: "purchase", label: "کڕین" },
-                            { code: "money_in", label: "پارەی هاتوو" },
-                            { code: "money_out", label: "پارەی ڕۆشتوو" },
-                            { code: "expense", label: "خەرجی" },
-                            { code: "quotation", label: "نرخاندن" },
-                            { code: "sales_return", label: "گەڕانەوەی فرۆشتن" },
-                            { code: "purchase_return", label: "گەڕانەوەی کڕین" },
-                            { code: "shareholder_deposit", label: "دانانی پارە" },
-                            { code: "shareholder_withdrawal", label: "کشانەوەی پارە" },
-                            { code: "my_debt_discount", label: "داشکاندن لە قەرزی من" },
-                            { code: "people_debt_discount", label: "داشکاندن لە قەرزی خەڵک" }
-                          ].map((t) => {
-                            const isChecked = filterInvoiceTypes.includes(t.code);
-                            return (
-                              <label key={t.code} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    if (isChecked) {
-                                      setFilterInvoiceTypes(prev => prev.filter(c => c !== t.code));
-                                    } else {
-                                      setFilterInvoiceTypes(prev => [...prev, t.code]);
-                                    }
-                                  }}
-                                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span className="text-slate-700 select-none">{t.label}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <MultiSelectDropdown
+                    label="جۆری پسوڵە"
+                    options={[
+                      { value: "sales", label: "فرۆشتن" },
+                      { value: "purchase", label: "کڕین" },
+                      { value: "money_in", label: "پارەی هاتوو" },
+                      { value: "money_out", label: "پارەی ڕۆشتوو" },
+                      { value: "expense", label: "خەرجی" },
+                      { value: "quotation", label: "نرخاندن" },
+                      { value: "sales_return", label: "گەڕانەوەی فرۆشتن" },
+                      { value: "purchase_return", label: "گەڕانەوەی کڕین" },
+                      { value: "shareholder_deposit", label: "دانانی پارە" },
+                      { value: "shareholder_withdrawal", label: "کشانەوەی پارە" },
+                      { value: "my_debt_discount", label: "داشکاندن لە قەرزی من" },
+                      { value: "people_debt_discount", label: "داشکاندن لە قەرزی خەڵک" }
+                    ]}
+                    selectedValues={filterInvoiceTypes}
+                    onChange={setFilterInvoiceTypes}
+                  />
 
                   {/* Payment Status */}
                   <div className="flex flex-col gap-1">
@@ -2072,7 +2468,7 @@ function InvoiceReportContent() {
                     <select
                       value={filterPaymentStatus}
                       onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                      className="border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white min-h-[46px] cursor-pointer shadow-sm"
                     >
                       <option value="all">ھەموو</option>
                       <option value="قەرز">قەرز</option>
@@ -2082,70 +2478,13 @@ function InvoiceReportContent() {
                   </div>
 
                   {/* Employee */}
-                  <div className="flex flex-col gap-1 relative">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">لەلایەن کارمەند (یەک یا چەند)</label>
-                    <div className="relative mb-0.5">
-                      <input
-                        type="text"
-                        placeholder={filterEmployees.length === 0 ? "ھەموو کارمەندەکان" : `${filterEmployees.length} کارمەند دیاریکراوە`}
-                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white text-right cursor-pointer"
-                        value={employeeSearch}
-                        onChange={(e) => {
-                          setEmployeeSearch(e.target.value);
-                          setShowEmployeesDropdown(true);
-                        }}
-                        onFocus={() => setShowEmployeesDropdown(true)}
-                      />
-                      <span
-                        onClick={() => setShowEmployeesDropdown(!showEmployeesDropdown)}
-                        className="absolute left-3 top-2.5 text-gray-400 text-[10px] cursor-pointer"
-                      >
-                        {showEmployeesDropdown ? "▲" : "▼"}
-                      </span>
-                    </div>
-
-                    {showEmployeesDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={() => {
-                            setShowEmployeesDropdown(false);
-                            setEmployeeSearch("");
-                          }}
-                        />
-                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
-                          {(() => {
-                            const filtered = employeeOptions.filter((emp) =>
-                              !employeeSearch.trim() || emp.toLowerCase().includes(employeeSearch.toLowerCase())
-                            );
-                            if (filtered.length === 0) {
-                              return <div className="text-xs text-gray-400 py-2 text-center">هیچ کارمەندێک نەدۆزرایەوە</div>;
-                            }
-                            return filtered.map((emp) => {
-                              const isChecked = filterEmployees.includes(emp);
-                              return (
-                                <label key={emp} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      if (isChecked) {
-                                        setFilterEmployees(prev => prev.filter(e => e !== emp));
-                                      } else {
-                                        setFilterEmployees(prev => [...prev, emp]);
-                                      }
-                                    }}
-                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                                  />
-                                  <span className="text-slate-700 select-none">{emp}</span>
-                                </label>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <MultiSelectDropdown
+                    label="لەلایەن کارمەند"
+                    options={employeeOptions.map(emp => ({ value: emp, label: emp }))}
+                    selectedValues={filterEmployees}
+                    onChange={setFilterEmployees}
+                    searchable
+                  />
 
                   {/* Invoice Number */}
                   <div className="flex flex-col gap-1">
@@ -2155,7 +2494,7 @@ function InvoiceReportContent() {
                       value={filterInvoiceNo}
                       onChange={(e) => setFilterInvoiceNo(e.target.value)}
                       placeholder="نموونە: 288"
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                      className="border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white min-h-[46px]"
                     />
                   </div>
 
@@ -2165,10 +2504,11 @@ function InvoiceReportContent() {
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                      className="border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white min-h-[46px] cursor-pointer"
                     >
-                      <option value="active">تەنها چالاکەکان</option>
-                      <option value="all">ھەموو پسوڵەکان</option>
+                      <option value="active">چالاک</option>
+                      <option value="modified">پسووڵە دەستکاریکراوەکان</option>
+                      <option value="deleted">پسووڵە سڕاوەکان</option>
                     </select>
                   </div>
 
@@ -2178,7 +2518,7 @@ function InvoiceReportContent() {
                     <select
                       value={filterDiscountType}
                       onChange={(e) => setFilterDiscountType(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                      className="border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white min-h-[46px] cursor-pointer"
                     >
                       <option value="all">ھەموو</option>
                       <option value="discounted">تەنیا پسوڵەکانی خاوەن داشکاندن</option>
@@ -2192,7 +2532,7 @@ function InvoiceReportContent() {
                     <select
                       value={filterCurrencyId}
                       onChange={(e) => setFilterCurrencyId(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white"
+                      className="border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white min-h-[46px] cursor-pointer"
                     >
                       <option value="all">ھەموو دراوەکان</option>
                       {currencies.map((c: any) => (
@@ -2210,238 +2550,42 @@ function InvoiceReportContent() {
                 <h3 className="text-xs font-black text-slate-500 mb-4 flex items-center gap-2 border-b border-slate-200/60 pb-2">
                   <span className="text-sm">👤</span> زانیاری هەژمار
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   {/* Account Type */}
-                  <div className="flex flex-col gap-1 relative">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">جۆری ھەژمار (یەک یا چەند)</label>
-                    <div
-                      onClick={() => setShowAccountTypesDropdown(!showAccountTypesDropdown)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white cursor-pointer flex justify-between items-center select-none"
-                    >
-                      <span>
-                        {filterAccountTypeIds.length === 0
-                          ? "ھەموو جۆرەکان"
-                          : `${filterAccountTypeIds.length} جۆر دیاریکراوە`}
-                      </span>
-                      <span className="text-gray-400 text-[10px]">
-                        {showAccountTypesDropdown ? "▲" : "▼"}
-                      </span>
-                    </div>
-
-                    {showAccountTypesDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={() => setShowAccountTypesDropdown(false)}
-                        />
-                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
-                          {accountTypes.map((type: any) => {
-                            const isChecked = filterAccountTypeIds.includes(type.id);
-                            return (
-                              <label key={type.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    if (isChecked) {
-                                      setFilterAccountTypeIds(prev => prev.filter(id => id !== type.id));
-                                    } else {
-                                      setFilterAccountTypeIds(prev => [...prev, type.id]);
-                                    }
-                                  }}
-                                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span className="text-slate-700 select-none">{type.name}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <MultiSelectDropdown
+                    label="جۆری ھەژمار"
+                    options={accountTypes?.map((a: any) => ({ value: a.id, label: a.name })) || []}
+                    selectedValues={filterAccountTypeIds}
+                    onChange={setFilterAccountTypeIds}
+                    searchable
+                  />
 
                   {/* Specific Account */}
-                  <div className="flex flex-col gap-1 relative">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">هەژمار (یەک یا چەند)</label>
-                    <div className="relative mb-0.5">
-                      <input
-                        type="text"
-                        placeholder={filterAccountIds.length === 0 ? "ھەموو هەژمارەکان" : `${filterAccountIds.length} هەژمار دیاریکراوە`}
-                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white text-right cursor-pointer"
-                        value={accountSearch}
-                        onChange={(e) => {
-                          setAccountSearch(e.target.value);
-                          setShowAccountsDropdown(true);
-                        }}
-                        onFocus={() => setShowAccountsDropdown(true)}
-                      />
-                      <span
-                        onClick={() => setShowAccountsDropdown(!showAccountsDropdown)}
-                        className="absolute left-3 top-2.5 text-gray-400 text-[10px] cursor-pointer"
-                      >
-                        {showAccountsDropdown ? "▲" : "▼"}
-                      </span>
-                    </div>
-
-                    {showAccountsDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={() => {
-                            setShowAccountsDropdown(false);
-                            setAccountSearch("");
-                          }}
-                        />
-                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
-                          {(() => {
-                            const filtered = accounts.filter((acc: any) => {
-                              const matchesSearch = !accountSearch.trim() || acc.name.toLowerCase().includes(accountSearch.toLowerCase());
-                              const matchesType = filterAccountTypeIds.length === 0 || filterAccountTypeIds.includes(acc.accountTypeId);
-                              return matchesSearch && matchesType;
-                            });
-                            if (filtered.length === 0) {
-                              return <div className="text-xs text-gray-400 py-2 text-center">هیچ هەژمارێک نەدۆزرایەوە</div>;
-                            }
-                            return filtered.map((acc: any) => {
-                              const isChecked = filterAccountIds.includes(acc.id);
-                              return (
-                                <label key={acc.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      if (isChecked) {
-                                        setFilterAccountIds(prev => prev.filter(id => id !== acc.id));
-                                      } else {
-                                        setFilterAccountIds(prev => [...prev, acc.id]);
-                                      }
-                                    }}
-                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                                  />
-                                  <span className="text-slate-700 select-none">{acc.name}</span>
-                                </label>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <MultiSelectDropdown
+                    label="هەژمار"
+                    options={accounts?.filter((acc: any) => filterAccountTypeIds.length === 0 || filterAccountTypeIds.includes(acc.accountTypeId)).map((a: any) => ({ value: a.id, label: a.name })) || []}
+                    selectedValues={filterAccountIds}
+                    onChange={setFilterAccountIds}
+                    searchable
+                  />
 
                   {/* Cashbox */}
-                  <div className="flex flex-col gap-1 relative">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">قاسە (یەک یا چەند)</label>
-                    <div
-                      onClick={() => setShowCashboxesDropdown(!showCashboxesDropdown)}
-                      className="border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white cursor-pointer flex justify-between items-center select-none"
-                    >
-                      <span>
-                        {filterCashboxIds.length === 0
-                          ? "ھەموو قاسەکان"
-                          : `${filterCashboxIds.length} قاسە دیاریکراوە`}
-                      </span>
-                      <span className="text-gray-400 text-[10px]">
-                        {showCashboxesDropdown ? "▲" : "▼"}
-                      </span>
-                    </div>
-
-                    {showCashboxesDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={() => setShowCashboxesDropdown(false)}
-                        />
-                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
-                          {cashboxes.map((cb: any) => {
-                            const isChecked = filterCashboxIds.includes(cb.id);
-                            return (
-                              <label key={cb.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    if (isChecked) {
-                                      setFilterCashboxIds(prev => prev.filter(id => id !== cb.id));
-                                    } else {
-                                      setFilterCashboxIds(prev => [...prev, cb.id]);
-                                    }
-                                  }}
-                                  className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span className="text-slate-700 select-none">{cb.name}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <MultiSelectDropdown
+                    label="قاسە"
+                    options={cashboxes?.map((c: any) => ({ value: c.id, label: c.name })) || []}
+                    selectedValues={filterCashboxIds}
+                    onChange={setFilterCashboxIds}
+                    searchable
+                  />
 
                   {/* Warehouse */}
-                  <div className="flex flex-col gap-1 relative">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">کۆگا (یەک یا چەند)</label>
-                    <div className="relative mb-0.5">
-                      <input
-                        type="text"
-                        placeholder={filterWarehouseIds.length === 0 ? "ھەموو کۆگاکان" : `${filterWarehouseIds.length} کۆگا دیاریکراوە`}
-                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white text-right cursor-pointer"
-                        value={warehouseSearch}
-                        onChange={(e) => {
-                          setWarehouseSearch(e.target.value);
-                          setShowWarehousesDropdown(true);
-                        }}
-                        onFocus={() => setShowWarehousesDropdown(true)}
-                      />
-                      <span
-                        onClick={() => setShowWarehousesDropdown(!showWarehousesDropdown)}
-                        className="absolute left-3 top-2.5 text-gray-400 text-[10px] cursor-pointer"
-                      >
-                        {showWarehousesDropdown ? "▲" : "▼"}
-                      </span>
-                    </div>
-
-                    {showWarehousesDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={() => {
-                            setShowWarehousesDropdown(false);
-                            setWarehouseSearch("");
-                          }}
-                        />
-                        <div className="absolute left-0 right-0 top-full mt-1 border border-slate-200 bg-white rounded-xl shadow-lg z-50 p-2 max-h-52 overflow-y-auto space-y-1 text-right" dir="rtl">
-                          {(() => {
-                            const filtered = (warehouses || []).filter((wh: any) =>
-                              !warehouseSearch.trim() || wh.name.toLowerCase().includes(warehouseSearch.toLowerCase())
-                            );
-                            if (filtered.length === 0) {
-                              return <div className="text-xs text-gray-400 py-2 text-center">هیچ کۆگایەک نەدۆزرایەوە</div>;
-                            }
-                            return filtered.map((wh: any) => {
-                              const isChecked = filterWarehouseIds.includes(wh.id);
-                              return (
-                                <label key={wh.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs transition-colors">
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() => {
-                                      if (isChecked) {
-                                        setFilterWarehouseIds(prev => prev.filter(id => id !== wh.id));
-                                      } else {
-                                        setFilterWarehouseIds(prev => [...prev, wh.id]);
-                                      }
-                                    }}
-                                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
-                                  />
-                                  <span className="text-slate-700 select-none">{wh.name}</span>
-                                </label>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <MultiSelectDropdown
+                    label="کۆگا"
+                    options={warehouses?.map((w: any) => ({ value: w.id, label: w.name })) || []}
+                    selectedValues={filterWarehouseIds}
+                    onChange={setFilterWarehouseIds}
+                    searchable
+                  />
                 </div>
               </div>
 

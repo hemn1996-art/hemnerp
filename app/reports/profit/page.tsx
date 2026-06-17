@@ -74,7 +74,7 @@ function MultiSelectDropdown({
           setIsOpen(true);
           inputRef.current?.focus();
         }}
-        className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[46px] ${
+        className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[52px] ${
           isOpen ? "border-[#061f5f] ring-2 ring-[#061f5f]/10" : ""
         }`}
       >
@@ -607,7 +607,7 @@ export default function ProfitReportPage() {
       {/* Filters Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 no-print">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="bg-[#061f5f] p-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
@@ -622,12 +622,12 @@ export default function ProfitReportPage() {
               </button>
             </div>
 
-            <div className="p-6 max-h-[70vh] overflow-y-auto bg-white text-right space-y-6">
+            <div className="p-6 max-h-[80vh] overflow-y-auto bg-white text-right space-y-6">
               <style dangerouslySetInnerHTML={{__html: `
-                .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 14px; background: white; transition: border-color 0.2s; }
+                .mui-outline { position: relative; border: 1px solid #cbd5e1; border-radius: 12px; padding: 13px 16px; background: white; transition: border-color 0.2s; }
                 .mui-outline:focus-within { border-color: #3b82f6; }
                 .mui-outline label { position: absolute; top: -10px; right: 12px; background: white; padding: 0 6px; color: #475569; font-size: 11px; font-weight: bold; }
-                .mui-outline select { width: 100%; border: none; outline: none; background: transparent; font-size: 13px; color: #1e293b; font-weight: bold; cursor: pointer; }
+                .mui-outline select, .mui-outline input { width: 100%; border: none; outline: none; background: transparent; font-size: 14px; color: #1e293b; font-weight: bold; cursor: pointer; }
                 .section-title { display: flex; align-items: center; gap: 8px; color: #0f172a; font-weight: 900; font-size: 13px; margin-bottom: 16px; }
                 .section-title::before { content: ""; flex: 1; height: 1px; background: #e2e8f0; }
               `}} />

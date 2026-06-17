@@ -19,6 +19,23 @@ export async function GET(request: Request) {
     const itemCode = searchParams.get("itemCode");
     const batchCode = searchParams.get("batchCode");
 
+    const parseNumberArray = (val: string | null) => {
+      if (!val || val === "all" || val === "") return undefined;
+      if (val.includes(",")) {
+        return { in: val.split(",").map(id => parseInt(id)).filter(id => !isNaN(id)) };
+      }
+      const parsed = parseInt(val);
+      return isNaN(parsed) ? undefined : parsed;
+    };
+
+    const parseStringArray = (val: string | null) => {
+      if (!val || val === "all" || val === "") return undefined;
+      if (val.includes(",")) {
+        return { in: val.split(",") };
+      }
+      return val;
+    };
+
     // Build where clause
     const where: any = { voucher: {} };
     
@@ -33,27 +50,33 @@ export async function GET(request: Request) {
     }
 
     if (accountId && accountId !== "all") {
-      where.voucher.accountId = parseInt(accountId);
+      const parsed = parseNumberArray(accountId);
+      if (parsed) where.voucher.accountId = parsed;
     }
 
     if (accountTypeId && accountTypeId !== "all") {
-      where.voucher.account = { accountTypeId: parseInt(accountTypeId) };
+      const parsed = parseNumberArray(accountTypeId);
+      if (parsed) where.voucher.account = { accountTypeId: parsed };
     }
 
     if (voucherType && voucherType !== "all") {
-      where.voucher.type = voucherType;
+      const parsed = parseStringArray(voucherType);
+      if (parsed) where.voucher.type = parsed;
     }
 
     if (productId && productId !== "all") {
-      where.productId = parseInt(productId);
+      const parsed = parseNumberArray(productId);
+      if (parsed) where.productId = parsed;
     }
 
     if (currencyId && currencyId !== "all") {
-      where.voucher.currencyId = parseInt(currencyId);
+      const parsed = parseNumberArray(currencyId);
+      if (parsed) where.voucher.currencyId = parsed;
     }
 
     if (createdBy && createdBy !== "all" && createdBy !== "") {
-      where.voucher.employeeName = createdBy;
+      const parsed = parseStringArray(createdBy);
+      if (parsed) where.voucher.employeeName = parsed;
     }
 
     if (itemCode && itemCode.trim() !== "") {
@@ -64,7 +87,8 @@ export async function GET(request: Request) {
 
     const txFilter: any = {};
     if (warehouseId && warehouseId !== "all") {
-      txFilter.warehouseId = parseInt(warehouseId);
+      const parsed = parseNumberArray(warehouseId);
+      if (parsed) txFilter.warehouseId = parsed;
     }
     if (batchCode && batchCode.trim() !== "") {
       txFilter.batchNo = { contains: batchCode.trim(), mode: 'insensitive' };
@@ -112,7 +136,7 @@ export async function GET(request: Request) {
       return {
         id: line.id,
         voucherId: line.voucherId,
-        voucherReference: line.voucher.referenceNo || line.voucherId.toString(),
+        voucherReference: line.voucherId.toString(),
         voucherType: line.voucher.type,
         productName: line.product.name,
         productCode: line.product.code || "-",

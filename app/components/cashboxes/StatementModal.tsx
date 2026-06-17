@@ -168,12 +168,13 @@ export default function StatementModal({
 
   // 2. Filter movements by date
   const filteredMovements = useMemo(() => {
-    return allMovements.filter((m) => {
+    const list = allMovements.filter((m) => {
       const mDateOnly = new Date(m.dateStr).toISOString().slice(0, 10);
       if (startDate && mDateOnly < startDate) return false;
       if (endDate && mDateOnly > endDate) return false;
       return true;
     });
+    return list.slice().reverse();
   }, [allMovements, startDate, endDate]);
 
   // 3. Paginated movements
@@ -188,7 +189,8 @@ export default function StatementModal({
   const statementBalance = useMemo(() => {
     if (filteredMovements.length === 0) return "0";
     // We show the final running balance of the filtered movements list
-    const lastMovement = filteredMovements[filteredMovements.length - 1];
+    // Since filteredMovements is reversed, the chronologically last item is now at index 0
+    const lastMovement = filteredMovements[0];
     return formatRunningBalanceMap(lastMovement.runningBalance);
   }, [filteredMovements]);
 

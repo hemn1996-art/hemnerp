@@ -47,6 +47,33 @@ function AccountStatementContent() {
     balance: true,
   });
 
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filterCurrencyId !== "all") count++;
+    if (filterShowItems !== "شاردنەوە") count++;
+    
+    const d = new Date();
+    const defaultEndDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    d.setMonth(d.getMonth() - 1);
+    const defaultStartDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    if (startDate !== defaultStartDateStr) count++;
+    if (endDate !== defaultEndDateStr) count++;
+    
+    return count;
+  }, [filterCurrencyId, filterShowItems, startDate, endDate]);
+
+  const handleResetFilters = () => {
+    const d = new Date();
+    const defaultEndDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    d.setMonth(d.getMonth() - 1);
+    const defaultStartDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    setStartDate(defaultStartDateStr);
+    setEndDate(defaultEndDateStr);
+    setFilterCurrencyId("all");
+    setFilterShowItems("شاردنەوە");
+  };
+
   const visibleColCount = 1 +
     (visibleColumns.date ? 1 : 0) +
     (visibleColumns.voucherId ? 1 : 0) +
@@ -360,46 +387,48 @@ function AccountStatementContent() {
       <div id="print-area" className="p-2 md:p-6 mx-auto bg-white min-h-screen shadow-sm print-border">
         {/* Toolbar */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 no-print border-b border-gray-100 pb-4">
-          <div className="flex gap-2 items-center w-full md:w-auto">
-            <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-[#e0e7ff] text-[#4f46e5] font-bold px-4 py-2 rounded-lg hover:bg-[#c7d2fe] transition-colors cursor-pointer text-sm shadow-sm flex-1 md:flex-none">
-              🖨️ پرینت
+          <div className="flex gap-3 items-center w-full md:w-auto flex-wrap">
+            <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-lg hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
+              <span>فلتەرەکان ⚙️</span>
+              {activeFiltersCount > 0 && (
+                <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                  {activeFiltersCount}
+                </span>
+              )}
             </button>
-            <button 
-              onClick={() => {
-                setStartDate("");
-                setEndDate("");
-                setFilterCurrencyId("all");
-                loadVouchers();
-              }}
-              className="flex items-center justify-center gap-2 bg-[#e0e7ff] text-[#4f46e5] font-bold px-4 py-2 rounded-lg hover:bg-[#c7d2fe] transition-colors cursor-pointer text-sm shadow-sm flex-1 md:flex-none"
-            >
-              ڕێکخستنەوە ✖️
-            </button>
+            {activeFiltersCount > 0 && (
+              <button 
+                onClick={handleResetFilters}
+                className="flex items-center justify-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 font-bold px-4 py-2.5 rounded-lg hover:bg-rose-200 transition-colors cursor-pointer text-sm shadow-sm"
+              >
+                🔄 ڕێکخستنەوە
+              </button>
+            )}
             <button 
               onClick={loadVouchers}
-              className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2 rounded-lg hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm flex-1 md:flex-none"
+              className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-lg hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm"
             >
               گەڕان 🔍
             </button>
-            <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2 rounded-lg hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm flex-1 md:flex-none">
-              فلتەرەکان ⚙️
+            <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
+              پرینت 🖨️
             </button>
           </div>
 
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-4 items-center flex-wrap">
             <div 
-              className="flex items-center border border-gray-200 rounded-lg overflow-hidden h-10 shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors"
+              className="flex items-center border border-gray-200 rounded-xl overflow-hidden h-12 shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors"
               onClick={(e) => (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker()}
             >
-              <span className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500 border-l border-gray-200">بەرواری دەستپێک</span>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-3 py-2 text-sm text-gray-700 outline-none w-36 bg-white cursor-pointer" />
+              <span className="bg-gray-50 px-4 py-3 text-sm font-bold text-gray-500 border-l border-gray-200 h-full flex items-center">بەرواری دەستپێک</span>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-4 py-3 text-sm font-bold text-gray-700 outline-none w-40 bg-white cursor-pointer h-full" />
             </div>
             <div 
-              className="flex items-center border border-gray-200 rounded-lg overflow-hidden h-10 shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors"
+              className="flex items-center border border-gray-200 rounded-xl overflow-hidden h-12 shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors"
               onClick={(e) => (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker()}
             >
-              <span className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500 border-l border-gray-200">بەرواری کۆتایی</span>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-3 py-2 text-sm text-gray-700 outline-none w-36 bg-white cursor-pointer" />
+              <span className="bg-gray-50 px-4 py-3 text-sm font-bold text-gray-500 border-l border-gray-200 h-full flex items-center">بەرواری کۆتایی</span>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-4 py-3 text-sm font-bold text-gray-700 outline-none w-40 bg-white cursor-pointer h-full" />
             </div>
           </div>
         </div>
@@ -642,15 +671,20 @@ function AccountStatementContent() {
       {/* Filter Modal - For remaining options */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="bg-[#0b1f50] text-white p-4 flex justify-between items-center">
               <h3 className="font-bold text-lg m-0">ئۆپشنەکانی فلتەرکردن</h3>
-              <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-gray-300 text-2xl font-bold cursor-pointer">×</button>
+              <div className="flex gap-4 items-center">
+                <button onClick={handleResetFilters} className="text-white hover:text-gray-300 text-sm font-bold flex items-center gap-1">
+                  لابردنی هەموو ⌫
+                </button>
+                <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-gray-300 text-2xl font-bold cursor-pointer">×</button>
+              </div>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-5 text-right">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">دراو</label>
-                <select value={filterCurrencyId} onChange={(e) => setFilterCurrencyId(e.target.value)} className="w-full border border-gray-300 rounded-lg p-3 text-sm font-medium bg-gray-50 outline-none focus:border-[#0b1f50]">
+                <select value={filterCurrencyId} onChange={(e) => setFilterCurrencyId(e.target.value)} className="w-full border border-gray-300 rounded-xl p-3 text-sm font-bold bg-white outline-none focus:border-[#0b1f50] shadow-sm">
                   <option value="all">هەموو دراوەکان (بە دراوی سەرەکی)</option>
                   {currencies.map((c: any) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -663,7 +697,7 @@ function AccountStatementContent() {
                 <select 
                   value={filterShowItems} 
                   onChange={(e) => setFilterShowItems(e.target.value)} 
-                  className="w-full border border-gray-300 rounded-lg p-3 text-sm font-medium bg-gray-50 outline-none focus:border-[#0b1f50] text-gray-700 animate-transition"
+                  className="w-full border border-gray-300 rounded-xl p-3 text-sm font-bold bg-white outline-none focus:border-[#0b1f50] text-gray-700 shadow-sm"
                 >
                   <option value="شاردنەوە">شاردنەوە</option>
                   <option value="پیشاندان">پیشاندان</option>
@@ -672,7 +706,7 @@ function AccountStatementContent() {
               
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">کۆڵۆمەکانی خشتە</label>
-                <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-xl border border-gray-200">
                   <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer">
                     <input type="checkbox" checked={visibleColumns.date} onChange={() => setVisibleColumns(p => ({ ...p, date: !p.date }))} className="rounded text-[#0b1f50] focus:ring-[#0b1f50]" />
                     بەروار

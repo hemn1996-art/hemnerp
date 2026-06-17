@@ -95,6 +95,38 @@ export default function StockSnapshotReportPage() {
     loadStockData();
   }, [asOfDate]);
 
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filters.warehouseId) count++;
+    if (filters.sellerName) count++;
+    if (filters.category) count++;
+    if (filters.brand) count++;
+    if (filters.code) count++;
+    if (filters.productName) count++;
+    if (filters.batchCode) count++;
+    if (filters.warehouseStatus) count++;
+    if (filters.grouped !== "نەخێر") count++;
+    if (filters.fromDate) count++;
+    if (filters.toDate) count++;
+    return count;
+  }, [filters]);
+
+  const handleResetFilters = () => {
+    setFilters({
+      warehouseId: "",
+      sellerName: "",
+      category: "",
+      brand: "",
+      code: "",
+      productName: "",
+      batchCode: "",
+      warehouseStatus: "",
+      grouped: "نەخێر",
+      fromDate: "",
+      toDate: "",
+    });
+  };
+
   const loadStockData = async () => {
     try {
       setLoading(true);
@@ -174,8 +206,19 @@ export default function StockSnapshotReportPage() {
           </div>
 
           <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
-            فلتەرەکان ☰
+            <span>فلتەرەکان ☰</span>
+            {activeFiltersCount > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
+          
+          {activeFiltersCount > 0 && (
+            <button onClick={handleResetFilters} className="flex items-center justify-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 font-bold px-4 py-2.5 rounded-md hover:bg-rose-200 transition-colors cursor-pointer text-sm shadow-sm">
+              🔄 ڕێکخستنەوە
+            </button>
+          )}
           <button onClick={loadStockData} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
             گەڕان 🔍
           </button>
@@ -357,87 +400,87 @@ export default function StockSnapshotReportPage() {
       {/* Filter Modal */}
       {showFilterModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="bg-[#0b1f50] text-white p-4 flex justify-between items-center">
               <h3 className="font-bold text-lg m-0">ئۆپشنەکانی فلتەرکردن</h3>
               <div className="flex gap-4 items-center">
-                <button className="text-white hover:text-gray-300 text-sm font-bold flex items-center gap-1">
+                <button onClick={handleResetFilters} className="text-white hover:text-gray-300 text-sm font-bold flex items-center gap-1 bg-transparent border-none cursor-pointer">
                   لابردنی هەموو ⌫
                 </button>
-                <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-gray-300 text-2xl font-bold cursor-pointer">×</button>
+                <button onClick={() => setShowFilterModal(false)} className="text-white hover:text-gray-300 text-2xl font-bold cursor-pointer bg-transparent border-none">×</button>
               </div>
             </div>
-            <div className="p-4 max-h-[85vh] overflow-y-auto">
+            <div className="p-6 max-h-[85vh] overflow-y-auto text-right" style={{ direction: 'rtl' }}>
               
-              <div className="mb-3">
-                <h4 className="font-bold text-gray-800 text-[13px] mb-2 flex items-center gap-2">
+              <div className="mb-4">
+                <h4 className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2 justify-end">
                   <span>📅</span> بەروار
                 </h4>
                 <div 
-                  className="flex items-center border border-gray-300 rounded overflow-hidden shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors bg-white w-full md:w-1/2"
+                  className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors bg-white w-full md:w-1/2 min-h-[46px]"
                   onClick={(e) => (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker()}
                 >
-                  <span className="bg-gray-50 px-2 py-1.5 text-xs font-bold text-gray-500 border-l border-gray-300 w-20">بەروار</span>
+                  <span className="bg-gray-50 px-3 py-2.5 text-sm font-bold text-gray-500 border-l border-gray-300 w-24">بەروار</span>
                   <input 
                     type="date" 
-                    className="flex-1 px-2 py-1.5 text-xs text-gray-700 outline-none cursor-pointer" 
+                    className="flex-1 px-3 py-2.5 text-sm text-gray-700 outline-none cursor-pointer font-bold" 
                     value={asOfDate}
                     onChange={(e) => setAsOfDate(e.target.value)}
                   />
                 </div>
               </div>
 
-              <div className="mb-3">
-                <h4 className="font-bold text-gray-800 text-[13px] mb-2 flex items-center gap-2">
+              <div className="mb-4">
+                <h4 className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2 justify-end">
                   <span>📍</span> شوێن و سەرچاوە
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <select className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-600 outline-none">
+                    <select className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 font-bold bg-white outline-none cursor-pointer min-h-[46px]">
                       <option>فرۆشیار</option>
                     </select>
                   </div>
                   <div>
-                    <select className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-600 outline-none">
+                    <select className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 font-bold bg-white outline-none cursor-pointer min-h-[46px]">
                       <option>کۆگا</option>
                     </select>
                   </div>
                 </div>
               </div>
 
-              <div className="mb-3">
-                <h4 className="font-bold text-gray-800 text-[13px] mb-2 flex items-center gap-2">
+              <div className="mb-4">
+                <h4 className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2 justify-end">
                   <span>📦</span> فلتەری کەرەستە
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <select className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-600 outline-none">
+                    <select className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 font-bold bg-white outline-none cursor-pointer min-h-[46px]">
                       <option>براند</option>
                     </select>
                   </div>
                   <div>
-                    <select className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-600 outline-none">
+                    <select className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 font-bold bg-white outline-none cursor-pointer min-h-[46px]">
                       <option>کاتیگۆری</option>
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <select className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-600 outline-none">
+                    <select className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 font-bold bg-white outline-none cursor-pointer min-h-[46px]">
                       <option>کەرەستە</option>
                     </select>
                   </div>
                   <div>
-                    <input type="text" placeholder="کۆد" className="w-full border border-gray-300 rounded p-1.5 text-xs text-gray-600 outline-none text-right" />
+                    <input type="text" placeholder="کۆد" className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 font-bold bg-white outline-none text-right min-h-[46px]" />
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-4 flex justify-between items-center">
-                <button onClick={() => { setShowFilterModal(false); loadStockData(); }} className="bg-[#0b1f50] text-white px-5 py-1.5 rounded shadow-md text-xs font-bold hover:bg-[#061f5f] transition-colors flex items-center gap-2">
+              <div className="border-t border-gray-200 pt-4 flex justify-between items-center">
+                <button onClick={() => { setShowFilterModal(false); loadStockData(); }} className="bg-[#0b1f50] text-white px-6 py-2.5 rounded-xl shadow-md text-sm font-bold hover:bg-[#061f5f] transition-colors flex items-center gap-2 border-none cursor-pointer">
                   جێبەجێکردنی فلتەرەکان ✔️
                 </button>
-                <button onClick={() => setShowFilterModal(false)} className="text-gray-500 hover:text-gray-700 font-bold text-xs px-3 py-1.5">
+                <button onClick={() => setShowFilterModal(false)} className="text-gray-500 hover:text-gray-700 font-bold text-sm px-4 py-2 bg-transparent border-none cursor-pointer">
                   پاشگەزبوونەوە
                 </button>
               </div>
