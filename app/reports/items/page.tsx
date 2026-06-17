@@ -412,6 +412,12 @@ export default function ItemsReportPage() {
       case "purchase_return": return "گەڕانەوەی کڕین";
       case "inventory_in": return "هاتنەناوەوە";
       case "inventory_out": return "چوونەدەرەوە";
+      case "expense": return "خەرجی";
+      case "money_in": return "پارەی هاتوو";
+      case "money_out": return "پارەی ڕۆشتوو";
+      case "quotation": return "نرخاندن";
+      case "cashbox_transfer": return "گواستنەوەی پارە";
+      case "cashbox_exchange": return "گۆڕینەوەی پارە";
       default: return type;
     }
   };
