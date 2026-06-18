@@ -385,6 +385,38 @@ export default function MyDebtPage({ headerSelector, editId }: Props) {
     return parts.length ? parts.join(" + ") : "0";
   }
 
+  function formatCurrencyMapWithColors(map: Record<string, number>) {
+    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    if (activeEntries.length === 0) {
+      return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+        {activeEntries.map(([curIdText, val]) => {
+          const isNegative = val < -0.01;
+          const color = isNegative ? "#dc2626" : "#16a34a";
+          const symbol = getCurrencySymbol(Number(curIdText));
+          const code = getCurrencyCode(Number(curIdText));
+          const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+          
+          if (code === "IQD") {
+            return (
+              <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
+                {isNegative ? "-" : ""}{formatted} دینار
+              </span>
+            );
+          }
+          
+          return (
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
+              {isNegative ? "-" : ""}{symbol}{formatted}
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+
   function formatBalanceColor(map: Record<string, number>) {
     const totalInDefault = Object.entries(map).reduce(
       (sum, [currencyIdText, amount]) => {
@@ -846,25 +878,11 @@ export default function MyDebtPage({ headerSelector, editId }: Props) {
               </InfoRow>
 
               <InfoRow label="باڵانسی پێشوو">
-                <span
-                  style={{
-                    color: formatBalanceColor(accountBalanceBeforeByCurrency),
-                    fontWeight: 900,
-                  }}
-                >
-                  {formatCurrencyMap(accountBalanceBeforeByCurrency)}
-                </span>
+                {formatCurrencyMapWithColors(accountBalanceBeforeByCurrency)}
               </InfoRow>
 
               <InfoRow label="کۆی گشتی ماوە">
-                <span
-                  style={{
-                    color: formatBalanceColor(accountBalanceAfterByCurrency),
-                    fontWeight: 900,
-                  }}
-                >
-                  {formatCurrencyMap(accountBalanceAfterByCurrency)}
-                </span>
+                {formatCurrencyMapWithColors(accountBalanceAfterByCurrency)}
               </InfoRow>
             </div>
           )}
@@ -883,8 +901,7 @@ export default function MyDebtPage({ headerSelector, editId }: Props) {
 
               <StatBox
                 title="کۆی گشتی ماوە"
-                value={formatCurrencyMap(accountBalanceAfterByCurrency)}
-                color={formatBalanceColor(accountBalanceAfterByCurrency)}
+                value={formatCurrencyMapWithColors(accountBalanceAfterByCurrency)}
               />
             </div>
 
@@ -1324,8 +1341,8 @@ function StatBox({
   color,
 }: {
   title: string;
-  value: string;
-  color: string;
+  value: ReactNode;
+  color?: string;
 }) {
   return (
     <div style={statBox}>

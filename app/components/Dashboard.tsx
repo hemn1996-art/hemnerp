@@ -745,8 +745,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                               raw === "money_out" || raw === "پارەی ڕۆشتوو" ? "money_out" :
                               raw === "sales_return" || raw === "گەڕانەوەی فرۆشتن" ? "sales_return" :
                               raw === "purchase_return" || raw === "گەڕانەوەی کڕین" ? "purchase_return" :
-                              raw === "my_debt" || raw === "قەرزی من" ? "my_debt" :
-                              raw === "people_debt" || raw === "قەرزی خەڵک" ? "people_debt" :
+                              raw === "my_debt" || raw === "قەرزی من" || raw === "من قەرزارم" || raw === "من قەرزدارم" ? "my_debt" :
+                              raw === "people_debt" || raw === "قەرزی خەڵک" || raw === "قەرزم لای خەڵکە" ? "people_debt" :
                               raw === "my_debt_discount" || raw === "داشکاندن لە قەرزی من" ? "my_debt_discount" :
                               raw === "people_debt_discount" || raw === "داشکاندن لە قەرزی خەڵک" ? "people_debt_discount" :
                               raw === "shareholder_deposit" || raw === "دانانی پارە" || raw === "deposit" ? "deposit" :
