@@ -1213,11 +1213,8 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
               <InfoRow label="ناونیشان">
                 {selectedAccount.address || "-"}
               </InfoRow>
-              <InfoRow label="قەرزی پێشوو">
-                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
-              </InfoRow>
-              <InfoRow label="کۆی گشتی ماوە">
-                {formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
+              <InfoRow label="باڵانس">
+                {formatCurrencyMapWithColors(isLocked ? screenAccountBalanceAfterByCurrency : screenAccountBalanceBeforeByCurrency)}
               </InfoRow>
             </div>
           )}

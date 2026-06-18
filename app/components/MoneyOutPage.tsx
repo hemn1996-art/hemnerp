@@ -1263,12 +1263,8 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                 {selectedAccount.address || "-"}
               </InfoRow>
 
-              <InfoRow label="باڵانسی پێشوو">
-                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
-              </InfoRow>
-
-              <InfoRow label="کۆی گشتی ماوە">
-                {formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
+              <InfoRow label="باڵانس">
+                {formatCurrencyMapWithColors(isLocked ? screenAccountBalanceAfterByCurrency : screenAccountBalanceBeforeByCurrency)}
               </InfoRow>
             </div>
           )}

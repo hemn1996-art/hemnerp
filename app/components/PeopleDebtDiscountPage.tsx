@@ -937,12 +937,8 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
                 {selectedAccount.address || "-"}
               </InfoRow>
 
-              <InfoRow label="باڵانسی پێشوو">
-                {formatCurrencyMapWithColors(accountBalanceBeforeByCurrency)}
-              </InfoRow>
-
-              <InfoRow label="کۆی گشتی ماوە">
-                {formatCurrencyMapWithColors(accountBalanceAfterByCurrency)}
+              <InfoRow label="باڵانس">
+                {formatCurrencyMapWithColors(isLocked ? accountBalanceAfterByCurrency : accountBalanceBeforeByCurrency)}
               </InfoRow>
             </div>
           )}
