@@ -52,11 +52,6 @@ export default function StockReportPage() {
     batchCode: "",
     warehouseStatus: "",
     grouped: "نەخێر",
-    fromDate: "",
-    toDate: (() => {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    })(),
   });
 
   // Columns visibility state
@@ -116,7 +111,7 @@ export default function StockReportPage() {
 
   useEffect(() => {
     loadStockData();
-  }, [filters.toDate]);
+  }, []);
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -127,15 +122,10 @@ export default function StockReportPage() {
     if (filters.code) count++;
     if (filters.productName) count++;
     if (filters.batchCode) count++;
-    if (filters.fromDate) count++;
     return count;
   }, [filters]);
 
   const handleResetFilters = () => {
-    const defaultToDate = (() => {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    })();
     setFilters({
       warehouseId: "",
       sellerName: "",
@@ -146,8 +136,6 @@ export default function StockReportPage() {
       batchCode: "",
       warehouseStatus: "",
       grouped: "نەخێر",
-      fromDate: "",
-      toDate: defaultToDate,
     });
     setTimeout(() => {
       loadStockData();
@@ -159,8 +147,6 @@ export default function StockReportPage() {
       setLoading(true);
       setErrorMsg(null);
       const query = new URLSearchParams();
-      if (filters.fromDate) query.append("fromDate", filters.fromDate);
-      if (filters.toDate) query.append("toDate", filters.toDate);
       if (filters.warehouseId) query.append("warehouseId", filters.warehouseId);
       if (filters.productName) query.append("productId", filters.productName);
       if (filters.sellerName) query.append("sellerName", filters.sellerName);
@@ -266,22 +252,8 @@ export default function StockReportPage() {
       <div id="print-area" className="p-4 md:p-6 mx-auto bg-transparent min-h-screen">
         
         {/* Actions Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 no-print">
-          {/* Date Selector */}
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-300 rounded-md shadow-sm">
-            <span className="text-xs font-bold text-gray-500">بەروار:</span>
-            <input 
-              type="date" 
-              value={filters.toDate}
-              onChange={e => {
-                const newDate = e.target.value;
-                setFilters(prev => ({ ...prev, toDate: newDate }));
-              }}
-              className="text-xs text-gray-700 outline-none cursor-pointer font-bold" 
-            />
-          </div>
-
-          <div className="flex flex-wrap justify-end items-center gap-2">
+        <div className="flex flex-col md:flex-row justify-end items-center gap-4 mb-6 no-print">
+          <div className="flex flex-wrap justify-end items-center gap-2 w-full">
             <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
               <span>فلتەرەکان ☰</span>
               {activeFiltersCount > 0 && (
@@ -295,7 +267,7 @@ export default function StockReportPage() {
                 🔄 ڕێکخستنەوە
               </button>
             )}
-            <button className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
+            <button onClick={loadStockData} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
               گەڕان 🔍
             </button>
             <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-md hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
@@ -627,30 +599,7 @@ export default function StockReportPage() {
                 </div>
               </div>
 
-              <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                <div 
-                  className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm hover:border-[#0b1f50] transition-colors min-h-[48px]"
-                >
-                  <span className="bg-gray-50 px-3.5 py-3 text-sm font-bold text-gray-500 border-l border-gray-300 h-full flex items-center">لە بەرواری کڕین</span>
-                  <input 
-                    type="date" 
-                    value={filters.fromDate}
-                    onChange={e => setFilters(prev => ({ ...prev, fromDate: e.target.value }))}
-                    className="w-full px-3.5 py-3 text-sm text-gray-700 outline-none cursor-pointer font-bold h-full" 
-                  />
-                </div>
-                <div 
-                  className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm hover:border-[#0b1f50] transition-colors min-h-[48px]"
-                >
-                  <span className="bg-gray-50 px-3.5 py-3 text-sm font-bold text-gray-500 border-l border-gray-300 h-full flex items-center">بۆ بەرواری کڕین</span>
-                  <input 
-                    type="date" 
-                    value={filters.toDate}
-                    onChange={e => setFilters(prev => ({ ...prev, toDate: e.target.value }))}
-                    className="w-full px-3.5 py-3 text-sm text-gray-700 outline-none cursor-pointer font-bold h-full" 
-                  />
-                </div>
-              </div>
+
 
               <div className="border-t border-gray-100 pt-5 flex justify-between items-center">
                 <button 
