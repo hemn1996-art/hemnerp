@@ -555,12 +555,31 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     return String(currencyId);
   }
 
+    function getNormalizedCurrencyId(id?: number): number {
+    if (!id) return currencies[0]?.id || 7;
+    const active = currencies.find((c: any) => c.id === id);
+    if (active) return active.id;
+
+    if (id === 1 || id === 5 || id === 7) {
+      const activeUsd = currencies.find((c: any) => c.code === "USD" || c.name === "دۆلار" || c.symbol === "$");
+      return activeUsd ? activeUsd.id : (currencies[0]?.id || 7);
+    }
+    if (id === 2 || id === 6 || id === 8) {
+      const activeIqd = currencies.find((c: any) => c.code === "IQD" || c.name === "دینار" || c.symbol === "د.ع");
+      return activeIqd ? activeIqd.id : (currencies[1]?.id || 8);
+    }
+
+    return currencies[0]?.id || 7;
+  }
+
   function getCurrencySymbol(currencyId?: number) {
-    return currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
+    const normId = getNormalizedCurrencyId(currencyId);
+    return currencies.find((c: any) => c.id === normId)?.symbol || "$";
   }
 
   function getCurrencyCode(currencyId?: number) {
-    return currencies.find((c: any) => c.id === currencyId)?.code || "";
+    const normId = getNormalizedCurrencyId(currencyId);
+    return currencies.find((c: any) => c.id === normId)?.code || "";
   }
 
   function isUsd(currencyId: number) {
@@ -642,17 +661,19 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   }
 
   function getSingleAccountBalanceCurrencyId(account?: AccountLike) {
-    if (!account?.balanceByCurrency) return undefined;
+    if (!account?.balanceByCurrency) {
+      return getNormalizedCurrencyId(account?.balanceCurrencyId || account?.creditLimitCurrencyId);
+    }
 
     const activeCurrencies = Object.entries(account.balanceByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText]) => Number(currencyIdText));
+      .map(([currencyIdText]) => getNormalizedCurrencyId(Number(currencyIdText)));
 
-    if (activeCurrencies.length === 1) {
-      return activeCurrencies[0];
-    }
+    const uniqueCurrencies = Array.from(new Set(activeCurrencies));
 
-    return undefined;
+    if (uniqueCurrencies.length === 1) return uniqueCurrencies[0];
+
+    return getNormalizedCurrencyId(account.balanceCurrencyId || account.creditLimitCurrencyId);
   }
 
   function normalizeMoneyMapToSingleCurrency(
@@ -661,17 +682,16 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   ) {
     if (!targetCurrencyId) return map;
 
-    const result: Record<string, number> = {
-      [String(targetCurrencyId)]: 0,
-    };
+    const normTargetId = getNormalizedCurrencyId(targetCurrencyId);
+    const result: Record<string, number> = { [String(normTargetId)]: 0 };
 
     for (const [currencyIdText, amount] of Object.entries(map)) {
-      const fromCurrencyId = Number(currencyIdText);
+      const fromCurrencyId = getNormalizedCurrencyId(Number(currencyIdText));
 
-      result[String(targetCurrencyId)] += convertCurrency(
+      result[String(normTargetId)] += convertCurrency(
         Number(amount || 0),
         fromCurrencyId,
-        targetCurrencyId
+        normTargetId
       );
     }
 
@@ -690,7 +710,8 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
         const n = Number(amount || 0);
 
         if (Math.abs(n) > 0.0001) {
-          map[currencyIdText] = n;
+          const normId = getNormalizedCurrencyId(Number(currencyIdText));
+          map[String(normId)] = (map[String(normId)] || 0) + n;
         }
       }
     }
@@ -701,7 +722,8 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
         account.creditLimitCurrencyId ||
         returnCurrencyId;
 
-      map[String(balanceCurrencyId)] = Number(account.balance || 0);
+      const normId = getNormalizedCurrencyId(balanceCurrencyId);
+      map[String(normId)] = Number(account.balance || 0);
     }
 
     return map;

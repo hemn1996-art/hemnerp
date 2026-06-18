@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       : undefined;
 
     // Fetch accounts and balances in parallel for speed
-    const [accounts, balanceAggs] = await Promise.all([
+    const [accounts, balanceAggs, dbCurrencies] = await Promise.all([
       prisma.account.findMany({
         where: whereClause,
         select: {
@@ -53,6 +53,9 @@ export async function GET(request: Request) {
           credit: true,
         },
       }),
+      prisma.currency.findMany({
+        where: { isActive: true }
+      })
     ]);
 
     // Build a fast lookup map: accountId -> { currencyId -> balance }
@@ -71,10 +74,12 @@ export async function GET(request: Request) {
 
       let totalBalance = 0;
       for (const [curIdText, amount] of Object.entries(balanceByCurrency)) {
-        if (curIdText === "1") {
-          totalBalance += amount;
-        } else if (curIdText === "2") {
-          totalBalance += amount / 1500;
+        const curId = Number(curIdText);
+        const cur = dbCurrencies.find(c => c.id === curId);
+        const isIqd = cur ? (cur.code === "IQD") : (curId === 2 || curId === 6 || curId === 8);
+        const rate = cur ? cur.rate : (isIqd ? 1500 : 1);
+        if (isIqd) {
+          totalBalance += amount / rate;
         } else {
           totalBalance += amount;
         }

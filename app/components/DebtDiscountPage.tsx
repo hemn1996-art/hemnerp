@@ -290,12 +290,31 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
     return Number.isFinite(n) ? n : 0;
   }
 
+    function getNormalizedCurrencyId(id?: number): number {
+    if (!id) return currencies[0]?.id || 7;
+    const active = currencies.find((c: any) => c.id === id);
+    if (active) return active.id;
+
+    if (id === 1 || id === 5 || id === 7) {
+      const activeUsd = currencies.find((c: any) => c.code === "USD" || c.name === "دۆلار" || c.symbol === "$");
+      return activeUsd ? activeUsd.id : (currencies[0]?.id || 7);
+    }
+    if (id === 2 || id === 6 || id === 8) {
+      const activeIqd = currencies.find((c: any) => c.code === "IQD" || c.name === "دینار" || c.symbol === "د.ع");
+      return activeIqd ? activeIqd.id : (currencies[1]?.id || 8);
+    }
+
+    return currencies[0]?.id || 7;
+  }
+
   function getCurrencySymbol(currencyId?: number) {
-    return currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
+    const normId = getNormalizedCurrencyId(currencyId);
+    return currencies.find((c: any) => c.id === normId)?.symbol || "$";
   }
 
   function getCurrencyCode(currencyId?: number) {
-    return currencies.find((c: any) => c.id === currencyId)?.code || "";
+    const normId = getNormalizedCurrencyId(currencyId);
+    return currencies.find((c: any) => c.id === normId)?.code || "";
   }
 
   function isUsd(currencyId: number) {
@@ -399,16 +418,18 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
 
   function getSingleAccountBalanceCurrencyId(account?: AccountLike) {
     if (!account?.balanceByCurrency) {
-      return account?.balanceCurrencyId || account?.creditLimitCurrencyId;
+      return getNormalizedCurrencyId(account?.balanceCurrencyId || account?.creditLimitCurrencyId);
     }
 
     const activeCurrencies = Object.entries(account.balanceByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText]) => Number(currencyIdText));
+      .map(([currencyIdText]) => getNormalizedCurrencyId(Number(currencyIdText)));
 
-    if (activeCurrencies.length === 1) return activeCurrencies[0];
+    const uniqueCurrencies = Array.from(new Set(activeCurrencies));
 
-    return account.balanceCurrencyId || account.creditLimitCurrencyId;
+    if (uniqueCurrencies.length === 1) return uniqueCurrencies[0];
+
+    return getNormalizedCurrencyId(account.balanceCurrencyId || account.creditLimitCurrencyId);
   }
 
   function normalizeMoneyMapToSingleCurrency(
@@ -417,15 +438,16 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
   ) {
     if (!targetCurrencyId) return map;
 
-    const result: Record<string, number> = { [String(targetCurrencyId)]: 0 };
+    const normTargetId = getNormalizedCurrencyId(targetCurrencyId);
+    const result: Record<string, number> = { [String(normTargetId)]: 0 };
 
     for (const [currencyIdText, amount] of Object.entries(map)) {
-      const fromCurrencyId = Number(currencyIdText);
+      const fromCurrencyId = getNormalizedCurrencyId(Number(currencyIdText));
 
-      result[String(targetCurrencyId)] += convertCurrency(
+      result[String(normTargetId)] += convertCurrency(
         Number(amount || 0),
         fromCurrencyId,
-        targetCurrencyId
+        normTargetId
       );
     }
 
@@ -444,7 +466,8 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
         const n = Number(amount || 0);
 
         if (Math.abs(n) > 0.0001) {
-          map[currencyIdText] = n;
+          const normId = getNormalizedCurrencyId(Number(currencyIdText));
+          map[String(normId)] = (map[String(normId)] || 0) + n;
         }
       }
     }
@@ -455,7 +478,8 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
         account.creditLimitCurrencyId ||
         defaultCurrency.id;
 
-      map[String(balanceCurrencyId)] = Number(account.balance || 0);
+      const normId = getNormalizedCurrencyId(balanceCurrencyId);
+      map[String(normId)] = Number(account.balance || 0);
     }
 
     return map;
@@ -465,11 +489,16 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
     baseMap: Record<string, number>,
     addMap: Record<string, number>
   ) {
-    const result: Record<string, number> = { ...baseMap };
+    const result: Record<string, number> = {};
+
+    for (const [currencyIdText, amount] of Object.entries(baseMap)) {
+      const normId = getNormalizedCurrencyId(Number(currencyIdText));
+      result[String(normId)] = (result[String(normId)] || 0) + Number(amount || 0);
+    }
 
     for (const [currencyIdText, amount] of Object.entries(addMap)) {
-      result[currencyIdText] =
-        Number(result[currencyIdText] || 0) + Number(amount || 0);
+      const normId = getNormalizedCurrencyId(Number(currencyIdText));
+      result[String(normId)] = (result[String(normId)] || 0) + Number(amount || 0);
     }
 
     return result;
@@ -478,18 +507,28 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
   function getDiscountByCurrency() {
     if (toNumber(discountAmount) <= 0) return {};
 
+    const normId = getNormalizedCurrencyId(discountCurrencyId);
     return {
-      [String(discountCurrencyId)]: toNumber(discountAmount),
+      [String(normId)]: toNumber(discountAmount),
     };
   }
 
   function getAccountBalanceChangeByCurrency() {
-    const balanceCurrencyId = getSingleAccountBalanceCurrencyId(selectedAccount);
+    const balanceCurrencyId = getNormalizedCurrencyId(getSingleAccountBalanceCurrencyId(selectedAccount));
 
-    return normalizeMoneyMapToSingleCurrency(
+    const normalized = normalizeMoneyMapToSingleCurrency(
       getDiscountByCurrency(),
       balanceCurrencyId
     );
+
+    const result: Record<string, number> = {};
+
+    for (const [currencyIdText, amount] of Object.entries(normalized)) {
+      const normId = getNormalizedCurrencyId(Number(currencyIdText));
+      result[String(normId)] = (result[String(normId)] || 0) - Number(amount || 0);
+    }
+
+    return result;
   }
 
   function validateBeforeSave() {
@@ -847,10 +886,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
                 color="#16a34a"
               />
 
-              <StatBox
-                title="کۆی گشتی ماوە"
-                value={formatCurrencyMapWithColors(accountBalanceAfterByCurrency)}
-              />
+              
             </div>
 
             <div style={twoCol}>

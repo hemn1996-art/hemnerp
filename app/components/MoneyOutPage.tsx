@@ -1281,10 +1281,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                 color="#111827"
               />
 
-              <StatBox
-                title="کۆی گشتی ماوە"
-                value={formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
-              />
+              
             </div>
 
             <Field label="قاسە">

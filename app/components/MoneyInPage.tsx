@@ -1225,10 +1225,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
           <div style={totalsCard}>
             <div style={totalGrid}>
               <StatBox title="پارەی دراو" value={getPaidSummaryText()} color="#16a34a" />
-              <StatBox
-                title="کۆی گشتی ماوە"
-                value={formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
-              />
+              
             </div>
 
             <Field label="قاسە">
