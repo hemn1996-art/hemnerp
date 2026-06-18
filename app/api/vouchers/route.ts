@@ -204,7 +204,7 @@ export async function POST(request: Request) {
 
           if (["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
             let qtyChange = Number(line.qty);
-            if (["sales", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
+            if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
               qtyChange = -qtyChange;
             }
             if (line.warehouseId) {
@@ -367,6 +367,9 @@ export async function POST(request: Request) {
       });
 
       return createdVoucher;
+    }, {
+      maxWait: 10000,
+      timeout: 25000,
     });
 
     return NextResponse.json(voucher, { status: 201 });

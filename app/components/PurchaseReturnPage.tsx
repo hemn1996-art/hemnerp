@@ -12,7 +12,7 @@ import {
 } from "react";
 
 import { store, useStore } from "../store/store";
-import { saveInvoice } from "../utils/invoiceLogic";
+import { calculateLedgerEntries } from "../utils/ledgerHelper";
 import { currencies as mockCurrencies } from "../data/mockData";
 
 type ToastType = "error" | "success" | "info";
@@ -88,7 +88,7 @@ type PrintOptions = {
   showEmployeePhone: boolean;
 };
 
-const warehouses = [
+const mockWarehouses = [
   { id: 1, name: "کۆگای سەرەکی" },
   { id: 2, name: "کۆگای دووکان" },
 ];
@@ -101,6 +101,28 @@ type Props = {
 export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
 
+  const accounts = useStore((s) => s.accounts) || [];
+  const cashboxes = useStore((s) => s.cashboxes) || [];
+  const products = useStore((s) => s.products) || [];
+  const storeCurrencies = useStore((s) => s.currencies) || [];
+  const warehousesFromStore = useStore((s) => s.warehouses) || [];
+  const addVoucher = useStore((s) => s.addVoucher);
+  const updateVoucher = useStore((s) => s.updateVoucher);
+  const fetchProducts = useStore((s) => s.fetchProducts);
+  const fetchAccounts = useStore((s) => s.fetchAccounts);
+  const fetchCashboxes = useStore((s) => s.fetchCashboxes);
+  const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
+  const fetchWarehouses = useStore((s: any) => s.fetchWarehouses);
+  const currentUser = useStore((s) => s.currentUser);
+
+  useEffect(() => {
+    if (accounts.length === 0) fetchAccounts();
+    if (cashboxes.length === 0) fetchCashboxes();
+    if (products.length === 0) fetchProducts();
+    if (storeCurrencies.length === 0) fetchCurrencies();
+    if (warehousesFromStore.length === 0) fetchWarehouses();
+  }, []);
+
   useEffect(() => {
     setIsEditLoading(!!editId);
     if (editId) {
@@ -108,12 +130,15 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     }
   }, [editId]);
 
-  const accounts = (store.accounts || []) as AccountLike[];
-  const cashboxes = (store.cashboxes || []) as any[];
-  const products = (store.products || []) as ProductLike[];
-  const storeCurrencies = (store as any).currencies || [];
   const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
-  const currentUser = useStore((s) => s.currentUser);
+
+  const warehouses = useMemo(() => {
+    return warehousesFromStore.length > 0
+      ? warehousesFromStore
+      : mockWarehouses;
+  }, [warehousesFromStore]);
+
+
 
   const defaultCurrency =
     currencies[0] ||
@@ -249,6 +274,12 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   );
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
   const [exchangeRate, setExchangeRate] = useState("150000");
+  const [excessModalConfig, setExcessModalConfig] = useState<{
+    isOpen: boolean;
+    excessAmount: number;
+    targetCurrencyId: number;
+    otherCurrencyId: number;
+  } | null>(null);
 
   const [productSearch, setProductSearch] = useState("");
   const [showProductList, setShowProductList] = useState(false);
@@ -1048,13 +1079,129 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     );
   }
 
-  function handleNewInvoice() {
-    if (hasUnsavedData() && !isSaved && !isLocked) {
-      setShowNewInvoiceConfirm(true);
+  function saveVoucher(action: "keep_credit" | "cross_deduct" | null) {
+    if (isLocked) {
+      showToast("ئەم پسوڵەیە پێشتر خەزن کراوە.");
       return;
     }
 
-    resetInvoice();
+    setExcessModalConfig(null);
+
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
+    const before = accountBalanceBeforeByCurrency;
+
+    const extraHandling = action === "cross_deduct"
+      ? "convert_to_other_currency"
+      : (action === "keep_credit" ? "keep_as_same_currency_balance" : null);
+
+    const paidList = Object.entries(paidAmounts)
+      .map(([currencyIdText, amountText]) => ({
+        currencyId: Number(currencyIdText),
+        amount: toNumber(amountText),
+      }))
+      .filter((x: any) => x.amount > 0);
+
+    const result = calculateLedgerEntries({
+      type: "purchase_return",
+      netAmount: totalReturnInBase,
+      currencyId: returnCurrencyId,
+      exchangeRate: rate,
+      paidAmounts: paidList.map((p: any) => ({
+        currencyId: p.currencyId,
+        amount: p.amount,
+        exchangeRate: (p.currencyId === returnCurrencyId) ? 1 : rate
+      })),
+      extraPaymentHandling: extraHandling,
+      balanceBeforeByCurrency: before
+    });
+
+    const combineDateAndTime = (dateStr: string, timeStr: string) => {
+      try {
+        if (!dateStr) return new Date().toISOString();
+        let cleanTime = (timeStr || "").trim();
+        const ampmMatch = cleanTime.match(/^(1[0-2]|0?[1-9]):([0-5][0-9])\s*(AM|PM)$/i);
+        if (ampmMatch) {
+          let hours = parseInt(ampmMatch[1], 10);
+          const minutes = ampmMatch[2];
+          const ampm = ampmMatch[3].toUpperCase();
+          if (ampm === "PM" && hours < 12) hours += 12;
+          if (ampm === "AM" && hours === 12) hours = 0;
+          cleanTime = hours.toString().padStart(2, "0") + ":" + minutes;
+        }
+        const hhmmMatch = cleanTime.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])/);
+        if (hhmmMatch) {
+          const hours = hhmmMatch[1].padStart(2, "0");
+          const minutes = hhmmMatch[2];
+          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+        }
+        const fallback = new Date(dateStr + " " + cleanTime);
+        if (!isNaN(fallback.getTime())) return fallback.toISOString();
+        const fallbackDate = new Date(dateStr);
+        if (!isNaN(fallbackDate.getTime())) return fallbackDate.toISOString();
+      } catch (e) {
+        console.error("Error combining date and time:", e);
+      }
+      return new Date().toISOString();
+    };
+
+    const payload = {
+      type: "purchase_return",
+      referenceNo: String(invoiceNumber),
+      date: combineDateAndTime(invoiceDate, createdTime),
+      accountId: supplierId || null,
+      cashboxId: cashboxId || null,
+      currencyId: returnCurrencyId,
+      exchangeRate: rate,
+      totalAmount: totalReturnInBase,
+      totalDiscount: 0,
+      netAmount: totalReturnInBase,
+      internalNote: internalNote,
+      printNote: printNote,
+      employeeName: employeeName,
+      lines: rows.map((row: any) => {
+        const warehouseId = warehouses.find((w: any) => w.name === row.warehouseName)?.id || warehouses[0]?.id || 1;
+        return {
+          productId: row.productId,
+          qty: toNumber(row.qty) * row.packageQuantity,
+          unitPrice: toNumber(row.returnPrice),
+          discountPercent: 0,
+          discountAmount: toNumber(row.discount),
+          lineTotal: getRowTotal(row),
+          note: row.note,
+          warehouseId,
+          unitCost: toNumber(row.returnPrice),
+        };
+      }),
+      paidAmounts: paidList.map((p: any) => ({
+        currencyId: p.currencyId,
+        amount: p.amount,
+        exchangeRate: (p.currencyId === returnCurrencyId) ? 1 : rate
+      })),
+      ledgerEntries: result.ledgerEntries,
+      extraPaymentHandling: extraHandling
+    };
+
+    const savePromise = editId
+      ? updateVoucher(Number(editId), payload)
+      : addVoucher(payload);
+
+    savePromise.then((res) => {
+      if (res) {
+        fetchProducts();
+        setSavedSnapshot(currentSnapshot);
+        if (editId) {
+          showToast("پسوڵەکە بە سەرکەوتوویی نوێکرایەوە ✅", "success");
+        } else {
+          setIsLocked(true);
+          showToast("پسوڵەی گەڕانەوەی کڕین خەزن کرا ✅ ستۆک کەمکرا، قاسە زیادکرا، باڵانسی دابینکەر نوێکرایەوە.", "success");
+        }
+      } else {
+        showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
+      }
+    }).catch((err) => {
+      console.error("Save error:", err);
+      showToast("هەڵەی نەتۆرک! تکایە دووبارە هەوڵ بدەوە.", "error");
+    });
   }
 
   function handleSave() {
@@ -1065,62 +1212,49 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
 
     if (!validateBeforeSave()) return;
 
-    const items = rows.map((row: any) => ({
-      productId: row.productId,
-      name: row.productName,
-      qty: getRowUnits(row),
-      quantity: getRowUnits(row),
-      price: toNumber(row.returnPrice),
-      discount: toNumber(row.discount),
-      total: getRowTotal(row),
-      totalInOwnCurrency: getRowTotalInOwnCurrency(row),
-      note: row.note,
-      packageName: row.packageName,
-      packageQuantity: row.packageQuantity,
-      warehouseName: row.warehouseName,
-      currencyId: row.currencyId,
-    }));
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
+    const before = accountBalanceBeforeByCurrency;
 
-    saveInvoice({
-      id: Number(invoiceNumber || Date.now().toString().slice(-6)),
-      type: "گەڕانەوەی کڕین",
-      accountId: supplierId,
-      cashboxId,
-      total: totalReturnInBase,
-      totalByCurrency: returnTotalsByCurrency,
-      paid: totalPaidInBase,
-      paidAmounts,
-      paidByCurrency,
-      paidConvertedToBalanceCurrency: normalizeMoneyMapToSingleCurrency(
-        getPaidAmountsByCurrency(),
-        getSingleAccountBalanceCurrencyId(supplier)
-      ),
-      remaining: Math.max(totalReturnInBase - totalPaidInBase, 0),
-      remainingByCurrency: supplierBalanceReductionByCurrency,
-      balanceCurrencyId: getSingleAccountBalanceCurrencyId(supplier),
-      accountBalanceBeforeByCurrency,
-      accountBalanceChangeByCurrency: supplierBalanceReductionByCurrency,
-      accountBalanceAfterByCurrency,
-      items,
-      note: internalNote,
-      printNote,
-      createdAt: new Date().toISOString(),
-      date: invoiceDate,
-      createdTime,
-      exchangeRate,
-    } as any);
+    const paidList = Object.entries(paidAmounts)
+      .map(([currencyIdText, amountText]) => ({
+        currencyId: Number(currencyIdText),
+        amount: toNumber(amountText),
+      }))
+      .filter((x: any) => x.amount > 0);
 
-    applyStockDecrease();
-    applyCashboxIncrease();
-    applySupplierBalanceReduction();
+    const result = calculateLedgerEntries({
+      type: "purchase_return",
+      netAmount: totalReturnInBase,
+      currencyId: returnCurrencyId,
+      exchangeRate: rate,
+      paidAmounts: paidList.map((p: any) => ({
+        currencyId: p.currencyId,
+        amount: p.amount,
+        exchangeRate: (p.currencyId === returnCurrencyId) ? 1 : rate
+      })),
+      extraPaymentHandling: null,
+      balanceBeforeByCurrency: before
+    });
 
-    setSavedSnapshot(currentSnapshot);
-    setIsLocked(true);
+    if (result.excess.exists) {
+      setExcessModalConfig({
+        isOpen: true,
+        excessAmount: result.excess.amount,
+        targetCurrencyId: result.excess.targetCurrencyId,
+        otherCurrencyId: result.excess.otherCurrencyId
+      });
+    } else {
+      saveVoucher(null);
+    }
+  }
 
-    showToast(
-      "پسوڵەی گەڕانەوەی کڕین خەزن کرا ✅ ستۆک کەمکرا، قاسە زیادکرا، باڵانسی دابینکەر نوێکرایەوە.",
-      "success"
-    );
+  function handleNewInvoice() {
+    if (hasUnsavedData() && !isSaved && !isLocked) {
+      setShowNewInvoiceConfirm(true);
+      return;
+    }
+
+    resetInvoice();
   }
 
   function handlePrint() {
@@ -2197,6 +2331,73 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
             <div style={modalFooter}>
               <button style={primaryBtn} onClick={() => setShowSettings(false)}>
                 تەواو
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {excessModalConfig?.isOpen && (
+        <div style={modalOverlay}>
+          <div style={{ ...confirmBox, width: 500 }}>
+            <h2 style={{ marginTop: 0, color: "#dc2626", fontWeight: 900 }}>پارەی زیادە داغڵکراوە</h2>
+            <p style={{ ...confirmText, color: "#374151", fontSize: 15, fontWeight: 700, lineHeight: 1.8 }}>
+              بڕی پارەی دراو لە باڵانسی دراوی هەڵبژێردراو زیاترە بە بڕی:
+              <br />
+              <span style={{ color: "#2563eb", fontWeight: 900, fontSize: 18 }}>
+                {formatCurrencyAmount(excessModalConfig.excessAmount, excessModalConfig.targetCurrencyId)}
+              </span>
+              <br />
+              چۆن دەتەوێت مامەڵە لەگەڵ پارە زیادەکەدا بکەیت؟
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+              <button
+                style={{
+                  ...primaryBtn,
+                  background: "#2563eb",
+                  color: "white",
+                  padding: "12px",
+                  fontSize: 14,
+                  fontWeight: 900,
+                  borderRadius: 12,
+                  border: 0,
+                  cursor: "pointer"
+                }}
+                onClick={() => saveVoucher("keep_credit")}
+              >
+                وەک باڵانس (قەرزاربوون) لەم دراوەدا بمێنێتەوە
+              </button>
+              <button
+                style={{
+                  ...primaryBtn,
+                  background: "#16a34a",
+                  color: "white",
+                  padding: "12px",
+                  fontSize: 14,
+                  fontWeight: 900,
+                  borderRadius: 12,
+                  border: 0,
+                  cursor: "pointer"
+                }}
+                onClick={() => saveVoucher("cross_deduct")}
+              >
+                لە قەرزی دراوەکەی تر دەرکرێت ({formatCurrencyAmount(convertCurrency(excessModalConfig.excessAmount, excessModalConfig.targetCurrencyId, excessModalConfig.otherCurrencyId), excessModalConfig.otherCurrencyId)})
+              </button>
+              <button
+                style={{
+                  ...outlineBlueBtn,
+                  background: "white",
+                  color: "#475569",
+                  border: "1px solid #cbd5e1",
+                  padding: "10px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  borderRadius: 12,
+                  cursor: "pointer"
+                }}
+                onClick={() => setExcessModalConfig(null)}
+              >
+                پاشگەزبوونەوە
               </button>
             </div>
           </div>

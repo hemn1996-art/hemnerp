@@ -269,7 +269,7 @@ export async function PUT(
 
           if (["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
             let qtyChange = Number(line.qty);
-            if (["sales", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
+            if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
               qtyChange = -qtyChange;
             }
             if (line.warehouseId) {
@@ -498,6 +498,9 @@ export async function PUT(
       });
 
       return updated;
+    }, {
+      maxWait: 10000,
+      timeout: 25000,
     });
 
     return NextResponse.json(updatedVoucher, { status: 200 });
