@@ -227,6 +227,10 @@ export const useStore = create<StoreState>((set, get) => ({
           else if (v.type === "quotation") uiType = "نرخاندن";
           else if (v.type === "sales_return") uiType = "گەڕانەوەی فرۆشتن";
           else if (v.type === "purchase_return") uiType = "گەڕانەوەی کڕین";
+          else if (v.type === "material_issue" || v.type === "سەرفی مواد") uiType = "سەرفی مەواد";
+          else if (v.type === "warehouse_damage" || v.type === "خەسارەی کۆگا") uiType = "زیانی کۆگا";
+          else if (v.type === "warehouse_stock" || v.type === "جەردی کۆگا") uiType = "جەردی کۆگا";
+          else if (v.type === "product_transfer" || v.type === "گواستنەوەی کاڵا") uiType = "گواستنەوەی کەرەستە";
           return {
             id: v.id,
             accountId: v.accountId,

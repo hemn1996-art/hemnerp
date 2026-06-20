@@ -418,6 +418,21 @@ export default function ItemsReportPage() {
       case "quotation": return "نرخاندن";
       case "cashbox_transfer": return "گواستنەوەی پارە";
       case "cashbox_exchange": return "گۆڕینەوەی پارە";
+      case "material_issue":
+      case "سەرفی مواد":
+      case "سەرفی مەواد":
+        return "سەرفی مەواد";
+      case "warehouse_damage":
+      case "خەسارەی کۆگا":
+      case "زیانی کۆگا":
+        return "زیانی کۆگا";
+      case "warehouse_stock":
+      case "جەردی کۆگا":
+        return "جەردی کۆگا";
+      case "product_transfer":
+      case "گواستنەوەی کاڵا":
+      case "گواستنەوەی کەرەستە":
+        return "گواستنەوەی کەرەستە";
       default: return type;
     }
   };
@@ -818,6 +833,10 @@ export default function ItemsReportPage() {
                         { value: "purchase_return", label: "گەڕانەوەی کڕین" },
                         { value: "inventory_in", label: "هاتنەناوەوە" },
                         { value: "inventory_out", label: "چوونەدەرەوە" },
+                        { value: "material_issue", label: "سەرفی مەواد" },
+                        { value: "warehouse_damage", label: "زیانی کۆگا" },
+                        { value: "warehouse_stock", label: "جەردی کۆگا" },
+                        { value: "product_transfer", label: "گواستنەوەی کەرەستە" }
                       ]}
                       selectedValues={filterVoucherTypes}
                       onChange={setFilterVoucherTypes}

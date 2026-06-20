@@ -751,9 +751,9 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                               raw === "people_debt_discount" || raw === "داشکاندن لە قەرزی خەڵک" ? "people_debt_discount" :
                               raw === "shareholder_deposit" || raw === "دانانی پارە" || raw === "deposit" ? "deposit" :
                               raw === "shareholder_withdrawal" || raw === "کشانەوەی پارە" || raw === "withdrawal" ? "withdrawal" :
-                              raw === "product_transfer" || raw === "گواستنەوەی کەرەستە" ? "product_transfer" :
-                              raw === "material_issue" || raw === "سەرفی مەواد" ? "material_issue" :
-                              raw === "warehouse_damage" || raw === "زیانی کۆگا" ? "warehouse_damage" :
+                              raw === "product_transfer" || raw === "گواستنەوەی کەرەستە" || raw === "گواستنەوەی کاڵا" ? "product_transfer" :
+                              raw === "material_issue" || raw === "سەرفی مەواد" || raw === "سەرفی مواد" ? "material_issue" :
+                              raw === "warehouse_damage" || raw === "زیانی کۆگا" || raw === "خەسارەی کۆگا" ? "warehouse_damage" :
                               raw === "warehouse_stock" || raw === "جەردی کۆگا" ? "warehouse_stock" : raw
                             );
                             router.push(`/invoices?editId=${inv.id}&type=${mappedType}`);

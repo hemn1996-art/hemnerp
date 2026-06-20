@@ -366,13 +366,13 @@ export default function ProfitReportPage() {
         typeParam = "my_debt_discount";
         break;
       case "expenses":
-        typeParam = "expense,warehouse_damage,خەسارەی کۆگا";
+        typeParam = "expense,warehouse_damage,خەسارەی کۆگا,زیانی کۆگا,material_issue,سەرفی مواد,سەرفی مەواد";
         break;
       case "people_debt_discount":
         typeParam = "people_debt_discount";
         break;
       case "final_profit":
-        typeParam = "sales,sales_return,my_debt_discount,people_debt_discount,expense,warehouse_damage,خەسارەی کۆگا";
+        typeParam = "sales,sales_return,my_debt_discount,people_debt_discount,expense,warehouse_damage,خەسارەی کۆگا,زیانی کۆگا,material_issue,سەرفی مواد,سەرفی مەواد";
         break;
       default:
         return;

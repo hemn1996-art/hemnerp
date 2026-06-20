@@ -530,6 +530,21 @@ function InvoiceReportContent() {
       case "debt_discount":
       case "debt discount":
         return "داشکاندن لە قەرزی خەڵک";
+      case "material_issue":
+      case "سەرفی مواد":
+      case "سەرفی مەواد":
+        return "سەرفی مەواد";
+      case "warehouse_damage":
+      case "خەسارەی کۆگا":
+      case "زیانی کۆگا":
+        return "زیانی کۆگا";
+      case "warehouse_stock":
+      case "جەردی کۆگا":
+        return "جەردی کۆگا";
+      case "product_transfer":
+      case "گواستنەوەی کاڵا":
+      case "گواستنەوەی کەرەستە":
+        return "گواستنەوەی کەرەستە";
       default:
         return type;
     }
@@ -2456,7 +2471,11 @@ function InvoiceReportContent() {
                       { value: "shareholder_deposit", label: "دانانی پارە" },
                       { value: "shareholder_withdrawal", label: "کشانەوەی پارە" },
                       { value: "my_debt_discount", label: "داشکاندن لە قەرزی من" },
-                      { value: "people_debt_discount", label: "داشکاندن لە قەرزی خەڵک" }
+                      { value: "people_debt_discount", label: "داشکاندن لە قەرزی خەڵک" },
+                      { value: "material_issue", label: "سەرفی مەواد" },
+                      { value: "warehouse_damage", label: "زیانی کۆگا" },
+                      { value: "warehouse_stock", label: "جەردی کۆگا" },
+                      { value: "product_transfer", label: "گواستنەوەی کەرەستە" }
                     ]}
                     selectedValues={filterInvoiceTypes}
                     onChange={setFilterInvoiceTypes}

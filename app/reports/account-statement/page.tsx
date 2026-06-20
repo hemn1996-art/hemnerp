@@ -126,6 +126,21 @@ function AccountStatementContent() {
       case "debt_discount":
       case "debt discount":
         return "داشکاندن لە قەرزی خەڵک";
+      case "material_issue":
+      case "سەرفی مواد":
+      case "سەرفی مەواد":
+        return "سەرفی مەواد";
+      case "warehouse_damage":
+      case "خەسارەی کۆگا":
+      case "زیانی کۆگا":
+        return "زیانی کۆگا";
+      case "warehouse_stock":
+      case "جەردی کۆگا":
+        return "جەردی کۆگا";
+      case "product_transfer":
+      case "گواستنەوەی کاڵا":
+      case "گواستنەوەی کەرەستە":
+        return "گواستنەوەی کەرەستە";
       default: return type;
     }
   };

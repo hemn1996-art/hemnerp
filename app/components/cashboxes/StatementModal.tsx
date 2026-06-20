@@ -97,6 +97,10 @@ export default function StatementModal({
     if (type === "my_debt_discount") return "داشکاندن لە قەرزی من";
     if (type === "people_debt_discount") return "داشکاندن لە قەرزی خەڵک";
     if (type === "debt_discount" || type === "debt discount") return "داشکاندن لە قەرزی خەڵک";
+    if (type === "material_issue" || type === "سەرفی مواد" || type === "سەرفی مەواد") return "سەرفی مەواد";
+    if (type === "warehouse_damage" || type === "خەسارەی کۆگا" || type === "زیانی کۆگا") return "زیانی کۆگا";
+    if (type === "warehouse_stock" || type === "جەردی کۆگا") return "جەردی کۆگا";
+    if (type === "product_transfer" || type === "گواستنەوەی کاڵا" || type === "گواستنەوەی کەرەستە") return "گواستنەوەی کەرەستە";
 
     // Fallback if already translated in store
     return type;
