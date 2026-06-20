@@ -121,12 +121,19 @@ export async function GET(request: Request) {
 
     const accountNetBalances: Record<number, number> = {};
     const shareholderBalances: Record<number, number> = {};
+    const shareholderBalancesUSD: Record<number, number> = {};
 
     ledgerAggs.forEach((agg) => {
       const netRaw = (agg._sum.debit || 0) - (agg._sum.credit || 0);
       const netConverted = convertToTarget(netRaw, agg.currencyId);
+      
+      const fromCur = currencies.find((c: any) => c.id === agg.currencyId);
+      const fromRate = fromCur ? fromCur.rate : 1.0;
+      const usdAmount = netRaw / fromRate;
+
       if (shareholderIds.has(agg.accountId)) {
         shareholderBalances[agg.accountId] = (shareholderBalances[agg.accountId] || 0) + netConverted;
+        shareholderBalancesUSD[agg.accountId] = (shareholderBalancesUSD[agg.accountId] || 0) + usdAmount;
         const creditConverted = convertToTarget(agg._sum.credit || 0, agg.currencyId);
         const debitConverted = convertToTarget(agg._sum.debit || 0, agg.currencyId);
         totalShareholderDeposits += creditConverted;
@@ -225,11 +232,13 @@ export async function GET(request: Request) {
 
     const shareholders = shareholderAccounts.map(a => {
       const balance = shareholderBalances[a.id] || 0;
+      const balanceUSD = shareholderBalancesUSD[a.id] || 0;
       return {
         id: a.id,
         name: a.name,
         phone: a.phone || "",
-        balance: -balance // credit - debit
+        balance: -balance, // credit - debit
+        balanceUSD: -balanceUSD // credit - debit in USD
       };
     });
 

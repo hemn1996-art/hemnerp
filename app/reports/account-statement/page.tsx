@@ -192,6 +192,10 @@ function AccountStatementContent() {
     );
   };
 
+  const usdCurrency = currencies.find((c: any) => c.code === "USD");
+  const usdId = usdCurrency ? usdCurrency.id : 1;
+  const isShareholder = account?.isShareholder === true;
+
   const processed = useMemo(() => {
     // 1. Filter vouchers related to this account
     let list = vouchers.filter((v) => 
@@ -265,9 +269,7 @@ function AccountStatementContent() {
       return a.id.includes("-main") ? -1 : 1;
     });
 
-    const usdCurrency = currencies.find((c: any) => c.code === "USD");
-    const usdId = usdCurrency ? usdCurrency.id : 1;
-    const isShareholder = account?.isShareholder === true;
+
 
     const runningBalances: Record<string, number> = {};
     let previousBalances: Record<string, number> = {};
@@ -282,7 +284,16 @@ function AccountStatementContent() {
         if (isShareholder) {
           const curKey = String(usdId);
           const change = le.debit - le.credit;
-          const convertedChange = le.currencyId === usdId ? change : change / (le.exchangeRate || 1500);
+          let rate = 1500;
+          if (le.exchangeRate && le.exchangeRate > 10) {
+            rate = le.exchangeRate;
+          } else {
+            const curObj = currencies.find((c: any) => c.id === le.currencyId);
+            if (curObj && curObj.rate > 1) {
+              rate = curObj.rate;
+            }
+          }
+          const convertedChange = le.currencyId === usdId ? change : change / rate;
           runningBalances[curKey] = (runningBalances[curKey] || 0) + convertedChange;
         } else {
           const curKey = String(le.currencyId);
@@ -599,7 +610,31 @@ function AccountStatementContent() {
                             )}
                           </td>
                         )}
-                        {visibleColumns.note && <td className="p-3 text-center text-gray-500 text-xs">{v.note || "—"}</td>}
+                        {visibleColumns.note && (
+                          <td className="p-3 text-center text-gray-500 text-xs">
+                            {(() => {
+                              if (isShareholder && v.currencyId !== usdId) {
+                                let rate = 1500;
+                                const ledgerWithRate = v.ledgerEntries.find((le: any) => le.exchangeRate && le.exchangeRate > 10);
+                                if (ledgerWithRate) {
+                                  rate = ledgerWithRate.exchangeRate;
+                                } else {
+                                  const curObj = currencies.find((c: any) => c.id === v.currencyId);
+                                  if (curObj && curObj.rate > 1) {
+                                    rate = curObj.rate;
+                                  }
+                                }
+                                const iqdAmount = v.paidAmounts && v.paidAmounts.length > 0
+                                  ? v.paidAmounts.reduce((sum: number, pa: any) => sum + pa.amount, 0)
+                                  : v.totalAmount;
+                                const usdVal = iqdAmount / rate;
+                                const autoNote = `ڕەیتی ١٠٠ دۆلار ${(rate * 100).toLocaleString("en-US")} دینار؛ بڕی پسووڵەکە = ${iqdAmount.toLocaleString("en-US")} دینار ($${usdVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`;
+                                return v.note ? `${v.note} | ${autoNote}` : autoNote;
+                              }
+                              return v.note || "—";
+                            })()}
+                          </td>
+                        )}
                         {visibleColumns.balance && (
                           <td className={`p-3 text-center font-black text-sm ${tc.balanceBg}`} dir="ltr">
                             {renderBalances(v.rowBalances)}

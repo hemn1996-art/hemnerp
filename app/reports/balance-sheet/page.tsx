@@ -398,7 +398,7 @@ export default function BalanceSheetPage() {
                         <td className="py-3.5 px-4 text-slate-800 font-bold text-sm text-right">{sh.name}</td>
                         <td className="py-3.5 px-4 text-slate-600 font-medium text-xs text-center" dir="ltr">{sh.phone || "—"}</td>
                         <td className="py-3.5 px-4 text-slate-800 font-black text-sm text-left" dir="ltr">
-                          {fmt(sh.balance)}
+                          {typeof sh.balanceUSD === "number" ? `$ ${sh.balanceUSD.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : "$ 0"}
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <button
