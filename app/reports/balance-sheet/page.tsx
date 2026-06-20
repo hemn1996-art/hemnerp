@@ -16,10 +16,23 @@ export default function BalanceSheetPage() {
   });
   const [currencyId, setCurrencyId] = useState("all");
   const [currencyLabel, setCurrencyLabel] = useState("دینار");
+  const [defaultCurrencyId, setDefaultCurrencyId] = useState("all");
 
   useEffect(() => {
     fetchCurrencies?.();
   }, [fetchCurrencies]);
+
+  useEffect(() => {
+    if (currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      const defaultId = iqd ? iqd.id.toString() : currencies[0].id.toString();
+      setDefaultCurrencyId(defaultId);
+      if (currencyId === "all") {
+        setCurrencyId(defaultId);
+        setCurrencyLabel(iqd ? iqd.symbol : currencies[0].symbol);
+      }
+    }
+  }, [currencies]);
 
   useEffect(() => {
     fetchData();
@@ -27,20 +40,24 @@ export default function BalanceSheetPage() {
 
   const activeFiltersCount = React.useMemo(() => {
     let count = 0;
-    if (currencyId !== "all") count++;
+    if (currencyId !== defaultCurrencyId) count++;
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     if (asOfDate !== todayStr) count++;
     return count;
-  }, [currencyId, asOfDate]);
+  }, [currencyId, defaultCurrencyId, asOfDate]);
 
   const handleResetFilters = () => {
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     setAsOfDate(todayStr);
-    setCurrencyId("all");
-    setCurrencyLabel("دینار");
-    fetchData(todayStr, "all");
+    
+    const iqd = currencies?.find((c: any) => c.code === "IQD");
+    const defaultId = iqd ? iqd.id.toString() : (currencies?.[0]?.id.toString() || "all");
+    
+    setCurrencyId(defaultId);
+    setCurrencyLabel(iqd ? iqd.symbol : (currencies?.[0]?.symbol || "دینار"));
+    fetchData(todayStr, defaultId);
   };
 
   const fetchData = async (customAsOfDate?: string, customCurrencyId?: string) => {
@@ -278,7 +295,6 @@ export default function BalanceSheetPage() {
                     const sel = e.target.options[e.target.selectedIndex];
                     setCurrencyLabel(e.target.value === "all" ? "دینار" : sel.text.split(" - ")[0] || "$");
                   }}>
-                    <option value="all">هەموو (دینار)</option>
                     {currencies?.map((c: any) => <option key={c.id} value={c.id}>{c.symbol} - {c.name}</option>)}
                   </select>
                 </div>
