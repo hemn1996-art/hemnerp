@@ -1712,6 +1712,14 @@ function InvoiceReportContent() {
             </button>
 
             <button
+              onClick={handlePrint}
+              className="bg-[#0284c7] text-white hover:bg-[#0369a1] font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-md"
+              title="پاشەکەوتکردن وەک PDF"
+            >
+              PDF 📄
+            </button>
+
+            <button
               onClick={loadVouchers}
               className="bg-[#0f172a] text-white hover:bg-slate-800 font-black px-5 py-2.5 rounded-xl transition-all cursor-pointer text-sm shadow-sm"
             >
@@ -1909,7 +1917,7 @@ function InvoiceReportContent() {
                     </th>
                   )}
                   {visibleColumns.notes && (
-                    <th className="px-4 py-3.5 text-center text-xs font-bold select-none align-middle max-w-[200px]">
+                    <th className="px-4 py-3.5 text-center text-xs font-bold select-none align-middle max-w-[200px] allow-wrap">
                       تێبینی
                     </th>
                   )}
@@ -2071,7 +2079,7 @@ function InvoiceReportContent() {
                             <td className="px-4 py-3.5 text-center">-</td>
                           )}
                           {visibleColumns.notes && (
-                            <td className="px-4 py-3.5 text-center text-xs font-medium align-middle max-w-[200px] break-words whitespace-normal">
+                            <td className="px-4 py-3.5 text-center text-xs font-medium align-middle max-w-[200px] break-words whitespace-normal allow-wrap">
                               {voucher.internalNote || "-"}
                             </td>
                           )}

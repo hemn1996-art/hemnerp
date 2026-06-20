@@ -298,4 +298,20 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     width: 100% !important;
     background: white !important;
   }
+
+  /* Global print table enhancements */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  
+  th:not(.allow-wrap),
+  td:not(.allow-wrap) {
+    white-space: nowrap !important;
+  }
+
+  .allow-wrap {
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
 }

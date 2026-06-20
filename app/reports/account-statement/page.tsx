@@ -403,11 +403,32 @@ function AccountStatementContent() {
     <div className="min-h-screen bg-[#f4f7fc] text-slate-800 rtl font-sans">
       <style jsx global>{`
         @media print {
-          body * { visibility: hidden; }
-          #print-area, #print-area * { visibility: visible; }
-          #print-area { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 0; margin: 0; }
-          .no-print { display: none !important; }
-          .print-border { border: 1px solid #e5e7eb !important; }
+          body * {
+            visibility: hidden;
+          }
+          #print-area, #print-area * {
+            visibility: visible;
+          }
+          #print-area {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+            border: none !important;
+            box-shadow: none !important;
+          }
+          th, td {
+            padding: 8px 6px !important;
+            font-size: 11px !important;
+          }
+          .no-print {
+            display: none !important;
+          }
         }
       `}</style>
 
@@ -448,8 +469,15 @@ function AccountStatementContent() {
             >
               گەڕان 🔍
             </button>
-            <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
+             <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
               پرینت 🖨️
+            </button>
+            <button 
+              onClick={handlePrint} 
+              className="flex items-center justify-center gap-2 bg-[#0284c7] text-white font-bold px-4 py-2.5 rounded-lg hover:bg-[#0369a1] transition-colors cursor-pointer text-sm shadow-sm"
+              title="پاشەکەوتکردن وەک PDF"
+            >
+              PDF 📄
             </button>
           </div>
 
@@ -528,7 +556,7 @@ function AccountStatementContent() {
                 {visibleColumns.totalAmount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">کۆی گشتی</th>}
                 {visibleColumns.discount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">داشکاندن</th>}
                 {visibleColumns.paidAmount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">پارەی دراو</th>}
-                {visibleColumns.note && <th className="p-3 font-bold text-center border-x border-[#1a3680]">تێبینی</th>}
+                {visibleColumns.note && <th className="p-3 font-bold text-center border-x border-[#1a3680] allow-wrap">تێبینی</th>}
                 {visibleColumns.balance && <th className="p-3 font-bold text-center border-x border-[#1a3680]">باڵانس</th>}
               </tr>
             </thead>
@@ -542,7 +570,7 @@ function AccountStatementContent() {
                 {visibleColumns.totalAmount && <td className="p-3 text-center text-gray-400">—</td>}
                 {visibleColumns.discount && <td className="p-3 text-center text-gray-400">—</td>}
                 {visibleColumns.paidAmount && <td className="p-3 text-center text-gray-400">—</td>}
-                {visibleColumns.note && <td className="p-3 text-center text-gray-500 font-bold">نەبەستراو نەقدی</td>}
+                {visibleColumns.note && <td className="p-3 text-center text-gray-500 font-bold allow-wrap">نەبەستراو نەقدی</td>}
                 {visibleColumns.balance && <td className="p-3 text-center font-black text-[#0b1f50]" dir="ltr">{renderBalances(processed.previousBalances)}</td>}
               </tr>
 
@@ -626,7 +654,7 @@ function AccountStatementContent() {
                           </td>
                         )}
                         {visibleColumns.note && (
-                          <td className="p-3 text-center text-gray-500 text-xs">
+                          <td className="p-3 text-center text-gray-500 text-xs allow-wrap">
                             {(() => {
                               if (isShareholder && v.currencyId !== usdId) {
                                 let rate = 1500;

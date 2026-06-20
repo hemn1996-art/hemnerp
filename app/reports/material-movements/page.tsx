@@ -517,6 +517,14 @@ export default function ItemsReportPage() {
           <button onClick={() => setShowColumnsModal(true)} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg text-xs hover:bg-blue-100 transition">
             <span className="text-sm">⚙️</span> کۆڵۆمەکان
           </button>
+          
+          <button onClick={() => window.print()} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs hover:bg-slate-200 transition">
+            🖨 پرینت
+          </button>
+          
+          <button onClick={() => window.print()} className="flex items-center gap-2 bg-[#0284c7] text-white px-4 py-2 rounded-lg text-xs hover:bg-[#0369a1] transition font-bold" title="پاشەکەوتکردن وەک PDF">
+            PDF 📄
+          </button>
         </div>
       </div>
 
@@ -578,7 +586,7 @@ export default function ItemsReportPage() {
                 {visibleColumns.voucherReference && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center w-20">پسوولە ↑</th>}
                 {visibleColumns.voucherType && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center">جۆر</th>}
                 {visibleColumns.accountName && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center">هەژمار</th>}
-                {visibleColumns.productName && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center">کەرەستە</th>}
+                {visibleColumns.productName && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center allow-wrap">کەرەستە</th>}
                 {visibleColumns.category && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center">کاتیگۆری</th>}
                 {visibleColumns.brand && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center">براند</th>}
                 {visibleColumns.warehouseName && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center">کۆگا</th>}
@@ -613,7 +621,7 @@ export default function ItemsReportPage() {
                     )}
                     {visibleColumns.voucherType && <td className="p-2 border-r border-slate-200 text-center font-medium text-slate-600">{translateVoucherType(item.voucherType)}</td>}
                     {visibleColumns.accountName && <td className="p-2 border-r border-slate-200 text-center text-blue-700 font-bold">{item.accountName}</td>}
-                    {visibleColumns.productName && <td className="p-2 border-r border-slate-200 text-center font-bold text-[#334155]">{item.productName}</td>}
+                    {visibleColumns.productName && <td className="p-2 border-r border-slate-200 text-center font-bold text-[#334155] allow-wrap">{item.productName}</td>}
                     {visibleColumns.category && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
                     {visibleColumns.brand && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
                     {visibleColumns.warehouseName && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.warehouseName}</td>}

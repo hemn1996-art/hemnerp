@@ -626,6 +626,11 @@ export default function ItemsReportPage() {
             className="flex items-center gap-1 bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs hover:bg-slate-200 transition">
             🖨 پرینت
           </button>
+          <button onClick={() => window.print()}
+            className="flex items-center gap-1 bg-[#0284c7] text-white px-3 py-1.5 rounded text-xs hover:bg-[#0369a1] transition font-bold"
+            title="پاشەکەوتکردن وەک PDF">
+            PDF 📄
+          </button>
 
           {/* Columns */}
           <button onClick={() => setShowColumnsModal(true)}
@@ -699,7 +704,7 @@ export default function ItemsReportPage() {
               {visibleColumns.label && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">لەبێڵ</th>}
               {visibleColumns.brand && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">براند</th>}
               {visibleColumns.category && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">کاتیگۆری</th>}
-              {visibleColumns.productName && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center min-w-[250px]">کەرەستە</th>}
+              {visibleColumns.productName && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center min-w-[250px] allow-wrap">کەرەستە</th>}
               {visibleColumns.voucherType && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">جۆر</th>}
               {visibleColumns.voucherReference && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center w-24">پسوولە ↑</th>}
             </tr>
@@ -722,7 +727,7 @@ export default function ItemsReportPage() {
                   {visibleColumns.label && <td className="p-2.5 border-r border-slate-200 text-center text-slate-400">{item.label}</td>}
                   {visibleColumns.brand && <td className="p-2.5 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
                   {visibleColumns.category && <td className="p-2.5 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
-                  {visibleColumns.productName && <td className="p-2.5 border-r border-slate-200 text-center text-slate-700 font-medium">{item.productName}</td>}
+                  {visibleColumns.productName && <td className="p-2.5 border-r border-slate-200 text-center text-slate-700 font-medium allow-wrap">{item.productName}</td>}
                   {visibleColumns.voucherType && <td className="p-2.5 border-r border-slate-200 text-center text-slate-600">{translateVoucherType(item.voucherType)}</td>}
                   {visibleColumns.voucherReference && (
                     <td className="p-2.5 border-r border-slate-200 text-center">
