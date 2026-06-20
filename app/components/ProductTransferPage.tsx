@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { store } from "../store/store";
+import { store, useStore } from "../store/store";
 import { saveInvoice } from "../utils/invoiceLogic";
 
 type ToastType = "error" | "success" | "info";
@@ -82,6 +82,9 @@ type Props = {
 
 export default function ProductTransferPage({ headerSelector, editId }: Props) {
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
+  const addVoucher = useStore((s) => s.addVoucher);
+  const updateVoucher = useStore((s) => s.updateVoucher);
+  const fetchProducts = useStore((s) => s.fetchProducts);
 
   useEffect(() => {
     setIsEditLoading(!!editId);
@@ -144,11 +147,29 @@ export default function ProductTransferPage({ headerSelector, editId }: Props) {
                 minute: "2-digit",
               })
             );
-            if (voucher.fromWarehouseId) setFromWarehouseId(voucher.fromWarehouseId);
-            if (voucher.toWarehouseId) setToWarehouseId(voucher.toWarehouseId);
+            
+            const fromW = voucher.inventoryTransactions?.find((t: any) => t.qtyChange < 0)?.warehouseId;
+            const toW = voucher.inventoryTransactions?.find((t: any) => t.qtyChange > 0)?.warehouseId;
+            if (fromW) setFromWarehouseId(fromW);
+            if (toW) setToWarehouseId(toW);
 
-            if (voucher.items && voucher.items.length > 0) {
-              const mappedRows: TransferRow[] = voucher.items.map((i: any) => ({
+            const dbLines = voucher.lines || [];
+            const mockItems = voucher.items || [];
+
+            if (dbLines.length > 0) {
+              const positiveLines = dbLines.filter((l: any) => l.qty > 0);
+              const mappedRows: TransferRow[] = positiveLines.map((l: any) => ({
+                id: Math.random(),
+                productId: l.productId,
+                productName: l.product?.name || "",
+                code: l.product?.code || "",
+                quantity: String(l.qty),
+                unitCost: Number(l.unitPrice || 0),
+                note: l.note || "",
+              }));
+              setRows(mappedRows);
+            } else if (mockItems.length > 0) {
+              const mappedRows: TransferRow[] = mockItems.map((i: any) => ({
                 id: Math.random(),
                 productId: i.productId,
                 productName: i.name,
@@ -590,55 +611,92 @@ export default function ProductTransferPage({ headerSelector, editId }: Props) {
 
     if (!validateBeforeSave()) return;
 
-    const items = rows.map((row: any) => ({
-      productId: row.productId,
-      name: row.productName,
-      code: row.code,
-      quantity: toNumber(row.quantity),
-      unitCost: row.unitCost,
-      totalCost: toNumber(row.quantity) * Number(row.unitCost || 0),
-      fromWarehouseId,
-      toWarehouseId,
-      note: row.note,
-    }));
+    const combineDateAndTime = (dateStr: string, timeStr: string) => {
+      try {
+        if (!dateStr) return new Date().toISOString();
+        let cleanTime = (timeStr || "").trim();
+        const ampmMatch = cleanTime.match(/^(1[0-2]|0?[1-9]):([0-5][0-9])\s*(AM|PM)$/i);
+        if (ampmMatch) {
+          let hours = parseInt(ampmMatch[1], 10);
+          const minutes = ampmMatch[2];
+          const ampm = ampmMatch[3].toUpperCase();
+          if (ampm === "PM" && hours < 12) hours += 12;
+          if (ampm === "AM" && hours === 12) hours = 0;
+          cleanTime = `${hours.toString().padStart(2, "0")}:${minutes}`;
+        }
+        const hhmmMatch = cleanTime.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])/);
+        if (hhmmMatch) {
+          const hours = hhmmMatch[1].padStart(2, "0");
+          const minutes = hhmmMatch[2];
+          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+        }
+        const fallback = new Date(dateStr + " " + cleanTime);
+        if (!isNaN(fallback.getTime())) return fallback.toISOString();
+        const fallbackDate = new Date(dateStr);
+        if (!isNaN(fallbackDate.getTime())) return fallbackDate.toISOString();
+      } catch (e) {
+        console.error("Error combining date and time:", e);
+      }
+      return new Date().toISOString();
+    };
 
-    saveInvoice({
-      id: Number(receiptNumber || Date.now().toString().slice(-6)),
-      type: "گواستنەوەی کاڵا",
-
-      fromWarehouseId,
-      fromWarehouseName: selectedFromWarehouse?.name || "",
-      toWarehouseId,
-      toWarehouseName: selectedToWarehouse?.name || "",
-
-      items,
-      totalQuantity,
-      totalCost,
-
-      cashboxEffect: 0,
-      accountEffect: 0,
-      profitEffect: 0,
-      warehouseEffect: "transfer-only",
-      reportScope: "warehouse-transfer",
-
-      note: receiptNote,
-      printNote,
-
+    const payload = {
+      type: "product_transfer",
+      referenceNo: String(receiptNumber),
+      date: combineDateAndTime(receiptDate, createdTime),
+      accountId: null,
+      warehouseId: fromWarehouseId || null,
+      currencyId: 1, // Default currency Dollar
+      exchangeRate: 1.0,
+      totalAmount: totalCost,
+      totalDiscount: 0,
+      netAmount: totalCost,
+      internalNote: receiptNote,
+      printNote: printNote,
       employeeName: employeeNameFromLogin,
-      employeePhone: employeePhoneFromLogin,
-      showEmployeeInfo: printOptions.showEmployeeInfo,
+      lines: rows.flatMap((row: any) => [
+        {
+          productId: row.productId,
+          qty: -toNumber(row.quantity),
+          unitPrice: toNumber(row.unitCost),
+          lineTotal: -toNumber(row.quantity) * toNumber(row.unitCost),
+          note: row.note || "",
+          warehouseId: fromWarehouseId,
+        },
+        {
+          productId: row.productId,
+          qty: toNumber(row.quantity),
+          unitPrice: toNumber(row.unitCost),
+          lineTotal: toNumber(row.quantity) * toNumber(row.unitCost),
+          note: row.note || "",
+          warehouseId: toWarehouseId,
+        }
+      ]),
+      paidAmounts: [],
+      ledgerEntries: [],
+    };
 
-      createdAt: new Date().toISOString(),
-      date: receiptDate,
-      createdTime,
-    } as any);
+    const savePromise = editId
+      ? updateVoucher(Number(editId), payload)
+      : addVoucher(payload);
 
-    applyWarehouseTransfer();
-
-    setSavedSnapshot(currentSnapshot);
-    setIsLocked(true);
-
-    showToast("پسوڵەی گواستنەوەی کاڵا خەزن کرا ✅", "success");
+    savePromise.then((res: any) => {
+      if (res) {
+        setSavedSnapshot(currentSnapshot);
+        if (editId) {
+          showToast("پسوڵەی گواستنەوەی کاڵا نوێکرایەوە ✅", "success");
+        } else {
+          setIsLocked(true);
+          showToast("پسوڵەی گواستنەوەی کاڵا خەزن کرا ✅", "success");
+        }
+        fetchProducts();
+      } else {
+        showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
+      }
+    }).catch((err: any) => {
+      console.error("Save error:", err);
+      showToast("هەڵەی نەتۆرک! تکایە دووبارە هەوڵ بدەوە.", "error");
+    });
   }
 
   function handlePrint() {

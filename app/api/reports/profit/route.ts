@@ -51,6 +51,10 @@ export async function GET(request: Request) {
           "gift",
           "warehouse_damage",
           "خەسارەی کۆگا",
+          "material_issue",
+          "سەرفی مواد",
+          "warehouse_stock",
+          "جەردی کۆگا",
         ]
       }
     };
@@ -303,7 +307,7 @@ export async function GET(request: Request) {
         if (!hasProductFilter) {
           totalGifts += amount;
         }
-      } else if (v.type === "warehouse_damage" || v.type === "خەسارەی کۆگا") {
+      } else if (v.type === "warehouse_damage" || v.type === "خەسارەی کۆگا" || v.type === "material_issue" || v.type === "سەرفی مواد") {
         let losses = 0;
         const hasProductFilter = productIds !== null || categories !== null || brands !== null;
         const hasWarehouseFilter = warehouseIds !== null;
@@ -321,6 +325,35 @@ export async function GET(request: Request) {
           totalLosses += convertToTarget(losses, usdId);
         } else {
           totalLosses += amount;
+        }
+      } else if (v.type === "warehouse_stock" || v.type === "جەردی کۆگا") {
+        let adjustmentValue = 0;
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
+        const hasWarehouseFilter = warehouseIds !== null;
+
+        if (hasProductFilter || hasWarehouseFilter) {
+          if (v.inventoryTransactions) {
+            v.inventoryTransactions.forEach((tx: any) => {
+              if (matchesProductFilters(tx.productId)) {
+                if (!hasWarehouseFilter || warehouseIds!.includes(tx.warehouseId)) {
+                  adjustmentValue -= tx.qtyChange * tx.unitCost;
+                }
+              }
+            });
+          }
+          totalLosses += convertToTarget(adjustmentValue, usdId);
+        } else {
+          if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
+            v.inventoryTransactions.forEach((tx: any) => {
+              adjustmentValue -= tx.qtyChange * tx.unitCost;
+            });
+          } else if (v.lines) {
+            v.lines.forEach((line: any) => {
+              const cost = productCosts[line.productId] || 0;
+              adjustmentValue -= line.qty * cost;
+            });
+          }
+          totalLosses += convertToTarget(adjustmentValue, usdId);
         }
       }
     });
