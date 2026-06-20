@@ -138,7 +138,8 @@ function AccountStatementContent() {
 
   const formatMoney = (amount: number, curId: number) => {
     const cur = currencies.find((c: any) => c.id === curId);
-    const num = Math.abs(amount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const isRounding = cur ? cur.rounding : false;
+    const num = Math.abs(amount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: isRounding ? 0 : 2 });
     const symbol = cur?.symbol || cur?.code || "";
     const isNegative = amount < 0;
     return (

@@ -388,7 +388,9 @@ export default function ProfitReportPage() {
 
   const formatCur = (num: number) => {
     const symbol = data.currencySymbol || "$";
-    const formatted = Math.abs(num).toLocaleString("en-US", {minimumFractionDigits: 0, maximumFractionDigits: 2});
+    const activeCurrency = currencies?.find((c: any) => c.symbol === symbol || c.code === symbol || (symbol === "IQD" && c.code === "IQD"));
+    const isRounding = activeCurrency ? activeCurrency.rounding : false;
+    const formatted = Math.abs(num).toLocaleString("en-US", {minimumFractionDigits: 0, maximumFractionDigits: isRounding ? 0 : 2});
     const isNegative = num < 0;
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", direction: "ltr" }}>

@@ -88,7 +88,12 @@ export default function BalanceSheetPage() {
 
   const fmt = (n: number) => {
     const symbol = data?.currencySymbol || currencyLabel;
-    return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 }) + " " + symbol;
+    const activeCurrency = currencies?.find((c: any) => c.id.toString() === currencyId.toString() || c.symbol === symbol || c.code === symbol);
+    const isRounding = activeCurrency ? activeCurrency.rounding : false;
+    return n.toLocaleString("en-US", { 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: isRounding ? 0 : 2 
+    }) + " " + symbol;
   };
 
   return (

@@ -214,22 +214,29 @@ function MultiSelectDropdown({
 }
 
 export default function DebtReportPage() {
-  const { accounts, accountTypes, fetchAccounts, fetchAccountTypes } = useStore();
+  const { accounts, accountTypes, fetchAccounts, fetchAccountTypes, currencies, fetchCurrencies } = useStore() as any;
   const [data, setData] = useState<DebtReportData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchAccounts();
     fetchAccountTypes();
+    fetchCurrencies?.();
   }, []);
 
   const cityOptions = Array.from(new Set(accounts.map((a: any) => a.city).filter(Boolean))) as string[];
 
   const formatMoney = (val: number, curId: number) => {
+    const currencyObj = currencies?.find((c: any) => c.id === curId);
+    const isRounding = currencyObj ? currencyObj.rounding : false;
+    const formatted = Math.abs(val).toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: isRounding ? 0 : 2
+    });
     if (curId === 2) {
-      return `${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} دینار`;
+      return `${formatted} دینار`;
     }
-    return `$${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    return `$${formatted}`;
   };
 
   const renderBalance = (map: Record<string, number>) => {
