@@ -522,9 +522,7 @@ export default function ItemsReportPage() {
             🖨 پرینت
           </button>
           
-          <button onClick={() => window.print()} className="flex items-center gap-2 bg-[#0284c7] text-white px-4 py-2 rounded-lg text-xs hover:bg-[#0369a1] transition font-bold" title="پاشەکەوتکردن وەک PDF">
-            PDF 📄
-          </button>
+
         </div>
       </div>
 

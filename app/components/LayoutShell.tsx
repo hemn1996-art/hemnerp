@@ -242,6 +242,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
 
       {/* Main Row - sidebar + content, fills all remaining height */}
       <div
+        className="layout-main-row"
         style={{
           flex: 1,
           display: "flex",

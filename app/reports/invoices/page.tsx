@@ -1711,13 +1711,7 @@ function InvoiceReportContent() {
               🖨️ پرینت
             </button>
 
-            <button
-              onClick={handlePrint}
-              className="bg-[#0284c7] text-white hover:bg-[#0369a1] font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-md"
-              title="پاشەکەوتکردن وەک PDF"
-            >
-              PDF 📄
-            </button>
+
 
             <button
               onClick={loadVouchers}

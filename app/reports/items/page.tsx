@@ -626,11 +626,7 @@ export default function ItemsReportPage() {
             className="flex items-center gap-1 bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs hover:bg-slate-200 transition">
             🖨 پرینت
           </button>
-          <button onClick={() => window.print()}
-            className="flex items-center gap-1 bg-[#0284c7] text-white px-3 py-1.5 rounded text-xs hover:bg-[#0369a1] transition font-bold"
-            title="پاشەکەوتکردن وەک PDF">
-            PDF 📄
-          </button>
+
 
           {/* Columns */}
           <button onClick={() => setShowColumnsModal(true)}

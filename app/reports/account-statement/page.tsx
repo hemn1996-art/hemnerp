@@ -1,8 +1,8 @@
 "use client";
-
 import React, { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "../../store/store";
+import PrintHeader from "../../components/PrintHeader";
 
 interface Product { id: number; name: string; code: string | null; costPrice: number | null; }
 interface VoucherLine { id: number; productId: number; qty: number; unitPrice: number; discountAmount: number; lineTotal: number; note: string | null; product: Product; }
@@ -472,13 +472,6 @@ function AccountStatementContent() {
              <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
               پرینت 🖨️
             </button>
-            <button 
-              onClick={handlePrint} 
-              className="flex items-center justify-center gap-2 bg-[#0284c7] text-white font-bold px-4 py-2.5 rounded-lg hover:bg-[#0369a1] transition-colors cursor-pointer text-sm shadow-sm"
-              title="پاشەکەوتکردن وەک PDF"
-            >
-              PDF 📄
-            </button>
           </div>
 
           <div className="flex gap-4 items-center flex-wrap">
@@ -499,48 +492,56 @@ function AccountStatementContent() {
           </div>
         </div>
 
-        {/* Info Header Box */}
-        <div className="border border-gray-200 rounded-2xl py-8 px-10 mb-8 bg-white shadow-md">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-base">
-            {/* Left side (Balance Info) */}
-            <div className="flex flex-col gap-4 text-right md:text-left md:items-start md:mr-auto">
-              <div className="flex justify-start gap-3 flex-row-reverse md:flex-row items-center">
-                <span className="text-gray-500 font-extrabold text-base">باڵانس :</span>
-                <span className="font-black text-xl text-gray-900" dir="ltr">{renderBalances(processed.finalBalances)}</span>
-              </div>
-              <div className="flex justify-start gap-3 flex-row-reverse md:flex-row items-center">
-                <span className="text-gray-500 font-extrabold text-base">سنووری قەرزی تێپەڕاندووە :</span>
-                <span className="font-bold text-gray-800 text-base">
-                  {account.creditLimit && Object.entries(processed.finalBalances).some(([curId, val]: [string, any]) => {
-                    if (account.creditLimitCurrencyId && String(account.creditLimitCurrencyId) === curId) {
-                      return val > account.creditLimit;
-                    }
-                    return val > account.creditLimit;
-                  }) ? "بەڵێ" : "نەخێر"}
-                </span>
-              </div>
-              <div className="flex justify-start gap-3 flex-row-reverse md:flex-row items-center">
-                <span className="text-gray-500 font-extrabold text-base">بەرواری پرینتکردن :</span>
-                <span className="font-bold text-gray-800 text-base" dir="ltr">{new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-              </div>
-            </div>
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <PrintHeader />
+        </div>
 
-            {/* Right side (Account Info) */}
-            <div className="flex flex-col gap-4 text-right">
-              <div className="flex justify-end gap-3 items-center">
-                <span className="font-black text-slate-900 text-3xl">{account.name}</span>
-                <span className="text-slate-500 font-extrabold text-lg"> : کەشف حساب</span>
-              </div>
-              <div className="flex justify-end gap-3 items-center">
-                <span className="font-bold text-slate-800 text-lg">{account.phone || "-"}</span>
-                <span className="text-slate-500 font-extrabold text-base"> : ژمارە تەلەفۆن</span>
-              </div>
-              <div className="flex justify-end gap-3 items-center">
-                <span className="font-bold text-slate-800 text-lg">{formatDate(startDate)} بۆ {formatDate(endDate)}</span>
-                <span className="text-slate-500 font-extrabold text-base"> : بەروار</span>
-              </div>
-            </div>
-          </div>
+        {/* Info Header Box */}
+        <div className="w-full border border-gray-300 rounded-lg overflow-hidden mb-6 bg-white text-xs" style={{ direction: "rtl" }}>
+          <table className="w-full text-right border-collapse">
+            <tbody>
+              <tr className="border-b border-gray-300">
+                <td className="p-3 border-l border-gray-300 w-1/3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 font-extrabold">کەشف حساب:</span>
+                    <span className="font-black text-slate-900 text-sm">{account.name}</span>
+                  </div>
+                </td>
+                <td className="p-3 border-l border-gray-300 w-1/3 text-center">
+                  {/* Center cell is blank in first row */}
+                </td>
+                <td className="p-3 w-1/3">
+                  <div className="flex items-center justify-between flex-row-reverse w-full">
+                    <span className="text-gray-500 font-extrabold">باڵانس:</span>
+                    <span className="font-black text-gray-900 text-sm" dir="ltr">{renderBalances(processed.finalBalances)}</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td className="p-3 border-l border-gray-300">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 font-extrabold">ژمارە تەلەفۆن:</span>
+                    <span className="font-bold text-gray-800">{account.phone || "-"}</span>
+                  </div>
+                </td>
+                <td className="p-3 border-l border-gray-300 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-gray-500 font-extrabold">بەروار:</span>
+                    <span className="font-bold text-gray-800">{formatDate(startDate)} - {formatDate(endDate)}</span>
+                  </div>
+                </td>
+                <td className="p-3">
+                  <div className="flex items-center justify-between flex-row-reverse w-full">
+                    <span className="text-gray-500 font-extrabold">بەرواری پرینتکردن:</span>
+                    <span className="font-bold text-gray-800 text-xs" dir="ltr">
+                      {new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         {/* Main Table */}
@@ -556,8 +557,8 @@ function AccountStatementContent() {
                 {visibleColumns.totalAmount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">کۆی گشتی</th>}
                 {visibleColumns.discount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">داشکاندن</th>}
                 {visibleColumns.paidAmount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">پارەی دراو</th>}
-                {visibleColumns.note && <th className="p-3 font-bold text-center border-x border-[#1a3680] allow-wrap">تێبینی</th>}
                 {visibleColumns.balance && <th className="p-3 font-bold text-center border-x border-[#1a3680]">باڵانس</th>}
+                {visibleColumns.note && <th className="p-3 font-bold text-center border-x border-[#1a3680] allow-wrap">تێبینی</th>}
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -570,8 +571,8 @@ function AccountStatementContent() {
                 {visibleColumns.totalAmount && <td className="p-3 text-center text-gray-400">—</td>}
                 {visibleColumns.discount && <td className="p-3 text-center text-gray-400">—</td>}
                 {visibleColumns.paidAmount && <td className="p-3 text-center text-gray-400">—</td>}
-                {visibleColumns.note && <td className="p-3 text-center text-gray-500 font-bold allow-wrap">نەبەستراو نەقدی</td>}
                 {visibleColumns.balance && <td className="p-3 text-center font-black text-[#0b1f50]" dir="ltr">{renderBalances(processed.previousBalances)}</td>}
+                {visibleColumns.note && <td className="p-3 text-center text-gray-500 font-bold allow-wrap">نەبەستراو نەقدی</td>}
               </tr>
 
               {loading ? (
@@ -653,6 +654,11 @@ function AccountStatementContent() {
                             )}
                           </td>
                         )}
+                        {visibleColumns.balance && (
+                          <td className={`p-3 text-center font-black text-sm ${tc.balanceBg}`} dir="ltr">
+                            {renderBalances(v.rowBalances)}
+                          </td>
+                        )}
                         {visibleColumns.note && (
                           <td className="p-3 text-center text-gray-500 text-xs allow-wrap">
                             {(() => {
@@ -676,11 +682,6 @@ function AccountStatementContent() {
                               }
                               return v.note || "—";
                             })()}
-                          </td>
-                        )}
-                        {visibleColumns.balance && (
-                          <td className={`p-3 text-center font-black text-sm ${tc.balanceBg}`} dir="ltr">
-                            {renderBalances(v.rowBalances)}
                           </td>
                         )}
                       </tr>
@@ -743,9 +744,12 @@ function AccountStatementContent() {
               {/* Final Balance Row */}
               {!loading && processed.visibleItems.length > 0 && (
                 <tr className="border-t-2 border-[#0b1f50] bg-[#0b1f50] text-white">
-                  <td colSpan={visibleColCount - (visibleColumns.balance ? 1 : 0)} className="p-3 text-right font-black text-base">باڵانسی کۆتایی</td>
+                  <td colSpan={visibleColCount - (visibleColumns.balance ? 1 : 0) - (visibleColumns.note ? 1 : 0)} className="p-3 text-right font-black text-base">باڵانسی کۆتایی</td>
                   {visibleColumns.balance && (
                     <td className="p-3 text-center font-black text-xl" dir="ltr">{renderBalances(processed.finalBalances, true)}</td>
+                  )}
+                  {visibleColumns.note && (
+                    <td className="p-3"></td>
                   )}
                 </tr>
               )}
