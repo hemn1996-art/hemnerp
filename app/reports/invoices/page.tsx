@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
+import PrintHeader from "../../components/PrintHeader";
 
 // TypeScript Interfaces for DB Vouchers & Relations
 interface Product {
@@ -1744,6 +1745,12 @@ function InvoiceReportContent() {
         id="print-report-area" 
         className="flex-1 p-6 space-y-6"
       >
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <PrintHeader />
+          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی پسوڵەکان</h2>
+        </div>
+
         {/* Summary KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
           {/* Card: Total Vouchers */}

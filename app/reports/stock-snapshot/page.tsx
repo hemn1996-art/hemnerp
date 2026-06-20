@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import PrintHeader from "../../components/PrintHeader";
 
 interface StockItem {
   productId: number;
@@ -187,6 +188,11 @@ export default function StockSnapshotReportPage() {
       </div>
 
       <div id="print-area" className="p-4 md:p-6 mx-auto bg-transparent min-h-screen">
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <PrintHeader />
+          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی ئاستی کۆگا</h2>
+        </div>
         
         {/* Actions Bar */}
         <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-6 no-print">

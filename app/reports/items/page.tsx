@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
+import PrintHeader from "../../components/PrintHeader";
 
 interface DropdownOption {
   value: string | number;
@@ -571,12 +572,12 @@ export default function ItemsReportPage() {
     <div className="p-0 bg-slate-50 min-h-screen font-ckb text-slate-800">
 
       {/* Top Header Bar */}
-      <div className="bg-[#0b1f50] text-white p-3 flex items-center justify-between">
+      <div className="bg-[#0b1f50] text-white p-3 flex items-center justify-between no-print">
         <h1 className="text-lg font-bold">ڕاپۆرتی کەرەستە</h1>
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 no-print">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Dates */}
           <div className="flex items-center gap-2">
@@ -636,8 +637,15 @@ export default function ItemsReportPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center gap-6 justify-end">
+      <div id="print-area">
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <PrintHeader />
+          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی کەرەستە</h2>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center gap-6 justify-end">
         <div className="text-center px-6 py-2 border-r border-slate-200">
           <p className="text-2xl font-bold text-slate-800">{renderTotalMoney()}</p>
           <p className="text-[11px] text-slate-500">گشتی پارە</p>
@@ -741,6 +749,8 @@ export default function ItemsReportPage() {
             )}
           </tbody>
         </table>
+      </div>
+
       </div>
 
       {/* Columns Modal */}

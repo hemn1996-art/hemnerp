@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { store, useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
+import PrintHeader from "../../components/PrintHeader";
 
 type DebtReportData = {
   id: number;
@@ -341,7 +342,7 @@ export default function DebtReportPage() {
 
   return (
     <div className="p-4 flex flex-col h-full bg-gray-50">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-4">
+      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-4 no-print">
         <div className="flex items-center gap-3">
           <button
             onClick={() => document.dispatchEvent(new CustomEvent("open-sidebar"))}
@@ -361,6 +362,12 @@ export default function DebtReportPage() {
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-bold transition-colors border-none cursor-pointer"
           >
              کۆڵۆمەکان
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            🖨️ پرینت
           </button>
            <button
             onClick={() => setShowFilterModal(true)}
@@ -397,7 +404,14 @@ export default function DebtReportPage() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm mb-4 text-left flex justify-between items-center">
+      <div id="print-area">
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <PrintHeader />
+          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی قەرز</h2>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl shadow-sm mb-4 text-left flex justify-between items-center">
          <div className="flex gap-2">
            <button onClick={() => setFilterDebtType("people")} className={`px-6 py-2 rounded-lg font-bold transition-colors cursor-pointer border-none ${filterDebtType === "people" ? "bg-[#061f5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>قەرزم لای خەڵک</button>
            <button onClick={() => setFilterDebtType("mine")} className={`px-6 py-2 rounded-lg font-bold transition-colors cursor-pointer border-none ${filterDebtType === "mine" ? "bg-[#061f5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>من قەرزارم</button>
@@ -457,6 +471,8 @@ export default function DebtReportPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
       </div>
 
       {showFilterModal && (

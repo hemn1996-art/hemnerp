@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
+import PrintHeader from "../../components/PrintHeader";
 
 interface DropdownOption {
   value: string | number;
@@ -481,7 +482,7 @@ export default function ItemsReportPage() {
   return (
     <div className="p-4 bg-slate-50 min-h-screen font-ckb text-slate-800">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between mb-4 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div className="flex flex-wrap items-center justify-between mb-4 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200 no-print">
         <div className="flex items-center gap-3">
           <div className="bg-blue-100 p-2 rounded-lg">
             <span className="text-blue-700 text-lg">📊</span>
@@ -526,8 +527,15 @@ export default function ItemsReportPage() {
         </div>
       </div>
 
-      {/* Summary Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      <div id="print-area">
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <PrintHeader />
+          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی جووڵەی کەرەستە</h2>
+        </div>
+
+        {/* Summary Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-blue-500 flex flex-col justify-center items-center">
           <p className="text-2xl font-bold text-slate-800">{filteredItems.reduce((s, i) => s + i.quantity, 0).toLocaleString("en-US")} عدد</p>
           <p className="text-xs text-slate-500 mt-1">{getQtyCardLabel()}</p>
@@ -649,6 +657,8 @@ export default function ItemsReportPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
       </div>
 
       {/* Columns Modal */}

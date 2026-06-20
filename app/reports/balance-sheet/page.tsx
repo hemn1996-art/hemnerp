@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
+import PrintHeader from "../../components/PrintHeader";
 
 export default function BalanceSheetPage() {
   const router = useRouter();
@@ -104,7 +105,7 @@ export default function BalanceSheetPage() {
     <div className="p-0 bg-[#f8f9fb] min-h-screen font-ckb text-slate-700">
 
       {/* Top Header */}
-      <div className="bg-[#0b1f50] text-white p-3 flex items-center justify-between">
+      <div className="bg-[#0b1f50] text-white p-3 flex items-center justify-between no-print">
         <h1 className="text-lg font-bold">ڕاپۆرتی میزانیە</h1>
       </div>
 
@@ -131,10 +132,17 @@ export default function BalanceSheetPage() {
         </button>
       </div>
 
-      {/* Main Content */}
-      {loading ? (
-        <div className="p-12 text-center text-slate-500 text-lg">خەریکی هێنانی داتاکانە...</div>
-      ) : data ? (
+      <div id="print-area">
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <PrintHeader />
+          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی میزانیە</h2>
+        </div>
+
+        {/* Main Content */}
+        {loading ? (
+          <div className="p-12 text-center text-slate-500 text-lg">خەریکی هێنانی داتاکانە...</div>
+        ) : data ? (
         <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
 
           {/* RIGHT: Assets (موجودات) */}
@@ -268,9 +276,10 @@ export default function BalanceSheetPage() {
           </div>
 
         </div>
-      ) : (
-        <div className="p-12 text-center text-red-500">هەڵەیەک ڕوویدا لە هێنانی داتاکان</div>
-      )}
+        ) : (
+          <div className="p-12 text-center text-red-500">هەڵەیەک ڕوویدا لە هێنانی داتاکان</div>
+        )}
+      </div>
 
       {/* Filter Modal */}
       {showFilterModal && (

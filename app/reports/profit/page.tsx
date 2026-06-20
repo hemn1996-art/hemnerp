@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import DateInput from "../../components/DateInput";
 import { useStore } from "../../store/store";
+import PrintHeader from "../../components/PrintHeader";
 
 interface Option {
   value: string | number;
@@ -405,9 +406,15 @@ export default function ProfitReportPage() {
 
   return (
     <div className="p-4 md:p-6 bg-slate-50 h-full overflow-y-auto">
-      
-      {/* HEADER SECTION */}
-      <div className="bg-gradient-to-l from-[#061f5f] to-[#03133f] rounded-3xl shadow-xl mb-6 p-6 lg:p-8 text-white relative overflow-hidden">
+      <div id="print-area">
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <PrintHeader />
+          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی قازانجی گشتی</h2>
+        </div>
+
+        {/* HEADER SECTION */}
+        <div className="bg-gradient-to-l from-[#061f5f] to-[#03133f] rounded-3xl shadow-xl mb-6 p-6 lg:p-8 text-white relative overflow-hidden no-print">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-5 blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-blue-400 opacity-10 blur-2xl pointer-events-none"></div>
 
@@ -602,9 +609,10 @@ export default function ProfitReportPage() {
               <p className="text-xs text-slate-400 font-medium m-0">کۆی گشتی قازانجی کۆتایی</p>
             </div>
           </div>
-
         </div>
       )}
+
+      </div>
 
       {/* Filters Modal */}
       {showFilterModal && (
