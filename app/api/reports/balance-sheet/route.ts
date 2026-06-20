@@ -115,7 +115,7 @@ export async function GET(request: Request) {
     let totalShareholderWithdrawals = 0;
     const shareholderAccounts = await prisma.account.findMany({
       where: { isShareholder: true },
-      select: { id: true }
+      select: { id: true, name: true, phone: true }
     });
     const shareholderIds = new Set(shareholderAccounts.map(a => a.id));
 
@@ -223,10 +223,21 @@ export async function GET(request: Request) {
     const startingCapital = 0;
     const totalLiabilitiesEquity = currentLiabilities + capital + annualProfit + withdrawals;
 
+    const shareholders = shareholderAccounts.map(a => {
+      const balance = shareholderBalances[a.id] || 0;
+      return {
+        id: a.id,
+        name: a.name,
+        phone: a.phone || "",
+        balance: -balance // credit - debit
+      };
+    });
+
     return NextResponse.json({
       asOfDate,
       currencySymbol: targetCurrency?.symbol || "$",
       currencyCode: targetCurrency?.code || "USD",
+      shareholders,
       assets: {
         currentAssets: totalCash,
         cash: totalCash,

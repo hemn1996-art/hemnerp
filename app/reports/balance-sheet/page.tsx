@@ -2,11 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import { useStore } from "../../store/store";
+import { useRouter } from "next/navigation";
 
 export default function BalanceSheetPage() {
+  const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showShareholdersModal, setShowShareholdersModal] = useState(false);
+  const [shareholderSearch, setShareholderSearch] = useState("");
 
   const { currencies, fetchCurrencies } = useStore() as any;
 
@@ -252,6 +256,17 @@ export default function BalanceSheetPage() {
             </div>
           </div>
 
+          {/* Bottom Button for Shareholders */}
+          <div className="md:col-span-2 flex justify-center mt-4 no-print">
+            <button
+              onClick={() => setShowShareholdersModal(true)}
+              className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-6 py-3.5 rounded-xl hover:bg-slate-800 transition duration-200 cursor-pointer shadow-md text-sm"
+            >
+              <span>کەشفی خاوەن پشکەکان</span>
+              <span>👥</span>
+            </button>
+          </div>
+
         </div>
       ) : (
         <div className="p-12 text-center text-red-500">هەڵەیەک ڕوویدا لە هێنانی داتاکان</div>
@@ -311,6 +326,113 @@ export default function BalanceSheetPage() {
                 جێبەجێکردنی فلتەرەکان <span>✔</span>
               </button>
               <button onClick={() => setShowFilterModal(false)} className="text-slate-600 hover:text-slate-900 text-sm font-medium">پاشگەزبوونەوە</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shareholders List Modal */}
+      {showShareholdersModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="bg-[#0b1f50] p-4 flex items-center justify-between text-white">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowShareholdersModal(false)} className="text-white hover:text-slate-300 text-lg border-none bg-transparent cursor-pointer">✕</button>
+                <h2 className="font-bold text-lg">کەشفی حیسابی خاوەن پشکەکان</h2>
+              </div>
+              <span className="text-sm font-bold opacity-80">ژمارەی خاوەن پشکەکان: {data?.shareholders?.length || 0}</span>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-end">
+              <input
+                type="text"
+                placeholder="🔍 گەڕان بەدوای ناوی خاوەن پشک یان تەلەفۆن..."
+                value={shareholderSearch}
+                onChange={e => setShareholderSearch(e.target.value)}
+                className="w-full max-w-sm px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-[#0b1f50] bg-white text-right text-sm font-bold text-slate-700 shadow-sm"
+                dir="rtl"
+              />
+            </div>
+
+            {/* Modal Body / Table */}
+            <div className="p-6 overflow-y-auto flex-1 text-right" dir="rtl">
+              <table className="w-full text-center border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-200">
+                    <th className="py-3 px-2 text-slate-500 font-bold text-xs w-12 text-center">#</th>
+                    <th className="py-3 px-4 text-slate-500 font-bold text-xs text-right">خاوەن پشک</th>
+                    <th className="py-3 px-4 text-slate-500 font-bold text-xs text-center">ژمارەی تەلەفۆن</th>
+                    <th className="py-3 px-4 text-slate-500 font-bold text-xs text-left">باڵانس / بەشە سەرمایە</th>
+                    <th className="py-3 px-4 text-slate-500 font-bold text-xs w-32 text-center">کردار</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data?.shareholders ? (() => {
+                    const filtered = data.shareholders.filter((sh: any) =>
+                      sh.name.toLowerCase().includes(shareholderSearch.toLowerCase()) ||
+                      sh.phone.toLowerCase().includes(shareholderSearch.toLowerCase())
+                    );
+                    
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">
+                            هیچ خاوەن پشکێک نەدۆزرایەوە
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((sh: any, index: number) => (
+                      <tr
+                        key={sh.id}
+                        onClick={() => {
+                          setShowShareholdersModal(false);
+                          router.push(`/reports/account-statement?accountId=${sh.id}`);
+                        }}
+                        className="border-b border-slate-100 hover:bg-blue-50/40 transition-colors cursor-pointer"
+                      >
+                        <td className="py-3.5 px-2 text-slate-400 text-xs font-bold text-center">{index + 1}</td>
+                        <td className="py-3.5 px-4 text-slate-800 font-bold text-sm text-right">{sh.name}</td>
+                        <td className="py-3.5 px-4 text-slate-600 font-medium text-xs text-center" dir="ltr">{sh.phone || "—"}</td>
+                        <td className="py-3.5 px-4 text-slate-800 font-black text-sm text-left" dir="ltr">
+                          {fmt(sh.balance)}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowShareholdersModal(false);
+                              router.push(`/reports/account-statement?accountId=${sh.id}`);
+                            }}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 font-bold px-3 py-1.5 rounded-lg text-xs transition duration-150 cursor-pointer border-none"
+                          >
+                            کەشفی حساب 📑
+                          </button>
+                        </td>
+                      </tr>
+                    ));
+                  })() : (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">
+                        لە بارکردندایە...
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-start">
+              <button
+                onClick={() => setShowShareholdersModal(false)}
+                className="px-5 py-2 bg-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-300 transition cursor-pointer border-none"
+              >
+                داخستن
+              </button>
             </div>
           </div>
         </div>
