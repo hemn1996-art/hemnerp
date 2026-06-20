@@ -41,6 +41,8 @@ export async function GET(request: Request) {
               "sales_return",
               "my_debt_discount",
               "people_debt_discount",
+              "داشکاندن لە قەرزی من",
+              "داشکاندن لە قەرزی خەڵک",
               "expense",
               "gift",
               "warehouse_damage",
@@ -199,9 +201,9 @@ export async function GET(request: Request) {
           });
         }
         totalCOGS -= convertToTarget(cogs, usdId);
-      } else if (v.type === "my_debt_discount") {
+      } else if (v.type === "my_debt_discount" || v.type === "داشکاندن لە قەرزی من") {
         totalMyDebtDiscount += amount;
-      } else if (v.type === "people_debt_discount") {
+      } else if (v.type === "people_debt_discount" || v.type === "داشکاندن لە قەرزی خەڵک") {
         totalPeopleDebtDiscount += amount;
       } else if (v.type === "expense") {
         totalExpenses += amount;
@@ -223,6 +225,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       asOfDate,
+      currencySymbol: targetCurrency?.symbol || "$",
+      currencyCode: targetCurrency?.code || "USD",
       assets: {
         currentAssets: totalCash,
         cash: totalCash,

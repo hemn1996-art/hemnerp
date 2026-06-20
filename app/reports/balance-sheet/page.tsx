@@ -53,7 +53,9 @@ export default function BalanceSheetPage() {
 
       const res = await fetch(`/api/reports/balance-sheet?${query.toString()}`);
       if (res.ok) {
-        setData(await res.json());
+        const json = await res.json();
+        setData(json);
+        if (json.currencySymbol) setCurrencyLabel(json.currencySymbol);
       }
     } catch (e) {
       console.error(e);
@@ -68,7 +70,8 @@ export default function BalanceSheetPage() {
   };
 
   const fmt = (n: number) => {
-    return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 }) + " " + currencyLabel;
+    const symbol = data?.currencySymbol || currencyLabel;
+    return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 }) + " " + symbol;
   };
 
   return (
@@ -275,7 +278,7 @@ export default function BalanceSheetPage() {
                     const sel = e.target.options[e.target.selectedIndex];
                     setCurrencyLabel(e.target.value === "all" ? "دینار" : sel.text.split(" - ")[0] || "$");
                   }}>
-                    <option value="all">$</option>
+                    <option value="all">هەموو (دینار)</option>
                     {currencies?.map((c: any) => <option key={c.id} value={c.id}>{c.symbol} - {c.name}</option>)}
                   </select>
                 </div>
