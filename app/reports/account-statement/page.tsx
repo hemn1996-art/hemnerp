@@ -8,7 +8,7 @@ interface Product { id: number; name: string; code: string | null; costPrice: nu
 interface VoucherLine { id: number; productId: number; qty: number; unitPrice: number; discountAmount: number; lineTotal: number; note: string | null; product: Product; }
 interface VoucherPaidAmount { id: number; currencyId: number; amount: number; exchangeRate: number; currency: any; }
 interface VoucherExpense { id: number; amount: number; currencyId: number; note: string | null; accountId: number | null; addToAccountDebt?: boolean; }
-interface LedgerEntry { id: number; debit: number; credit: number; currencyId: number; date?: string; currency: any; accountId?: number | null; }
+interface LedgerEntry { id: number; debit: number; credit: number; currencyId: number; exchangeRate?: number; date?: string; currency: any; accountId?: number | null; }
 interface Account { id: number; name: string; phone?: string; creditLimit?: number; accountTypeId: number; isShareholder: boolean; }
 interface RawVoucher { id: number; type: string; date: string; accountId: number | null; currencyId: number | null; exchangeRate: number; totalAmount: number; totalDiscount: number; netAmount: number; internalNote: string | null; printNote: string | null; hasDelivery: boolean; deliveryFee: number | null; account: Account | null; lines: VoucherLine[]; paidAmounts: VoucherPaidAmount[]; expenses: VoucherExpense[]; ledgerEntries: LedgerEntry[]; }
 
@@ -265,6 +265,10 @@ function AccountStatementContent() {
       return a.id.includes("-main") ? -1 : 1;
     });
 
+    const usdCurrency = currencies.find((c: any) => c.code === "USD");
+    const usdId = usdCurrency ? usdCurrency.id : 1;
+    const isShareholder = account?.isShareholder === true;
+
     const runningBalances: Record<string, number> = {};
     let previousBalances: Record<string, number> = {};
 
@@ -275,8 +279,15 @@ function AccountStatementContent() {
 
     const items = rowsList.map((row: any) => {
       row.ledgerEntries.forEach((le: LedgerEntry) => {
-        const curKey = String(le.currencyId);
-        runningBalances[curKey] = (runningBalances[curKey] || 0) + (le.debit - le.credit);
+        if (isShareholder) {
+          const curKey = String(usdId);
+          const change = le.debit - le.credit;
+          const convertedChange = le.currencyId === usdId ? change : change / (le.exchangeRate || 1500);
+          runningBalances[curKey] = (runningBalances[curKey] || 0) + convertedChange;
+        } else {
+          const curKey = String(le.currencyId);
+          runningBalances[curKey] = (runningBalances[curKey] || 0) + (le.debit - le.credit);
+        }
       });
 
       const vDate = new Date(row.date);
