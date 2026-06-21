@@ -203,6 +203,7 @@ export default function ItemsReportPage() {
   const router = useRouter();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showReportStats, setShowReportStats] = useState(true);
 
   // Date Filters
   const [startDate, setStartDate] = useState(() => {
@@ -301,6 +302,16 @@ export default function ItemsReportPage() {
     fetchCurrencies?.();
     fetchWarehouses?.();
     fetchInvoices?.();
+
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.showReportStats === "boolean") {
+          setShowReportStats(parsed.showReportStats);
+        }
+      } catch (e) {}
+    }
   }, [fetchAccounts, fetchProducts, fetchAccountTypes, fetchCurrencies, fetchWarehouses, fetchInvoices]);
 
   const employeeOptions = React.useMemo(() => {
@@ -535,16 +546,18 @@ export default function ItemsReportPage() {
         </div>
 
         {/* Summary Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-blue-500 flex flex-col justify-center items-center">
-          <p className="text-2xl font-bold text-slate-800">{filteredItems.reduce((s, i) => s + i.quantity, 0).toLocaleString("en-US")} عدد</p>
-          <p className="text-xs text-slate-500 mt-1">{getQtyCardLabel()}</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-green-500 flex flex-col justify-center items-center">
-          <p className="text-2xl font-bold text-green-600">{filteredItems.reduce((s, i) => s + (i.profit || 0), 0).toLocaleString("en-US")} $</p>
-          <p className="text-xs text-slate-500 mt-1">کۆی قازانج</p>
-        </div>
-      </div>
+        {showReportStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 animate-in fade-in duration-200">
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-blue-500 flex flex-col justify-center items-center">
+              <p className="text-2xl font-bold text-slate-800">{filteredItems.reduce((s, i) => s + i.quantity, 0).toLocaleString("en-US")} عدد</p>
+              <p className="text-xs text-slate-500 mt-1">{getQtyCardLabel()}</p>
+            </div>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-green-500 flex flex-col justify-center items-center">
+              <p className="text-2xl font-bold text-green-600">{filteredItems.reduce((s, i) => s + (i.profit || 0), 0).toLocaleString("en-US")} $</p>
+              <p className="text-xs text-slate-500 mt-1">کۆی قازانج</p>
+            </div>
+          </div>
+        )}
 
       {/* Notice Banners */}
       {showSalesReturnNotice && (

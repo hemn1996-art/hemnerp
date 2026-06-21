@@ -332,6 +332,7 @@ function InvoiceReportContent() {
   // Local state
   const [vouchers, setVouchers] = useState<RawVoucher[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showReportStats, setShowReportStats] = useState(true);
   const [voucherType, setVoucherType] = useState("all");
   const [deleteVoucherId, setDeleteVoucherId] = useState<number | null>(null);
 
@@ -453,6 +454,16 @@ function InvoiceReportContent() {
     fetchProducts();
     fetchWarehouses();
     loadVouchers();
+
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.showReportStats === "boolean") {
+          setShowReportStats(parsed.showReportStats);
+        }
+      } catch (e) {}
+    }
   }, []);
 
   // Click listener to close dropdowns when clicking outside
@@ -1752,63 +1763,65 @@ function InvoiceReportContent() {
         </div>
 
         {/* Summary KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-          {/* Card: Total Vouchers */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">کۆی پسوڵەکان</span>
-            <span className="text-blue-900 text-xl font-black mt-2">
-              {visibleColumns.invoiceId ? totals.count : "ناچالاکە"}
-            </span>
-          </div>
+        {showReportStats && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 animate-in fade-in duration-200">
+            {/* Card: Total Vouchers */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
+              <span className="text-slate-600 text-xs font-bold">کۆی پسوڵەکان</span>
+              <span className="text-blue-900 text-xl font-black mt-2">
+                {visibleColumns.invoiceId ? totals.count : "ناچالاکە"}
+              </span>
+            </div>
 
-          {/* Card: Total Value */}
-          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">کۆی گشتی پارەی جوڵاو</span>
-            <span className="text-indigo-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.valueByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
-              {visibleColumns.total ? formatKPIMultiCurrency(totals.valueByCurrency) : "ناچالاکە"}
-            </span>
-          </div>
+            {/* Card: Total Value */}
+            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
+              <span className="text-slate-600 text-xs font-bold">کۆی گشتی پارەی جوڵاو</span>
+              <span className="text-indigo-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.valueByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
+                {visibleColumns.total ? formatKPIMultiCurrency(totals.valueByCurrency) : "ناچالاکە"}
+              </span>
+            </div>
 
-          {/* Card: Paid */}
-          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">پارەی دراو</span>
-            <span className="text-emerald-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.paidByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
-              {visibleColumns.paid ? formatKPIMultiCurrency(totals.paidByCurrency) : "ناچالاکە"}
-            </span>
-          </div>
+            {/* Card: Paid */}
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
+              <span className="text-slate-600 text-xs font-bold">پارەی دراو</span>
+              <span className="text-emerald-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.paidByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
+                {visibleColumns.paid ? formatKPIMultiCurrency(totals.paidByCurrency) : "ناچالاکە"}
+              </span>
+            </div>
 
-          {/* Card: Remaining */}
-          <div className="bg-gradient-to-br from-rose-50 to-rose-100/50 border border-rose-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">باقیاتی ماوە</span>
-            <span className="text-rose-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.remainingByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
-              {visibleColumns.remaining ? formatKPIMultiCurrency(totals.remainingByCurrency) : "ناچالاکە"}
-            </span>
-          </div>
+            {/* Card: Remaining */}
+            <div className="bg-gradient-to-br from-rose-50 to-rose-100/50 border border-rose-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
+              <span className="text-slate-600 text-xs font-bold">باقیاتی ماوە</span>
+              <span className="text-rose-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.remainingByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
+                {visibleColumns.remaining ? formatKPIMultiCurrency(totals.remainingByCurrency) : "ناچالاکە"}
+              </span>
+            </div>
 
-          {/* Card: Expenses */}
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">خەرجی پسووڵەی کڕین</span>
-            <span className="text-purple-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.expensesByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
-              {visibleColumns.expenses ? formatKPIMultiCurrency(totals.expensesByCurrency) : "ناچالاکە"}
-            </span>
-          </div>
+            {/* Card: Expenses */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
+              <span className="text-slate-600 text-xs font-bold">خەرجی پسووڵەی کڕین</span>
+              <span className="text-purple-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.expensesByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
+                {visibleColumns.expenses ? formatKPIMultiCurrency(totals.expensesByCurrency) : "ناچالاکە"}
+              </span>
+            </div>
 
-          {/* Card: Discounts */}
-          <div className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">داشکاندن</span>
-            <span className="text-slate-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.discountByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
-              {visibleColumns.discount ? formatKPIMultiCurrency(totals.discountByCurrency) : "ناچالاکە"}
-            </span>
-          </div>
+            {/* Card: Discounts */}
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
+              <span className="text-slate-600 text-xs font-bold">داشکاندن</span>
+              <span className="text-slate-900 text-xl font-black mt-2" style={{ fontSize: Object.keys(totals.discountByCurrency).length > 1 && filterCurrencyId === 'all' ? '14px' : undefined }}>
+                {visibleColumns.discount ? formatKPIMultiCurrency(totals.discountByCurrency) : "ناچالاکە"}
+              </span>
+            </div>
 
-          {/* Card: Profits */}
-          <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-            <span className="text-slate-600 text-xs font-bold">قازانج (فرۆشتن)</span>
-            <span className="text-amber-900 text-xl font-black mt-2">
-              {visibleColumns.profit ? formatKPIMultiCurrency(totals.profitByCurrency) : "ناچالاکە"}
-            </span>
+            {/* Card: Profits */}
+            <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
+              <span className="text-slate-600 text-xs font-bold">قازانج (فرۆشتن)</span>
+              <span className="text-amber-900 text-xl font-black mt-2">
+                {visibleColumns.profit ? formatKPIMultiCurrency(totals.profitByCurrency) : "ناچالاکە"}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         {showSalesReturnNotice && (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm no-print text-right" dir="rtl">

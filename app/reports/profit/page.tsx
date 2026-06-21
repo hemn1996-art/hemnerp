@@ -240,6 +240,7 @@ export default function ProfitReportPage() {
     currencySymbol: "$",
   });
   const [loading, setLoading] = useState(true);
+  const [showReportStats, setShowReportStats] = useState(true);
   
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -276,6 +277,16 @@ export default function ProfitReportPage() {
         const rawBrand = localStorage.getItem("__erp_brands");
         if (rawBrand) setBrandsList(JSON.parse(rawBrand));
       } catch (e) { console.error(e); }
+
+      const saved = localStorage.getItem("general_settings");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.showReportStats === "boolean") {
+            setShowReportStats(parsed.showReportStats);
+          }
+        } catch (e) {}
+      }
     }
   }, [fetchAccounts, fetchProducts, fetchAccountTypes, fetchCurrencies, fetchWarehouses, fetchInvoices]);
 
@@ -508,8 +519,8 @@ export default function ProfitReportPage() {
           <div className="w-14 h-14 border-4 border-slate-200 border-t-[#061f5f] rounded-full animate-spin shadow-md"></div>
           <p className="mt-6 text-[#061f5f] font-black text-xl animate-pulse">لە بارکردندایە...</p>
         </div>
-      ) : (
-        <div className="max-w-7xl mx-auto w-full pb-10 space-y-6">
+      ) : showReportStats ? (
+        <div className="max-w-7xl mx-auto w-full pb-10 space-y-6 animate-in fade-in duration-200">
 
           {/* TOP ROW - 4 cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
@@ -609,6 +620,12 @@ export default function ProfitReportPage() {
               <p className="text-xs text-slate-400 font-medium m-0">کۆی گشتی قازانجی کۆتایی</p>
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="text-center py-20 bg-white border border-slate-200 rounded-3xl shadow-sm animate-in fade-in duration-200">
+          <span className="text-4xl">📊</span>
+          <h3 className="text-lg font-black text-slate-800 mt-4">ئاماری ڕاپۆرت ناچالاک کراوە</h3>
+          <p className="text-xs text-slate-400 mt-1 font-bold">بۆ بینینی قازانج، تکایە ڕێکخستنی (پیشاندانی ئاماری ڕاپۆرت) چالاک بکە لە بەشی ڕێکخستنی گشتی.</p>
         </div>
       )}
 

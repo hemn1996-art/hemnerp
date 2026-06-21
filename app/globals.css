@@ -225,7 +225,7 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   /* Reset browser margin and page margins */
   @page {
     size: auto;
-    margin: 0 !important;
+    margin: 8mm 6mm !important;
   }
 
   /* Reset layout zoom and dimensions */
@@ -283,7 +283,7 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     width: 100% !important;
     min-width: 100% !important;
     max-width: 100% !important;
-    padding: 24px !important;
+    padding: 0 !important; /* Page margin handles spacing */
     margin: 0 !important;
     box-sizing: border-box !important;
     border: none !important;
@@ -319,15 +319,59 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   table {
     width: 100% !important;
     border-collapse: collapse !important;
+    table-layout: auto !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
   
+  th, td {
+    padding: 4px 5px !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
   th:not(.allow-wrap),
   td:not(.allow-wrap) {
-    white-space: nowrap !important;
+    white-space: normal !important;
   }
 
   .allow-wrap {
     white-space: normal !important;
     word-break: break-word !important;
+  }
+
+  /* Prevent grids from overflowing on print by forcing wrap */
+  .grid-cols-7, .grid-cols-2, .grid-cols-3, .grid-cols-4, .grid {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .grid-cols-7 > div,
+  .grid-cols-2 > div,
+  .grid-cols-3 > div,
+  .grid-cols-4 > div,
+  .grid > div {
+    flex: 1 1 12% !important;
+    min-width: 90px !important;
+    padding: 6px 8px !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .grid-cols-7 > div span,
+  .grid-cols-2 > div span,
+  .grid-cols-3 > div span,
+  .grid-cols-4 > div span,
+  .grid > div span {
+    font-size: 10px !important;
   }
 }

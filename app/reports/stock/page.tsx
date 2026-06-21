@@ -28,6 +28,7 @@ export default function StockReportPage() {
   const [stockData, setStockData] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showReportStats, setShowReportStats] = useState(true);
 
   const {
     warehouses, fetchWarehouses,
@@ -107,6 +108,16 @@ export default function StockReportPage() {
       const rawBrand = localStorage.getItem("__erp_brands");
       if (rawCat) setCategories(JSON.parse(rawCat));
       if (rawBrand) setBrands(JSON.parse(rawBrand));
+
+      const saved = localStorage.getItem("general_settings");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.showReportStats === "boolean") {
+            setShowReportStats(parsed.showReportStats);
+          }
+        } catch (e) {}
+      }
     }
   }, [fetchWarehouses, fetchProducts, fetchAccounts]);
 
@@ -289,25 +300,27 @@ export default function StockReportPage() {
         </div>
 
         {/* Totals Cards */}
-        <div className={`grid grid-cols-1 ${visibleColumns.warehouseValue ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-6`}>
-          {visibleColumns.warehouseValue && (
-            <div className="bg-white rounded-md p-5 border-r-4 border-blue-500 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-gray-500 font-bold text-sm mb-2">بەهای کۆگا</span>
-              <span className="text-2xl font-black text-gray-800" dir="ltr">{formatMoney(totalValue)}</span>
+        {showReportStats && (
+          <div className={`grid grid-cols-1 ${visibleColumns.warehouseValue ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-6 animate-in fade-in duration-200`}>
+            {visibleColumns.warehouseValue && (
+              <div className="bg-white rounded-md p-5 border-r-4 border-blue-500 shadow-sm flex flex-col items-center justify-center">
+                <span className="text-gray-500 font-bold text-sm mb-2">بەهای کۆگا</span>
+                <span className="text-2xl font-black text-gray-800" dir="ltr">{formatMoney(totalValue)}</span>
+              </div>
+            )}
+            <div className="bg-white rounded-md p-5 border-r-4 border-green-500 shadow-sm flex flex-col items-center justify-center">
+              <span className="text-gray-500 font-bold text-sm mb-2">گشتی عدد</span>
+              <div className="text-2xl font-black text-gray-800" dir="ltr">
+                <span className="text-sm font-bold text-gray-400 ml-1">دانە</span>
+                {totalQuantity.toLocaleString()}
+              </div>
             </div>
-          )}
-          <div className="bg-white rounded-md p-5 border-r-4 border-green-500 shadow-sm flex flex-col items-center justify-center">
-            <span className="text-gray-500 font-bold text-sm mb-2">گشتی عدد</span>
-            <div className="text-2xl font-black text-gray-800" dir="ltr">
-              <span className="text-sm font-bold text-gray-400 ml-1">دانە</span>
-              {totalQuantity.toLocaleString()}
+            <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
+              <span className="text-gray-500 font-bold text-sm mb-2">گشتی کەرەستە</span>
+              <span className="text-2xl font-black text-gray-800">{totalItems}</span>
             </div>
           </div>
-          <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-            <span className="text-gray-500 font-bold text-sm mb-2">گشتی کەرەستە</span>
-            <span className="text-2xl font-black text-gray-800">{totalItems}</span>
-          </div>
-        </div>
+        )}
 
         {/* Main Table */}
         <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">

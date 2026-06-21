@@ -204,6 +204,7 @@ export default function ItemsReportPage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showReportStats, setShowReportStats] = useState(true);
 
   const {
     accounts, fetchAccounts,
@@ -307,6 +308,16 @@ export default function ItemsReportPage() {
         const rawPkg = localStorage.getItem("__erp_packaging");
         if (rawPkg) setLabelsList(JSON.parse(rawPkg));
       } catch (e) { console.error(e); }
+
+      const saved = localStorage.getItem("general_settings");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.showReportStats === "boolean") {
+            setShowReportStats(parsed.showReportStats);
+          }
+        } catch (e) {}
+      }
     }
   }, [fetchAccounts, fetchProducts, fetchAccountTypes, fetchCurrencies, fetchWarehouses, fetchInvoices]);
 
@@ -645,20 +656,22 @@ export default function ItemsReportPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center gap-6 justify-end">
-        <div className="text-center px-6 py-2 border-r border-slate-200">
-          <p className="text-2xl font-bold text-slate-800">{renderTotalMoney()}</p>
-          <p className="text-[11px] text-slate-500">گشتی پارە</p>
-        </div>
-        <div className="text-center px-6 py-2 border-r border-slate-200">
-          <p className="text-2xl font-bold text-slate-800">{totalQty.toLocaleString("en-US")} عدد</p>
-          <p className="text-[11px] text-slate-500">{getQtyCardLabel()}</p>
-        </div>
-        <div className="text-center px-6 py-2">
-          <p className="text-2xl font-bold text-slate-400">0 عدد</p>
-          <p className="text-[11px] text-slate-500">کۆی گشتی دیاری</p>
-        </div>
-      </div>
+        {showReportStats && (
+          <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center gap-6 justify-end animate-in fade-in duration-200">
+            <div className="text-center px-6 py-2 border-r border-slate-200">
+              <p className="text-2xl font-bold text-slate-800">{renderTotalMoney()}</p>
+              <p className="text-[11px] text-slate-500">گشتی پارە</p>
+            </div>
+            <div className="text-center px-6 py-2 border-r border-slate-200">
+              <p className="text-2xl font-bold text-slate-800">{totalQty.toLocaleString("en-US")} عدد</p>
+              <p className="text-[11px] text-slate-500">{getQtyCardLabel()}</p>
+            </div>
+            <div className="text-center px-6 py-2">
+              <p className="text-2xl font-bold text-slate-400">0 عدد</p>
+              <p className="text-[11px] text-slate-500">کۆی گشتی دیاری</p>
+            </div>
+          </div>
+        )}
 
       {/* Notice Banners */}
       {showSalesReturnNotice && (

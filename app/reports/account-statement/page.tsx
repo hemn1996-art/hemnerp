@@ -403,6 +403,10 @@ function AccountStatementContent() {
     <div className="min-h-screen bg-[#f4f7fc] text-slate-800 rtl font-sans">
       <style jsx global>{`
         @media print {
+          @page {
+            size: auto;
+            margin: 8mm 6mm !important;
+          }
           body * {
             visibility: hidden;
           }
@@ -421,13 +425,30 @@ function AccountStatementContent() {
             box-sizing: border-box !important;
             border: none !important;
             box-shadow: none !important;
+            background: white !important;
+          }
+          table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            table-layout: auto !important;
           }
           th, td {
-            padding: 8px 6px !important;
-            font-size: 11px !important;
+            padding: 4px 5px !important;
+            font-size: 10px !important;
+            line-height: 1.2 !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+          }
+          th:not(.allow-wrap),
+          td:not(.allow-wrap) {
+            white-space: normal !important;
           }
           .no-print {
             display: none !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>

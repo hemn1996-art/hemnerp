@@ -218,11 +218,22 @@ export default function DebtReportPage() {
   const { accounts, accountTypes, fetchAccounts, fetchAccountTypes, currencies, fetchCurrencies } = useStore() as any;
   const [data, setData] = useState<DebtReportData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showReportStats, setShowReportStats] = useState(true);
 
   useEffect(() => {
     fetchAccounts();
     fetchAccountTypes();
     fetchCurrencies?.();
+
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.showReportStats === "boolean") {
+          setShowReportStats(parsed.showReportStats);
+        }
+      } catch (e) {}
+    }
   }, []);
 
   const cityOptions = Array.from(new Set(accounts.map((a: any) => a.city).filter(Boolean))) as string[];
@@ -416,10 +427,12 @@ export default function DebtReportPage() {
            <button onClick={() => setFilterDebtType("people")} className={`px-6 py-2 rounded-lg font-bold transition-colors cursor-pointer border-none ${filterDebtType === "people" ? "bg-[#061f5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>قەرزم لای خەڵک</button>
            <button onClick={() => setFilterDebtType("mine")} className={`px-6 py-2 rounded-lg font-bold transition-colors cursor-pointer border-none ${filterDebtType === "mine" ? "bg-[#061f5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>من قەرزارم</button>
          </div>
-         <div>
-           <div className="text-sm text-gray-500">گشتی قەرز ({filterDebtType === "people" ? "قەرزی خەڵک" : "قەرزی من"})</div>
-           <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>${Math.abs(totalOverallDebt).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</div>
-         </div>
+         {showReportStats && (
+           <div className="animate-in fade-in duration-200">
+             <div className="text-sm text-gray-500">گشتی قەرز ({filterDebtType === "people" ? "قەرزی خەڵک" : "قەرزی من"})</div>
+             <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>${Math.abs(totalOverallDebt).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</div>
+           </div>
+         )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
