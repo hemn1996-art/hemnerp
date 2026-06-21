@@ -414,6 +414,7 @@ function AccountStatementContent() {
             visibility: visible;
           }
           #print-area {
+            zoom: 0.70 !important; /* Scale to 70% to behave like A3 space scaled down to A4 */
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
@@ -427,15 +428,22 @@ function AccountStatementContent() {
             box-shadow: none !important;
             background: white !important;
           }
+          .overflow-hidden,
+          .overflow-x-auto,
+          .overflow-y-auto {
+            overflow: visible !important;
+            max-width: none !important;
+            width: auto !important;
+          }
           table {
             width: 100% !important;
             border-collapse: collapse !important;
             table-layout: auto !important;
           }
           th, td {
-            padding: 4px 5px !important;
-            font-size: 10px !important;
-            line-height: 1.2 !important;
+            padding: 4px 6px !important;
+            font-size: 11px !important;
+            line-height: 1.3 !important;
             white-space: normal !important;
             word-break: break-word !important;
           }

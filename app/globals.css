@@ -277,6 +277,7 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   #print-area,
   #print-report-area,
   [id$="-print-area"] {
+    zoom: 0.70 !important; /* Scale to 70% to behave like A3 space scaled down to A4 */
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
@@ -291,6 +292,16 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     background: white !important;
     display: block !important;
     z-index: 9999 !important;
+  }
+
+  /* Force all wrapper containers to show overflow instead of clipping on print */
+  .overflow-hidden,
+  .overflow-x-auto,
+  .overflow-y-auto,
+  div[class*="overflow-"] {
+    overflow: visible !important;
+    max-width: none !important;
+    width: auto !important;
   }
 
   /* Reset structural layout containers */
@@ -328,9 +339,9 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   }
   
   th, td {
-    padding: 4px 5px !important;
-    font-size: 10px !important;
-    line-height: 1.2 !important;
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
     white-space: normal !important;
     word-break: break-word !important;
   }
@@ -372,6 +383,6 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   .grid-cols-3 > div span,
   .grid-cols-4 > div span,
   .grid > div span {
-    font-size: 10px !important;
+    font-size: 11px !important;
   }
 }
