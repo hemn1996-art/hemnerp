@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
 import PrintHeader from "../../components/PrintHeader";
+import { exportTableToExcel } from "../../utils/excelExport";
 
 // TypeScript Interfaces for DB Vouchers & Relations
 interface Product {
@@ -1723,6 +1724,13 @@ function InvoiceReportContent() {
               🖨️ پرینت
             </button>
 
+            <button
+              onClick={() => exportTableToExcel("invoices-report-table", "raporti_paswlakani.xlsx")}
+              className="bg-emerald-600 text-white hover:bg-emerald-700 font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-md border-none"
+            >
+              ناردن بۆ ئێکسڵ 📊
+            </button>
+
 
 
             <button
@@ -1862,7 +1870,7 @@ function InvoiceReportContent() {
         {/* ── Table Component ── */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto min-w-full pb-36 min-h-[350px]">
-            <table className="min-w-full divide-y divide-slate-200">
+            <table id="invoices-report-table" className="min-w-full divide-y divide-slate-200">
               <thead className="bg-[#0f172a] text-white">
                 <tr>
                   {visibleColumns.invoiceId && (

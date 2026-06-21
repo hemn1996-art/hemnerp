@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
+import { exportTableToExcel } from "../../utils/excelExport";
 
 interface DropdownOption {
   value: string | number;
@@ -533,6 +534,11 @@ export default function ItemsReportPage() {
           <button onClick={() => window.print()} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs hover:bg-slate-200 transition">
             🖨 پرینت
           </button>
+
+          <button onClick={() => exportTableToExcel("material-movements-table", "jwlay_kerestekan.xlsx")}
+            className="flex items-center gap-2 bg-emerald-600 border border-emerald-700 text-white px-4 py-2 rounded-lg text-xs hover:bg-emerald-700 transition cursor-pointer font-bold border-none shadow-sm">
+            ناردن بۆ ئێکسڵ 📊
+          </button>
           
 
         </div>
@@ -599,7 +605,7 @@ export default function ItemsReportPage() {
       {/* Table */}
       <div className="bg-white shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto max-h-[70vh]">
-          <table className="w-full text-[11px] text-right">
+          <table id="material-movements-table" className="w-full text-[11px] text-right">
             <thead className="bg-[#1e293b] text-white sticky top-0 z-10 border-b-4 border-slate-700">
               <tr>
                 {visibleColumns.voucherReference && <th className="p-3 border-r border-slate-600 whitespace-nowrap text-center w-20">پسوولە ↑</th>}

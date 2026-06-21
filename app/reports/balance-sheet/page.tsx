@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
+import { exportTableToExcel } from "../../utils/excelExport";
 
 export default function BalanceSheetPage() {
   const router = useRouter();
@@ -354,7 +355,13 @@ export default function BalanceSheetPage() {
             </div>
 
             {/* Search Input */}
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-end">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+              <button
+                onClick={() => exportTableToExcel("shareholders-list-table", "hawbashakan.xlsx")}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition duration-150 cursor-pointer border-none shadow-sm flex items-center gap-1.5"
+              >
+                ناردن بۆ ئێکسڵ 📊
+              </button>
               <input
                 type="text"
                 placeholder="🔍 گەڕان بەدوای ناوی خاوەن پشک یان تەلەفۆن..."
@@ -367,7 +374,7 @@ export default function BalanceSheetPage() {
 
             {/* Modal Body / Table */}
             <div className="p-6 overflow-y-auto flex-1 text-right" dir="rtl">
-              <table className="w-full text-center border-collapse">
+              <table id="shareholders-list-table" className="w-full text-center border-collapse">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-200">
                     <th className="py-3 px-2 text-slate-500 font-bold text-xs w-12 text-center">#</th>

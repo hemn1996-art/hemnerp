@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { store, useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
 import PrintHeader from "../../components/PrintHeader";
+import { exportTableToExcel } from "../../utils/excelExport";
 
 type DebtReportData = {
   id: number;
@@ -380,6 +381,13 @@ export default function DebtReportPage() {
           >
             🖨️ پرینت
           </button>
+
+          <button
+            onClick={() => exportTableToExcel("debts-report-table", "raporti_qarzekan.xlsx")}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-1.5 border-none shadow-sm"
+          >
+            ناردن بۆ ئێکسڵ 📊
+          </button>
            <button
             onClick={() => setShowFilterModal(true)}
             className="px-4 py-2 bg-[#061f5f] hover:bg-[#03133f] text-white rounded-lg text-sm font-bold transition-colors border-none cursor-pointer flex items-center gap-1.5"
@@ -437,7 +445,7 @@ export default function DebtReportPage() {
 
       <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
-          <table className="w-full text-center border-collapse min-w-[800px]">
+          <table id="debts-report-table" className="w-full text-center border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-[#03133f] text-white">
                 {visibleColumns.account && <th className="p-3 font-bold text-sm">هەژمار</th>}

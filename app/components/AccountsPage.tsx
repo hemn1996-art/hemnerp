@@ -1,5 +1,6 @@
 "use client";
 import FormattedNumberInput from "./FormattedNumberInput";
+import { exportTableToExcel } from "../utils/excelExport";
 
 import { CSSProperties, ReactNode, useEffect, useMemo, useState } from "react";
 import { store, useStore } from "../store/store";
@@ -595,14 +596,37 @@ export default function AccountsPage() {
           style={searchInput}
         />
 
-        <div style={countBadge}>
-          کۆی هەژمار: {filteredAccounts.length.toLocaleString("en-US")}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => exportTableToExcel("accounts-list-table", "hejmari_gisti.xlsx")}
+            style={{
+              background: "linear-gradient(135deg, #10b981, #059669)",
+              color: "white",
+              border: "none",
+              borderRadius: 10,
+              padding: "0 16px",
+              fontWeight: 900,
+              cursor: "pointer",
+              height: 38,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              gap: 6,
+              boxShadow: "0 2px 6px rgba(16, 185, 129, 0.3)"
+            }}
+          >
+            ناردن بۆ ئێکسڵ 📊
+          </button>
+          <div style={countBadge}>
+            کۆی هەژمار: {filteredAccounts.length.toLocaleString("en-US")}
+          </div>
         </div>
       </div>
 
       <div style={tableCard}>
         <div style={{ overflowX: "auto" }}>
-          <table style={table}>
+          <table id="accounts-list-table" style={table}>
             <thead>
               <tr>
                 <th style={th}>#</th>

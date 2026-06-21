@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "../../store/store";
 import PrintHeader from "../../components/PrintHeader";
+import { exportTableToExcel } from "../../utils/excelExport";
 
 interface StockItem {
   productId: number;
@@ -290,8 +291,9 @@ export default function StockReportPage() {
             <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-md hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
               پرینت 🖨️
             </button>
-            <button className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-md hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
-              ئێکسڵ 📊
+            <button onClick={() => exportTableToExcel("stock-report-table", "raporti_koga.xlsx")}
+              className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 py-2.5 rounded-md hover:bg-emerald-700 transition-colors cursor-pointer text-sm shadow-sm border-none">
+              ناردن بۆ ئێکسڵ 📊
             </button>
             <button onClick={() => setShowColumnModal(true)} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-[#4f46e5] font-bold px-4 py-2.5 rounded-md hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
               کۆڵۆمەکان ◫
@@ -325,7 +327,7 @@ export default function StockReportPage() {
         {/* Main Table */}
         <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-right whitespace-nowrap">
+            <table id="stock-report-table" className="w-full text-xs text-right whitespace-nowrap">
               <thead className="bg-[#0b1f50] text-white">
                 <tr>
                   {visibleColumns.id && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center w-10">#</th>}

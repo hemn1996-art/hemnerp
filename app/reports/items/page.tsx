@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
+import { exportTableToExcel } from "../../utils/excelExport";
 
 interface DropdownOption {
   value: string | number;
@@ -639,6 +640,12 @@ export default function ItemsReportPage() {
             🖨 پرینت
           </button>
 
+          {/* Export to Excel */}
+          <button onClick={() => exportTableToExcel("items-report-table", "raporti_kerestekan.xlsx")}
+            className="flex items-center gap-1.5 bg-emerald-600 border border-emerald-700 text-white px-3 py-1.5 rounded text-xs hover:bg-emerald-700 transition cursor-pointer font-bold border-none shadow-sm">
+            ناردن بۆ ئێکسڵ 📊
+          </button>
+
 
           {/* Columns */}
           <button onClick={() => setShowColumnsModal(true)}
@@ -712,7 +719,7 @@ export default function ItemsReportPage() {
 
       {/* Table */}
       <div className="overflow-x-auto max-h-[70vh]">
-        <table className="w-full text-[11px] text-right">
+        <table id="items-report-table" className="w-full text-[11px] text-right">
           <thead className="bg-[#1e293b] text-white sticky top-0 z-10">
             <tr>
               {visibleColumns.accountName && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">هەژمار</th>}

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "../../store/store";
 import PrintHeader from "../../components/PrintHeader";
+import { exportTableToExcel } from "../../utils/excelExport";
 
 interface Product { id: number; name: string; code: string | null; costPrice: number | null; }
 interface VoucherLine { id: number; productId: number; qty: number; unitPrice: number; discountAmount: number; lineTotal: number; note: string | null; product: Product; }
@@ -501,6 +502,11 @@ function AccountStatementContent() {
              <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
               پرینت 🖨️
             </button>
+
+            <button onClick={() => exportTableToExcel("account-statement-table", `keshf_hisab_${account.name}.xlsx`)}
+              className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 py-2.5 rounded-lg hover:bg-emerald-705 transition-colors cursor-pointer text-sm shadow-sm border-none">
+              ناردن بۆ ئێکسڵ 📊
+            </button>
           </div>
 
           <div className="flex gap-4 items-center flex-wrap">
@@ -576,7 +582,7 @@ function AccountStatementContent() {
         {/* Main Table */}
         <div className="border border-gray-200 bg-white overflow-hidden print:border-none">
           {/* Table Header */}
-          <table className="w-full text-right text-sm print:text-xs">
+          <table id="account-statement-table" className="w-full text-right text-sm print:text-xs">
             <thead className="bg-[#0b1f50] text-white">
               <tr>
                 <th className="p-3 font-bold text-center border-x border-[#1a3680] w-10">#</th>
