@@ -38,8 +38,10 @@ type AccountLike = {
   balanceByCurrency?: Record<string, number>;
   balanceCurrencyId?: number;
   isShareholder?: boolean;
+  sharePercentage?: number;
   shareholderBalance?: number;
   shareholderBalanceByCurrency?: Record<string, number>;
+  canDelete?: boolean;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -49,6 +51,7 @@ type AccountForm = {
   name: string;
   accountTypeId: string;
   isShareholder: boolean;
+  sharePercentage: string;
   isActive: boolean;
   phone: string;
   email: string;
@@ -77,10 +80,12 @@ const fallbackCities = ["سلێمانی", "هەولێر", "کەرکووک", "د�
 
 const fallbackDistricts = ["بازاڕ", "تەیراوە", "شاری نوێ", "ڕەحیم ئاوا"];
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function AccountsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
 
   const accountTypesStore = useStore((s: any) => s.accountTypes);
   const storeCurrencies = useStore((s: any) => s.currencies) || [];
@@ -102,6 +107,21 @@ export default function AccountsPage() {
   useEffect(() => {
     setAccountsState([...accountsStore]);
   }, [accountsStore]);
+
+  useEffect(() => {
+    if (editId && accountsState.length > 0) {
+      const accountToEdit = accountsState.find(
+        (acc: any) => String(acc.id) === String(editId)
+      );
+      if (accountToEdit) {
+        openEditModal(accountToEdit);
+        setShowModal(true);
+        // Clear the edit parameter from the URL to avoid reopening on refresh
+        const newUrl = window.location.pathname;
+        window.history.replaceState({ ...window.history.state }, "", newUrl);
+      }
+    }
+  }, [editId, accountsState]);
 
   const activeAccountTypes = useMemo(() => {
     return accountTypes.filter((type: any) => type.isActive !== false);
@@ -129,6 +149,7 @@ export default function AccountsPage() {
     name: "",
     accountTypeId: "",
     isShareholder: false,
+    sharePercentage: "0",
     isActive: true,
     phone: "",
     email: "",
@@ -347,6 +368,7 @@ export default function AccountsPage() {
       name: "",
       accountTypeId: "",
       isShareholder: false,
+      sharePercentage: "0",
       isActive: true,
       phone: "",
       email: "",
@@ -376,6 +398,7 @@ export default function AccountsPage() {
       name: account.name || "",
       accountTypeId: account.accountTypeId ? String(account.accountTypeId) : "",
       isShareholder: Boolean(account.isShareholder),
+      sharePercentage: String(account.sharePercentage ?? 0),
       isActive: account.isActive !== false,
       phone: account.phone || "",
       email: account.email || "",
@@ -453,6 +476,7 @@ export default function AccountsPage() {
         fullAddress: form.address.trim() || undefined,
         accountTypeId: form.isShareholder ? undefined : Number(form.accountTypeId) || undefined,
         isShareholder: form.isShareholder,
+        sharePercentage: form.isShareholder ? toNumber(form.sharePercentage) : 0,
         isActive: form.isActive,
         creditLimit: toNumber(form.creditLimit),
         creditLimitCurrencyId: Number(form.creditLimitCurrencyId),
@@ -479,6 +503,7 @@ export default function AccountsPage() {
         fullAddress: form.address.trim() || undefined,
         accountTypeId: form.isShareholder ? undefined : Number(form.accountTypeId) || undefined,
         isShareholder: form.isShareholder,
+        sharePercentage: form.isShareholder ? toNumber(form.sharePercentage) : 0,
         isActive: form.isActive,
       };
 
@@ -670,7 +695,7 @@ export default function AccountsPage() {
                     creditLimit > 0 &&
                     Math.abs(balance) > creditLimit;
 
-                  const canDelete = canDeleteAccount(account);
+                  const canDelete = typeof account.canDelete === "boolean" ? account.canDelete : canDeleteAccount(account);
 
                   return (
                     <tr key={account.id}>
@@ -876,15 +901,19 @@ export default function AccountsPage() {
                     <input
                       type="checkbox"
                       checked={form.isShareholder}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const isChecking = event.target.checked;
+                        const wasShareholderBefore = editingId && accountsState.find((a: any) => a.id === editingId)?.isShareholder;
+                        if (isChecking || wasShareholderBefore) {
+                          // Show warning when changing shareholder status
+                        }
                         setForm((prev) => ({
                           ...prev,
-                          isShareholder: event.target.checked,
-                          accountTypeId: event.target.checked
-                            ? ""
-                            : prev.accountTypeId,
-                        }))
-                      }
+                          isShareholder: isChecking,
+                          accountTypeId: isChecking ? "" : prev.accountTypeId,
+                          sharePercentage: isChecking ? prev.sharePercentage : "0",
+                        }));
+                      }}
                     />
                     <span>خاوەن پشکە؟</span>
                   </label>
@@ -903,6 +932,60 @@ export default function AccountsPage() {
                     <span>چالاک</span>
                   </label>
                 </div>
+
+                {/* Shareholder percentage + warning */}
+                {form.isShareholder && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{
+                      background: "linear-gradient(135deg, #fef2f2, #fff1f2)",
+                      border: "2px solid #ef4444",
+                      borderRadius: 12,
+                      padding: "12px 16px",
+                      marginBottom: 14,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                    }}>
+                      <span style={{ fontSize: 22 }}>⚠️</span>
+                      <div>
+                        <div style={{ color: "#b91c1c", fontWeight: 900, fontSize: 13, marginBottom: 2 }}>ئاگاداری گرنگ!</div>
+                        <div style={{ color: "#dc2626", fontWeight: 700, fontSize: 12, lineHeight: 1.6 }}>
+                          تکایە پێش گۆڕینی ڕێژەی پشکداری یان زیاد/لابردنی خاوەن پشک، ڕێکخستنەوەی قازانجی خاوەن پشکەکان بکە لە بەشی میزانیەدا!
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <Field label="ڕێژەی پشکداری (%)">
+                        <input
+                          value={form.sharePercentage}
+                          onChange={(event) => {
+                            const val = onlyPositiveDecimal(event.target.value);
+                            if (Number(val) > 100) return;
+                            setForm((prev) => ({ ...prev, sharePercentage: val }));
+                          }}
+                          style={input}
+                          inputMode="decimal"
+                          dir="ltr"
+                          placeholder="0"
+                        />
+                      </Field>
+                      <div style={{ display: "flex", alignItems: "center", fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+                        {(() => {
+                          const otherShareholdersTotal = accountsState
+                            .filter((a: any) => a.isShareholder && a.id !== editingId)
+                            .reduce((sum: number, a: any) => sum + (a.sharePercentage || 0), 0);
+                          const remaining = 100 - otherShareholdersTotal - toNumber(form.sharePercentage);
+                          return (
+                            <span style={{ color: remaining < 0 ? "#dc2626" : "#16a34a" }}>
+                              {remaining < 0 ? `⛔ ${Math.abs(remaining).toFixed(2)}% زیاترە!` : `✅ ${remaining.toFixed(2)}% ماوە`}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CollapsibleSection>
 
               <CollapsibleSection

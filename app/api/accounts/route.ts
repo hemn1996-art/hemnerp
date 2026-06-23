@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       : undefined;
 
     // Fetch accounts and balances in parallel for speed
-    const [accounts, balanceAggs, dbCurrencies] = await Promise.all([
+    const [accounts, balanceAggs, dbCurrencies, ledgerCounts, voucherCounts] = await Promise.all([
       prisma.account.findMany({
         where: whereClause,
         select: {
@@ -29,6 +29,7 @@ export async function GET(request: Request) {
           fullAddress: true,
           accountTypeId: true,
           isShareholder: true,
+          sharePercentage: true,
           isActive: true,
           createdAt: true,
           updatedAt: true,
@@ -55,8 +56,20 @@ export async function GET(request: Request) {
       }),
       prisma.currency.findMany({
         where: { isActive: true }
+      }),
+      prisma.ledgerEntry.groupBy({
+        by: ["accountId"],
+        _count: { id: true }
+      }),
+      prisma.voucher.groupBy({
+        by: ["accountId"],
+        _count: { id: true }
       })
     ]);
+
+    // Build lookup maps for ledger/voucher counts
+    const ledgerCountsMap = new Map(ledgerCounts.map(c => [c.accountId, c._count.id]));
+    const voucherCountsMap = new Map(voucherCounts.map(c => [c.accountId, c._count.id]));
 
     // Build a fast lookup map: accountId -> { currencyId -> balance }
     const balanceMap = new Map<number, Record<string, number>>();
@@ -71,6 +84,9 @@ export async function GET(request: Request) {
 
     const accountsWithBalances = accounts.map((account: any) => {
       const balanceByCurrency = balanceMap.get(account.id) || {};
+      const hasLedger = (ledgerCountsMap.get(account.id) || 0) > 0;
+      const hasVoucher = (voucherCountsMap.get(account.id) || 0) > 0;
+      const canDelete = !hasLedger && !hasVoucher;
 
       let totalBalance = 0;
       for (const [curIdText, amount] of Object.entries(balanceByCurrency)) {
@@ -101,6 +117,7 @@ export async function GET(request: Request) {
         balance: totalBalance,
         shareholderBalanceByCurrency: account.isShareholder ? shareholderBalanceByCurrency : undefined,
         shareholderBalance: account.isShareholder ? -totalBalance : undefined,
+        canDelete,
       };
     });
 
@@ -145,6 +162,21 @@ export async function POST(request: Request) {
       }
     }
 
+    // Validate sharePercentage total for shareholders
+    if (data.isShareholder && data.sharePercentage > 0) {
+      const existingShareholders = await prisma.account.findMany({
+        where: { isShareholder: true },
+        select: { id: true, sharePercentage: true },
+      });
+      const currentTotal = existingShareholders.reduce((sum: number, s: any) => sum + (s.sharePercentage || 0), 0);
+      if (currentTotal + data.sharePercentage > 100) {
+        return NextResponse.json(
+          { error: `کۆی ڕێژەکان لە ١٠٠٪ زیاتر دەبێت! ئێستا ${currentTotal}% بەکارهاتووە. تەنها ${(100 - currentTotal).toFixed(2)}% ماوە.` },
+          { status: 400 }
+        );
+      }
+    }
+
     const account = await prisma.account.create({
       data: {
         name: data.name.trim(),
@@ -155,6 +187,7 @@ export async function POST(request: Request) {
         cityId: data.cityId || null,
         districtId: data.districtId || null,
         isShareholder: data.isShareholder || false,
+        sharePercentage: data.isShareholder ? (data.sharePercentage || 0) : 0,
         isActive: data.isActive ?? true,
       },
     });
@@ -181,11 +214,27 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
+    // Validate sharePercentage total for shareholders
+    if (data.isShareholder && typeof data.sharePercentage === 'number' && data.sharePercentage > 0) {
+      const existingShareholders = await prisma.account.findMany({
+        where: { isShareholder: true, id: { not: Number(data.id) } },
+        select: { id: true, sharePercentage: true },
+      });
+      const currentTotal = existingShareholders.reduce((sum: number, s: any) => sum + (s.sharePercentage || 0), 0);
+      if (currentTotal + data.sharePercentage > 100) {
+        return NextResponse.json(
+          { error: `کۆی ڕێژەکان لە ١٠٠٪ زیاتر دەبێت! ئێستا ${currentTotal}% بەکارهاتووە. تەنها ${(100 - currentTotal).toFixed(2)}% ماوە.` },
+          { status: 400 }
+        );
+      }
+    }
+
     const updateData: any = {
       name: data.name.trim(),
       phone: data.phone || null,
       fullAddress: data.fullAddress || null,
       isShareholder: data.isShareholder || false,
+      sharePercentage: data.isShareholder ? (data.sharePercentage ?? 0) : 0,
       isActive: data.isActive ?? true,
       creditLimit: data.creditLimit ?? 0,
       creditLimitCurrencyId: data.creditLimitCurrencyId ?? 1,
@@ -209,6 +258,44 @@ export async function PUT(request: Request) {
     console.error("Error updating account:", error);
     return NextResponse.json(
       { error: "Failed to update account" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "ID is required" }, { status: 400 });
+    }
+
+    const accountId = Number(id);
+
+    // Check for ledger entries or vouchers
+    const [ledgerCount, voucherCount] = await Promise.all([
+      prisma.ledgerEntry.count({ where: { accountId } }),
+      prisma.voucher.count({ where: { accountId } }),
+    ]);
+
+    if (ledgerCount > 0 || voucherCount > 0) {
+      return NextResponse.json(
+        { error: "ناتوانرێت ئەم هەژمارە/خاوەن پشکە بسڕدرێتەوە چونکە چالاکی یان مامەڵەی دارایی لەسەر تۆمارکراوە." },
+        { status: 400 }
+      );
+    }
+
+    await prisma.account.delete({
+      where: { id: accountId },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting account:", error);
+    return NextResponse.json(
+      { error: "Failed to delete account", message: error.message },
       { status: 500 }
     );
   }

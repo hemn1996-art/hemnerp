@@ -21,7 +21,12 @@ export async function GET(request: Request) {
       // 2. Inventory transactions
       prisma.inventoryTransaction.findMany({
         where: { date: { lte: dateFilter } },
-        select: { productId: true, qtyChange: true, unitCost: true },
+        select: {
+          productId: true,
+          qtyChange: true,
+          unitCost: true,
+          voucher: { select: { type: true } },
+        },
       }),
       // 3. Ledger entry aggregations by account and currency
       prisma.ledgerEntry.groupBy({
@@ -47,6 +52,7 @@ export async function GET(request: Request) {
               "gift",
               "warehouse_damage",
               "خەسارەی کۆگا",
+              "profit_distribution",
             ]
           }
         },
@@ -71,7 +77,7 @@ export async function GET(request: Request) {
     const usdId = usdCurrency ? usdCurrency.id : 1;
 
     // Define target currency for the report
-    let targetCurrency = currencies.find((c: any) => c.code === "IQD"); // Default to IQD / Dinar for consolidated view
+    let targetCurrency = currencies.find((c: any) => c.code === "USD"); // Default to USD for consolidated view
     if (currencyId && currencyId !== "all") {
       const parsedId = parseInt(currencyId);
       const matched = currencies.find((c: any) => c.id === parsedId);
@@ -103,11 +109,24 @@ export async function GET(request: Request) {
     }, 0);
 
     // 2. Warehouse Value
-    const productStock: Record<number, number> = {};
+    const stockQty: Record<number, number> = {};
+    const stockCost: Record<number, number> = {};
     inventoryTrans.forEach(t => {
-      productStock[t.productId] = (productStock[t.productId] || 0) + t.qtyChange * t.unitCost;
+      stockQty[t.productId] = (stockQty[t.productId] || 0) + t.qtyChange;
+      if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
+        stockCost[t.productId] = t.unitCost;
+      }
     });
-    const totalWarehouseValueInUsd = Object.values(productStock).reduce((s, v) => s + v, 0);
+
+    let totalWarehouseValueInUsd = 0;
+    Object.keys(stockQty).forEach(prodIdStr => {
+      const prodId = Number(prodIdStr);
+      const qty = stockQty[prodId];
+      const cost = stockCost[prodId] || 0;
+      if (qty > 0) {
+        totalWarehouseValueInUsd += qty * cost;
+      }
+    });
     const warehouseValue = totalWarehouseValueInUsd * targetRate;
 
     // 3. Accounts receivable / payable
@@ -115,7 +134,7 @@ export async function GET(request: Request) {
     let totalShareholderWithdrawals = 0;
     const shareholderAccounts = await prisma.account.findMany({
       where: { isShareholder: true },
-      select: { id: true, name: true, phone: true }
+      select: { id: true, name: true, phone: true, sharePercentage: true, isActive: true }
     });
     const shareholderIds = new Set(shareholderAccounts.map(a => a.id));
 
@@ -159,7 +178,13 @@ export async function GET(request: Request) {
       }
     });
 
-    const totalAssets = totalCash + warehouseValue + accountsReceivable;
+    const activeAssetsSum = await prisma.fixedAsset.aggregate({
+      where: { isActive: true },
+      _sum: { currentValue: true }
+    });
+    const fixedAssetsValue = activeAssetsSum._sum.currentValue || 0;
+
+    const totalAssets = totalCash + warehouseValue + accountsReceivable + fixedAssetsValue;
 
     // 4. Net Profit calculation (matching final profit in profit report)
     const productCosts: Record<number, number> = {};
@@ -176,6 +201,7 @@ export async function GET(request: Request) {
     let totalExpenses = 0;
     let totalGifts = 0;
     let totalLosses = 0;
+    let totalDistributedProfit = 0;
 
     vouchers.forEach((v: any) => {
       const amount = convertVoucherToTarget(v.netAmount, v.currencyId || usdId, v.exchangeRate);
@@ -218,27 +244,52 @@ export async function GET(request: Request) {
         totalGifts += amount;
       } else if (v.type === "warehouse_damage" || v.type === "خەسارەی کۆگا") {
         totalLosses += amount;
+      } else if (v.type === "profit_distribution") {
+        totalDistributedProfit += amount;
       }
     });
 
     const salesProfit = totalSales - totalCOGS;
-    const annualProfit = salesProfit + totalMyDebtDiscount - totalExpenses - totalGifts - totalPeopleDebtDiscount - totalLosses;
-
     const currentLiabilities = accountsPayable;
-    const withdrawals = 0;
     const capital = totalShareholderDeposits - totalShareholderWithdrawals;
+    const annualProfit = totalCash + warehouseValue + accountsReceivable + fixedAssetsValue - accountsPayable - capital;
+    const withdrawals = 0;
     const startingCapital = 0;
     const totalLiabilitiesEquity = currentLiabilities + capital + annualProfit + withdrawals;
+
+    const shareholderIdsList = shareholderAccounts.map(a => a.id);
+    const [ledgerCounts, voucherCounts] = await Promise.all([
+      prisma.ledgerEntry.groupBy({
+        by: ["accountId"],
+        where: { accountId: { in: shareholderIdsList } },
+        _count: { id: true }
+      }),
+      prisma.voucher.groupBy({
+        by: ["accountId"],
+        where: { accountId: { in: shareholderIdsList } },
+        _count: { id: true }
+      })
+    ]);
+
+    const ledgerCountsMap = new Map(ledgerCounts.map(c => [c.accountId, c._count.id]));
+    const voucherCountsMap = new Map(voucherCounts.map(c => [c.accountId, c._count.id]));
 
     const shareholders = shareholderAccounts.map(a => {
       const balance = shareholderBalances[a.id] || 0;
       const balanceUSD = shareholderBalancesUSD[a.id] || 0;
+      const hasLedger = (ledgerCountsMap.get(a.id) || 0) > 0;
+      const hasVoucher = (voucherCountsMap.get(a.id) || 0) > 0;
+      const canDelete = !hasLedger && !hasVoucher;
+
       return {
         id: a.id,
         name: a.name,
         phone: a.phone || "",
+        sharePercentage: a.sharePercentage || 0,
+        isActive: a.isActive,
         balance: -balance, // credit - debit
-        balanceUSD: -balanceUSD // credit - debit in USD
+        balanceUSD: -balanceUSD, // credit - debit in USD
+        canDelete
       };
     });
 
@@ -252,8 +303,8 @@ export async function GET(request: Request) {
         cash: totalCash,
         warehouseValue,
         accountsReceivable,
-        otherAssets: 0,
-        allInventory: 0,
+        otherAssets: fixedAssetsValue,
+        allInventory: fixedAssetsValue,
         total: totalAssets,
       },
       liabilitiesEquity: {

@@ -66,7 +66,8 @@ model Account {
   cityId        Int?
   districtId    Int?
   accountTypeId Int
-  isShareholder Boolean       @default(false)
+  isShareholder    Boolean       @default(false)
+  sharePercentage  Float         @default(0)
   isActive      Boolean       @default(true)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -361,5 +362,62 @@ model SystemAnnouncement {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ProfitDistribution {
+  id              Int                       @id @default(autoincrement())
+  date            DateTime                  @default(now())
+  calculatedProfit Float                    // قازانجی فیعلی (حیسابکراو)
+  distributedProfit Float                   // قازانجی دابەشکراو (دەستکاریکراو)
+  note            String?
+  createdAt       DateTime                  @default(now())
+  items           ProfitDistributionItem[]
+}
+
+model ProfitDistributionItem {
+  id                Int                  @id @default(autoincrement())
+  distributionId    Int
+  accountId         Int
+  accountName       String
+  sharePercentage   Float
+  previousBalance   Float
+  profitShare       Float
+  finalBalance      Float
+  distribution      ProfitDistribution   @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+
+  @@index([distributionId])
+}
+
+model FixedAssetCategory {
+  id        Int          @id @default(autoincrement())
+  name      String       @unique
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  assets    FixedAsset[]
+}
+
+model FixedAsset {
+  id            Int                    @id @default(autoincrement())
+  name          String
+  categoryId    Int
+  code          String?
+  initialValue  Float                  @default(0.0)
+  currentValue  Float                  @default(0.0)
+  purchaseDate  DateTime               @default(now())
+  isActive      Boolean                @default(true)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  category      FixedAssetCategory     @relation(fields: [categoryId], references: [id])
+  history       FixedAssetHistory[]
+}
+
+model FixedAssetHistory {
+  id           Int        @id @default(autoincrement())
+  assetId      Int
+  value        Float
+  changeDate   DateTime   @default(now())
+  note         String?
+  createdAt    DateTime   @default(now())
+  asset        FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 }
 

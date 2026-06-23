@@ -42,6 +42,15 @@ const menuItems = [
   },
 
   {
+    name: "مەوجودات",
+    icon: "💼",
+    children: [
+      { name: "کاتیگۆری مەوجودات", path: "/fixed-asset-categories" },
+      { name: "مەوجودات", path: "/fixed-assets" },
+    ],
+  },
+
+  {
     name: "HR",
     icon: "👥",
     children: [
@@ -221,8 +230,18 @@ export default function Sidebar({
           // Permission check: filter menu items
           if (item.perm && !hasPermission(item.perm, "canView")) return null;
           
-          // Filter children by permission
-          const visibleChildren = item.children?.filter((c: any) => !c.perm || hasPermission(c.perm, "canView"));
+          // Filter children by permission and role (restricted views)
+          const visibleChildren = item.children?.filter((c: any) => {
+            if (
+              (c.path === "/reports/balance-sheet" || 
+               c.path === "/reports/profit" || 
+               c.path === "/reports/profit-distribution") && 
+              currentUser?.role !== "admin"
+            ) {
+              return false;
+            }
+            return !c.perm || hasPermission(c.perm, "canView");
+          });
           if (item.children && (!visibleChildren || visibleChildren.length === 0)) return null;
           
           const isActive = item.path ? pathname.startsWith(item.path) : visibleChildren?.some((c: any) => pathname.startsWith(c.path));
