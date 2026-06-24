@@ -89,7 +89,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
     };
 
     fetchAnnouncement();
-    const interval = setInterval(fetchAnnouncement, 5000); // Poll every 5 seconds
+    const interval = setInterval(fetchAnnouncement, 60000); // Poll every 60 seconds
 
     return () => clearInterval(interval);
   }, [currentUser, isLoginPage]);
