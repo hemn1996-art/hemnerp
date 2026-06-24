@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { simpleHash, verifyPassword, getCurrentUser } from "../../../lib/auth";
+import { hashPassword, verifyPassword, getCurrentUser } from "../../../lib/auth";
 
 // PUT - Change password for current user
 export async function PUT(request: Request) {
@@ -25,7 +25,12 @@ export async function PUT(request: Request) {
       where: { id: currentUser.id },
     });
 
-    if (!user || !verifyPassword(currentPassword, user.password)) {
+    let isValid = false;
+    if (user) {
+      isValid = await verifyPassword(currentPassword, user.password);
+    }
+
+    if (!user || !isValid) {
       return NextResponse.json(
         { error: "پاسۆردی ئێستا هەڵەیە" },
         { status: 400 }
@@ -42,7 +47,7 @@ export async function PUT(request: Request) {
           { status: 400 }
         );
       }
-      updateData.password = simpleHash(newPassword);
+      updateData.password = await hashPassword(newPassword);
     }
 
     // Update username if provided

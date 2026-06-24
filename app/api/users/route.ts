@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
-import { simpleHash, verifyPassword, getCurrentUser, permissionsEmitter } from "../../lib/auth";
+import { hashPassword, verifyPassword, getCurrentUser, permissionsEmitter } from "../../lib/auth";
 
 // GET - List all users (admin only)
 export async function GET() {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const hashedPassword = simpleHash(password);
+    const hashedPassword = await hashPassword(password);
 
     const user = await prisma.user.create({
       data: {
@@ -132,7 +132,7 @@ export async function PUT(request: Request) {
     if (name !== undefined) updateData.name = name;
     if (role !== undefined) updateData.role = role;
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (password) updateData.password = simpleHash(password);
+    if (password) updateData.password = await hashPassword(password);
     if (phone !== undefined) updateData.phone = phone;
     if (canSeeOthersData !== undefined) updateData.canSeeOthersData = canSeeOthersData;
     if (allowedWarehouses !== undefined) updateData.allowedWarehouses = allowedWarehouses;

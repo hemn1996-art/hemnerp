@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import bcrypt from "bcryptjs";
 import { prisma } from "../../lib/prisma";
 import { EventEmitter } from "events";
 
@@ -13,27 +14,14 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 
-// Simple hash function (no external dependency needed)
-// For production, consider using bcrypt
-export function simpleHash(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  // Make it longer and more unique
-  const base = Math.abs(hash).toString(36);
-  let hash2 = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash2 = ((hash2 << 5) + hash2) + str.charCodeAt(i);
-    hash2 = hash2 & hash2;
-  }
-  return base + Math.abs(hash2).toString(36);
+// Hash a password securely using bcryptjs
+export async function hashPassword(str: string): Promise<string> {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(str, salt);
 }
 
-export function verifyPassword(plain: string, hashed: string): boolean {
-  return simpleHash(plain) === hashed;
+export async function verifyPassword(plain: string, hashed: string): Promise<boolean> {
+  return bcrypt.compare(plain, hashed);
 }
 
 export interface SessionUser {

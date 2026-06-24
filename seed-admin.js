@@ -5,6 +5,7 @@ const { Pool } = require("pg");
 
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 // Try to load .env file manually
 try {
@@ -29,22 +30,7 @@ try {
   console.log("No .env file found or failed to parse:", e.message);
 }
 
-// Same hash function as in auth.ts
-function simpleHash(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  const base = Math.abs(hash).toString(36);
-  let hash2 = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash2 = ((hash2 << 5) + hash2) + str.charCodeAt(i);
-    hash2 = hash2 & hash2;
-  }
-  return base + Math.abs(hash2).toString(36);
-}
+
 
 async function main() {
   const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL || "postgresql://postgres.xjjilptidbrekoptqpde:GoxlanPass2026@aws-1-eu-central-1.pooler.supabase.com:5432/postgres";
@@ -61,7 +47,8 @@ async function main() {
     where: { username: "admin" },
   });
 
-  const hashedPassword = simpleHash("admin123");
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash("admin123", salt);
 
   if (existing) {
     console.log("Admin user already exists, resetting password to admin123...");

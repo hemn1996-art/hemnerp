@@ -41,7 +41,8 @@ export async function POST(request: Request) {
     }
 
     // Verify password
-    if (!verifyPassword(password, user.password)) {
+    const isValidPassword = await verifyPassword(password, user.password);
+    if (!isValidPassword) {
       return NextResponse.json(
         { success: false, error: "یوزەرنەیم یان پاسوۆرد هەڵەیە!" },
         { status: 401 }
