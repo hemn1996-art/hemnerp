@@ -1,5 +1,6 @@
 "use client";
 
+import MultiSelectDropdown from "../../components/MultiSelectDropdown";
 import React, { useEffect, useState, useRef } from "react";
 import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
@@ -11,194 +12,7 @@ interface DropdownOption {
   label: string;
 }
 
-function MultiSelectDropdown({
-  label,
-  options,
-  selectedValues,
-  onChange,
-  searchable = false
-}: {
-  label: string;
-  options: DropdownOption[];
-  selectedValues: any[];
-  onChange: (values: any[]) => void;
-  searchable?: boolean;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setSearchTerm("");
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const filteredOptions = React.useMemo(() => {
-    if (!searchTerm) return options;
-    return options.filter(opt =>
-      opt.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [options, searchTerm]);
-
-  const toggleOption = (val: any) => {
-    if (selectedValues.includes(val)) {
-      onChange(selectedValues.filter(v => v !== val));
-    } else {
-      onChange([...selectedValues, val]);
-    }
-    inputRef.current?.focus();
-  };
-
-  const handleClearAll = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange([]);
-    setSearchTerm("");
-    inputRef.current?.focus();
-  };
-
-  const handleRemoveValue = (e: React.MouseEvent, val: any) => {
-    e.stopPropagation();
-    onChange(selectedValues.filter(v => v !== val));
-    inputRef.current?.focus();
-  };
-
-  return (
-    <div ref={containerRef} className="relative w-full text-right" dir="rtl">
-      <div 
-        onClick={() => {
-          setIsOpen(true);
-          inputRef.current?.focus();
-        }}
-        className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[52px] ${
-          isOpen ? "border-[#0b1f50] ring-2 ring-[#0b1f50]/10" : ""
-        }`}
-      >
-        <label className="select-none pointer-events-none">{label}</label>
-
-        {/* Selected chips list + Search input inline */}
-        <div className="flex-1 flex flex-wrap gap-1.5 items-center justify-start overflow-hidden py-1">
-          {selectedValues.map(val => {
-            const opt = options.find(o => o.value === val);
-            const name = opt ? opt.label : String(val);
-            return (
-              <div
-                key={val}
-                className="bg-slate-100 border border-slate-200 text-slate-800 rounded-full flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 text-[11px] font-black hover:bg-slate-200 transition-colors shadow-sm animate-in fade-in-50 duration-150"
-              >
-                <button
-                  type="button"
-                  onClick={(e) => handleRemoveValue(e, val)}
-                  className="w-4 h-4 rounded-full bg-slate-300 text-slate-600 hover:bg-slate-400 hover:text-slate-800 flex items-center justify-center text-[10px] font-black border-none cursor-pointer shrink-0 transition-colors"
-                >
-                  ✕
-                </button>
-                <span className="truncate max-w-[120px] select-none">{name}</span>
-              </div>
-            );
-          })}
-
-          {searchable ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder={selectedValues.length === 0 ? "هەموو" : ""}
-              className="flex-1 min-w-[60px] max-w-full border-none outline-none text-xs font-black text-slate-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
-              dir="rtl"
-              onClick={e => e.stopPropagation()}
-              onFocus={() => setIsOpen(true)}
-            />
-          ) : (
-            selectedValues.length === 0 && (
-              <span className="text-slate-400 font-bold text-xs pr-1">هەموو</span>
-            )
-          )}
-        </div>
-
-        {/* Action icons */}
-        <div className="flex items-center gap-2 text-slate-500 shrink-0 pl-1 border-r border-slate-200 pr-2">
-          {(selectedValues.length > 0 || searchTerm) && (
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="text-slate-400 hover:text-slate-700 bg-transparent border-none cursor-pointer text-sm font-bold flex items-center justify-center w-5 h-5"
-              title="پاککردنەوەی هەموو"
-            >
-              ✕
-            </button>
-          )}
-          <span className="text-[10px] select-none text-slate-400">
-            {isOpen ? "▲" : "▼"}
-          </span>
-        </div>
-      </div>
-
-      {isOpen && (
-        <div className="absolute z-[1050] mt-1 right-0 left-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 max-h-72 overflow-y-auto flex flex-col text-right">
-          <div className="overflow-y-auto flex-1 space-y-1 pr-1" style={{ maxHeight: "220px" }}>
-            <div
-              onClick={() => {
-                onChange([]);
-                setSearchTerm("");
-                inputRef.current?.focus();
-              }}
-              className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
-                selectedValues.length === 0
-                  ? "bg-slate-100 text-[#0b1f50]"
-                  : "text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <span className="select-none">هەموو (کۆی گشتی)</span>
-              <input
-                type="checkbox"
-                checked={selectedValues.length === 0}
-                readOnly
-                className="w-4 h-4 rounded border-slate-300 text-[#0b1f50] focus:ring-[#0b1f50] accent-[#0b1f50] cursor-pointer"
-              />
-            </div>
-
-            {filteredOptions.map(opt => {
-              const isChecked = selectedValues.includes(opt.value);
-              return (
-                <div
-                  key={opt.value}
-                  onClick={() => toggleOption(opt.value)}
-                  className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-black transition-all ${
-                    isChecked
-                      ? "bg-slate-100 text-[#0b1f50]"
-                      : "text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="truncate max-w-[85%] select-none">{opt.label}</span>
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    readOnly
-                    className="w-4 h-4 rounded border-slate-300 text-[#0b1f50] focus:ring-[#0b1f50] accent-[#0b1f50] cursor-pointer"
-                  />
-                </div>
-              );
-            })}
-
-            {filteredOptions.length === 0 && (
-              <div className="text-center text-slate-400 py-3 text-xs select-none">
-                هیچ ئەنجامێک نەدۆزرایەوە
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function ItemsReportPage() {
   const router = useRouter();
@@ -949,7 +763,7 @@ export default function ItemsReportPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <MultiSelectDropdown
-                      label="کۆگا"
+                      label="کۆگا" pluralLabel="کۆگا"
                       options={warehouses?.map((w: any) => ({ value: w.id, label: w.name })) || []}
                       selectedValues={filterWarehouseIds}
                       onChange={setFilterWarehouseIds}
