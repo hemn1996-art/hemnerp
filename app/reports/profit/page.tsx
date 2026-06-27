@@ -335,6 +335,17 @@ export default function ProfitReportPage() {
           <div className="w-14 h-14 border-4 border-slate-200 border-t-[#061f5f] rounded-full animate-spin shadow-md"></div>
           <p className="mt-6 text-[#061f5f] font-black text-xl animate-pulse">لە بارکردندایە...</p>
         </div>
+      ) : errorMsg ? (
+        <div className="flex-1 flex flex-col items-center justify-center py-20 text-center text-red-500 animate-in fade-in">
+          <span className="text-4xl mb-3">⚠️</span>
+          <p className="font-black text-lg">{errorMsg}</p>
+          <button 
+            onClick={fetchReport}
+            className="mt-4 bg-red-100 hover:bg-red-200 text-red-700 px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+          >
+            هەوڵی دووبارە بدەرەوە
+          </button>
+        </div>
       ) : showReportStats ? (
         <div className="max-w-7xl mx-auto w-full pb-10 space-y-6 animate-in fade-in duration-200">
 
