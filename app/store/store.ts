@@ -106,15 +106,20 @@ export const useStore = create<StoreState>((set, get) => ({
       if (res.ok) {
         const data = await res.json();
         set({ currentUser: data, userLoaded: true });
-      } else {
+      } else if (res.status === 401 || res.status === 403) {
         // Clear session cookies client-side on failure (deactivation/unauthorized)
         document.cookie = "auth_token=; path=/; max-age=0; SameSite=Lax";
         document.cookie = "user_session=; path=/; max-age=0; SameSite=Lax";
         set({ currentUser: null, userLoaded: true });
+      } else {
+        // Server error (500) or DB timeout. Don't logout immediately!
+        // We just mark userLoaded true so layout can render, but keep existing currentUser if any.
+        set({ userLoaded: true });
       }
     } catch (err) {
       console.error("Failed to fetch current user", err);
-      set({ currentUser: null, userLoaded: true });
+      // Network error, don't logout aggressively
+      set({ userLoaded: true });
     }
   },
 

@@ -35,11 +35,11 @@ export interface SessionUser {
  * Get the current authenticated user from cookies
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("user_session");
-    if (!sessionCookie?.value) return null;
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get("user_session");
+  if (!sessionCookie?.value) return null;
 
+  try {
     const decodedValue = sessionCookie.value.includes("%")
       ? decodeURIComponent(sessionCookie.value)
       : sessionCookie.value;
@@ -60,8 +60,14 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       name: session.name,
       role: session.role,
     };
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      // Invalid JSON in cookie
+      return null;
+    }
+    // For database or other errors, throw so the caller knows it's a server error
+    console.error("getCurrentUser error:", error);
+    throw error;
   }
 }
 
