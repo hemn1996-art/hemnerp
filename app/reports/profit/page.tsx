@@ -221,13 +221,22 @@ export default function ProfitReportPage() {
     const isRounding = activeCurrency ? activeCurrency.rounding : false;
     const formatted = Math.abs(num).toLocaleString("en-US", {minimumFractionDigits: 0, maximumFractionDigits: isRounding ? 0 : 2});
     const isNegative = num < 0;
+    const parts = formatted.split('.');
+    const wholePart = parts[0];
+    const decimalPart = parts[1];
+
     return (
-      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", direction: "ltr" }}>
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", direction: "ltr" }}>
         {isNegative && <span style={{ marginRight: "2px" }}>-</span>}
         <span style={{ fontSize: "0.8em", opacity: 0.7, marginRight: "4px" }}>
           {symbol}
         </span>
-        <span>{formatted}</span>
+        <span>{wholePart}</span>
+        {decimalPart && (
+          <span style={{ fontSize: "0.7em", opacity: 0.8, verticalAlign: "baseline" }}>
+            .{decimalPart}
+          </span>
+        )}
       </span>
     );
   };

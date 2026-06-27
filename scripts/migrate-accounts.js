@@ -30,7 +30,7 @@ async function main() {
     throw new Error("جۆری هەژمارەکان نەدۆزرانەوە (کڕیار/دابینکەر)");
   }
 
-  const rawData = fs.readFileSync("C:\\Users\\ZETTA\\.gemini\\antigravity-ide\\brain\\4b28324f-151f-40c7-8566-1b846d29d724\\scratch\\accounts.json", "utf8");
+  const rawData = fs.readFileSync(path.join(__dirname, "..", "scratch", "accounts.json"), "utf8");
   const accounts = JSON.parse(rawData);
 
   let successCount = 0;

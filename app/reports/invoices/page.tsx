@@ -350,6 +350,10 @@ function InvoiceReportContent() {
         return "دانانی پارە";
       case "shareholder_withdrawal":
         return "کشانەوەی پارە";
+      case "people_debt":
+        return "قەرزی خەڵک";
+      case "my_debt":
+        return "قەرزی من";
       case "my_debt_discount":
         return "داشکاندن لە قەرزی من";
       case "people_debt_discount":
@@ -1814,6 +1818,7 @@ function InvoiceReportContent() {
                     const isDebtVoucherType = [
                       "money_in", "money_out", "my_debt_discount", "people_debt_discount",
                       "debt_discount", "debt discount",
+                      "people_debt", "my_debt",
                       "پارەی هاتوو", "پارەی ڕۆشتوو", "داشکاندن لە قەرزی من", "داشکاندن لە قەرزی خەڵک"
                     ].includes(voucher.type);
 
@@ -1836,7 +1841,7 @@ function InvoiceReportContent() {
                                 title="دەستکاریکردنی پسوڵە"
                                 className="bg-blue-600 hover:bg-blue-700 text-white font-black text-lg px-6 py-2 rounded-xl cursor-pointer shadow-md transition-all inline-block hover:scale-105"
                               >
-                                {voucher.id}
+                                {voucher.referenceNo ? String(voucher.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '') : voucher.id}
                               </span>
                             </td>
                           )}

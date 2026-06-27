@@ -1,5 +1,6 @@
 import { useStore } from "../../store/store";
 import { CashboxLike, CurrencyLike } from "./types";
+import FormattedNumber from "../FormattedNumber";
 
 type Props = {
   cashboxesState: CashboxLike[];
@@ -42,15 +43,6 @@ export default function CashboxTable({
           const symbol = currency?.symbol || "$";
           const amount = Number(b.amount || 0);
           const isNegative = amount < -0.01;
-          const absAmountText = Math.abs(amount).toLocaleString("en-US", {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2,
-          });
-
-          const formattedText = currency?.code === "IQD"
-            ? `${isNegative ? "-" : ""}${absAmountText} دینار`
-            : `${isNegative ? "-" : ""}${symbol}${absAmountText}`;
-
           return (
             <span
               key={b.currencyId}
@@ -66,7 +58,11 @@ export default function CashboxTable({
                 border: isNegative ? "1px solid rgba(220, 38, 38, 0.15)" : "none",
               }}
             >
-              {formattedText}
+              <FormattedNumber 
+                value={isNegative ? -amount : amount} 
+                currencySymbol={currency?.code === "IQD" ? "دینار" : symbol} 
+              />
+              {isNegative && <span className="mr-1">-</span>}
             </span>
           );
         })}

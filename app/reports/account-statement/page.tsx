@@ -235,6 +235,7 @@ function AccountStatementContent() {
         rowsList.push({
           id: `${v.id}-main`,
           voucherId: v.id,
+          referenceNo: v.referenceNo,
           date: v.date,
           type: v.type,
           originalType: v.type,
@@ -650,7 +651,7 @@ function AccountStatementContent() {
                               }}
                               className={`font-black text-sm px-3 py-1 rounded-lg cursor-pointer hover:opacity-85 transition-opacity ${tc.badge}`}
                             >
-                              {v.voucherId}
+                              {v.referenceNo ? String(v.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '') : v.voucherId}
                             </span>
                           </td>
                         )}
