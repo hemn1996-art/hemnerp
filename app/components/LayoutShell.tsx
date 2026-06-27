@@ -99,7 +99,12 @@ export default function LayoutShell({ children }: LayoutShellProps) {
     return () => clearInterval(interval);
   }, [currentUser, isLoginPage]);
 
-  // Real-time updates via SSE (Server-Sent Events)
+  // Real-time updates via SSE — DISABLED temporarily
+  // SSE was causing DB connection pool exhaustion on Supabase free tier,
+  // because each SSE connection holds a DB connection open and auto-reconnects on failure.
+  // This was the root cause of the logout issue.
+  // TODO: Re-enable when using a proper connection pooler or upgrade DB tier.
+  /*
   useEffect(() => {
     if (isLoginPage || !currentUser) return;
 
@@ -109,8 +114,6 @@ export default function LayoutShell({ children }: LayoutShellProps) {
       try {
         const data = JSON.parse(event.data);
         if (data.type === "permissions_updated" || data.type === "user_updated" || data.type === "deactivated") {
-          // Trigger fetchCurrentUser to sync permissions/status.
-          // If deactivated, this fetch will fail with 401 and automatically log the user out.
           fetchCurrentUser();
         }
       } catch (err) {
@@ -122,6 +125,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
       eventSource.close();
     };
   }, [currentUser, isLoginPage, fetchCurrentUser]);
+  */
 
 
   /* Global: auto-convert Arabic/Kurdish digits → English on any numeric input */
