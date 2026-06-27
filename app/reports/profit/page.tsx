@@ -56,6 +56,7 @@ export default function ProfitReportPage() {
     currencySymbol: "$",
   });
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
   const [showReportStats, setShowReportStats] = useState(true);
   
   const [startDate, setStartDate] = useState(() => {
