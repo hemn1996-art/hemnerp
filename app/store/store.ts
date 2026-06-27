@@ -79,6 +79,30 @@ interface StoreState {
   updateVoucher: (id: number, voucherData: any) => Promise<any>;
 }
 
+// Fallback: read user data from the user_session cookie (set at login)
+// Used when /api/users/me fails due to server errors (not auth errors)
+function _readUserFromCookie(): CurrentUser | null {
+  try {
+    const cookies = document.cookie.split(";").map((c) => c.trim());
+    const sessionCookie = cookies.find((c) => c.startsWith("user_session="));
+    if (!sessionCookie) return null;
+    const raw = sessionCookie.split("=").slice(1).join("=");
+    const decoded = raw.includes("%") ? decodeURIComponent(raw) : raw;
+    const parsed = JSON.parse(decoded);
+    if (!parsed.id) return null;
+    return {
+      id: parsed.id,
+      username: parsed.username,
+      name: parsed.name,
+      role: parsed.role,
+      isActive: true,
+      permissions: [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   accounts: [],
   accountTypes: [],
@@ -107,18 +131,34 @@ export const useStore = create<StoreState>((set, get) => ({
         const data = await res.json();
         set({ currentUser: data, userLoaded: true });
       } else if (res.status === 401 || res.status === 403) {
-        // Clear session cookies client-side on failure (deactivation/unauthorized)
+        // Clear session cookies client-side on auth failure
         document.cookie = "auth_token=; path=/; max-age=0; SameSite=Lax";
         document.cookie = "user_session=; path=/; max-age=0; SameSite=Lax";
         set({ currentUser: null, userLoaded: true });
       } else {
-        // Server error (500) or DB timeout. Don't logout immediately!
-        // We just mark userLoaded true so layout can render, but keep existing currentUser if any.
+        // Server error (500) or DB timeout — don't logout!
+        // If we don't have a user yet, try reading from the cookie as fallback
+        const existing = get().currentUser;
+        if (!existing) {
+          const fallback = _readUserFromCookie();
+          if (fallback) {
+            set({ currentUser: fallback, userLoaded: true });
+            return;
+          }
+        }
         set({ userLoaded: true });
       }
     } catch (err) {
       console.error("Failed to fetch current user", err);
-      // Network error, don't logout aggressively
+      // Network error — try cookie fallback if no user loaded yet
+      const existing = get().currentUser;
+      if (!existing) {
+        const fallback = _readUserFromCookie();
+        if (fallback) {
+          set({ currentUser: fallback, userLoaded: true });
+          return;
+        }
+      }
       set({ userLoaded: true });
     }
   },

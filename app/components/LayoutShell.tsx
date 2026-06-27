@@ -43,12 +43,17 @@ export default function LayoutShell({ children }: LayoutShellProps) {
   const [announcement, setAnnouncement] = useState<{ id: number; message: string; type: string } | null>(null);
   const [dismissedId, setDismissedId] = useState<number | null>(null);
 
+  // Fetch current user ONCE on mount, not on every pathname change
   useEffect(() => {
-    fetchCurrencies();
     if (!isLoginPage) {
       fetchCurrentUser();
     }
-  }, [fetchCurrencies, fetchCurrentUser, isLoginPage, pathname]);
+  }, [fetchCurrentUser, isLoginPage]);
+
+  // Fetch currencies on mount
+  useEffect(() => {
+    fetchCurrencies();
+  }, [fetchCurrencies]);
 
   useEffect(() => {
     if (!isLoginPage && userLoaded && !currentUser) {
