@@ -11,9 +11,9 @@ const getPrismaClient = () => {
   if (!globalForPrisma.pgPool) {
     globalForPrisma.pgPool = new Pool({
       // DIRECT_URL → session mode, پێویستە بۆ interactive transactions
-      // max: 20 بەکاردەهێنین چونکە ئێستا بەکاردەهێنین Transaction Pooler (port 6543)
+      // max: 5 بەکاردەهێنین تا سنووری ١٥ تێپەڕاندن نەبێت
       connectionString: process.env.DATABASE_URL,
-      max: 20,
+      max: 5,
       idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 8000,
     });

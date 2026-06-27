@@ -11,7 +11,7 @@ const config = {
   password: 'Hemn@ERP2026#Strong'
 };
 
-const commands = 'cd /var/www/hemnerp && git fetch --all && git reset --hard origin/main && rm -rf .next && npm install && npm run build && pm2 restart hemnerp';
+const commands = 'cd /var/www/hemnerp && git fetch --all && git reset --hard origin/main && rm -rf .next && npm install && nohup sh -c "npm run build && pm2 restart hemnerp" > build.log 2>&1 & tail -f build.log';
 
 conn.on('ready', () => {
   console.log('SSH connection established successfully!');
