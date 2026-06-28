@@ -83,11 +83,13 @@ export async function GET(request: Request) {
         stockMap[key].totalPurchaseValue += (t.qtyChange * t.unitCost);
         stockMap[key].totalPurchaseQty += t.qtyChange;
         
-        stockMap[key].purchasePrice = t.unitCost;
         if (stockMap[key].isMultiBatch) {
+          stockMap[key].purchasePrice = t.unitCost;
           stockMap[key].cost = t.unitCost;
         } else {
-          stockMap[key].cost = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : t.unitCost;
+          const avg = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : t.unitCost;
+          stockMap[key].purchasePrice = avg;
+          stockMap[key].cost = avg;
         }
         stockMap[key].sellerName = t.voucher?.account?.name || "نەزانراو";
         stockMap[key].sellerId = t.voucher?.account?.id || null;

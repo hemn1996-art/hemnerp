@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         warehouseId: true,
         qtyChange: true,
         unitCost: true,
-        product: { select: { name: true, code: true } },
+        product: { select: { name: true, code: true, isMultiBatch: true } },
         warehouse: { select: { name: true } },
         voucher: {
           select: {
@@ -55,15 +55,27 @@ export async function GET(request: Request) {
           cost: 0,
           sellerName: "-",
           sellerId: null as number | null,
-          purchaseDate: "-"
+          purchaseDate: "-",
+          totalPurchaseValue: 0,
+          totalPurchaseQty: 0,
+          isMultiBatch: t.product?.isMultiBatch || false
         };
       }
 
       stockMap[key].quantity += t.qtyChange;
 
       if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
-        stockMap[key].purchasePrice = t.unitCost;
-        stockMap[key].cost = t.unitCost;
+        stockMap[key].totalPurchaseValue += (t.qtyChange * t.unitCost);
+        stockMap[key].totalPurchaseQty += t.qtyChange;
+
+        if (stockMap[key].isMultiBatch) {
+          stockMap[key].purchasePrice = t.unitCost;
+          stockMap[key].cost = t.unitCost;
+        } else {
+          const avg = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : t.unitCost;
+          stockMap[key].purchasePrice = avg;
+          stockMap[key].cost = avg;
+        }
         stockMap[key].sellerName = t.voucher?.account?.name || "نەزانراو";
         stockMap[key].sellerId = t.voucher?.account?.id || null;
         stockMap[key].purchaseDate = t.voucher?.date || "-";
