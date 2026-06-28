@@ -44,6 +44,14 @@ export async function GET(request: Request) {
             type: true,
             date: true,
             account: { select: { id: true, name: true } },
+            lines: {
+              select: {
+                productId: true,
+                unitPrice: true,
+                discountAmount: true,
+                qty: true
+              }
+            }
           },
         },
       },
@@ -73,6 +81,7 @@ export async function GET(request: Request) {
           purchaseDate: "-",
           totalPurchaseValue: 0,
           totalPurchaseQty: 0,
+          totalExpenseValue: 0,
           isMultiBatch: t.product?.isMultiBatch || false
         };
       }
@@ -80,16 +89,26 @@ export async function GET(request: Request) {
       stockMap[key].quantity += t.qtyChange;
 
       if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
+        const line = t.voucher.lines?.find((l: any) => l.productId === t.productId);
+        const originalPrice = line ? line.unitPrice : t.unitCost;
+        const unitExpense = Math.max(0, t.unitCost - originalPrice);
+
         stockMap[key].totalPurchaseValue += (t.qtyChange * t.unitCost);
         stockMap[key].totalPurchaseQty += t.qtyChange;
+        stockMap[key].totalExpenseValue += (t.qtyChange * unitExpense);
         
         if (stockMap[key].isMultiBatch) {
-          stockMap[key].purchasePrice = t.unitCost;
+          stockMap[key].purchasePrice = originalPrice;
           stockMap[key].cost = t.unitCost;
+          stockMap[key].expense = unitExpense;
         } else {
-          const avg = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : t.unitCost;
-          stockMap[key].purchasePrice = avg;
-          stockMap[key].cost = avg;
+          const avgCost = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : t.unitCost;
+          const avgExpense = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalExpenseValue / stockMap[key].totalPurchaseQty) : unitExpense;
+          const avgPrice = Math.max(0, avgCost - avgExpense);
+          
+          stockMap[key].purchasePrice = avgPrice;
+          stockMap[key].cost = avgCost;
+          stockMap[key].expense = avgExpense;
         }
         stockMap[key].sellerName = t.voucher?.account?.name || "نەزانراو";
         stockMap[key].sellerId = t.voucher?.account?.id || null;
