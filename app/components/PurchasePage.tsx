@@ -2411,21 +2411,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                       </select>
                                     </Field>
 
-                                    <Field label="نرخی کڕین">
-                                      <FormattedNumberInput
-                                        value={row.purchasePrice}
-                                        disabled={isLocked}
-                                        onChange={(val) =>
-                                          updateRow(row.id, {
-                                            purchasePrice: val,
-                                          })
-                                        }
-                                        style={{
-                                          ...compactInput,
-                                          ...lockedFieldStyle,
-                                        }}
-                                      />
-                                    </Field>
+
 
                                     {(() => {
                                       const prevPurchase = supplierId
