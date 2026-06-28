@@ -604,12 +604,10 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
-
     if (code === "IQD") {
-      return `${Number(value || 0).toLocaleString("en-US")} دینار`;
+      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
     }
-
-    return `${Number(value || 0).toLocaleString("en-US")} ${symbol}`;
+    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
@@ -2619,8 +2617,8 @@ const currentBadge: CSSProperties = { background: "#eff6ff", color: "#1d4ed8", b
 const tableCard: CSSProperties = { background: "white", border: "1px solid #e5e7eb", borderRadius: 16, padding: 14 };
 const table: CSSProperties = { width: "100%", minWidth: 800, borderCollapse: "collapse" };
 const th: CSSProperties = { background: "#f8fafc", padding: 12, borderBottom: "1px solid #e5e7eb", textAlign: "center", fontWeight: 800 };
-const tdCenter: CSSProperties = { padding: 12, borderBottom: "1px solid #eef2f7", textAlign: "center", verticalAlign: "top" };
-const tdWide: CSSProperties = { padding: 12, borderBottom: "1px solid #eef2f7", minWidth: 280, verticalAlign: "top", position: "relative" };
+const tdCenter: CSSProperties = { padding: 12, borderBottom: "1px solid #eef2f7", textAlign: "center", verticalAlign: "middle" };
+const tdWide: CSSProperties = { padding: 12, borderBottom: "1px solid #eef2f7", minWidth: 280, verticalAlign: "middle", position: "relative" };
 const productNameBlock: CSSProperties = { cursor: "pointer", color: "#2563eb" };
 const itemNote: CSSProperties = { fontSize: 12, color: "#6b7280", marginTop: 3 };
 const deleteBtn: CSSProperties = { border: "1px solid #fecaca", background: "#fff1f2", color: "#dc2626", borderRadius: 10, padding: "9px 10px", fontWeight: 700, cursor: "pointer", fontFamily: appFont };
@@ -2650,8 +2648,8 @@ const printInfoBox: CSSProperties = {
 const printInfoRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, lineHeight: 1.8 };
 const printTable: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 10, marginTop: 6 };
 const printTh: CSSProperties = { border: "1px solid #0f172a", background: "#0f172a", color: "#ffffff", padding: "7px 5px", textAlign: "center", fontWeight: 900, fontSize: 10, letterSpacing: "0.2px" };
-const printTd: CSSProperties = { border: "1px solid #e5e7eb", padding: "6px 5px", textAlign: "center", verticalAlign: "top" };
-const printTdWide: CSSProperties = { border: "1px solid #e5e7eb", padding: "6px 5px", textAlign: "right", verticalAlign: "top", minWidth: 150 };
+const printTd: CSSProperties = { border: "1px solid #e5e7eb", padding: "6px 5px", textAlign: "center", verticalAlign: "middle" };
+const printTdWide: CSSProperties = { border: "1px solid #e5e7eb", padding: "6px 5px", textAlign: "right", verticalAlign: "middle", minWidth: 150 };
 const printSmallNote: CSSProperties = { color: "#6b7280", fontSize: 9, marginTop: 3 };
 const printItemCountLine: CSSProperties = {
   width: "48%",

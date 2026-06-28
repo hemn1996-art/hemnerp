@@ -337,12 +337,10 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
-
     if (code === "IQD") {
-      return `${Number(value || 0).toLocaleString("en-US")} دینار`;
+      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
     }
-
-    return `${Number(value || 0).toLocaleString("en-US")} ${symbol}`;
+    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
@@ -1921,14 +1919,14 @@ const tdCenter: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const tdWide: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   minWidth: 240,
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const smallInput: CSSProperties = {
@@ -2120,14 +2118,14 @@ const printTd: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const printTdWide: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "right",
-  verticalAlign: "top",
+  verticalAlign: "middle",
   minWidth: 120,
 };
 

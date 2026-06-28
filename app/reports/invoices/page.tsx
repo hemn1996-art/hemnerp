@@ -476,6 +476,92 @@ function InvoiceReportContent() {
     return `${formattedNumber} ${baseCurrency.symbol}`;
   };
 
+  const formatCurrencyValueJSX = (amount: number, currencyId: number) => {
+    const currencyObj = currencies.find((c: any) => c.id === currencyId);
+    const isInteger = amount % 1 === 0;
+    const formattedNumber = amount.toLocaleString("en-US", { 
+      minimumFractionDigits: isInteger ? 0 : 2, 
+      maximumFractionDigits: 2 
+    });
+
+    const parts = formattedNumber.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+
+    const renderedNumber = (
+      <span dir="ltr">
+        {whole}
+        {decimal !== undefined && (
+          <span className="text-[0.82em] opacity-85" style={{ fontSize: '0.82em', opacity: 0.85 }}>.{decimal}</span>
+        )}
+      </span>
+    );
+
+    let prefix = "";
+    if (filterCurrencyId !== "all") {
+      if (currencyObj?.code === "USD") {
+        prefix = "$ ";
+      } else if (currencyObj?.code === "IQD") {
+        prefix = "دینار ";
+      } else {
+        prefix = `${currencyObj?.symbol || ""} `;
+      }
+    } else {
+      if (currencyObj?.code === "IQD") {
+        prefix = "دینار ";
+      } else if (currencyObj?.code === "USD") {
+        prefix = "$ ";
+      } else {
+        prefix = `${currencyObj?.name || ""} `;
+      }
+    }
+
+    return (
+      <span className="inline-flex items-baseline" style={{ display: 'inline-flex', alignItems: 'baseline', gap: '2px' }}>
+        <span style={{ fontSize: '0.85em', opacity: 0.8 }}>{prefix}</span>
+        {renderedNumber}
+      </span>
+    );
+  };
+
+  const formatBaseCurrencyJSX = (val: number) => {
+    const baseCurrency = getBaseCurrency();
+    const isInteger = val % 1 === 0;
+    const formattedNumber = val.toLocaleString("en-US", { 
+      minimumFractionDigits: isInteger ? 0 : 2, 
+      maximumFractionDigits: 2 
+    });
+
+    const parts = formattedNumber.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+
+    const renderedNumber = (
+      <span dir="ltr">
+        {whole}
+        {decimal !== undefined && (
+          <span className="text-[0.82em] opacity-85" style={{ fontSize: '0.82em', opacity: 0.85 }}>.{decimal}</span>
+        )}
+      </span>
+    );
+
+    let prefix = "";
+    if (baseCurrency.code === "USD") {
+      prefix = "$ ";
+    } else if (baseCurrency.code === "IQD") {
+      prefix = "دینار ";
+    } else {
+      prefix = `${baseCurrency.symbol} `;
+    }
+
+    return (
+      <span className="inline-flex items-baseline" style={{ display: 'inline-flex', alignItems: 'baseline', gap: '2px' }}>
+        <span style={{ fontSize: '0.85em', opacity: 0.8 }}>{prefix}</span>
+        {renderedNumber}
+      </span>
+    );
+  };
+
   // Dynamic KPI Formatter converting USD to active filtered currency if chosen
   const formatKPI = (valUSD: number) => {
     const baseCurrency = getBaseCurrency();
@@ -487,7 +573,7 @@ function InvoiceReportContent() {
     const targetId = targetCurrency ? targetCurrency.id : 1;
     
     const converted = convertAmount(valUSD, currencies.find((c: any) => c.code === "USD")?.id || 1, targetCode, 1500);
-    return formatCurrencyValue(converted, targetId);
+    return formatCurrencyValueJSX(converted, targetId);
   };
 
   // Multi-currency KPI formatter: when no currency filter is active, show per-currency breakdown
@@ -502,7 +588,7 @@ function InvoiceReportContent() {
         const curId = Number(curIdStr);
         total += convertBetweenCurrencies(amount, curId, targetId, 1500);
       });
-      return <span>{formatCurrencyValue(total, targetId)}</span>;
+      return <span>{formatCurrencyValueJSX(total, targetId)}</span>;
     }
     
     // When "all" currencies, show each currency separately
@@ -512,7 +598,7 @@ function InvoiceReportContent() {
       if (Math.abs(amount) > 0.01) {
         parts.push(
           <div key={curId} className="text-sm md:text-[15px] font-bold leading-normal">
-            {formatCurrencyValue(amount, curId)}
+            {formatCurrencyValueJSX(amount, curId)}
           </div>
         );
       }
@@ -1866,19 +1952,19 @@ function InvoiceReportContent() {
                           )}
                           {visibleColumns.total && (
                             <td className="px-4 py-3.5 text-center font-black">
-                              {formatCurrencyValue(valVal, displayCurrencyId)}
+                              {formatCurrencyValueJSX(valVal, displayCurrencyId)}
                             </td>
                           )}
                           {visibleColumns.discount && (
                             <td className="px-4 py-3.5 text-center text-rose-600">
                               {voucher.totalDiscount > 0
-                                ? formatCurrencyValue(discountVal, displayCurrencyId)
+                                ? formatCurrencyValueJSX(discountVal, displayCurrencyId)
                                 : "-"}
                             </td>
                           )}
                           {visibleColumns.paid && (
                             <td className="px-4 py-3.5 text-center text-emerald-600">
-                              {paidVal > 0 ? formatCurrencyValue(paidVal, displayCurrencyId) : "-"}
+                              {paidVal > 0 ? formatCurrencyValueJSX(paidVal, displayCurrencyId) : "-"}
                             </td>
                           )}
                           {visibleColumns.remaining && (
@@ -1886,7 +1972,7 @@ function InvoiceReportContent() {
                               {isDebtVoucherType ? (
                                 (() => {
                                   const runningBal = getVoucherRunningBalance(voucher);
-                                  return runningBal !== null ? formatCurrencyValue(runningBal, voucher.currencyId || 1) : "-";
+                                  return runningBal !== null ? formatCurrencyValueJSX(runningBal, voucher.currencyId || 1) : "-";
                                 })()
                               ) : (
                                 remainingVal > 0 ? formatCurrencyValue(remainingVal, displayCurrencyId) : "-"
@@ -1896,18 +1982,18 @@ function InvoiceReportContent() {
                           {visibleColumns.deliveryFee && (
                             <td className="px-4 py-3.5 text-center">
                               {voucher.deliveryFee
-                                ? formatCurrencyValue(deliveryFeeVal, displayCurrencyId)
+                                ? formatCurrencyValueJSX(deliveryFeeVal, displayCurrencyId)
                                 : "-"}
                             </td>
                           )}
                           {visibleColumns.expenses && (
                             <td className="px-4 py-3.5 text-center text-purple-700">
-                              {expensesVal > 0 ? formatCurrencyValue(expensesVal, displayCurrencyId) : "-"}
+                              {expensesVal > 0 ? formatCurrencyValueJSX(expensesVal, displayCurrencyId) : "-"}
                             </td>
                           )}
                           {visibleColumns.profit && (
                             <td className={`px-4 py-3.5 text-center font-bold ${(voucher.type === "sales" || voucher.type === "sales_return") && profitVal < 0 ? "text-rose-600" : "text-amber-700"}`}>
-                              {(voucher.type === "sales" || voucher.type === "sales_return") ? formatBaseCurrency(profitVal) : "-"}
+                              {(voucher.type === "sales" || voucher.type === "sales_return") ? formatBaseCurrencyJSX(profitVal) : "-"}
                             </td>
                           )}
                           {visibleColumns.cashbox && (

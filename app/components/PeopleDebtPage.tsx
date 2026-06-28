@@ -396,12 +396,10 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
-
     if (code === "IQD") {
-      return `${Number(value || 0).toLocaleString("en-US")} دینار`;
+      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
     }
-
-    return `${Number(value || 0).toLocaleString("en-US")} ${symbol}`;
+    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
   }
 
   function formatCurrencyMap(map: Record<string, number>) {

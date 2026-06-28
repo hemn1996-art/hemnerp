@@ -353,6 +353,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   );
 
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
+  const [expenseSearches, setExpenseSearches] = useState<Record<number, string>>({});
+  const [showExpenseList, setShowExpenseList] = useState<Record<number, boolean>>({});
   const [expenseAllocationMode, setExpenseAllocationMode] =
     useState<ExpenseAllocationMode>("quantity");
 
@@ -456,9 +458,9 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     if (code === "IQD") {
-      return `${Number(value || 0).toLocaleString("en-US")} دینار`;
+      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
     }
-    return `${Number(value || 0).toLocaleString("en-US")} ${symbol}`;
+    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
@@ -471,11 +473,14 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const symbol = currencies.find((c: any) => c.id === Number(curIdText))?.symbol || "$";
+          const curObj = currencies.find((c: any) => c.id === Number(curIdText));
+          const code = curObj?.code || "";
+          const symbol = curObj?.symbol || "$";
+          const displaySymbol = code === "IQD" ? "دینار" : symbol;
           const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{symbol}{formatted}
+              {isNegative ? "-" : ""}{displaySymbol} {formatted}
             </span>
           );
         })}
@@ -490,6 +495,53 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         formatCurrencyAmount(amount, Number(currencyIdText))
       );
     return parts.length ? parts.join(" + ") : "0";
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number) {
+    const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
+    const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
+    const isRounding = currencies.find((c: any) => c.id === currencyId)?.rounding || false;
+    const isInteger = value % 1 === 0;
+    const formatted = Math.abs(value).toLocaleString("en-US", { 
+      minimumFractionDigits: isInteger ? 0 : 2, 
+      maximumFractionDigits: isRounding ? 0 : 2 
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+
+    const displaySymbol = code === "IQD" ? "دینار" : symbol;
+    const isNegative = value < 0;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 2 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal !== undefined && (
+            <span style={{ fontSize: "0.82em", opacity: 0.85 }}>.{decimal}</span>
+          )}
+        </span>
+      </span>
+    );
+  }
+
+  function formatCurrencyMapJSX(map: Record<string, number>) {
+    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    if (activeEntries.length === 0) {
+      return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+        {activeEntries.map(([curIdText, val]) => (
+          <div key={curIdText} style={{ fontWeight: 900, fontSize: 14 }}>
+            {formatCurrencyAmountJSX(val, Number(curIdText))}
+          </div>
+        ))}
+      </div>
+    );
   }
 
   const accountBalanceBeforeByCurrency = useMemo(() => {
@@ -1818,7 +1870,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             <div style={totalGrid}>
               <StatBox
                 title="گشتی"
-                value={formatCurrencyMap(itemsTotalsByCurrency)}
+                value={formatCurrencyMapJSX(itemsTotalsByCurrency)}
                 color="#16a34a"
               />
               <StatBox
@@ -2296,7 +2348,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                               />
                             ) : (
                               <strong>
-                                {formatCurrencyAmount(
+                                {formatCurrencyAmountJSX(
                                   getAllocatedExpensePerUnitInRowCurrency(row),
                                   row.currencyId
                                 )}
@@ -2308,7 +2360,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                         {tableColumns.cost && (
                           <td style={tdCenter}>
                             <strong>
-                              {formatCurrencyAmount(
+                              {formatCurrencyAmountJSX(
                                 getFinalCostPerUnitInRowCurrency(row),
                                 row.currencyId
                               )}
@@ -2334,7 +2386,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                         {tableColumns.total && (
                           <td style={tdCenter}>
                             <strong>
-                              {formatCurrencyAmount(
+                              {formatCurrencyAmountJSX(
                                 getRowTotalInOwnCurrency(row),
                                 row.currencyId
                               )}
@@ -2482,25 +2534,104 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                         </label>
 
                         {expense.addAsDebt && (
-                          <select
-                            value={expense.accountId || ""}
-                            disabled={isLocked}
-                            onChange={(e) =>
-                              updateExpense(expense.id, {
-                                accountId: e.target.value
-                                  ? Number(e.target.value)
-                                  : undefined,
-                              })
-                            }
-                            style={{ ...input, marginTop: 8, ...lockedFieldStyle }}
-                          >
-                            <option value="">هەژمار هەڵبژێرە</option>
-                            {accounts.filter((a: any) => a.isActive !== false && a.isShareholder !== true).map((account: any) => (
-                              <option key={account.id} value={account.id}>
-                                {account.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div style={{ position: "relative", marginTop: 8 }}>
+                            <div style={supplierInputWrap}>
+                              <input
+                                value={expenseSearches[expense.id] !== undefined ? expenseSearches[expense.id] : (accounts.find((a: any) => a.id === expense.accountId)?.name || "")}
+                                disabled={isLocked}
+                                onFocus={() => {
+                                  if (!isLocked) {
+                                    const currentName = accounts.find((a: any) => a.id === expense.accountId)?.name || "";
+                                    setExpenseSearches(prev => ({ ...prev, [expense.id]: currentName }));
+                                    setShowExpenseList(prev => ({ ...prev, [expense.id]: true }));
+                                  }
+                                }}
+                                onBlur={() => {
+                                  setTimeout(() => {
+                                    setShowExpenseList(prev => ({ ...prev, [expense.id]: false }));
+                                    setExpenseSearches(prev => {
+                                      const copy = { ...prev };
+                                      delete copy[expense.id];
+                                      return copy;
+                                    });
+                                  }, 200);
+                                }}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setExpenseSearches(prev => ({ ...prev, [expense.id]: val }));
+                                  updateExpense(expense.id, { accountId: undefined });
+                                  setShowExpenseList(prev => ({ ...prev, [expense.id]: true }));
+                                }}
+                                placeholder="بۆ هەژمار بگەڕێ..."
+                                style={{
+                                  ...input,
+                                  ...lockedFieldStyle,
+                                  paddingLeft: expense.accountId && !isLocked ? 36 : 14,
+                                }}
+                              />
+
+                              {expense.accountId && !isLocked && (
+                                <button
+                                  type="button"
+                                  style={{
+                                    ...supplierClearBtn,
+                                    width: 24,
+                                    height: 24,
+                                    fontSize: 16,
+                                  }}
+                                  onClick={() => {
+                                    updateExpense(expense.id, { accountId: undefined });
+                                    setExpenseSearches(prev => {
+                                      const copy = { ...prev };
+                                      delete copy[expense.id];
+                                      return copy;
+                                    });
+                                  }}
+                                  title="لابردنی هەژمار"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+
+                            {showExpenseList[expense.id] && !isLocked && (
+                              <div style={{ ...dropdownLarge, maxHeight: 200, width: "100%", zIndex: 100 }}>
+                                {(() => {
+                                  const q = (expenseSearches[expense.id] || "").trim().toLowerCase();
+                                  const expAccounts = accounts.filter((a: any) => a.isActive !== false && a.isShareholder !== true && a.accountType?.name !== 'کڕیار');
+                                  const filtered = q
+                                    ? expAccounts.filter((a: any) =>
+                                        String(a.name || "").toLowerCase().includes(q) ||
+                                        String(a.phone || "").toLowerCase().includes(q) ||
+                                        String(a.city || "").toLowerCase().includes(q)
+                                      )
+                                    : expAccounts;
+
+                                  if (filtered.length === 0) {
+                                    return <div style={{ padding: 12, color: "#9ca3af", textAlign: "center", fontSize: 13 }}>هیچ هەژمارێک نەدۆزرایەوە</div>;
+                                  }
+
+                                  return filtered.map((account: any) => (
+                                    <button
+                                      key={account.id}
+                                      style={dropdownItem}
+                                      onMouseDown={() => {
+                                        updateExpense(expense.id, { accountId: account.id });
+                                        setShowExpenseList(prev => ({ ...prev, [expense.id]: false }));
+                                        setExpenseSearches(prev => {
+                                          const copy = { ...prev };
+                                          delete copy[expense.id];
+                                          return copy;
+                                        });
+                                      }}
+                                    >
+                                      <strong>{account.name}</strong>
+                                    </button>
+                                  ));
+                                })()}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -2532,7 +2663,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                 <div style={expenseBadges}>
                   {getExpensesByCurrency().map((item: any) => (
                     <span key={item.currencyId} style={moneyBadge}>
-                      {formatCurrencyAmount(item.amount, item.currencyId)}
+                      {formatCurrencyAmountJSX(item.amount, item.currencyId)}
                     </span>
                   ))}
                 </div>
@@ -3866,14 +3997,14 @@ const tdCenter: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const tdWide: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   minWidth: 280,
-  verticalAlign: "top",
+  verticalAlign: "middle",
   position: "relative",
 };
 
@@ -4145,14 +4276,14 @@ const printTd: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const printTdWide: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "right",
-  verticalAlign: "top",
+  verticalAlign: "middle",
   minWidth: 150,
 };
 

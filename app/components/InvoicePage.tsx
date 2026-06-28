@@ -475,9 +475,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     if (code === "IQD") {
-      return `${Number(value || 0).toLocaleString("en-US")} دینار`;
+      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
     }
-    return `${Number(value || 0).toLocaleString("en-US")} ${symbol}`;
+    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
@@ -490,11 +490,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const symbol = currencies.find((c: any) => c.id === Number(curIdText))?.symbol || "$";
+          const curObj = currencies.find((c: any) => c.id === Number(curIdText));
+          const code = curObj?.code || "";
+          const symbol = curObj?.symbol || "$";
+          const displaySymbol = code === "IQD" ? "دینار" : symbol;
           const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{symbol}{formatted}
+              {isNegative ? "-" : ""}{displaySymbol} {formatted}
             </span>
           );
         })}
@@ -509,6 +512,53 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         formatCurrencyAmount(amount, Number(currencyIdText))
       );
     return parts.length ? parts.join(" + ") : "0";
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number) {
+    const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
+    const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
+    const isRounding = currencies.find((c: any) => c.id === currencyId)?.rounding || false;
+    const isInteger = value % 1 === 0;
+    const formatted = Math.abs(value).toLocaleString("en-US", { 
+      minimumFractionDigits: isInteger ? 0 : 2, 
+      maximumFractionDigits: isRounding ? 0 : 2 
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+
+    const displaySymbol = code === "IQD" ? "دینار" : symbol;
+    const isNegative = value < 0;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 2 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal !== undefined && (
+            <span style={{ fontSize: "0.82em", opacity: 0.85 }}>.{decimal}</span>
+          )}
+        </span>
+      </span>
+    );
+  }
+
+  function formatCurrencyMapJSX(map: Record<string, number>) {
+    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    if (activeEntries.length === 0) {
+      return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+        {activeEntries.map(([curIdText, val]) => (
+          <div key={curIdText} style={{ fontWeight: 900, fontSize: 14 }}>
+            {formatCurrencyAmountJSX(val, Number(curIdText))}
+          </div>
+        ))}
+      </div>
+    );
   }
 
   const accountBalanceBeforeByCurrency = useMemo(() => {
@@ -928,7 +978,37 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function formatMoney(value: number, symbol = invoiceSymbol) {
-    return `${Number(value || 0).toLocaleString("en-US")} ${symbol}`;
+    const isIqd = symbol === "IQD" || symbol === "دینار";
+    const displaySymbol = isIqd ? "دینار" : symbol;
+    return `${displaySymbol} ${Number(value || 0).toLocaleString("en-US")}`;
+  }
+
+  function formatMoneyJSX(value: number, symbol = invoiceSymbol) {
+    const isIqd = symbol === "IQD" || symbol === "دینار";
+    const displaySymbol = isIqd ? "دینار" : symbol;
+    const isInteger = value % 1 === 0;
+    const formatted = Math.abs(value).toLocaleString("en-US", { 
+      minimumFractionDigits: isInteger ? 0 : 2, 
+      maximumFractionDigits: 2 
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const isNegative = value < 0;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 2 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal !== undefined && (
+            <span style={{ fontSize: "0.82em", opacity: 0.85 }}>.{decimal}</span>
+          )}
+        </span>
+      </span>
+    );
   }
 
   function formatDate(dateText: string) {
@@ -1898,12 +1978,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             <div style={totalGrid}>
               <StatBox
                 title="گشتی"
-                value={formatMoney(total)}
+                value={formatMoneyJSX(total)}
                 color="#16a34a"
               />
               <StatBox
                 title="کۆی ماوەی ئەم پسووڵە"
-                value={formatMoney(remaining)}
+                value={formatMoneyJSX(remaining)}
               />
             </div>
 
@@ -2537,7 +2617,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         {tableColumns.total && (
                           <td style={tdCenter}>
                             <strong>
-                              {formatMoney(
+                              {formatMoneyJSX(
                                 getRowNetTotalInRowCurrency(row),
                                 getCurrencySymbol(row.currencyId)
                               )}
@@ -3867,14 +3947,14 @@ const tdCenter: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const tdWide: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   minWidth: 280,
-  verticalAlign: "top",
+  verticalAlign: "middle",
   position: "relative",
 };
 
@@ -4200,14 +4280,14 @@ const printTd: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const printTdWide: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "right",
-  verticalAlign: "top",
+  verticalAlign: "middle",
   minWidth: 150,
 };
 

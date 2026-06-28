@@ -21,5 +21,8 @@ export function formatNumber(value: number | string | null | undefined): string 
  * Format number with currency symbol
  */
 export function formatCurrency(value: number | string | null | undefined, symbol: string = "$"): string {
-  return `${formatNumber(value)} ${symbol}`;
+  if (symbol === "IQD" || symbol === "دینار") {
+    return `دینار ${formatNumber(value)}`;
+  }
+  return `${symbol} ${formatNumber(value)}`;
 }

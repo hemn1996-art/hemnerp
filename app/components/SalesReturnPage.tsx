@@ -389,13 +389,13 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     return defaultCurrency.id || 1;
   }
 
-  function formatCurrencyAmount(value: number, currencyId: number) {
+    function formatCurrencyAmount(value: number, currencyId: number) {
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     if (code === "IQD") {
-      return `${Number(value || 0).toLocaleString("en-US")} دینار`;
+      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
     }
-    return `${Number(value || 0).toLocaleString("en-US")} ${symbol}`;
+    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
@@ -408,11 +408,14 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const symbol = currencies.find((c: any) => c.id === Number(curIdText))?.symbol || "$";
+                    const curObj = currencies.find((c: any) => c.id === Number(curIdText));
+          const code = curObj?.code || "";
+          const symbol = curObj?.symbol || "$";
+          const displaySymbol = code === "IQD" ? "دینار" : symbol;
           const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{symbol}{formatted}
+              {isNegative ? "-" : ""}{displaySymbol} {formatted}
             </span>
           );
         })}
@@ -3112,14 +3115,14 @@ const tdCenter: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const tdWide: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   minWidth: 280,
-  verticalAlign: "top",
+  verticalAlign: "middle",
   position: "relative",
 };
 
@@ -3284,14 +3287,14 @@ const printTd: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const printTdWide: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "right",
-  verticalAlign: "top",
+  verticalAlign: "middle",
   minWidth: 150,
 };
 

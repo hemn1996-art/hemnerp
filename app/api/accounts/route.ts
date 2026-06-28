@@ -92,7 +92,7 @@ export async function GET(request: Request) {
       for (const [curIdText, amount] of Object.entries(balanceByCurrency)) {
         const curId = Number(curIdText);
         const cur = dbCurrencies.find(c => c.id === curId);
-        const isIqd = cur ? (cur.code === "IQD") : (curId === 2 || curId === 6 || curId === 8);
+        const isIqd = cur ? (cur.code === "IQD") : (curId === 2 || curId === 6 || curId === 8 || curId === 12);
         const rate = cur ? cur.rate : (isIqd ? 1500 : 1);
         if (isIqd) {
           totalBalance += amount / rate;

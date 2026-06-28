@@ -297,12 +297,12 @@ export default function AccountsPage() {
     return "#64748b";
   }
 
-  function formatMoney(value: number, currencyId = 1) {
+    function formatMoney(value: number, currencyId = 1) {
     const symbol = getCurrencySymbol(currencyId);
-    if (currencyId === 2) {
-      return `${Math.abs(Number(value || 0)).toLocaleString("en-US")} دینار`;
+    if (currencyId === 2 || currencyId === 12 || symbol === "دینار" || symbol === "IQD") {
+      return `دینار ${Math.abs(Number(value || 0)).toLocaleString("en-US")}`;
     }
-    return `${Math.abs(Number(value || 0)).toLocaleString("en-US")} ${symbol}`;
+    return `${symbol} ${Math.abs(Number(value || 0)).toLocaleString("en-US")}`;
   }
 
   function getAddressText(account: AccountLike) {

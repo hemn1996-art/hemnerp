@@ -1786,14 +1786,14 @@ const tdCenter: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const tdWide: CSSProperties = {
   padding: 12,
   borderBottom: "1px solid #eef2f7",
   minWidth: 240,
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const smallInput: CSSProperties = {
@@ -1919,14 +1919,14 @@ const printTd: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "center",
-  verticalAlign: "top",
+  verticalAlign: "middle",
 };
 
 const printTdWide: CSSProperties = {
   border: "1px solid #e5e7eb",
   padding: "6px 5px",
   textAlign: "right",
-  verticalAlign: "top",
+  verticalAlign: "middle",
   minWidth: 120,
 };
 

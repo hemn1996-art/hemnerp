@@ -60,10 +60,10 @@ export default function DebtReportPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: isRounding ? 0 : 2
     });
-    if (curId === 2) {
-      return `${formatted} دینار`;
+    if (currencyObj?.code === "IQD" || curId === 12) {
+      return `دینار ${formatted}`;
     }
-    return `$${formatted}`;
+    return `$ ${formatted}`;
   };
 
   const renderBalance = (map: Record<string, number>) => {
