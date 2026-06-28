@@ -381,6 +381,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     const q = productSearch.trim().toLowerCase();
 
     return products.filter((product: any) => {
+      if (product.isExpense || product.isService) return false;
       const hasStock = Number(product.stock || 0) > 0;
       if (!hasStock) return false;
       if (!q) return true;

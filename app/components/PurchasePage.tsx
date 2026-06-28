@@ -709,10 +709,11 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
+    const list = products.filter((product: any) => !product.isExpense && !product.isService);
 
-    if (!q) return products;
+    if (!q) return list;
 
-    return products.filter((product: any) => {
+    return list.filter((product: any) => {
       return (
         String(product.name || "").toLowerCase().includes(q) ||
         String(product.code || "").toLowerCase().includes(q) ||

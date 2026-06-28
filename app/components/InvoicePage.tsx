@@ -816,9 +816,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
-    let list = products;
+    let list = products.filter((product: any) => !product.isExpense);
     if (invoiceType === "فرۆشتن") {
-      list = products.filter((product: any) => (product.stock || 0) > 0);
+      list = list.filter((product: any) => (product.stock || 0) > 0 || product.isService);
     }
     if (!q) return list;
 
