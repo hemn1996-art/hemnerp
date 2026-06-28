@@ -128,6 +128,7 @@ const fallbackWarehouses = [
 export default function InvoicePage({ headerSelector, invoiceType, editId }: Props) {
   const router = useRouter();
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setIsEditLoading(!!editId);
@@ -1379,6 +1380,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       showToast("ئەم پسوڵەیە پێشتر خەزن کراوە.");
       return;
     }
+    if (isSaving) return;
+    setIsSaving(true);
 
     setExcessModalConfig(null);
 
@@ -1499,6 +1502,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       : addVoucher(payload);
 
     savePromise.then((res) => {
+      setIsSaving(false);
       if (res) {
         setSavedInvoiceSnapshot(currentInvoiceSnapshot);
         if (editId) {
@@ -1512,6 +1516,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
       }
     }).catch((err) => {
+      setIsSaving(false);
       console.error("Save error:", err);
       showToast("هەڵەی نەتۆرک! تکایە دووبارە هەوڵ بدەوە.", "error");
     });
@@ -2229,13 +2234,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             <button
               style={{
                 ...primaryBtn,
-                opacity: (isInvoiceLocked || (!!editId && isInvoiceSaved)) ? 0.55 : 1,
-                cursor: (isInvoiceLocked || (!!editId && isInvoiceSaved)) ? "not-allowed" : "pointer",
+                opacity: (isInvoiceLocked || (!!editId && isInvoiceSaved) || isSaving) ? 0.55 : 1,
+                cursor: (isInvoiceLocked || (!!editId && isInvoiceSaved) || isSaving) ? "not-allowed" : "pointer",
               }}
               onClick={handleSaveInvoice}
-              disabled={isInvoiceLocked || (!!editId && isInvoiceSaved)}
+              disabled={isInvoiceLocked || (!!editId && isInvoiceSaved) || isSaving}
             >
-              {isInvoiceLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
+              {isSaving ? "چاوەڕوان بە..." : isInvoiceLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
 
             <button style={outlineBlueBtn} onClick={handlePrint}>

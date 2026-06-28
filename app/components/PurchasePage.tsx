@@ -165,6 +165,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<ToastType>("error");
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setIsEditLoading(!!editId);
@@ -1493,6 +1494,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       showToast("ئەم پسوڵەیە پێشتر خەزن کراوە.");
       return;
     }
+    if (isSaving) return;
+    setIsSaving(true);
 
     setExcessModalConfig(null);
 
@@ -1603,6 +1606,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       : addVoucher(payload);
 
     savePromise.then((res) => {
+      setIsSaving(false);
       if (res) {
         fetchProducts(); // refresh products stock
         setSavedSnapshot(currentSnapshot);
@@ -1616,6 +1620,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
       }
     }).catch((err) => {
+      setIsSaving(false);
       console.error("Save error:", err);
       showToast("هەڵەی نەتۆرک! تکایە دووبارە هەوڵ بدەوە.", "error");
     });
@@ -2069,13 +2074,13 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             <button
               style={{
                 ...primaryBtn,
-                opacity: (isLocked || (!!editId && isSaved)) ? 0.55 : 1,
-                cursor: (isLocked || (!!editId && isSaved)) ? "not-allowed" : "pointer",
+                opacity: (isLocked || (!!editId && isSaved) || isSaving) ? 0.55 : 1,
+                cursor: (isLocked || (!!editId && isSaved) || isSaving) ? "not-allowed" : "pointer",
               }}
               onClick={handleSave}
-              disabled={isLocked || (!!editId && isSaved)}
+              disabled={isLocked || (!!editId && isSaved) || isSaving}
             >
-              {isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
+              {isSaving ? "چاوەڕوان بە..." : isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
 
             <button style={outlineBlueBtn} onClick={handlePrint}>
