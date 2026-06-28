@@ -109,22 +109,15 @@ export async function GET(request: Request) {
     }, 0);
 
     // 2. Warehouse Value
-    const stockQty: Record<number, number> = {};
-    const stockCost: Record<number, number> = {};
+    const productStock: Record<number, number> = {};
     inventoryTrans.forEach(t => {
-      stockQty[t.productId] = (stockQty[t.productId] || 0) + t.qtyChange;
-      if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
-        stockCost[t.productId] = t.unitCost;
-      }
+      productStock[t.productId] = (productStock[t.productId] || 0) + t.qtyChange * t.unitCost;
     });
 
     let totalWarehouseValueInUsd = 0;
-    Object.keys(stockQty).forEach(prodIdStr => {
-      const prodId = Number(prodIdStr);
-      const qty = stockQty[prodId];
-      const cost = stockCost[prodId] || 0;
-      if (qty > 0) {
-        totalWarehouseValueInUsd += qty * cost;
+    Object.values(productStock).forEach(val => {
+      if (val > 0) {
+        totalWarehouseValueInUsd += val;
       }
     });
     const warehouseValue = totalWarehouseValueInUsd * targetRate;
