@@ -166,6 +166,35 @@ export default function DebtReportPage() {
 
   const totalOverallDebt = data.reduce((sum, item) => sum + item.totalDebt, 0);
 
+  const totalOverallByCurrency = useMemo(() => {
+    const map: Record<string, number> = {};
+    data.forEach((item) => {
+      if (item.balanceByCurrency) {
+        for (const [curIdText, amount] of Object.entries(item.balanceByCurrency)) {
+          const val = Number(amount || 0);
+          map[curIdText] = (map[curIdText] || 0) + val;
+        }
+      }
+    });
+    return map;
+  }, [data]);
+
+  const formatTotalOverall = (map: Record<string, number>) => {
+    const entries = Object.entries(map).filter(([, val]) => Math.abs(val) > 0.01);
+    if (entries.length === 0) return "0";
+    return entries.map(([curIdText, val]) => {
+      const curId = Number(curIdText);
+      const absVal = Math.abs(val);
+      const isRounding = currencies?.find((c: any) => c.id === curId)?.rounding ?? false;
+      const formattedNum = absVal.toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: isRounding ? 0 : 2
+      });
+      const symbol = curId === 12 || currencies?.find((c: any) => c.id === curId)?.code === "IQD" ? "دینار" : "$";
+      return `${symbol} ${formattedNum}`;
+    }).join(" + ");
+  };
+
   return (
     <div className="p-4 flex flex-col h-full bg-gray-50">
       <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-4 no-print">
@@ -252,7 +281,7 @@ export default function DebtReportPage() {
          {showReportStats && (
            <div className="animate-in fade-in duration-200">
              <div className="text-sm text-gray-500">گشتی قەرز ({filterDebtType === "people" ? "قەرزی خەڵک" : "قەرزی من"})</div>
-             <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>${Math.abs(totalOverallDebt).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</div>
+              <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>{formatTotalOverall(totalOverallByCurrency)}</div>
            </div>
          )}
       </div>
