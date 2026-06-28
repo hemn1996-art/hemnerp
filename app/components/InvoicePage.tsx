@@ -492,14 +492,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const curObj = currencies.find((c: any) => c.id === Number(curIdText));
-          const code = curObj?.code || "";
-          const symbol = curObj?.symbol || "$";
-          const displaySymbol = code === "IQD" ? "دینار" : symbol;
-          const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{displaySymbol} {formatted}
+              {formatCurrencyAmountJSX(val, Number(curIdText))}
             </span>
           );
         })}
@@ -520,9 +515,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     const isRounding = currencies.find((c: any) => c.id === currencyId)?.rounding || false;
-    const isInteger = value % 1 === 0;
     const formatted = Math.abs(value).toLocaleString("en-US", { 
-      minimumFractionDigits: isInteger ? 0 : 2, 
+      minimumFractionDigits: isRounding ? 0 : 2, 
       maximumFractionDigits: isRounding ? 0 : 2 
     });
 
@@ -540,7 +534,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         <span>
           <span>{whole}</span>
           {decimal !== undefined && (
-            <span style={{ fontSize: "0.82em", opacity: 0.85 }}>.{decimal}</span>
+            <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
       </span>
@@ -988,10 +982,10 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   function formatMoneyJSX(value: number, symbol = invoiceSymbol) {
     const isIqd = symbol === "IQD" || symbol === "دینار";
     const displaySymbol = isIqd ? "دینار" : symbol;
-    const isInteger = value % 1 === 0;
+    const isRounding = isIqd;
     const formatted = Math.abs(value).toLocaleString("en-US", { 
-      minimumFractionDigits: isInteger ? 0 : 2, 
-      maximumFractionDigits: 2 
+      minimumFractionDigits: isRounding ? 0 : 2, 
+      maximumFractionDigits: isRounding ? 0 : 2 
     });
 
     const parts = formatted.split('.');
@@ -1006,10 +1000,24 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         <span>
           <span>{whole}</span>
           {decimal !== undefined && (
-            <span style={{ fontSize: "0.82em", opacity: 0.85 }}>.{decimal}</span>
+            <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
       </span>
+    );
+  }
+
+  function getPaidSummaryTextJSX() {
+    const paidList = getPaidCurrencies();
+    if (paidList.length === 0) return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+        {paidList.map((item: any, idx: number) => (
+          <div key={idx}>
+            {formatMoneyJSX(item.amount, getCurrencySymbol(item.currencyId))}
+          </div>
+        ))}
+      </div>
     );
   }
 
@@ -2750,24 +2758,24 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             {invoiceDiscountAmount > 0 && (
               <SummaryItem
                 label="داشکاندن"
-                value={formatMoney(invoiceDiscountAmount)}
+                value={formatMoneyJSX(invoiceDiscountAmount)}
               />
             )}
 
             {hasDelivery && deliveryFee.trim() && deliveryFeeAmount > 0 && (
               <SummaryItem
                 label="کرێی دلیڤەری"
-                value={formatMoney(deliveryFeeAmount)}
+                value={formatMoneyJSX(deliveryFeeAmount)}
               />
             )}
 
             <SummaryItem
               label="کۆی گشتی پسوڵە"
-              value={formatMoney(total)}
+              value={formatMoneyJSX(total)}
               strong
             />
-            <SummaryItem label="پارەی دراو" value={getPaidSummaryText()} />
-            <SummaryItem label="ماوە" value={formatMoney(remaining)} strong />
+            <SummaryItem label="پارەی دراو" value={getPaidSummaryTextJSX()} />
+            <SummaryItem label="ماوە" value={formatMoneyJSX(remaining)} strong />
           </div>
         </main>
       </div>
@@ -3369,7 +3377,7 @@ function SummaryItem({
   strong,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   strong?: boolean;
 }) {
   return (

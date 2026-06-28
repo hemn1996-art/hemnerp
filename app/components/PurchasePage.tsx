@@ -481,14 +481,9 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const curObj = currencies.find((c: any) => c.id === Number(curIdText));
-          const code = curObj?.code || "";
-          const symbol = curObj?.symbol || "$";
-          const displaySymbol = code === "IQD" ? "دینار" : symbol;
-          const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{displaySymbol} {formatted}
+              {formatCurrencyAmountJSX(val, Number(curIdText))}
             </span>
           );
         })}
@@ -509,9 +504,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     const isRounding = currencies.find((c: any) => c.id === currencyId)?.rounding || false;
-    const isInteger = value % 1 === 0;
     const formatted = Math.abs(value).toLocaleString("en-US", { 
-      minimumFractionDigits: isInteger ? 0 : 2, 
+      minimumFractionDigits: isRounding ? 0 : 2, 
       maximumFractionDigits: isRounding ? 0 : 2 
     });
 
@@ -529,10 +523,24 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         <span>
           <span>{whole}</span>
           {decimal !== undefined && (
-            <span style={{ fontSize: "0.82em", opacity: 0.85 }}>.{decimal}</span>
+            <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
       </span>
+    );
+  }
+
+  function getPaidSummaryTextJSX() {
+    const list = getPaidCurrencies();
+    if (list.length === 0) return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+        {list.map((item: any, idx: number) => (
+          <div key={idx}>
+            {formatCurrencyAmountJSX(item.amount, item.currencyId)}
+          </div>
+        ))}
+      </div>
     );
   }
 
@@ -2820,24 +2828,24 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             <SummaryItem label="کۆی کەرەستەکان" value={`${itemCount}`} />
             <SummaryItem
               label="کۆی بەهای کاڵاکان"
-              value={formatCurrencyMap(itemsTotalsByCurrency)}
+              value={formatCurrencyMapJSX(itemsTotalsByCurrency)}
             />
             <SummaryItem
               label="کۆی بڕی خەرجی"
-              value={formatCurrencyAmount(
+              value={formatCurrencyAmountJSX(
                 finalExpenseTotalInSelectedCurrency,
                 expenseTotalCurrencyId || defaultCurrency?.id || 5
               )}
             />
             <SummaryItem
               label="کۆستی گشتی کۆگا"
-              value={formatCurrencyMap(costGrandTotalByCurrency)}
+              value={formatCurrencyMapJSX(costGrandTotalByCurrency)}
               strong
             />
-            <SummaryItem label="پارەی دراو" value={getPaidSummaryText()} />
+            <SummaryItem label="پارەی دراو" value={getPaidSummaryTextJSX()} />
             <SummaryItem
               label="ماوەی دابینکەر"
-              value={formatCurrencyMap(supplierRemainingByCurrency)}
+              value={formatCurrencyMapJSX(supplierRemainingByCurrency)}
               strong
             />
           </div>
@@ -3480,7 +3488,7 @@ function SummaryItem({
   strong,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   strong?: boolean;
 }) {
   return (
