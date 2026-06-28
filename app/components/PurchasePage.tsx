@@ -2445,9 +2445,6 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                                 }}
                                                 onClick={() => {
                                                   setShowPrevPrice(true);
-                                                  updateRow(row.id, {
-                                                    purchasePrice: String(prevPurchase.price),
-                                                  });
                                                 }}
                                               >
                                                 پیشاندان
