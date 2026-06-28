@@ -2318,7 +2318,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                           {isDetailOpen && (
                             <tr key={`${row.id}-details`}>
                               <td colSpan={visibleColumnCount} style={{ padding: "8px 12px", background: "#f8fafc", borderBottom: "1px solid #eef2f7" }}>
-                                <div style={{ ...detailPanel, marginTop: 0, maxWidth: "100%" }}>
+                                <div style={{ ...detailPanel, marginTop: 0 }}>
                                   <div style={detailTitle}>{row.productName}</div>
 
                                   <div style={detailGrid}>
@@ -2427,63 +2427,43 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                       />
                                     </Field>
 
-                                    <Field label="دابینکەر (بۆ نرخی پێشوو)">
-                                      <select
-                                        value={detailSupplierId || ""}
-                                        onChange={(e) =>
-                                          setDetailSupplierId(
-                                            e.target.value
-                                              ? Number(e.target.value)
-                                              : undefined
-                                          )
-                                        }
-                                        style={{
-                                          ...compactInput,
-                                        }}
-                                      >
-                                        <option value="">هەڵبژێرە...</option>
-                                        {purchaseAccounts.map((acc: any) => (
-                                          <option key={acc.id} value={acc.id}>
-                                            {acc.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </Field>
+                                    {(() => {
+                                      if (!supplierId) return null;
+                                      const prevPurchase = getPreviousPurchasePrice(row.productId, supplierId);
+                                      if (!prevPurchase) return null;
 
-                                    <Field label="نرخی پێشوو">
-                                      {showPrevPrice ? (
-                                        <div style={compactReadonlyBox}>
-                                          {(() => {
-                                            const prevPurchase = getPreviousPurchasePrice(row.productId, detailSupplierId);
-                                            return prevPurchase
-                                              ? formatCurrencyAmount(
-                                                  prevPurchase.price,
-                                                  prevPurchase.currencyId
-                                                )
-                                              : "نییە";
-                                          })()}
-                                        </div>
-                                      ) : (
-                                        <button
-                                          style={{
-                                            borderRadius: 8,
-                                            border: 0,
-                                            background: "#2563eb",
-                                            color: "white",
-                                            padding: "6px 12px",
-                                            fontWeight: 800,
-                                            cursor: "pointer",
-                                            fontFamily: appFont,
-                                            width: "100%",
-                                            fontSize: 12,
-                                            minHeight: 30,
-                                          }}
-                                          onClick={() => setShowPrevPrice(true)}
-                                        >
-                                          پیشاندان
-                                        </button>
-                                      )}
-                                    </Field>
+                                      return (
+                                        <Field label="نرخی پێشوو">
+                                          {showPrevPrice ? (
+                                            <div style={compactReadonlyBox}>
+                                              {formatCurrencyAmount(
+                                                prevPurchase.price,
+                                                prevPurchase.currencyId
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <button
+                                              style={{
+                                                borderRadius: 8,
+                                                border: 0,
+                                                background: "#2563eb",
+                                                color: "white",
+                                                padding: "6px 12px",
+                                                fontWeight: 800,
+                                                cursor: "pointer",
+                                                fontFamily: appFont,
+                                                width: "100%",
+                                                fontSize: 12,
+                                                minHeight: 30,
+                                              }}
+                                              onClick={() => setShowPrevPrice(true)}
+                                            >
+                                              پیشاندان
+                                            </button>
+                                          )}
+                                        </Field>
+                                      );
+                                    })()}
                                   </div>
 
                                   <div style={{ marginTop: 8 }}>
