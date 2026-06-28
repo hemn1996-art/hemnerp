@@ -2428,38 +2428,49 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                     </Field>
 
                                     {(() => {
-                                      if (!supplierId) return null;
-                                      const prevPurchase = getPreviousPurchasePrice(row.productId, supplierId);
-                                      if (!prevPurchase) return null;
+                                      const prevPurchase = supplierId
+                                        ? getPreviousPurchasePrice(row.productId, supplierId)
+                                        : null;
 
                                       return (
                                         <Field label="نرخی پێشوو">
-                                          {showPrevPrice ? (
-                                            <div style={compactReadonlyBox}>
-                                              {formatCurrencyAmount(
-                                                prevPurchase.price,
-                                                prevPurchase.currencyId
-                                              )}
-                                            </div>
+                                          {prevPurchase ? (
+                                            showPrevPrice ? (
+                                              <div style={compactReadonlyBox}>
+                                                {formatCurrencyAmount(
+                                                  prevPurchase.price,
+                                                  prevPurchase.currencyId
+                                                )}
+                                              </div>
+                                            ) : (
+                                              <button
+                                                style={{
+                                                  borderRadius: 8,
+                                                  border: 0,
+                                                  background: "#2563eb",
+                                                  color: "white",
+                                                  padding: "6px 12px",
+                                                  fontWeight: 800,
+                                                  cursor: "pointer",
+                                                  fontFamily: appFont,
+                                                  width: "100%",
+                                                  fontSize: 12,
+                                                  minHeight: 30,
+                                                }}
+                                                onClick={() => {
+                                                  setShowPrevPrice(true);
+                                                  updateRow(row.id, {
+                                                    purchasePrice: String(prevPurchase.price),
+                                                  });
+                                                }}
+                                              >
+                                                پیشاندان
+                                              </button>
+                                            )
                                           ) : (
-                                            <button
-                                              style={{
-                                                borderRadius: 8,
-                                                border: 0,
-                                                background: "#2563eb",
-                                                color: "white",
-                                                padding: "6px 12px",
-                                                fontWeight: 800,
-                                                cursor: "pointer",
-                                                fontFamily: appFont,
-                                                width: "100%",
-                                                fontSize: 12,
-                                                minHeight: 30,
-                                              }}
-                                              onClick={() => setShowPrevPrice(true)}
-                                            >
-                                              پیشاندان
-                                            </button>
+                                            <div style={compactReadonlyBox}>
+                                              نییە
+                                            </div>
                                           )}
                                         </Field>
                                       );
