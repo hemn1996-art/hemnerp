@@ -68,8 +68,8 @@ export default function StockReportPage() {
     quantity: true,
     purchasePrice: true,
     expense: true,
-    cost: false,
-    warehouseValue: false,
+    cost: true,
+    warehouseValue: true,
     sellerName: true,
     purchaseDate: true,
   };
