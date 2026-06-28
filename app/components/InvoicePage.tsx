@@ -201,7 +201,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, []);
 
   useEffect(() => {
-    setInvoiceNumber(Date.now().toString().slice(-6));
+    setInvoiceNumber("");
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
         hour: "2-digit",
@@ -1321,7 +1321,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       router.push("/invoices?type=sales");
       return; // The route change will remount the component with editId=undefined
     }
-    setInvoiceNumber(Date.now().toString().slice(-6));
+    setInvoiceNumber("");
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
         hour: "2-digit",

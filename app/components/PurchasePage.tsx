@@ -189,7 +189,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   useEffect(() => {
     if (!editId) {
-      setInvoiceNumber(Date.now().toString().slice(-6));
+      setInvoiceNumber("");
       setCreatedTime(
         new Date().toLocaleTimeString("en-US", {
           hour: "2-digit",
@@ -1422,7 +1422,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       router.push("/invoices?type=purchase");
       return; // The route change will remount the component with editId=undefined
     }
-    setInvoiceNumber(Date.now().toString().slice(-6));
+    setInvoiceNumber("");
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
         hour: "2-digit",
