@@ -1443,7 +1443,12 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setPaidAmounts({});
     setPurchaseCurrencyId(defaultCurrency.id);
     setPaidCurrencyId(defaultCurrency.id);
-    setExchangeRate("150000");
+    const iqd = currencies.find((c: any) => c.code === "IQD");
+    if (iqd && iqd.rate) {
+      setExchangeRate(String(iqd.rate * 100));
+    } else {
+      setExchangeRate("150000");
+    }
     setManualExpenseTotal("");
     setIsExpenseTotalManual(false);
     setExpenseGeneralNote("");

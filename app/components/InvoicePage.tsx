@@ -1346,6 +1346,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setShowInvoiceDiscount(false);
     setPaidAmounts({});
     setPaidCurrencyId(defaultCurrency.id);
+    const iqd = currencies.find((c: any) => c.code === "IQD");
+    if (iqd && iqd.rate) {
+      setExchangeRate(String(iqd.rate * 100));
+    } else {
+      setExchangeRate("150000");
+    }
     setInternalNote("");
     setPrintNote("");
     setShowInvoiceNotes(false);

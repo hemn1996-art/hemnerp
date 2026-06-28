@@ -794,7 +794,12 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     setShowAccountList(false);
     setPaidAmounts({});
     setPaidCurrencyId(defaultCurrency.id);
-    setExchangeRate("150000");
+    const iqd = currencies.find((c: any) => c.code === "IQD");
+    if (iqd && iqd.rate) {
+      setExchangeRate(String(iqd.rate * 100));
+    } else {
+      setExchangeRate("150000");
+    }
     setReceiptNote("");
     setPrintNote("");
     setShowNotes(false);

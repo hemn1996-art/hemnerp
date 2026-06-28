@@ -33,6 +33,15 @@ export default function CurrencyExchangePage() {
   
   const [cashboxId, setCashboxId] = useState("");
   const [rate, setRate] = useState("150000");
+
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD" || c.name.includes("دینار"));
+      if (iqd && iqd.rate) {
+        setRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
   
   const iqdCurrency = currencies.find(c => c.code === "IQD" || c.name.includes("دینار"));
   const usdCurrency = currencies.find(c => c.code === "USD" || c.name.includes("دۆلار"));
@@ -170,6 +179,12 @@ export default function CurrencyExchangePage() {
     setToAmount("");
     setIsNoteEdited(false);
     setCashboxId("");
+    const iqd = currencies.find((c: any) => c.code === "IQD" || c.name.includes("دینار"));
+    if (iqd && iqd.rate) {
+      setRate(String(iqd.rate * 100));
+    } else {
+      setRate("150000");
+    }
   }
 
   // Handle Edit Click
