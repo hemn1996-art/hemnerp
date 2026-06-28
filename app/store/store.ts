@@ -302,6 +302,8 @@ export const useStore = create<StoreState>((set, get) => ({
             exchangeRate: v.exchangeRate,
             employeeName: v.employeeName,
             versions: v.versions || [],
+            lines: v.lines || [],
+            items: v.lines || [],
           };
         });
 

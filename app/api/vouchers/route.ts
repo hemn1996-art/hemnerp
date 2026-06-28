@@ -105,7 +105,7 @@ export async function GET(request: Request) {
           orderBy: { version: "desc" as const },
         },
       },
-      orderBy: { date: "desc" },
+      orderBy: [{ date: "desc" }, { id: "desc" }],
     });
 
     return NextResponse.json(vouchers);

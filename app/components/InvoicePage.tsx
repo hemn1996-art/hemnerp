@@ -2,6 +2,7 @@
 import DateInput from "./DateInput";
 import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
+import { useRouter } from "next/navigation";
 
 import {
   useEffect,
@@ -125,6 +126,7 @@ const fallbackWarehouses = [
 ];
 
 export default function InvoicePage({ headerSelector, invoiceType, editId }: Props) {
+  const router = useRouter();
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
 
   useEffect(() => {
@@ -1314,6 +1316,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function resetInvoice() {
+    // Clear editId from URL so the component exits edit mode
+    if (editId) {
+      router.push("/invoices?type=sales");
+      return; // The route change will remount the component with editId=undefined
+    }
     setInvoiceNumber(Date.now().toString().slice(-6));
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {

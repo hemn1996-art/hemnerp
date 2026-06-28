@@ -2,11 +2,13 @@
 import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";
+import { useRouter } from "next/navigation";
 
 import {
   useEffect,
   useMemo,
   useState,
+  Fragment,
   type CSSProperties,
   type ReactNode,
 } from "react";
@@ -114,9 +116,12 @@ type PrintOptions = {
 
 
 export default function PurchasePage({headerSelector,  invoiceType = "کڕین", editId }: Props) {
+  const router = useRouter();
   const accounts = useStore((s) => s.accounts) || [];
   const cashboxes = useStore((s) => s.cashboxes) || [];
   const products = useStore((s) => s.products) || [];
+  const invoices = useStore((s) => s.invoices) || [];
+  const fetchInvoices = useStore((s) => s.fetchInvoices);
   const addVoucher = useStore((s) => s.addVoucher);
   const updateVoucher = useStore((s) => s.updateVoucher);
   const fetchProducts = useStore((s) => s.fetchProducts);
@@ -175,6 +180,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     if (warehousesFromStore.length === 0) fetchWarehouses();
     if (accountTypesStore.length === 0) fetchAccountTypes();
     if (storeCurrencies.length === 0) fetchCurrencies();
+    if (invoices.length === 0) fetchInvoices();
   }, []);
 
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -351,6 +357,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const [openedDetailRowId, setOpenedDetailRowId] = useState<number | null>(
     null
   );
+  const [detailSupplierId, setDetailSupplierId] = useState<number | undefined>();
+  const [showPrevPrice, setShowPrevPrice] = useState(false);
 
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [expenseSearches, setExpenseSearches] = useState<Record<number, string>>({});
@@ -1154,7 +1162,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       productName: product.name,
       code: product.code || "",
       qty: "1",
-      purchasePrice: String(product.purchasePrice || product.costPrice || 0),
+      purchasePrice: "",
       discount: "",
       note: "",
       packageName: firstPackage.name,
@@ -1201,6 +1209,32 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       packageName,
       packageQuantity: selectedPackage?.quantity || 1,
     });
+  }
+
+  function getPreviousPurchasePrice(productId: number, supplierAccountId?: number) {
+    if (!supplierAccountId) return undefined;
+
+    const reversed = [...invoices].reverse();
+
+    for (const invoice of reversed) {
+      if (invoice.rawType !== "purchase" && invoice.type !== "کڕین") continue;
+      if (invoice.accountId !== supplierAccountId) continue;
+
+      const foundLine = invoice.lines?.find(
+        (line: any) => line.productId === productId
+      ) || invoice.items?.find(
+        (item: any) => item.productId === productId
+      );
+
+      if (foundLine) {
+        return {
+          price: Number(foundLine.unitPrice || foundLine.price || 0),
+          currencyId: foundLine.currencyId || invoice.currencyId || 5,
+        };
+      }
+    }
+
+    return undefined;
   }
 
   function addExpense() {
@@ -1383,6 +1417,11 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   }
 
   function resetInvoice() {
+    // Clear editId from URL so the component exits edit mode
+    if (editId) {
+      router.push("/invoices?type=purchase");
+      return; // The route change will remount the component with editId=undefined
+    }
     setInvoiceNumber(Date.now().toString().slice(-6));
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
@@ -2129,288 +2168,358 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       </td>
                     </tr>
                   ) : (
-                    rows.map((row, index) => (
-                      <tr key={row.id}>
-                        <td style={tdCenter}>{index + 1}</td>
+                    rows.map((row, index) => {
+                      const isDetailOpen = openedDetailRowId === row.id;
+                      return (
+                        <Fragment key={row.id}>
+                          <tr>
+                            <td style={tdCenter}>{index + 1}</td>
 
-                        {tableColumns.product && (
-                          <td style={tdWide}>
-                            <div
-                              onClick={() =>
-                                setOpenedDetailRowId(
-                                  openedDetailRowId === row.id ? null : row.id
-                                )
-                              }
-                              style={productNameBlock}
-                            >
-                              <strong>{row.productName}</strong>
-                              <div style={smallMuted}>
-                                {row.packageName} / {row.warehouseName} /{" "}
-                                {getCurrencySymbol(row.currencyId)}
-                              </div>
-                              {row.note && (
-                                <div style={itemNote}>{row.note}</div>
-                              )}
-                            </div>
-
-                            {openedDetailRowId === row.id && (
-                              <div style={detailPanel}>
-                                <div style={detailTitle}>{row.productName}</div>
-
-                                <div style={detailGrid}>
-                                  <Field label="پێچانەوە">
-                                    <select
-                                      value={row.packageName}
-                                      disabled={isLocked}
-                                      onChange={(e) =>
-                                        changeRowPackage(row, e.target.value)
-                                      }
-                                      style={{
-                                        ...compactInput,
-                                        ...lockedFieldStyle,
-                                      }}
-                                    >
-                                      {getProductPackages(
-                                        products.find(
-                                          (p: any) => p.id === row.productId
-                                        )
-                                      ).map((pkg) => (
-                                        <option
-                                          key={pkg.name}
-                                          value={pkg.name}
-                                        >
-                                          {pkg.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </Field>
-
-                                  <Field label="کۆگا">
-                                    <select
-                                      value={row.warehouseName}
-                                      disabled={isLocked}
-                                      onChange={(e) =>
-                                        updateRow(row.id, {
-                                          warehouseName: e.target.value,
-                                        })
-                                      }
-                                      style={{
-                                        ...compactInput,
-                                        ...lockedFieldStyle,
-                                      }}
-                                    >
-                                      {warehouses.map((warehouse: any) => (
-                                        <option
-                                          key={warehouse.id}
-                                          value={warehouse.name}
-                                        >
-                                          {warehouse.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </Field>
-
-                                  <Field label="دانەی بەردەست">
-                                    <div style={compactReadonlyBox}>
-                                      {row.oldStock} دانە
-                                    </div>
-                                  </Field>
-
-                                  <Field label="دوای کڕین">
-                                    <div style={compactReadonlyBox}>
-                                      {row.oldStock + getRowUnits(row)} دانە
-                                    </div>
-                                  </Field>
-
-                                  <Field label="دراوی کەرەستە">
-                                    <select
-                                      value={row.currencyId}
-                                      disabled={isLocked}
-                                      onChange={(e) =>
-                                        updateRow(row.id, {
-                                          currencyId: Number(e.target.value),
-                                        })
-                                      }
-                                      style={{
-                                        ...compactInput,
-                                        ...lockedFieldStyle,
-                                      }}
-                                    >
-                                      {currencies.map((currency: any) => (
-                                        <option
-                                          key={currency.id}
-                                          value={currency.id}
-                                        >
-                                          {currency.name} ({currency.symbol})
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </Field>
-
-                                  <Field label="نرخی کڕین">
-                                    <FormattedNumberInput
-                                      value={row.purchasePrice}
-                                      disabled={isLocked}
-                                      onChange={(val) =>
-                                        updateRow(row.id, {
-                                          purchasePrice: val,
-                                        })
-                                      }
-                                      style={{
-                                        ...compactInput,
-                                        ...lockedFieldStyle,
-                                      }}
-                                    />
-                                  </Field>
+                            {tableColumns.product && (
+                              <td style={tdWide}>
+                                <div
+                                  onClick={() => {
+                                    if (isLocked) return;
+                                    const isOpening = openedDetailRowId !== row.id;
+                                    setOpenedDetailRowId(isOpening ? row.id : null);
+                                    if (isOpening) {
+                                      setDetailSupplierId(supplierId);
+                                      setShowPrevPrice(false);
+                                    }
+                                  }}
+                                  style={productNameBlock}
+                                >
+                                  <strong>{row.productName}</strong>
+                                  <div style={smallMuted}>
+                                    {row.packageName} / {row.warehouseName} /{" "}
+                                    {getCurrencySymbol(row.currencyId)}
+                                  </div>
+                                  {row.note && (
+                                    <div style={itemNote}>{row.note}</div>
+                                  )}
                                 </div>
-
-                                <div style={{ marginTop: 8 }}>
-                                  <Field label="تێبینی">
-                                    <textarea
-                                      value={row.note}
-                                      disabled={isLocked}
-                                      onChange={(e) =>
-                                        updateRow(row.id, {
-                                          note: e.target.value,
-                                        })
-                                      }
-                                      rows={2}
-                                      style={{
-                                        ...compactTextarea,
-                                        ...lockedFieldStyle,
-                                      }}
-                                    />
-                                  </Field>
-                                </div>
-
-                                <div style={detailFooter}>
-                                  <button
-                                    style={blueSaveBtn}
-                                    onClick={() => setOpenedDetailRowId(null)}
-                                  >
-                                    تەواو
-                                  </button>
-                                </div>
-                              </div>
+                              </td>
                             )}
-                          </td>
-                        )}
 
-                        {tableColumns.code && (
-                          <td style={tdCenter}>{row.code || "-"}</td>
-                        )}
+                            {tableColumns.code && (
+                              <td style={tdCenter}>{row.code || "-"}</td>
+                            )}
 
-                        {tableColumns.qty && (
-                          <td style={tdCenter}>
-                            <input
-                              value={row.qty}
-                              disabled={isLocked}
-                              onChange={(e) =>
-                                updateRow(row.id, {
-                                  qty: onlyDecimal(e.target.value),
-                                })
-                              }
-                              inputMode="decimal"
-                              lang="en"
-                              dir="ltr"
-                              style={{ ...smallInput, ...lockedFieldStyle }}
-                            />
-                          </td>
-                        )}
+                            {tableColumns.qty && (
+                              <td style={tdCenter}>
+                                <input
+                                  value={row.qty}
+                                  disabled={isLocked}
+                                  onChange={(e) =>
+                                    updateRow(row.id, {
+                                      qty: onlyDecimal(e.target.value),
+                                    })
+                                  }
+                                  inputMode="decimal"
+                                  lang="en"
+                                  dir="ltr"
+                                  style={{ ...smallInput, ...lockedFieldStyle }}
+                                />
+                              </td>
+                            )}
 
-                        {tableColumns.purchasePrice && (
-                          <td style={tdCenter}>
-                            <FormattedNumberInput
-                              value={row.purchasePrice}
-                              disabled={isLocked}
-                              onChange={(val) =>
-                                updateRow(row.id, {
-                                  purchasePrice: val,
-                                })
-                              }
-                              style={{ ...smallInput, ...lockedFieldStyle }}
-                            />
-                          </td>
-                        )}
+                            {tableColumns.purchasePrice && (
+                              <td style={tdCenter}>
+                                <FormattedNumberInput
+                                  value={row.purchasePrice}
+                                  disabled={isLocked}
+                                  onChange={(val) =>
+                                    updateRow(row.id, {
+                                      purchasePrice: val,
+                                    })
+                                  }
+                                  style={{ ...smallInput, ...lockedFieldStyle }}
+                                />
+                              </td>
+                            )}
 
-                        {tableColumns.expense && (
-                          <td style={tdCenter}>
-                            {expenseAllocationMode === "manual" ? (
-                              <FormattedNumberInput
-                                value={row.manualExpensePerUnit}
-                                disabled={isLocked}
-                                onChange={(val) =>
-                                  updateRow(row.id, {
-                                    manualExpensePerUnit: val,
-                                  })
-                                }
-                                style={{ ...smallInput, ...lockedFieldStyle }}
-                              />
-                            ) : (
-                              <strong>
-                                {formatCurrencyAmountJSX(
-                                  getAllocatedExpensePerUnitInRowCurrency(row),
-                                  row.currencyId
+                            {tableColumns.expense && (
+                              <td style={tdCenter}>
+                                {expenseAllocationMode === "manual" ? (
+                                  <FormattedNumberInput
+                                    value={row.manualExpensePerUnit}
+                                    disabled={isLocked}
+                                    onChange={(val) =>
+                                      updateRow(row.id, {
+                                        manualExpensePerUnit: val,
+                                      })
+                                    }
+                                    style={{ ...smallInput, ...lockedFieldStyle }}
+                                  />
+                                ) : (
+                                  <strong>
+                                    {formatCurrencyAmountJSX(
+                                      getAllocatedExpensePerUnitInRowCurrency(row),
+                                      row.currencyId
+                                    )}
+                                  </strong>
                                 )}
-                              </strong>
+                              </td>
                             )}
-                          </td>
-                        )}
 
-                        {tableColumns.cost && (
-                          <td style={tdCenter}>
-                            <strong>
-                              {formatCurrencyAmountJSX(
-                                getFinalCostPerUnitInRowCurrency(row),
-                                row.currencyId
-                              )}
-                            </strong>
-                          </td>
-                        )}
+                            {tableColumns.cost && (
+                              <td style={tdCenter}>
+                                <strong>
+                                  {formatCurrencyAmountJSX(
+                                    getFinalCostPerUnitInRowCurrency(row),
+                                    row.currencyId
+                                  )}
+                                </strong>
+                              </td>
+                            )}
 
-                        {tableColumns.discount && (
-                          <td style={tdCenter}>
-                            <FormattedNumberInput
-                              value={row.discount}
-                              disabled={isLocked}
-                              onChange={(val) =>
-                                updateRow(row.id, {
-                                  discount: val,
-                                })
-                              }
-                              style={{ ...smallInput, ...lockedFieldStyle }}
-                            />
-                          </td>
-                        )}
+                            {tableColumns.discount && (
+                              <td style={tdCenter}>
+                                <FormattedNumberInput
+                                  value={row.discount}
+                                  disabled={isLocked}
+                                  onChange={(val) =>
+                                    updateRow(row.id, {
+                                      discount: val,
+                                    })
+                                  }
+                                  style={{ ...smallInput, ...lockedFieldStyle }}
+                                />
+                              </td>
+                            )}
 
-                        {tableColumns.total && (
-                          <td style={tdCenter}>
-                            <strong>
-                              {formatCurrencyAmountJSX(
-                                getRowTotalInOwnCurrency(row),
-                                row.currencyId
-                              )}
-                            </strong>
-                          </td>
-                        )}
+                            {tableColumns.total && (
+                              <td style={tdCenter}>
+                                <strong>
+                                  {formatCurrencyAmountJSX(
+                                    getRowTotalInOwnCurrency(row),
+                                    row.currencyId
+                                  )}
+                                </strong>
+                              </td>
+                            )}
 
-                        {tableColumns.action && (
-                          <td style={tdCenter}>
-                            <button
-                              style={{
-                                ...deleteBtn,
-                                opacity: isLocked ? 0.45 : 1,
-                                cursor: isLocked ? "not-allowed" : "pointer",
-                              }}
-                              disabled={isLocked}
-                              onClick={() => removeRow(row.id)}
-                            >
-                              سڕینەوە
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))
+                            {tableColumns.action && (
+                              <td style={tdCenter}>
+                                <button
+                                  style={{
+                                    ...deleteBtn,
+                                    opacity: isLocked ? 0.45 : 1,
+                                    cursor: isLocked ? "not-allowed" : "pointer",
+                                  }}
+                                  disabled={isLocked}
+                                  onClick={() => removeRow(row.id)}
+                                >
+                                  سڕینەوە
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                          {isDetailOpen && (
+                            <tr key={`${row.id}-details`}>
+                              <td colSpan={visibleColumnCount} style={{ padding: "8px 12px", background: "#f8fafc", borderBottom: "1px solid #eef2f7" }}>
+                                <div style={{ ...detailPanel, marginTop: 0, maxWidth: "100%" }}>
+                                  <div style={detailTitle}>{row.productName}</div>
+
+                                  <div style={detailGrid}>
+                                    <Field label="پێچانەوە">
+                                      <select
+                                        value={row.packageName}
+                                        disabled={isLocked}
+                                        onChange={(e) =>
+                                          changeRowPackage(row, e.target.value)
+                                        }
+                                        style={{
+                                          ...compactInput,
+                                          ...lockedFieldStyle,
+                                        }}
+                                      >
+                                        {getProductPackages(
+                                          products.find(
+                                            (p: any) => p.id === row.productId
+                                          )
+                                        ).map((pkg) => (
+                                          <option
+                                            key={pkg.name}
+                                            value={pkg.name}
+                                          >
+                                            {pkg.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </Field>
+
+                                    <Field label="کۆگا">
+                                      <select
+                                        value={row.warehouseName}
+                                        disabled={isLocked}
+                                        onChange={(e) =>
+                                          updateRow(row.id, {
+                                            warehouseName: e.target.value,
+                                          })
+                                        }
+                                        style={{
+                                          ...compactInput,
+                                          ...lockedFieldStyle,
+                                        }}
+                                      >
+                                        {warehouses.map((warehouse: any) => (
+                                          <option
+                                            key={warehouse.id}
+                                            value={warehouse.name}
+                                          >
+                                            {warehouse.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </Field>
+
+                                    <Field label="دانەی بەردەست">
+                                      <div style={compactReadonlyBox}>
+                                        {row.oldStock} دانە
+                                      </div>
+                                    </Field>
+
+                                    <Field label="دوای کڕین">
+                                      <div style={compactReadonlyBox}>
+                                        {row.oldStock + getRowUnits(row)} دانە
+                                      </div>
+                                    </Field>
+
+                                    <Field label="دراوی کەرەستە">
+                                      <select
+                                        value={row.currencyId}
+                                        disabled={isLocked}
+                                        onChange={(e) =>
+                                          updateRow(row.id, {
+                                            currencyId: Number(e.target.value),
+                                          })
+                                        }
+                                        style={{
+                                          ...compactInput,
+                                          ...lockedFieldStyle,
+                                        }}
+                                      >
+                                        {currencies.map((currency: any) => (
+                                          <option
+                                            key={currency.id}
+                                            value={currency.id}
+                                          >
+                                            {currency.name} ({currency.symbol})
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </Field>
+
+                                    <Field label="نرخی کڕین">
+                                      <FormattedNumberInput
+                                        value={row.purchasePrice}
+                                        disabled={isLocked}
+                                        onChange={(val) =>
+                                          updateRow(row.id, {
+                                            purchasePrice: val,
+                                          })
+                                        }
+                                        style={{
+                                          ...compactInput,
+                                          ...lockedFieldStyle,
+                                        }}
+                                      />
+                                    </Field>
+
+                                    <Field label="دابینکەر (بۆ نرخی پێشوو)">
+                                      <select
+                                        value={detailSupplierId || ""}
+                                        onChange={(e) =>
+                                          setDetailSupplierId(
+                                            e.target.value
+                                              ? Number(e.target.value)
+                                              : undefined
+                                          )
+                                        }
+                                        style={{
+                                          ...compactInput,
+                                        }}
+                                      >
+                                        <option value="">هەڵبژێرە...</option>
+                                        {purchaseAccounts.map((acc: any) => (
+                                          <option key={acc.id} value={acc.id}>
+                                            {acc.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </Field>
+
+                                    <Field label="نرخی پێشوو">
+                                      {showPrevPrice ? (
+                                        <div style={compactReadonlyBox}>
+                                          {(() => {
+                                            const prevPurchase = getPreviousPurchasePrice(row.productId, detailSupplierId);
+                                            return prevPurchase
+                                              ? formatCurrencyAmount(
+                                                  prevPurchase.price,
+                                                  prevPurchase.currencyId
+                                                )
+                                              : "نییە";
+                                          })()}
+                                        </div>
+                                      ) : (
+                                        <button
+                                          style={{
+                                            borderRadius: 8,
+                                            border: 0,
+                                            background: "#2563eb",
+                                            color: "white",
+                                            padding: "6px 12px",
+                                            fontWeight: 800,
+                                            cursor: "pointer",
+                                            fontFamily: appFont,
+                                            width: "100%",
+                                            fontSize: 12,
+                                            minHeight: 30,
+                                          }}
+                                          onClick={() => setShowPrevPrice(true)}
+                                        >
+                                          پیشاندان
+                                        </button>
+                                      )}
+                                    </Field>
+                                  </div>
+
+                                  <div style={{ marginTop: 8 }}>
+                                    <Field label="تێبینی">
+                                      <textarea
+                                        value={row.note}
+                                        disabled={isLocked}
+                                        onChange={(e) =>
+                                          updateRow(row.id, {
+                                            note: e.target.value,
+                                          })
+                                        }
+                                        rows={2}
+                                        style={{
+                                          ...compactTextarea,
+                                          ...lockedFieldStyle,
+                                        }}
+                                      />
+                                    </Field>
+                                  </div>
+
+                                  <div style={detailFooter}>
+                                    <button
+                                      style={blueSaveBtn}
+                                      onClick={() => setOpenedDetailRowId(null)}
+                                    >
+                                      تەواو
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
