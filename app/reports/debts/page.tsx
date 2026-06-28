@@ -1,7 +1,7 @@
 "use client";
 
 import MultiSelectDropdown from "../../components/MultiSelectDropdown";
-import { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { store, useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
 import PrintHeader from "../../components/PrintHeader";
@@ -53,17 +53,24 @@ export default function DebtReportPage() {
 
   const cityOptions = Array.from(new Set(accounts.map((a: any) => a.city).filter(Boolean))) as string[];
 
-  const formatMoney = (val: number, curId: number) => {
+  const formatMoneyJSX = (val: number, curId: number) => {
     const currencyObj = currencies?.find((c: any) => c.id === curId);
     const isRounding = currencyObj ? currencyObj.rounding : false;
-    const formatted = Math.abs(val).toLocaleString("en-US", {
+    const absVal = Math.abs(val);
+    const formatted = absVal.toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: isRounding ? 0 : 2
     });
-    if (currencyObj?.code === "IQD" || curId === 12) {
-      return `دینار ${formatted}`;
-    }
-    return `$ ${formatted}`;
+    const symbol = currencyObj?.code === "IQD" || curId === 12 ? "دینار" : "$";
+    const isNegative = val < 0;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "4px" }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span>{symbol}</span>
+        <span>{formatted}</span>
+      </span>
+    );
   };
 
   const renderBalance = (map: Record<string, number>) => {
@@ -75,8 +82,8 @@ export default function DebtReportPage() {
           const curId = Number(curIdText);
           const color = val > 0 ? "text-green-600" : val < 0 ? "text-red-500" : "text-gray-700";
           return (
-            <span key={curIdText} className={`font-black ${color}`} dir="ltr">
-              {val < 0 ? "-" : ""}{formatMoney(val, curId)}
+            <span key={curIdText} className={`font-black ${color}`}>
+              {formatMoneyJSX(val, curId)}
             </span>
           );
         })}
@@ -179,20 +186,22 @@ export default function DebtReportPage() {
     return map;
   }, [data]);
 
-  const formatTotalOverall = (map: Record<string, number>) => {
+  const formatTotalOverallJSX = (map: Record<string, number>) => {
     const entries = Object.entries(map).filter(([, val]) => Math.abs(val) > 0.01);
-    if (entries.length === 0) return "0";
-    return entries.map(([curIdText, val]) => {
-      const curId = Number(curIdText);
-      const absVal = Math.abs(val);
-      const isRounding = currencies?.find((c: any) => c.id === curId)?.rounding ?? false;
-      const formattedNum = absVal.toLocaleString("en-US", {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: isRounding ? 0 : 2
-      });
-      const symbol = curId === 12 || currencies?.find((c: any) => c.id === curId)?.code === "IQD" ? "دینار" : "$";
-      return `${symbol} ${formattedNum}`;
-    }).join(" + ");
+    if (entries.length === 0) return <span className="text-gray-500 font-bold">0</span>;
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "8px" }} dir="ltr">
+        {entries.map(([curIdText, val], index) => {
+          const curId = Number(curIdText);
+          return (
+            <React.Fragment key={curIdText}>
+              {index > 0 && <span className="text-gray-400">+</span>}
+              {formatMoneyJSX(val, curId)}
+            </React.Fragment>
+          );
+        })}
+      </span>
+    );
   };
 
   return (
@@ -281,7 +290,7 @@ export default function DebtReportPage() {
          {showReportStats && (
            <div className="animate-in fade-in duration-200">
              <div className="text-sm text-gray-500">گشتی قەرز ({filterDebtType === "people" ? "قەرزی خەڵک" : "قەرزی من"})</div>
-              <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>{formatTotalOverall(totalOverallByCurrency)}</div>
+              <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>{formatTotalOverallJSX(totalOverallByCurrency)}</div>
            </div>
          )}
       </div>
@@ -326,7 +335,7 @@ export default function DebtReportPage() {
                     {visibleColumns.district && <td className="p-3 text-sm text-gray-600">{item.district}</td>}
                     {visibleColumns.creditLimitExceeded && <td className="p-3 text-sm text-gray-500">نەخێر</td>}
                     {visibleColumns.debtBeforeLastPayment && <td className="p-3 text-sm font-semibold text-gray-700">{renderBalance(item.debtBeforeLastPaymentByCurrency)}</td>}
-                    {visibleColumns.lastPaymentAmount && <td className="p-3 text-sm font-semibold text-gray-700" dir="ltr">{item.lastPaymentAmount > 0 ? formatMoney(item.lastPaymentAmount, item.lastPaymentCurrencyId) : "—"}</td>}
+                    {visibleColumns.lastPaymentAmount && <td className="p-3 text-sm font-semibold text-gray-700">{item.lastPaymentAmount > 0 ? formatMoneyJSX(item.lastPaymentAmount, item.lastPaymentCurrencyId) : "—"}</td>}
                     {visibleColumns.lastPaymentDate && <td className="p-3 text-sm text-gray-600">{item.lastPaymentDate ? new Date(item.lastPaymentDate).toLocaleDateString() : "نییە"}</td>}
                     {visibleColumns.totalDebt && <td className="p-3 text-sm font-black">{renderBalance(item.balanceByCurrency)}</td>}
                   </tr>
