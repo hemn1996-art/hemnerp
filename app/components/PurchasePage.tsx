@@ -190,14 +190,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   useEffect(() => {
     if (!editId) {
-      setInvoiceNumber("");
-      setCreatedTime(
-        new Date().toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
-      setInvoiceDate(new Date().toISOString().slice(0, 10));
+      resetInvoice();
     }
   }, [editId]);
 

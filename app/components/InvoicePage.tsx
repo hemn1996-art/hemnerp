@@ -134,6 +134,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setIsEditLoading(!!editId);
     if (editId) {
       setSavedInvoiceSnapshot("");
+    } else {
+      resetInvoice();
     }
   }, [editId]);
 

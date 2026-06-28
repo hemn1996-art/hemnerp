@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";
@@ -98,6 +99,7 @@ type Props = {
 };
 
 export default function SalesReturnPage({ headerSelector, editId }: Props) {
+  const router = useRouter();
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
 
   useEffect(() => {
@@ -170,14 +172,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
   useEffect(() => {
     if (!editId) {
-      setInvoiceNumber(Date.now().toString().slice(-6));
-      setCreatedTime(
-        new Date().toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
-      setInvoiceDate(new Date().toISOString().slice(0, 10));
+      resetInvoice();
     }
   }, [editId]);
 
@@ -1128,7 +1123,11 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
   }
 
   function resetInvoice() {
-    setInvoiceNumber(Date.now().toString().slice(-6));
+    if (editId) {
+      router.push("/invoices?type=sales_return");
+      return;
+    }
+    setInvoiceNumber("");
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
         hour: "2-digit",
