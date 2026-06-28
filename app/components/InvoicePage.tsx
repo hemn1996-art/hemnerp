@@ -1961,12 +1961,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 {getCurrencySymbol(selectedAccount.creditLimitCurrencyId)}
               </InfoRow>
 
-              <InfoRow label="قەرزی پێشوو">
+              <InfoRow label="قەرز">
                 {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
-              </InfoRow>
-
-              <InfoRow label="کۆی گشتی ماوە">
-                {formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
               </InfoRow>
 
               <InfoRow label="ئاگاداری دواکەوتن">

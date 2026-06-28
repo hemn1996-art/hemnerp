@@ -1896,12 +1896,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                 {supplier.address || "-"}
               </InfoRow>
 
-              <InfoRow label="قەرزی پێشوو">
+              <InfoRow label="قەرز">
                 {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
-              </InfoRow>
-
-              <InfoRow label="کۆی گشتی ماوە">
-                {formatCurrencyMapWithColors(screenAccountBalanceAfterByCurrency)}
               </InfoRow>
             </div>
           )}
