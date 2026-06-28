@@ -95,7 +95,7 @@ export async function GET(request: Request) {
       }),
       prisma.inventoryTransaction.findMany({
         where: endDate ? { date: { lte: dateFilter.lte } } : undefined,
-        select: { productId: true, qtyChange: true, unitCost: true, warehouseId: true }
+        select: { productId: true, qtyChange: true, unitCost: true, warehouseId: true, product: { select: { isMultiBatch: true } } }
       }),
       prisma.product.findMany(),
       prisma.account.findMany()
@@ -140,16 +140,30 @@ export async function GET(request: Request) {
     let totalGifts = 0;
     let totalLosses = 0;
 
-    // Calculate the latest purchase cost for every product
-    const productCosts: Record<number, number> = {};
-    inventoryTrans.forEach((t) => {
+    // Calculate the cost for every product
+    const productPurchaseStats: Record<number, { totalValue: number, totalQty: number, latestCost: number, isMultiBatch: boolean }> = {};
+    inventoryTrans.forEach((t: any) => {
       const matchesWarehouse = !warehouseIds || warehouseIds.includes(t.warehouseId);
       const matchesProduct = matchesProductFilters(t.productId);
       
       if (matchesWarehouse && matchesProduct && t.qtyChange > 0 && t.unitCost > 0) {
-        productCosts[t.productId] = t.unitCost;
+        if (!productPurchaseStats[t.productId]) {
+          productPurchaseStats[t.productId] = { totalValue: 0, totalQty: 0, latestCost: 0, isMultiBatch: t.product?.isMultiBatch || false };
+        }
+        productPurchaseStats[t.productId].totalValue += (t.qtyChange * t.unitCost);
+        productPurchaseStats[t.productId].totalQty += t.qtyChange;
+        productPurchaseStats[t.productId].latestCost = t.unitCost;
       }
     });
+
+    const productCosts: Record<number, number> = {};
+    for (const [pId, stats] of Object.entries(productPurchaseStats)) {
+      if (stats.isMultiBatch) {
+        productCosts[Number(pId)] = stats.latestCost;
+      } else {
+        productCosts[Number(pId)] = stats.totalQty > 0 ? (stats.totalValue / stats.totalQty) : 0;
+      }
+    }
 
     vouchers.forEach((v: any) => {
       // Apply voucher-level filters

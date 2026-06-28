@@ -44,7 +44,16 @@ export async function GET(request: Request) {
       const purchaseTx = p.inventoryTransactions
         .filter((t) => t.qtyChange > 0 && t.unitCost > 0)
         .sort((a, b) => b.id - a.id);
-      const latestCost = purchaseTx.length > 0 ? purchaseTx[0].unitCost : 0;
+      
+      let costPrice = 0;
+      if (p.isMultiBatch) {
+        costPrice = purchaseTx.length > 0 ? purchaseTx[0].unitCost : 0;
+      } else {
+        const totalValue = purchaseTx.reduce((sum, t) => sum + (t.qtyChange * t.unitCost), 0);
+        const totalQty = purchaseTx.reduce((sum, t) => sum + t.qtyChange, 0);
+        costPrice = totalQty > 0 ? (totalValue / totalQty) : 0;
+      }
+
       const hasTransactions = (p._count?.inventoryTransactions || 0) > 0 || (p._count?.voucherLines || 0) > 0;
       return {
         id: p.id,
@@ -59,7 +68,7 @@ export async function GET(request: Request) {
         isActive: p.isActive,
         createdAt: p.createdAt,
         stock: stock,
-        costPrice: latestCost,
+        costPrice: costPrice,
         isDeletable: !hasTransactions,
       };
     });
