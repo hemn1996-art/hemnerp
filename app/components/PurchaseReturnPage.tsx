@@ -1789,8 +1789,26 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                             </div>
 
                             {openedDetailRowId === row.id && (
-                              <div style={detailPanel}>
-                                <div style={detailTitle}>{row.productName}</div>
+                              <>
+                                {/* Backdrop */}
+                                <div
+                                  style={{
+                                    position: "fixed",
+                                    top: 0,
+                                    left: 0,
+                                    width: "100vw",
+                                    height: "100vh",
+                                    background: "rgba(15, 23, 42, 0.3)",
+                                    backdropFilter: "blur(2px)",
+                                    zIndex: 9998,
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenedDetailRowId(null);
+                                  }}
+                                />
+                                <div style={detailPanel} onClick={(e) => e.stopPropagation()}>
+                                  <div style={detailTitle}>{row.productName}</div>
 
                                 <div style={detailGrid}>
                                   <Field label="پێچانەوە">
@@ -1900,7 +1918,8 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                                   </button>
                                 </div>
                               </div>
-                            )}
+                            </>
+                          )}
                           </td>
                         )}
 
@@ -2627,7 +2646,7 @@ const tdWide: CSSProperties = { padding: 12, borderBottom: "1px solid #eef2f7", 
 const productNameBlock: CSSProperties = { cursor: "pointer", color: "#2563eb" };
 const itemNote: CSSProperties = { fontSize: 12, color: "#6b7280", marginTop: 3 };
 const deleteBtn: CSSProperties = { border: "1px solid #fecaca", background: "#fff1f2", color: "#dc2626", borderRadius: 10, padding: "9px 10px", fontWeight: 700, cursor: "pointer", fontFamily: appFont };
-const detailPanel: CSSProperties = { marginTop: 8, padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", background: "white", maxWidth: 360, boxShadow: "0 10px 24px rgba(15,23,42,0.18)" };
+const detailPanel: CSSProperties = { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 9999, padding: 20, borderRadius: 12, border: "1px solid #e2e8f0", background: "white", width: "90%", maxWidth: 400, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)", maxHeight: "85vh", overflowY: "auto" };
 const detailTitle: CSSProperties = { fontSize: 14, fontWeight: 900, marginBottom: 8, color: "#1d4ed8", textAlign: "center" };
 const detailGrid: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 6 };
 const compactReadonlyBox: CSSProperties = { padding: "6px 8px", borderRadius: 7, border: "1px solid #e5e7eb", background: "#f8fafc", fontWeight: 700, fontSize: 12, minHeight: 30 };

@@ -1825,8 +1825,26 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                             </div>
 
                             {openedDetailRowId === row.id && (
-                              <div style={detailPanel}>
-                                <div style={detailTitle}>{row.productName}</div>
+                              <>
+                                {/* Backdrop */}
+                                <div
+                                  style={{
+                                    position: "fixed",
+                                    top: 0,
+                                    left: 0,
+                                    width: "100vw",
+                                    height: "100vh",
+                                    background: "rgba(15, 23, 42, 0.3)",
+                                    backdropFilter: "blur(2px)",
+                                    zIndex: 9998,
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenedDetailRowId(null);
+                                  }}
+                                />
+                                <div style={detailPanel} onClick={(e) => e.stopPropagation()}>
+                                  <div style={detailTitle}>{row.productName}</div>
 
                                 <div style={detailGrid}>
                                   <Field label="پێچانەوە">
@@ -1941,7 +1959,8 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                                   </button>
                                 </div>
                               </div>
-                            )}
+                            </>
+                          )}
                           </td>
                         )}
 
@@ -3154,13 +3173,20 @@ const deleteBtn: CSSProperties = {
 };
 
 const detailPanel: CSSProperties = {
-  marginTop: 8,
-  padding: 10,
-  borderRadius: 10,
-  border: "1px solid #cbd5e1",
+  position: "fixed",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  zIndex: 9999,
+  padding: 20,
+  borderRadius: 12,
+  border: "1px solid #e2e8f0",
   background: "white",
-  maxWidth: 360,
-  boxShadow: "0 10px 24px rgba(15,23,42,0.18)",
+  width: "90%",
+  maxWidth: 400,
+  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+  maxHeight: "85vh",
+  overflowY: "auto",
 };
 
 const detailTitle: CSSProperties = {

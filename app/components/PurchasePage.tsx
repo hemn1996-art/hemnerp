@@ -2325,8 +2325,25 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                           </tr>
                           {isDetailOpen && (
                             <tr key={`${row.id}-details`}>
-                              <td colSpan={visibleColumnCount} style={{ padding: "8px 12px", background: "#f8fafc", borderBottom: "1px solid #eef2f7" }}>
-                                <div style={{ ...detailPanel, marginTop: 0 }}>
+                              <td colSpan={visibleColumnCount} style={{ padding: 0, border: 0 }}>
+                                {/* Backdrop */}
+                                <div
+                                  style={{
+                                    position: "fixed",
+                                    top: 0,
+                                    left: 0,
+                                    width: "100vw",
+                                    height: "100vh",
+                                    background: "rgba(15, 23, 42, 0.3)",
+                                    backdropFilter: "blur(2px)",
+                                    zIndex: 9998,
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenedDetailRowId(null);
+                                  }}
+                                />
+                                <div style={{ ...detailPanel, marginTop: 0 }} onClick={(e) => e.stopPropagation()}>
                                   <div style={detailTitle}>{row.productName}</div>
 
                                   <div style={detailGrid}>
