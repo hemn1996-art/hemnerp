@@ -666,7 +666,7 @@ function AccountStatementContent() {
                               </span>
                               {["purchase", "money_out"].includes(v.type) && v.referenceNo && String(v.referenceNo).trim() !== "" && String(v.referenceNo) !== String(v.voucherId) && (
                                 <span className="text-[11px] text-gray-500 font-bold mt-0.5 normal-case font-sans">
-                                  (لای فرۆشیار: {String(v.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '')})
+                                  ({v.type === "purchase" ? "لای فرۆشیار" : "لای وەرگر"}: {String(v.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '')})
                                 </span>
                               )}
                             </div>

@@ -635,17 +635,28 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
       return new Date().toISOString();
     };
 
+    const uniqueLineCurrencies = Array.from(new Set(rows.map((row: any) => row.currencyId)));
+    const activeVoucherCurrencyId = uniqueLineCurrencies.length === 1 ? Number(uniqueLineCurrencies[0]) : defaultCurrency.id;
+
+    const finalTotalAmount = rows.reduce((sum, row) => {
+      if (uniqueLineCurrencies.length === 1) {
+        return sum + toNumber(row.amount);
+      } else {
+        return sum + convertCurrency(toNumber(row.amount), row.currencyId, defaultCurrency.id);
+      }
+    }, 0);
+
     const payload = {
       type: "expense",
       referenceNo: String(receiptNumber),
       date: combineDateAndTime(receiptDate, createdTime),
       accountId: accountId || null,
       cashboxId: cashboxId || null,
-      currencyId: defaultCurrency.id,
+      currencyId: activeVoucherCurrencyId,
       exchangeRate: rate,
-      totalAmount: totalExpenseInDefaultCurrency,
+      totalAmount: finalTotalAmount,
       totalDiscount: 0,
-      netAmount: totalExpenseInDefaultCurrency,
+      netAmount: finalTotalAmount,
       internalNote: receiptNote,
       printNote: printNote,
       employeeName: employeeNameFromLogin,
@@ -660,7 +671,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (p.currencyId === defaultCurrency.id) ? 1 : rate
+        exchangeRate: (p.currencyId === activeVoucherCurrencyId) ? 1 : rate
       })),
       ledgerEntries: []
     };

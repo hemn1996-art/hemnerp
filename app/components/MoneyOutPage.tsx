@@ -1481,7 +1481,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
             {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>پارەی ڕۆشتوو</h2>}
             
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای فرۆشیار:</span>
+              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای وەرگر:</span>
               <input
                 value={receiptNumber}
                 disabled={isLocked}

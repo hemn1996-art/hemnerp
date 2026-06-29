@@ -98,7 +98,10 @@ export async function GET(request: Request) {
     };
 
     const convertVoucherToTarget = (amount: number, voucherCurId: number, exchangeRate: number) => {
-      const rate = voucherCurId === usdId ? 1.0 : exchangeRate || 1500;
+      if (voucherCurId === usdId) return amount * targetRate;
+      let rate = exchangeRate || 1500;
+      if (rate > 10000) rate = rate / 100; // 155000 -> 1550
+      if (rate < 10) rate = rate * 100;    // 15.5 -> 1550
       const usdAmount = amount / rate;
       return usdAmount * targetRate;
     };

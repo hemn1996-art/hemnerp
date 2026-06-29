@@ -2017,7 +2017,7 @@ function InvoiceReportContent() {
                                 <span className="font-extrabold">{getKurdishType(voucher.type)}</span>
                                 {["purchase", "money_out"].includes(voucher.type) && voucher.referenceNo && String(voucher.referenceNo).trim() !== "" && String(voucher.referenceNo) !== String(voucher.id) && (
                                   <span className="text-[11px] text-gray-500 font-bold mt-0.5">
-                                    (لای فرۆشیار: {String(voucher.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '')})
+                                    ({voucher.type === "purchase" ? "لای فرۆشیار" : "لای وەرگر"}: {String(voucher.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '')})
                                   </span>
                                 )}
                               </div>
