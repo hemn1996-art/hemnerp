@@ -2430,19 +2430,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                   <div style={detailTitle}>{row.productName}</div>
 
                                 <div style={detailGrid}>
-                                  <Field label="کۆد">
-                                    <div style={compactReadonlyBox}>
-                                      {row.code || "-"}
-                                    </div>
-                                  </Field>
-
-                                  <Field label="بچووکترین پێچانەوە">
-                                    <div style={compactReadonlyBox}>
-                                      {row.packageName}
-                                    </div>
-                                  </Field>
-
-                                  <Field label="پێچانەوە">
+                                  <DetailField label="پێچانەوە">
                                     <select
                                       value={row.packageName}
                                       disabled={isInvoiceLocked}
@@ -2464,9 +2452,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                         </option>
                                       ))}
                                     </select>
-                                  </Field>
+                                  </DetailField>
 
-                                  <Field label="کۆگا">
+                                  <DetailField label="کۆگا">
                                     <select
                                       value={row.warehouseName}
                                       disabled={isInvoiceLocked}
@@ -2492,15 +2480,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                         </option>
                                       ))}
                                     </select>
-                                  </Field>
+                                  </DetailField>
 
-                                  <Field label="بەردەست">
+                                  <DetailField label="بەردەست">
                                     <div style={compactReadonlyBox}>
                                       {availableText(row)}
                                     </div>
-                                  </Field>
+                                  </DetailField>
 
-                                  <Field label="کۆست">
+                                  <DetailField label="کۆست">
                                     {row.showCost ? (
                                       <div style={compactReadonlyBox}>
                                         {formatMoney(
@@ -2516,6 +2504,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                           cursor: isInvoiceLocked
                                             ? "not-allowed"
                                             : "pointer",
+                                          fontSize: "11px",
+                                          padding: "4px 8px",
+                                          height: "26px",
                                         }}
                                         disabled={isInvoiceLocked}
                                         onClick={() =>
@@ -2525,9 +2516,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                         پیشاندان
                                       </button>
                                     )}
-                                  </Field>
+                                  </DetailField>
 
-                                  <Field label="جۆری نرخ">
+                                  <DetailField label="جۆری نرخ">
                                     <select
                                       value={row.priceType}
                                       disabled={isInvoiceLocked}
@@ -2545,9 +2536,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                         </option>
                                       ))}
                                     </select>
-                                  </Field>
+                                  </DetailField>
 
-                                  <Field label="دراو">
+                                  <DetailField label="دراو">
                                     <select
                                       value={row.currencyId}
                                       disabled={isInvoiceLocked}
@@ -2571,9 +2562,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                         </option>
                                       ))}
                                     </select>
-                                  </Field>
+                                  </DetailField>
 
-                                  <Field label="نرخی فرۆشتن">
+                                  <DetailField label="نرخی فرۆشتن">
                                     <FormattedNumberInput
                                       value={row.price}
                                       disabled={isInvoiceLocked}
@@ -2587,9 +2578,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                         ...lockedFieldStyle,
                                       }}
                                     />
-                                  </Field>
+                                  </DetailField>
 
-                                  <Field label="نرخی پێشوو">
+                                  <DetailField label="نرخی پێشوو">
                                     <div style={compactReadonlyBox}>
                                       {row.previousPrice !== undefined
                                         ? formatMoney(
@@ -2598,12 +2589,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                           )
                                         : "نییە"}
                                     </div>
-                                  </Field>
+                                  </DetailField>
                                 </div>
 
-                                <div style={{ marginTop: 8 }}>
-                                  <Field label="تێبینی">
-                                    <textarea
+                                <div style={{ marginTop: 6 }}>
+                                  <DetailField label="تێبینی">
+                                    <input
+                                      type="text"
                                       value={row.note}
                                       disabled={isInvoiceLocked}
                                       onChange={(e) =>
@@ -2611,14 +2603,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                           note: e.target.value,
                                         })
                                       }
-                                      rows={2}
                                       style={{
-                                        ...compactTextarea,
+                                        ...compactInput,
                                         ...lockedFieldStyle,
                                       }}
                                       placeholder="تێبینی..."
                                     />
-                                  </Field>
+                                  </DetailField>
                                 </div>
 
                                 <div style={detailFooter}>
@@ -3411,6 +3402,21 @@ function Field({
   );
 }
 
+function DetailField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label style={{ display: "block" }}>
+      <div style={detailLabel}>{label}</div>
+      {children}
+    </label>
+  );
+}
+
 function InfoRow({
   label,
   children,
@@ -3674,14 +3680,15 @@ const input: CSSProperties = {
 
 const compactInput: CSSProperties = {
   width: "100%",
-  padding: "6px 8px",
-  borderRadius: 7,
-  border: "1px solid #d1d5db",
-  fontSize: 12,
+  padding: "3px 6px",
+  borderRadius: 6,
+  border: "1px solid #cbd5e1",
+  fontSize: "11px",
   outline: "none",
   background: "white",
   boxSizing: "border-box",
   fontFamily: appFont,
+  height: "26px",
 };
 
 const smallInput: CSSProperties = {
@@ -3739,6 +3746,14 @@ const labelStyle: CSSProperties = {
   marginBottom: 6,
   fontWeight: 700,
   color: "#374151",
+};
+
+const detailLabel: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 700,
+  color: "#4b5563",
+  marginBottom: "3px",
+  fontFamily: appFont,
 };
 
 const dropdownLarge: CSSProperties = {
@@ -4077,20 +4092,20 @@ const detailPanel: CSSProperties = {
   top: "calc(100% + 6px)",
   right: 0,
   zIndex: 9999,
-  padding: 16,
-  borderRadius: 12,
-  border: "1px solid #e2e8f0",
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "1px solid #cbd5e1",
   background: "white",
-  width: "330px",
-  boxShadow: "0 15px 30px rgba(0, 0, 0, 0.15)",
-  maxHeight: "450px",
-  overflowY: "auto",
+  width: "300px",
+  boxShadow: "0 10px 24px rgba(15,23,42,0.18)",
+  maxHeight: "550px",
+  overflowY: "visible",
 };
 
 const detailTitle: CSSProperties = {
-  fontSize: 14,
+  fontSize: 12,
   fontWeight: 900,
-  marginBottom: 8,
+  marginBottom: 6,
   color: "#1d4ed8",
   textAlign: "center",
 };
@@ -4102,13 +4117,15 @@ const detailGrid: CSSProperties = {
 };
 
 const compactReadonlyBox: CSSProperties = {
-  padding: "6px 8px",
-  borderRadius: 7,
+  padding: "4px 6px",
+  borderRadius: 6,
   border: "1px solid #e5e7eb",
   background: "#f8fafc",
   fontWeight: 700,
-  fontSize: 12,
-  minHeight: 30,
+  fontSize: "11px",
+  minHeight: "26px",
+  display: "flex",
+  alignItems: "center",
 };
 
 const showCostBtn: CSSProperties = {
