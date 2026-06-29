@@ -2419,12 +2419,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                   }}
                                 />
                                 <div
-                                  style={{
-                                    ...detailPanel,
-                                    position: "fixed",
-                                    top: detailCoords?.top ?? "10%",
-                                    right: detailCoords?.right ?? "24px",
-                                  }}
+                                  style={detailPanel}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div style={detailTitle}>{row.productName}</div>
@@ -3680,15 +3675,15 @@ const input: CSSProperties = {
 
 const compactInput: CSSProperties = {
   width: "100%",
-  padding: "3px 6px",
-  borderRadius: 6,
+  padding: "5px 8px",
+  borderRadius: 7,
   border: "1px solid #cbd5e1",
-  fontSize: "11px",
+  fontSize: "12px",
   outline: "none",
   background: "white",
   boxSizing: "border-box",
   fontFamily: appFont,
-  height: "26px",
+  height: "30px",
 };
 
 const smallInput: CSSProperties = {
@@ -3749,10 +3744,10 @@ const labelStyle: CSSProperties = {
 };
 
 const detailLabel: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 700,
   color: "#4b5563",
-  marginBottom: "3px",
+  marginBottom: "4px",
   fontFamily: appFont,
 };
 
@@ -4092,20 +4087,20 @@ const detailPanel: CSSProperties = {
   top: "calc(100% + 6px)",
   right: 0,
   zIndex: 9999,
-  padding: "10px 12px",
+  padding: "12px 14px",
   borderRadius: 10,
   border: "1px solid #cbd5e1",
   background: "white",
-  width: "300px",
+  width: "330px",
   boxShadow: "0 10px 24px rgba(15,23,42,0.18)",
-  maxHeight: "550px",
+  maxHeight: "none",
   overflowY: "visible",
 };
 
 const detailTitle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 900,
-  marginBottom: 6,
+  marginBottom: 8,
   color: "#1d4ed8",
   textAlign: "center",
 };
@@ -4113,17 +4108,17 @@ const detailTitle: CSSProperties = {
 const detailGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 6,
+  gap: 8,
 };
 
 const compactReadonlyBox: CSSProperties = {
-  padding: "4px 6px",
-  borderRadius: 6,
+  padding: "5px 8px",
+  borderRadius: 7,
   border: "1px solid #e5e7eb",
   background: "#f8fafc",
   fontWeight: 700,
-  fontSize: "11px",
-  minHeight: "26px",
+  fontSize: "12px",
+  minHeight: "30px",
   display: "flex",
   alignItems: "center",
 };
