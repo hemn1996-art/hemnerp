@@ -1480,6 +1480,28 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           <div style={headerCard}>
             {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>پارەی ڕۆشتوو</h2>}
             
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای فرۆشیار:</span>
+              <input
+                value={receiptNumber}
+                disabled={isLocked}
+                onChange={(e) => {
+                  if (blockIfLocked()) return;
+                  setReceiptNumber(e.target.value);
+                }}
+                placeholder="ژمارەی پسوڵە بنووسە..."
+                style={{
+                  ...input,
+                  width: "180px",
+                  padding: "6px 12px",
+                  fontSize: "14px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  textAlign: "center",
+                  ...lockedFieldStyle
+                }}
+              />
+            </div>
           </div>
 
           <div style={emptyMainCard}>
