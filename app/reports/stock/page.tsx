@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useStore } from "../../store/store";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
+import FormattedNumber from "../../components/FormattedNumber";
 
 interface StockItem {
   productId: number;
@@ -194,7 +195,7 @@ export default function StockReportPage() {
   };
 
   const formatMoney = (amount: number) => {
-    return `$ ${amount.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 4 })}`;
+    return <FormattedNumber value={amount} currencySymbol="$" decimals={2} />;
   };
 
   const formatDate = (dateStr: string) => {
