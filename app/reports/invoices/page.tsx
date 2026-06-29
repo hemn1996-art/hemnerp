@@ -2015,7 +2015,7 @@ function InvoiceReportContent() {
                             <td className="px-4 py-3.5 text-center">
                               <div className="flex flex-col items-center justify-center">
                                 <span className="font-extrabold">{getKurdishType(voucher.type)}</span>
-                                {voucher.referenceNo && (
+                                {["purchase", "money_out"].includes(voucher.type) && voucher.referenceNo && String(voucher.referenceNo).trim() !== "" && String(voucher.referenceNo) !== String(voucher.id) && (
                                   <span className="text-[11px] text-gray-500 font-bold mt-0.5">
                                     (لای فرۆشیار: {String(voucher.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '')})
                                   </span>
