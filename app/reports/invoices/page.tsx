@@ -270,7 +270,7 @@ function InvoiceReportContent() {
 
 
   // Table Sorting
-  const [sortField, setSortField] = useState<string>("date");
+  const [sortField, setSortField] = useState<string>("id");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Table pagination
