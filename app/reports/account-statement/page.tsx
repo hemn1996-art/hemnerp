@@ -651,18 +651,25 @@ function AccountStatementContent() {
                               }}
                               className={`font-black text-sm px-3 py-1 rounded-lg cursor-pointer hover:opacity-85 transition-opacity ${tc.badge}`}
                             >
-                              {v.referenceNo && !/^\d{5,10}$/.test(v.referenceNo) ? String(v.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '') : v.voucherId}
+                              {v.voucherId}
                             </span>
                           </td>
                         )}
                         {visibleColumns.type && (
                           <td className="p-3 text-center font-bold text-gray-800">
-                            <span className="flex items-center justify-center gap-1">
-                              {filterShowItems === "شاردنەوە" && hasLines && (
-                                <span className="text-gray-400 text-xs">{isRowExpanded ? "▲" : "▼"}</span>
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="flex items-center justify-center gap-1 font-extrabold">
+                                {filterShowItems === "شاردنەوە" && hasLines && (
+                                  <span className="text-gray-400 text-xs">{isRowExpanded ? "▲" : "▼"}</span>
+                                )}
+                                {v.kurdishType}
+                              </span>
+                              {v.referenceNo && (
+                                <span className="text-[11px] text-gray-500 font-bold mt-0.5 normal-case font-sans">
+                                  (لای فرۆشیار: {String(v.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '')})
+                                </span>
                               )}
-                              {v.kurdishType}
-                            </span>
+                            </div>
                           </td>
                         )}
                         {visibleColumns.totalAmount && <td className="p-3 text-center text-gray-800 font-black" dir="ltr">{formatMoney(v.totalAmount, v.currencyId || 1)}</td>}

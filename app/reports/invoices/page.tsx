@@ -2007,13 +2007,20 @@ function InvoiceReportContent() {
                                 title="دەستکاریکردنی پسوڵە"
                                 className="bg-blue-600 hover:bg-blue-700 text-white font-black text-lg px-6 py-2 rounded-xl cursor-pointer shadow-md transition-all inline-block hover:scale-105"
                               >
-                                {voucher.referenceNo && !/^\d{5,10}$/.test(voucher.referenceNo) ? String(voucher.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '') : voucher.id}
+                                {voucher.id}
                               </span>
                             </td>
                           )}
                           {visibleColumns.type && (
                             <td className="px-4 py-3.5 text-center">
-                              {getKurdishType(voucher.type)}
+                              <div className="flex flex-col items-center justify-center">
+                                <span className="font-extrabold">{getKurdishType(voucher.type)}</span>
+                                {voucher.referenceNo && (
+                                  <span className="text-[11px] text-gray-500 font-bold mt-0.5">
+                                    (لای فرۆشیار: {String(voucher.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '')})
+                                  </span>
+                                )}
+                              </div>
                             </td>
                           )}
                           {visibleColumns.paymentStatus && (
