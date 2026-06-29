@@ -62,6 +62,7 @@ type ProductLike = {
   salePrice?: number;
   costPrice?: number;
   stock?: number;
+  warehouseStocks?: Record<number, number>;
   salePrices?: {
     currencyId: number;
     amount?: number;
