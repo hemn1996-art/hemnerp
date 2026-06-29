@@ -193,6 +193,79 @@ function InvoiceReportContent() {
   const [filterCurrencyId, setFilterCurrencyId] = useState("all"); // currency filter
   const [filterCityName, setFilterCityName] = useState("all");
   const [filterDistrictName, setFilterDistrictName] = useState("all");
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
+
+  // Load filters from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("__erp_invoices_report_filters_data");
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.startDate) setStartDate(data.startDate);
+        if (data.endDate) setEndDate(data.endDate);
+        if (data.filterInvoiceTypes) setFilterInvoiceTypes(data.filterInvoiceTypes);
+        if (data.filterPaymentStatus) setFilterPaymentStatus(data.filterPaymentStatus);
+        if (data.filterStatus) setFilterStatus(data.filterStatus);
+        if (data.filterAccountTypeIds) setFilterAccountTypeIds(data.filterAccountTypeIds);
+        if (data.filterAccountIds) setFilterAccountIds(data.filterAccountIds);
+        if (data.filterCashboxIds) setFilterCashboxIds(data.filterCashboxIds);
+        if (data.filterWarehouseIds) setFilterWarehouseIds(data.filterWarehouseIds);
+        if (data.filterInvoiceNo) setFilterInvoiceNo(data.filterInvoiceNo);
+        if (data.filterDiscountType) setFilterDiscountType(data.filterDiscountType);
+        if (data.filterEmployees) setFilterEmployees(data.filterEmployees);
+        if (data.filterCurrencyId) setFilterCurrencyId(data.filterCurrencyId);
+        if (data.filterCityName) setFilterCityName(data.filterCityName);
+        if (data.filterDistrictName) setFilterDistrictName(data.filterDistrictName);
+      }
+    } catch (e) {
+      console.error("Failed to load persisted filters:", e);
+    }
+    setFiltersLoaded(true);
+  }, []);
+
+  // Save filters to sessionStorage when they change
+  useEffect(() => {
+    if (!filtersLoaded) return;
+    try {
+      const filtersObj = {
+        startDate,
+        endDate,
+        filterInvoiceTypes,
+        filterPaymentStatus,
+        filterStatus,
+        filterAccountTypeIds,
+        filterAccountIds,
+        filterCashboxIds,
+        filterWarehouseIds,
+        filterInvoiceNo,
+        filterDiscountType,
+        filterEmployees,
+        filterCurrencyId,
+        filterCityName,
+        filterDistrictName
+      };
+      sessionStorage.setItem("__erp_invoices_report_filters_data", JSON.stringify(filtersObj));
+    } catch (e) {
+      console.error("Failed to save filters to sessionStorage:", e);
+    }
+  }, [
+    filtersLoaded,
+    startDate,
+    endDate,
+    filterInvoiceTypes,
+    filterPaymentStatus,
+    filterStatus,
+    filterAccountTypeIds,
+    filterAccountIds,
+    filterCashboxIds,
+    filterWarehouseIds,
+    filterInvoiceNo,
+    filterDiscountType,
+    filterEmployees,
+    filterCurrencyId,
+    filterCityName,
+    filterDistrictName
+  ]);
 
 
 
@@ -1299,6 +1372,9 @@ function InvoiceReportContent() {
     d.setDate(1);
     setStartDate(d.toISOString().slice(0, 10));
     setEndDate(new Date().toISOString().slice(0, 10));
+    try {
+      sessionStorage.removeItem("__erp_invoices_report_filters_data");
+    } catch (e) {}
   };
 
   const getVersionData = (index: number) => {

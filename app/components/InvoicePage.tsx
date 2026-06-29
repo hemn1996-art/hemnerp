@@ -250,6 +250,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [openedDetailRowId, setOpenedDetailRowId] = useState<number | null>(
     null
   );
+  const [detailCoords, setDetailCoords] = useState<{ top: number; right: number } | null>(null);
 
   const [showInvoiceNotes, setShowInvoiceNotes] = useState(false);
   const [internalNote, setInternalNote] = useState("");
@@ -1030,8 +1031,30 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     return `${day}/${month}/${year}`;
   }
 
+  function getRowAvailableQty(productId: number, warehouseName: string) {
+    const prod = products.find((p: any) => p.id === productId);
+    if (!prod) return 0;
+
+    const warehouse = warehouses.find((w: any) => w.name === warehouseName);
+    const whId = warehouse ? warehouse.id : warehouses[0]?.id;
+
+    const baseStock = prod.warehouseStocks ? (prod.warehouseStocks[whId] || 0) : (prod.stock || 0);
+
+    let originalQty = 0;
+    if (originalVoucher) {
+      const origLine = originalVoucher.lines?.find((l: any) => l.productId === productId);
+      const origTx = originalVoucher.inventoryTransactions?.find((t: any) => t.productId === productId);
+      const origWhId = origTx?.warehouseId || origTx?.warehouse?.id;
+      if (origLine && origWhId === whId) {
+        originalQty = origLine.qty || 0;
+      }
+    }
+
+    return baseStock + originalQty;
+  }
+
   function availableText(row: InvoiceRow) {
-    const totalAvailable = row.availableQty || 0;
+    const totalAvailable = getRowAvailableQty(row.productId, row.warehouseName);
     const packageQty = row.packageQuantity || 1;
     if (packageQty > 1) {
       const packs = Math.floor(totalAvailable / packageQty);
@@ -1044,7 +1067,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   function validateStockBeforeSave() {
     for (const row of rows) {
       const requestedQty = toNumber(row.qty) * row.packageQuantity;
-      const availableQty = row.availableQty || 0;
+      const availableQty = getRowAvailableQty(row.productId, row.warehouseName);
 
       if (requestedQty <= 0) {
         showToast(`عەددی کەرەستەی "${row.productName}" دروست نییە.`);
@@ -1075,7 +1098,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     const clean = onlyDecimal(nextQtyText);
     const requestedQty = toNumber(clean) * row.packageQuantity;
-    const availableQty = row.availableQty || 0;
+    const availableQty = getRowAvailableQty(row.productId, row.warehouseName);
 
     if (requestedQty > availableQty) {
       showToast(
@@ -1151,7 +1174,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (existing) {
       const nextQty = toNumber(existing.qty) + 1;
       const requestedQty = nextQty * existing.packageQuantity;
-      const availableQty = existing.availableQty || 0;
+      const availableQty = getRowAvailableQty(existing.productId, existing.warehouseName);
 
       if (requestedQty > availableQty) {
         showToast(
@@ -1171,6 +1194,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       return;
     }
 
+    const defaultWarehouseName = warehouses[0]?.name || "کۆگای سەرەکی";
+
     const newRow: InvoiceRow = {
       id: Date.now() + Math.floor(Math.random() * 100000),
       productId: product.id,
@@ -1183,13 +1208,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       note: "",
       packageName: firstPackage.name,
       packageQuantity: firstPackage.quantity || 1,
-      warehouseName: warehouses[0]?.name || "کۆگای سەرەکی",
+      warehouseName: defaultWarehouseName,
       priceType:
         (selectedPrice as any).priceType ||
         (selectedPrice as any).name ||
         invoicePriceType,
       currencyId: selectedPrice.currencyId || invoiceCurrencyId,
-      availableQty: product.stock || 0,
+      availableQty: getRowAvailableQty(product.id, defaultWarehouseName),
       previousPrice: getPreviousPrice(product.id),
       costPrice: product.costPrice || 0,
       showCost: false,
@@ -2352,11 +2377,16 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         {tableColumns.product && (
                           <td style={tdWide}>
                             <div
-                              onClick={() =>
+                              onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setDetailCoords({
+                                  top: rect.bottom + 6,
+                                  right: window.innerWidth - rect.right,
+                                });
                                 setOpenedDetailRowId(
                                   openedDetailRowId === row.id ? null : row.id
-                                )
-                              }
+                                );
+                              }}
                               style={productNameBlock}
                             >
                               <strong>{row.productName}</strong>
@@ -2378,8 +2408,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                     left: 0,
                                     width: "100vw",
                                     height: "100vh",
-                                    background: "rgba(15, 23, 42, 0.3)",
-                                    backdropFilter: "blur(2px)",
+                                    background: "rgba(0, 0, 0, 0.01)",
                                     zIndex: 9998,
                                   }}
                                   onClick={(e) => {
@@ -2387,7 +2416,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                     setOpenedDetailRowId(null);
                                   }}
                                 />
-                                <div style={detailPanel} onClick={(e) => e.stopPropagation()}>
+                                <div
+                                  style={{
+                                    ...detailPanel,
+                                    position: "fixed",
+                                    top: detailCoords?.top ?? "10%",
+                                    right: detailCoords?.right ?? "24px",
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <div style={detailTitle}>{row.productName}</div>
 
                                 <div style={detailGrid}>
@@ -2431,11 +2468,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                     <select
                                       value={row.warehouseName}
                                       disabled={isInvoiceLocked}
-                                      onChange={(e) =>
+                                      onChange={(e) => {
+                                        const nextWhName = e.target.value;
+                                        const nextAvail = getRowAvailableQty(row.productId, nextWhName);
                                         updateRow(row.id, {
-                                          warehouseName: e.target.value,
-                                        })
-                                      }
+                                          warehouseName: nextWhName,
+                                          availableQty: nextAvail,
+                                        });
+                                      }}
                                       style={{
                                         ...compactInput,
                                         ...lockedFieldStyle,
@@ -4031,19 +4071,17 @@ const deleteBtn: CSSProperties = {
 };
 
 const detailPanel: CSSProperties = {
-  position: "fixed",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
+  position: "absolute",
+  top: "calc(100% + 6px)",
+  right: 0,
   zIndex: 9999,
-  padding: 20,
+  padding: 16,
   borderRadius: 12,
   border: "1px solid #e2e8f0",
   background: "white",
-  width: "90%",
-  maxWidth: 400,
-  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-  maxHeight: "85vh",
+  width: "330px",
+  boxShadow: "0 15px 30px rgba(0, 0, 0, 0.15)",
+  maxHeight: "450px",
   overflowY: "auto",
 };
 

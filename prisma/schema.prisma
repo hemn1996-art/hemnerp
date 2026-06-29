@@ -132,6 +132,7 @@ model Product {
   createdAt             DateTime               @default(now())
   inventoryTransactions InventoryTransaction[]
   voucherLines          VoucherLine[]
+  salePrices            String?
 }
 
 model Voucher {

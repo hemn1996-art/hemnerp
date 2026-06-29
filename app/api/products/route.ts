@@ -30,6 +30,7 @@ export async function GET(request: Request) {
             qtyChange: true,
             unitCost: true,
             date: true,
+            warehouseId: true,
           },
         },
       },
@@ -41,6 +42,13 @@ export async function GET(request: Request) {
         (sum, t) => sum + t.qtyChange,
         0
       );
+      
+      const warehouseStocks: Record<number, number> = {};
+      p.inventoryTransactions.forEach((t) => {
+        const wId = t.warehouseId;
+        warehouseStocks[wId] = (warehouseStocks[wId] || 0) + t.qtyChange;
+      });
+
       const purchaseTx = p.inventoryTransactions
         .filter((t) => t.qtyChange > 0 && t.unitCost > 0)
         .sort((a, b) => b.id - a.id);
@@ -70,6 +78,8 @@ export async function GET(request: Request) {
         stock: stock,
         costPrice: costPrice,
         isDeletable: !hasTransactions,
+        salePrices: p.salePrices ? JSON.parse(p.salePrices) : [],
+        warehouseStocks,
       };
     });
 
@@ -98,6 +108,7 @@ export async function POST(request: Request) {
         isExpense: data.isExpense || false,
         isService: data.isService || false,
         isActive: data.isActive ?? true,
+        salePrices: data.salePrices ? JSON.stringify(data.salePrices) : null,
       },
     });
 
@@ -115,19 +126,21 @@ export async function PUT(request: Request) {
   try {
     const data = await request.json();
 
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name?.trim();
+    if (data.code !== undefined) updateData.code = data.code?.trim() || null;
+    if (data.category !== undefined) updateData.category = data.category?.trim() || null;
+    if (data.brand !== undefined) updateData.brand = data.brand?.trim() || null;
+    if (data.packaging !== undefined) updateData.packaging = data.packaging?.trim() || null;
+    if (data.isMultiBatch !== undefined) updateData.isMultiBatch = data.isMultiBatch;
+    if (data.isExpense !== undefined) updateData.isExpense = data.isExpense;
+    if (data.isService !== undefined) updateData.isService = data.isService;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.salePrices !== undefined) updateData.salePrices = data.salePrices ? JSON.stringify(data.salePrices) : null;
+
     const updatedProduct = await prisma.product.update({
       where: { id: Number(data.id) },
-      data: {
-        name: data.name?.trim(),
-        code: data.code?.trim() || null,
-        category: data.category?.trim() || null,
-        brand: data.brand?.trim() || null,
-        packaging: data.packaging?.trim() || null,
-        isMultiBatch: data.isMultiBatch,
-        isExpense: data.isExpense,
-        isService: data.isService,
-        isActive: data.isActive,
-      },
+      data: updateData,
     });
 
     return NextResponse.json(updatedProduct);

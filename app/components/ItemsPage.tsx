@@ -299,13 +299,21 @@ function AddItemForm({
       : "inventory"
   );
 
-  const [salePrices, setSalePrices] = useState([
-    {
-      currencyId: "",
-      priceType: "",
-      amount: "",
-    },
-  ]);
+  const [salePrices, setSalePrices] = useState(
+    productToEdit?.salePrices && productToEdit.salePrices.length > 0
+      ? productToEdit.salePrices.map((p) => ({
+          currencyId: String(p.currencyId),
+          priceType: p.priceType,
+          amount: String(p.amount),
+        }))
+      : [
+          {
+            currencyId: "1",
+            priceType: "جوملە",
+            amount: "",
+          },
+        ]
+  );
 
   const [packages, setPackages] = useState([
     {
@@ -512,6 +520,11 @@ function AddItemForm({
       isExpense,
       isService,
       isActive,
+      salePrices: salePrices.map((sp) => ({
+        currencyId: Number(sp.currencyId),
+        priceType: sp.priceType,
+        amount: Number(sp.amount) || 0,
+      })),
     };
 
     const result = productToEdit

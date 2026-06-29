@@ -12,7 +12,7 @@ export default function MultiSelectDropdown({
   options,
   selectedValues,
   onChange,
-  searchable = false,
+  searchable = true,
   pluralLabel = "دیاریکراوە",
 }: {
   label: string;
@@ -74,26 +74,48 @@ export default function MultiSelectDropdown({
       >
         <label className="select-none pointer-events-none">{label}</label>
 
-        <div className="flex-1 flex flex-wrap items-center justify-start overflow-hidden py-1">
-          {searchable && isOpen ? (
+        <div className="flex-1 flex flex-wrap items-center justify-start gap-1 py-1 px-1 overflow-hidden">
+          {selectedValues.map(val => {
+            const opt = options.find(o => o.value === val);
+            if (!opt) return null;
+            return (
+              <span
+                key={val}
+                onClick={e => e.stopPropagation()}
+                className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-[#0b1f50] font-bold text-[11px] pr-2.5 pl-1.5 py-0.5 rounded-full transition-colors shrink-0"
+              >
+                <span>{opt.label}</span>
+                <button
+                  type="button"
+                  onClick={e => {
+                    e.stopPropagation();
+                    toggleOption(val);
+                  }}
+                  className="bg-slate-300 hover:bg-red-500 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center text-[9px] font-black transition-colors cursor-pointer border-none p-0 shrink-0"
+                >
+                  ✕
+                </button>
+              </span>
+            );
+          })}
+
+          {selectedValues.length === 0 && !isOpen && (
+            <span className="text-slate-400 font-bold text-sm text-right px-1">
+              هەموو
+            </span>
+          )}
+
+          {searchable && isOpen && (
             <input
               ref={inputRef}
               type="text"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder="گەڕان..."
-              className="flex-1 min-w-[60px] border-none outline-none text-sm font-black text-slate-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
+              placeholder={selectedValues.length === 0 ? "گەڕان..." : ""}
+              className="flex-1 min-w-[80px] border-none outline-none text-xs font-bold text-slate-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
               dir="rtl"
               onClick={e => e.stopPropagation()}
             />
-          ) : (
-            <span className="text-slate-800 font-bold text-sm truncate w-full text-right px-1">
-              {selectedValues.length === 0 
-                ? "هەموو" 
-                : selectedValues.length === 1 
-                  ? (options.find(o => o.value === selectedValues[0])?.label || "دیاریکراوە")
-                  : `${selectedValues.length} ${pluralLabel}`}
-            </span>
           )}
         </div>
 

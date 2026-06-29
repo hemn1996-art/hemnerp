@@ -6,6 +6,7 @@ import { useStore } from "../../store/store";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import FormattedNumber from "../../components/FormattedNumber";
+import { currencies as mockCurrencies } from "../../data/mockData";
 
 interface StockItem {
   productId: number;
@@ -35,8 +36,11 @@ export default function StockReportPage() {
   const {
     warehouses, fetchWarehouses,
     products, fetchProducts,
-    accounts, fetchAccounts
+    accounts, fetchAccounts,
   } = useStore() as any;
+  const storeCurrencies = useStore((s: any) => s.currencies) || [];
+  const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
+  const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
 
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
@@ -104,6 +108,7 @@ export default function StockReportPage() {
     fetchWarehouses?.();
     fetchProducts?.();
     fetchAccounts?.();
+    fetchCurrencies?.();
 
     if (typeof window !== "undefined") {
       const rawCat = localStorage.getItem("__erp_categories");
@@ -196,6 +201,135 @@ export default function StockReportPage() {
 
   const formatMoney = (amount: number) => {
     return <FormattedNumber value={amount} currencySymbol="$" decimals={2} />;
+  };
+
+  const getCurrencySymbol = (currencyId: number | string) => {
+    const active = currencies?.find((c: any) => String(c.id) === String(currencyId) || c.code === currencyId);
+    return active ? active.symbol : "$";
+  };
+
+  const formatSalePrices = (item: StockItem | any) => {
+    if (!item.salePrices || item.salePrices.length === 0) {
+      return <span className="text-gray-400 font-normal">دیاری نەکراوە (کلیک بکە)</span>;
+    }
+
+    return (
+      <div className="flex flex-col gap-0.5 items-center">
+        {item.salePrices.map((sp: any, i: number) => {
+          const symbol = getCurrencySymbol(sp.currencyId);
+          return (
+            <div key={i} className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+              <FormattedNumber value={sp.amount} currencySymbol={symbol} decimals={2} />
+              <span className="text-[10px] text-gray-400 font-normal">({sp.priceType})</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Selling Prices Modal State
+  const [editingPriceItem, setEditingPriceItem] = useState<any | null>(null);
+  const [editingPrices, setEditingPrices] = useState<any[]>([]);
+  const [priceTypes, setPriceTypes] = useState<any[]>([]);
+  const [isSavingPrices, setIsSavingPrices] = useState(false);
+
+  useEffect(() => {
+    async function loadPriceTypes() {
+      try {
+        const res = await fetch("/api/attributes?type=priceType");
+        if (res.ok) {
+          const listPriceTypes = await res.json();
+          setPriceTypes(listPriceTypes.filter((x: any) => x.isActive !== false));
+        }
+      } catch (err) {
+        console.error("Error loading price types", err);
+      }
+    }
+    loadPriceTypes();
+  }, []);
+
+  const handleOpenPricesModal = (item: StockItem | any) => {
+    const product = products.find((p: any) => p.id === item.productId);
+    setEditingPriceItem(item);
+    
+    const prices = product?.salePrices || item.salePrices || [];
+    setEditingPrices(
+      prices.length > 0
+        ? prices.map((p: any) => ({
+            currencyId: String(p.currencyId),
+            priceType: p.priceType,
+            amount: String(p.amount),
+          }))
+        : [
+            {
+              currencyId: "1",
+              priceType: "جوملە",
+              amount: "",
+            },
+          ]
+    );
+  };
+
+  const handleSavePrices = async () => {
+    if (!editingPriceItem) return;
+    setIsSavingPrices(true);
+    try {
+      const res = await fetch("/api/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingPriceItem.productId,
+          salePrices: editingPrices.map((sp) => ({
+            currencyId: Number(sp.currencyId),
+            priceType: sp.priceType,
+            amount: Number(sp.amount) || 0,
+          })),
+        }),
+      });
+
+      if (res.ok) {
+        await fetchProducts?.();
+        await loadStockData();
+        setEditingPriceItem(null);
+      } else {
+        alert("کێشەیەک لە پاشەکەوتکردنی نرخەکاندا ڕوویدا");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("کێشەی پەیوەندی کردن بە سێرڤەرەوە ڕوویدا");
+    } finally {
+      setIsSavingPrices(false);
+    }
+  };
+
+  const updateSalePrice = (index: number, field: string, value: string) => {
+    setEditingPrices((prev) => {
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
+        [field]: value,
+      };
+      return next;
+    });
+  };
+
+  const addSalePriceRow = () => {
+    setEditingPrices((prev) => [
+      ...prev,
+      {
+        currencyId: "1",
+        priceType: priceTypes[0]?.name || "جوملە",
+        amount: "",
+      },
+    ]);
+  };
+
+  const removeSalePriceRow = (index: number) => {
+    setEditingPrices((prev) => {
+      if (prev.length === 1) return prev;
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const formatDate = (dateStr: string) => {
@@ -384,7 +518,15 @@ export default function StockReportPage() {
                       )}
                       {visibleColumns.category && <td className="px-2 py-2 text-center text-gray-600">{item.category}</td>}
                       {visibleColumns.brand && <td className="px-2 py-2 text-center text-gray-600">{item.brand}</td>}
-                      {visibleColumns.sellPrice && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{item.sellPrice === 0 ? "0" : formatMoney(item.sellPrice)}</td>}
+                      {visibleColumns.sellPrice && (
+                        <td 
+                          className="px-2 py-2 text-center text-blue-600 font-bold hover:underline cursor-pointer transition-colors hover:text-blue-800" 
+                          dir="ltr"
+                          onClick={() => handleOpenPricesModal(item)}
+                        >
+                          {formatSalePrices(item)}
+                        </td>
+                      )}
                       {visibleColumns.warehouseName && <td className="px-2 py-2 text-center text-gray-600">{item.warehouseName}</td>}
                       {visibleColumns.quantity && (
                         <td className="px-2 py-2 text-center text-gray-800 font-bold">
@@ -478,6 +620,107 @@ export default function StockReportPage() {
                   پاشگەزبوونەوە
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Prices Modal */}
+      {editingPriceItem && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-[#0b1f50] text-white p-4 flex justify-between items-center shrink-0">
+              <div className="flex flex-col">
+                <h3 className="font-bold text-lg m-0">دەستکاریکردنی نرخەکانی فرۆشتن</h3>
+                <span className="text-xs text-blue-200 mt-1">{editingPriceItem.productName}</span>
+              </div>
+              <button onClick={() => setEditingPriceItem(null)} className="text-white hover:text-gray-300 text-2xl font-bold cursor-pointer">×</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 text-right" dir="rtl">
+              <div className="space-y-4">
+                {editingPrices.map((row, index) => (
+                  <div key={index} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <div className="flex flex-col">
+                      <label className="text-[11px] font-bold text-gray-500 mb-1 text-right">دراو</label>
+                      <select
+                        value={row.currencyId}
+                        onChange={(e) => updateSalePrice(index, "currencyId", e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded text-xs font-bold bg-white"
+                      >
+                        <option value="">دراو...</option>
+                        {currencies
+                          .filter((x: any) => x.isActive !== false)
+                          .map((currency: any) => (
+                            <option key={currency.id} value={currency.id}>
+                              {currency.name} - {currency.symbol}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-[11px] font-bold text-gray-500 mb-1 text-right">جۆری نرخ</label>
+                      <select
+                        value={row.priceType}
+                        onChange={(e) => updateSalePrice(index, "priceType", e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded text-xs font-bold bg-white"
+                      >
+                        {priceTypes.map((pt) => (
+                          <option key={pt.id} value={pt.name}>
+                            {pt.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-[11px] font-bold text-gray-500 mb-1 text-right">نرخ</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        lang="en"
+                        dir="ltr"
+                        value={row.amount}
+                        onChange={(e) => updateSalePrice(index, "amount", e.target.value.replace(/[^0-9.]/g, ""))}
+                        className="w-full p-2 border border-gray-300 rounded text-xs font-bold text-left bg-white"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => removeSalePriceRow(index)}
+                      className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded p-2 text-xs font-bold transition-colors cursor-pointer"
+                      disabled={editingPrices.length === 1}
+                    >
+                      لابردن
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={addSalePriceRow}
+                className="mt-4 w-full border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50 rounded py-2 text-xs font-bold transition-colors cursor-pointer"
+              >
+                + زیادکردنی نرخی تر
+              </button>
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 shrink-0" dir="rtl">
+              <button
+                onClick={handleSavePrices}
+                disabled={isSavingPrices}
+                className="bg-[#0b1f50] hover:bg-[#061f5f] text-white px-5 py-2 rounded text-xs font-bold shadow-md transition-colors cursor-pointer disabled:opacity-55"
+              >
+                {isSavingPrices ? "پاشەکەوت دەکرێت..." : "پاشەکەوتکردن ✔️"}
+              </button>
+              <button
+                onClick={() => setEditingPriceItem(null)}
+                className="text-gray-500 hover:text-gray-700 font-bold text-xs px-4 py-2 cursor-pointer"
+              >
+                پاشگەزبوونەوە
+              </button>
             </div>
           </div>
         </div>
