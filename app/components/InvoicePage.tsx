@@ -253,6 +253,24 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   );
   const [detailCoords, setDetailCoords] = useState<{ top: number; right: number } | null>(null);
 
+  useEffect(() => {
+    if (openedDetailRowId === null) return;
+    const updatePosition = () => {
+      const triggerEl = document.getElementById(`product-name-${openedDetailRowId}`);
+      if (triggerEl) {
+        const rect = triggerEl.getBoundingClientRect();
+        setDetailCoords({
+          top: rect.bottom + 6,
+          right: window.innerWidth - rect.right,
+        });
+      }
+    };
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [openedDetailRowId]);
+
   const [showInvoiceNotes, setShowInvoiceNotes] = useState(false);
   const [internalNote, setInternalNote] = useState("");
   const [printNote, setPrintNote] = useState("");
@@ -2379,6 +2397,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         {tableColumns.product && (
                           <td style={tdWide}>
                             <div
+                              id={`product-name-${row.id}`}
                               onClick={(e) => {
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 setDetailCoords({
@@ -2419,7 +2438,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                   }}
                                 />
                                 <div
-                                  style={detailPanel}
+                                  style={{
+                                    ...detailPanel,
+                                    position: "fixed",
+                                    top: detailCoords?.top ?? "10%",
+                                    right: detailCoords?.right ?? "24px",
+                                  }}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div style={detailTitle}>{row.productName}</div>
