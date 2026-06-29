@@ -604,11 +604,15 @@ export const useStore = create<StoreState>((set, get) => ({
         ]).catch((err) => console.error("Failed to refresh data after addVoucher:", err));
         
         return createdVoucher;
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        console.error("Add voucher failed:", res.status, errBody);
+        return errBody || { error: "Failed to add voucher" };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to add voucher", err);
+      return { error: err.message || "Failed to add voucher" };
     }
-    return null;
   },
 
   updateVoucher: async (id, voucherData) => {
@@ -632,12 +636,12 @@ export const useStore = create<StoreState>((set, get) => ({
       } else {
         const errBody = await res.json().catch(() => ({}));
         console.error("Update voucher failed:", res.status, errBody);
-        return null;
+        return errBody || { error: "Failed to update voucher" };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update voucher", err);
+      return { error: err.message || "Failed to update voucher" };
     }
-    return null;
   },
 }));
 

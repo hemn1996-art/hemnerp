@@ -651,7 +651,7 @@ function AccountStatementContent() {
                               }}
                               className={`font-black text-sm px-3 py-1 rounded-lg cursor-pointer hover:opacity-85 transition-opacity ${tc.badge}`}
                             >
-                              {v.referenceNo ? String(v.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '') : v.voucherId}
+                              {v.referenceNo && !/^\d{5,10}$/.test(v.referenceNo) ? String(v.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '') : v.voucherId}
                             </span>
                           </td>
                         )}

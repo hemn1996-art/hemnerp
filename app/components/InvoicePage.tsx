@@ -1537,7 +1537,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     savePromise.then((res) => {
       setIsSaving(false);
-      if (res) {
+      if (res && !res.error) {
         setSavedInvoiceSnapshot(currentInvoiceSnapshot);
         if (editId) {
           // In edit mode: don't lock, allow further edits
@@ -1547,7 +1547,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           showToast("پسوڵەکە خەزن کرا ✅ ئەم پسوڵەیە ئیتر قوفڵ کرا.", "success");
         }
       } else {
-        showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
+        const errorMsg = res?.error || "هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.";
+        showToast(errorMsg, "error");
       }
     }).catch((err) => {
       setIsSaving(false);

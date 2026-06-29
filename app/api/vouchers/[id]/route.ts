@@ -283,6 +283,26 @@ export async function PUT(
                   date: updated.date,
                 },
               });
+
+              if (qtyChange < 0) {
+                const currentInv = await tx.inventoryTransaction.aggregate({
+                  where: {
+                    productId: Number(line.productId),
+                    warehouseId: Number(line.warehouseId),
+                  },
+                  _sum: {
+                    qtyChange: true,
+                  },
+                });
+                const currentStock = currentInv._sum.qtyChange || 0;
+                if (currentStock < -0.0001) {
+                  const product = await tx.product.findUnique({
+                    where: { id: Number(line.productId) },
+                    select: { name: true },
+                  });
+                  throw new Error(`ناتوانیت کەرەستەی "${product?.name || line.productId}" بفرۆشیت یان کەم بکەیتەوە، چونکە بڕی پێویست لە کۆگادا نییە. بڕی بەردەست لە کۆگادا: ${currentStock - qtyChange} دانە.`);
+                }
+              }
             }
           }
         }
@@ -507,8 +527,8 @@ export async function PUT(
   } catch (error: any) {
     console.error("Error updating voucher:", error);
     return NextResponse.json(
-      { error: "Failed to update voucher", message: error.message, stack: error.stack },
-      { status: 500 }
+      { error: error.message || "Failed to update voucher" },
+      { status: 400 }
     );
   }
 }

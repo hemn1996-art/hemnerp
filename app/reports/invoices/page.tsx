@@ -270,7 +270,7 @@ function InvoiceReportContent() {
 
 
   // Table Sorting
-  const [sortField, setSortField] = useState<string>("id");
+  const [sortField, setSortField] = useState<string>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Table pagination
@@ -1167,6 +1167,10 @@ function InvoiceReportContent() {
 
       if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      
+      // Secondary sort by id descending for stable sorting when values are equal
+      if (a.id < b.id) return 1;
+      if (a.id > b.id) return -1;
       return 0;
     });
 
@@ -2003,7 +2007,7 @@ function InvoiceReportContent() {
                                 title="دەستکاریکردنی پسوڵە"
                                 className="bg-blue-600 hover:bg-blue-700 text-white font-black text-lg px-6 py-2 rounded-xl cursor-pointer shadow-md transition-all inline-block hover:scale-105"
                               >
-                                {voucher.referenceNo ? String(voucher.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '') : voucher.id}
+                                {voucher.referenceNo && !/^\d{5,10}$/.test(voucher.referenceNo) ? String(voucher.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '') : voucher.id}
                               </span>
                             </td>
                           )}
