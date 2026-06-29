@@ -78,7 +78,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
 
   useEffect(() => {
     if (!editId) {
-      setReceiptNumber(Date.now().toString().slice(-6));
+      setReceiptNumber("");
       setCreatedTime(
         new Date().toLocaleTimeString("en-US", {
           hour: "2-digit",
@@ -586,7 +586,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
   }
 
   function resetReceipt() {
-    setReceiptNumber(Date.now().toString().slice(-6));
+    setReceiptNumber("");
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
         hour: "2-digit",
@@ -640,7 +640,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
     if (!validateBeforeSave()) return;
 
     const payload = {
-      id: Number(receiptNumber || Date.now().toString().slice(-6)),
+      id: Number(receiptNumber || ""),
       type: "داشکاندن لە قەرزی من",
       accountId,
       netAmount: toNumber(discountAmount),

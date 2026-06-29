@@ -131,7 +131,7 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
 
   useEffect(() => {
     if (!editId) {
-      setReceiptNumber(Date.now().toString().slice(-6));
+      setReceiptNumber("");
       setCreatedTime(
         new Date().toLocaleTimeString("en-US", {
           hour: "2-digit",
@@ -234,7 +234,7 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
   });
 
   useEffect(() => {
-    setReceiptNumber(Date.now().toString().slice(-6));
+    setReceiptNumber("");
 
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
@@ -598,7 +598,7 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
   }
 
   function resetReceipt() {
-    setReceiptNumber(Date.now().toString().slice(-6));
+    setReceiptNumber("");
 
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
