@@ -127,8 +127,13 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
         .then((res) => res.json())
         .then((voucher) => {
           if (voucher) {
+            const refNo = voucher.referenceNo;
             setOriginalVoucher(voucher);
-            setReceiptNumber(String(voucher.id));
+            if (refNo && String(refNo) !== String(voucher.id)) {
+              setReceiptNumber(refNo);
+            } else {
+              setReceiptNumber("");
+            }
             setReceiptDate(voucher.date.slice(0, 10));
             const d = new Date(voucher.date);
             setCreatedTime(
@@ -419,6 +424,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const currentSnapshot = useMemo(() => {
     return JSON.stringify({
       accountId,
+      receiptNumber,
       receiptDate,
       createdTime,
       cashboxId,
@@ -430,6 +436,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     });
   }, [
     accountId,
+    receiptNumber,
     receiptDate,
     createdTime,
     cashboxId,

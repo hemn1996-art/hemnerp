@@ -214,7 +214,12 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         .then((res) => res.json())
         .then((voucher) => {
           if (voucher) {
-            setInvoiceNumber(voucher.referenceNo || String(voucher.id));
+            const refNo = voucher.referenceNo;
+            if (refNo && String(refNo) !== String(voucher.id)) {
+              setInvoiceNumber(refNo);
+            } else {
+              setInvoiceNumber("");
+            }
             setInvoiceDate(voucher.date.slice(0, 10));
             const d = new Date(voucher.date);
             setCreatedTime(
@@ -786,6 +791,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const currentSnapshot = useMemo(() => {
     return JSON.stringify({
       supplierId,
+      invoiceNumber,
       invoiceDate,
       createdTime,
       cashboxId,
@@ -805,6 +811,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     });
   }, [
     supplierId,
+    invoiceNumber,
     invoiceDate,
     createdTime,
     cashboxId,
