@@ -68,6 +68,7 @@ interface Account {
   isShareholder: boolean;
   city?: { name: string } | null;
   district?: { name: string } | null;
+  phone?: string | null;
 }
 
 interface Cashbox {
@@ -95,6 +96,8 @@ interface RawVoucher {
   printNote: string | null;
   hasDelivery: boolean;
   deliveryFee: number | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
   account: Account | null;
   cashbox: Cashbox | null;
   currency: {
@@ -154,9 +157,26 @@ function InvoiceReportContent() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [generalSearch, setGeneralSearch] = useState("");
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [lastScrollTop, setLastScrollTop] = useState(0);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  const getTemporaryCustomer = (v: any) => {
+    if (v.accountId) return null;
+    if (v.versions && Array.isArray(v.versions)) {
+      for (let i = v.versions.length - 1; i >= 0; i--) {
+        try {
+          const parsed = JSON.parse(v.versions[i].data);
+          if (parsed && (parsed.tempCustomerName || parsed.tempCustomerPhone)) {
+            return {
+              name: parsed.tempCustomerName,
+              phone: parsed.tempCustomerPhone,
+              address: parsed.tempCustomerAddress
+            };
+          }
+        } catch {}
+      }
+    }
+    return null;
+  };
 
   // Date Filters (default: 6 months ago → today)
   const [startDate, setStartDate] = useState(() => {
@@ -366,7 +386,7 @@ function InvoiceReportContent() {
   const loadVouchers = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/vouchers?includeDeleted=true");
+      const res = await fetch(`/api/vouchers?includeDeleted=true&t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         const filtered = (data || []).filter((v: any) => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange" && v.rawType !== "cashbox_transfer" && v.rawType !== "cashbox_exchange");
@@ -900,14 +920,15 @@ function InvoiceReportContent() {
       // General Search
       const search = (searchTerm || generalSearch).trim().toLowerCase();
       if (search) {
-        const empName = v.employeeName || "کۆساری مەلا فەرهاد";
+        const tempCust = getTemporaryCustomer(v);
         const match =
           v.id.toString().includes(search) ||
           (v.referenceNo && v.referenceNo.toLowerCase().includes(search)) ||
           (v.account && v.account.name.toLowerCase().includes(search)) ||
-          (v.cashbox && v.cashbox.name.toLowerCase().includes(search)) ||
-          empName.toLowerCase().includes(search) ||
-          (v.internalNote && v.internalNote.toLowerCase().includes(search));
+          (tempCust && tempCust.name && tempCust.name.toLowerCase().includes(search)) ||
+          (v.account && v.account.phone && v.account.phone.toLowerCase().includes(search)) ||
+          (tempCust && tempCust.phone && tempCust.phone.toLowerCase().includes(search)) ||
+          (v.driverPhone && v.driverPhone.toLowerCase().includes(search));
         if (!match) return false;
       }
 
@@ -1057,14 +1078,15 @@ function InvoiceReportContent() {
     const search = (searchTerm || generalSearch).trim().toLowerCase();
     if (search) {
       list = list.filter((v) => {
-        const empName = v.employeeName || "کۆساری مەلا فەرهاد";
+        const tempCust = getTemporaryCustomer(v);
         return (
           v.id.toString().includes(search) ||
           (v.referenceNo && v.referenceNo.toLowerCase().includes(search)) ||
           (v.account && v.account.name.toLowerCase().includes(search)) ||
-          (v.cashbox && v.cashbox.name.toLowerCase().includes(search)) ||
-          empName.toLowerCase().includes(search) ||
-          (v.internalNote && v.internalNote.toLowerCase().includes(search))
+          (tempCust && tempCust.name && tempCust.name.toLowerCase().includes(search)) ||
+          (v.account && v.account.phone && v.account.phone.toLowerCase().includes(search)) ||
+          (tempCust && tempCust.phone && tempCust.phone.toLowerCase().includes(search)) ||
+          (v.driverPhone && v.driverPhone.toLowerCase().includes(search))
         );
       });
     }
@@ -1961,11 +1983,12 @@ function InvoiceReportContent() {
                     const displayCurrencyObj = currencies.find((c: any) => c.id === displayCurrencyId);
 
                     const voucherCurrencyId = voucher.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1;
+                    const iqdIdForDelivery = currencies.find((c: any) => c.code === "IQD")?.id || 12;
 
                     const valVal = convertBetweenCurrencies(voucher.netAmount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
                     const discountVal = convertBetweenCurrencies(voucher.totalDiscount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
                     const deliveryFeeVal = voucher.deliveryFee 
-                      ? convertBetweenCurrencies(voucher.deliveryFee, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate)
+                      ? convertBetweenCurrencies(voucher.deliveryFee, iqdIdForDelivery, displayCurrencyId, voucher.exchangeRate)
                       : 0;
 
                     const paidVal = voucher.paidAmounts.reduce((sum, pa) => {
@@ -2002,7 +2025,7 @@ function InvoiceReportContent() {
                               <span 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  router.push(`/invoices?editId=${voucher.id}&type=${voucher.type}`);
+                                  router.push(`/invoices?editId=${voucher.id}&type=${voucher.type}&t=${Date.now()}`);
                                 }}
                                 title="دەستکاریکردنی پسوڵە"
                                 className="bg-blue-600 hover:bg-blue-700 text-white font-black text-lg px-6 py-2 rounded-xl cursor-pointer shadow-md transition-all inline-block hover:scale-105"
@@ -2034,7 +2057,23 @@ function InvoiceReportContent() {
                           )}
                           {visibleColumns.account && (
                             <td className="px-4 py-3.5 text-right font-bold text-slate-900">
-                              {voucher.account?.name || "-"}
+                              {(() => {
+                                const tempCust = getTemporaryCustomer(voucher);
+                                if (tempCust && tempCust.name) {
+                                  return <span>{tempCust.name} <span className="text-[10px] text-gray-400 font-normal">(هەژماری کاتی)</span></span>;
+                                }
+                                if (voucher.account) {
+                                  return (
+                                    <a
+                                      href={`/reports/account-statement?accountId=${voucher.accountId}`}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    >
+                                      {voucher.account.name}
+                                    </a>
+                                  );
+                                }
+                                return "-";
+                              })()}
                             </td>
                           )}
                           {visibleColumns.total && (

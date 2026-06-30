@@ -55,6 +55,8 @@ export async function GET(request: Request) {
           "سەرفی مواد",
           "warehouse_stock",
           "جەردی کۆگا",
+          "money_in",
+          "money_out"
         ]
       }
     };
@@ -70,6 +72,7 @@ export async function GET(request: Request) {
           type: true,
           netAmount: true,
           totalAmount: true,
+          totalDiscount: true,
           currencyId: true,
           exchangeRate: true,
           accountId: true,
@@ -303,6 +306,18 @@ export async function GET(request: Request) {
         const hasWarehouseFilter = warehouseIds !== null;
         if (!hasProductFilter && !hasWarehouseFilter) {
           totalPeopleDebtDiscount += amount;
+        }
+      } else if (v.type === "money_in") {
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
+        const hasWarehouseFilter = warehouseIds !== null;
+        if (!hasProductFilter && !hasWarehouseFilter) {
+          totalPeopleDebtDiscount += convertVoucherToTarget(v.totalDiscount || 0, v.currencyId || usdId, v.exchangeRate);
+        }
+      } else if (v.type === "money_out") {
+        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
+        const hasWarehouseFilter = warehouseIds !== null;
+        if (!hasProductFilter && !hasWarehouseFilter) {
+          totalMyDebtDiscount += convertVoucherToTarget(v.totalDiscount || 0, v.currencyId || usdId, v.exchangeRate);
         }
       } else if (v.type === "expense") {
         if (productIds !== null || categories !== null || brands !== null) {

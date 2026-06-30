@@ -404,15 +404,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               }
             }
             
-            if (voucher.hasDelivery || voucher.delivery) {
+            if (voucher.hasDelivery) {
               setHasDelivery(true);
-              const del = voucher.delivery || {};
-              setDeliveryName(del.name || "");
-              setDeliveryPhone(del.phone || "");
-              setDeliveryCity(del.city || "");
-              setDeliveryAddress(del.address || "");
-              setDeliveryFee(String(del.fee || ""));
-              setDeliveryNote(del.note || "");
+              setDeliveryName(voucher.driverName || "");
+              setDeliveryPhone(voucher.driverPhone || "");
+              setDeliveryCity(voucher.deliveryCity || "");
+              setDeliveryAddress(voucher.deliveryAddress || "");
+              setDeliveryFee(voucher.deliveryFee ? String(voucher.deliveryFee) : "");
             }
             
             if (voucher.exchangeRate) {
@@ -657,8 +655,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     invoiceDiscountValue
   );
 
-  const deliveryFeeAmount =
-    hasDelivery && deliveryFee.trim() ? toNumber(deliveryFee) : 0;
+  const iqdCurrencyId = currencies.find((c: any) => c.code === "IQD")?.id || 12;
+  const rateForDelivery = (toNumber(exchangeRate) / 100) || 1500;
+
+  const deliveryFeeAmount = useMemo(() => {
+    const rawFee = hasDelivery && deliveryFee.trim() ? toNumber(deliveryFee) : 0;
+    if (rawFee <= 0) return 0;
+    if (invoiceCurrencyId === iqdCurrencyId) return rawFee;
+    return rawFee / rateForDelivery;
+  }, [deliveryFee, hasDelivery, invoiceCurrencyId, iqdCurrencyId, rateForDelivery]);
 
   const total =
     Math.max(itemsSubtotal - invoiceDiscountAmount, 0) + deliveryFeeAmount;
@@ -1520,7 +1525,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       driverPhone: deliveryPhone || null,
       deliveryCity: deliveryCity || null,
       deliveryAddress: deliveryAddress || null,
-      deliveryFee: deliveryFeeAmount || null,
+      deliveryFee: (hasDelivery && deliveryFee.trim()) ? toNumber(deliveryFee) : null,
       lines: rows.map((row: any) => {
         const warehouseId = warehouses.find((w: any) => w.name === row.warehouseName)?.id || warehouses[0]?.id || 1;
         return {
@@ -2809,7 +2814,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   />
                 </Field>
 
-                <Field label="کرێی دلیڤەری">
+                <Field label="کرێی دلیڤەری (دینار)">
                   <FormattedNumberInput
                     value={deliveryFee}
                     disabled={isInvoiceLocked}

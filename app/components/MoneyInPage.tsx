@@ -14,6 +14,7 @@ import {
 import { store, useStore } from "../store/store";
 import { calculateLedgerEntries } from "../utils/ledgerHelper";
 import { currencies as mockCurrencies } from "../data/mockData";
+import { useRouter } from "next/navigation";
 
 type ToastType = "error" | "success" | "info";
 type PaidAmounts = Record<number, string>;
@@ -63,11 +64,14 @@ type Props = {
 
 export default function MoneyInPage({ headerSelector, editId }: Props) {
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
+  const router = useRouter();
 
   useEffect(() => {
     setIsEditLoading(!!editId);
     if (editId) {
       setSavedSnapshot("");
+    } else {
+      resetReceipt();
     }
   }, [editId]);
 
@@ -155,6 +159,8 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             setPrintNote(voucher.printNote || "");
             if (voucher.internalNote || voucher.printNote) setShowNotes(true);
 
+            setDiscountAmount(voucher.totalDiscount ? String(voucher.totalDiscount) : "");
+
             if (voucher.exchangeRate) {
               setExchangeRate(String(voucher.exchangeRate * 100));
             }
@@ -204,6 +210,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   const [receiptNote, setReceiptNote] = useState("");
   const [printNote, setPrintNote] = useState("");
   const [showNotes, setShowNotes] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState("");
 
   const [showSettings, setShowSettings] = useState(false);
   const [showNewReceiptConfirm, setShowNewReceiptConfirm] = useState(false);
@@ -364,17 +371,24 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       netAmount: 0,
       currencyId: activeTargetCurrencyId,
       exchangeRate: rate,
-      paidAmounts: getPaidCurrencies().map((p: any) => ({
-        currencyId: p.currencyId,
-        amount: p.amount,
-        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
-      })),
+      paidAmounts: [
+        ...getPaidCurrencies().map((p: any) => ({
+          currencyId: p.currencyId,
+          amount: p.amount,
+          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+        })),
+        ...(toNumber(discountAmount) > 0 ? [{
+          currencyId: activeTargetCurrencyId,
+          amount: toNumber(discountAmount),
+          exchangeRate: 1
+        }] : [])
+      ],
       extraPaymentHandling: null,
       balanceBeforeByCurrency: before
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount]);
 
   const screenAccountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
@@ -387,17 +401,24 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       netAmount: 0,
       currencyId: activeTargetCurrencyId,
       exchangeRate: rate,
-      paidAmounts: getPaidCurrencies().map((p: any) => ({
-        currencyId: p.currencyId,
-        amount: p.amount,
-        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
-      })),
+      paidAmounts: [
+        ...getPaidCurrencies().map((p: any) => ({
+          currencyId: p.currencyId,
+          amount: p.amount,
+          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+        })),
+        ...(toNumber(discountAmount) > 0 ? [{
+          currencyId: activeTargetCurrencyId,
+          amount: toNumber(discountAmount),
+          exchangeRate: 1
+        }] : [])
+      ],
       extraPaymentHandling: null,
       balanceBeforeByCurrency: before
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount]);
 
   const currentSnapshot = useMemo(() => {
     return JSON.stringify({
@@ -410,6 +431,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       exchangeRate,
       receiptNote,
       printNote,
+      discountAmount,
     });
   }, [
     accountId,
@@ -421,6 +443,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     exchangeRate,
     receiptNote,
     printNote,
+    discountAmount,
   ]);
 
   
@@ -759,11 +782,18 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       netAmount: 0,
       currencyId: activeTargetCurrencyId,
       exchangeRate: rate,
-      paidAmounts: getPaidCurrencies().map((p: any) => ({
-        currencyId: p.currencyId,
-        amount: p.amount,
-        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
-      })),
+      paidAmounts: [
+        ...getPaidCurrencies().map((p: any) => ({
+          currencyId: p.currencyId,
+          amount: p.amount,
+          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+        })),
+        ...(toNumber(discountAmount) > 0 ? [{
+          currencyId: activeTargetCurrencyId,
+          amount: toNumber(discountAmount),
+          exchangeRate: 1
+        }] : [])
+      ],
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before
     });
@@ -780,6 +810,10 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   }
 
   function resetReceipt() {
+    if (editId) {
+      router.push("/invoices?type=money_in");
+      return;
+    }
     setReceiptNumber("");
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
@@ -806,6 +840,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     setSavedSnapshot("");
     setIsLocked(false);
     setTargetCurrencyId(undefined);
+    setDiscountAmount("");
   }
 
   function hasUnsavedData() {
@@ -816,7 +851,8 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       accountSearch.trim() !== "" ||
       hasPaid ||
       receiptNote.trim() !== "" ||
-      printNote.trim() !== ""
+      printNote.trim() !== "" ||
+      toNumber(discountAmount) > 0
     );
   }
 
@@ -850,11 +886,18 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       netAmount: 0,
       currencyId: activeTargetCurrencyId,
       exchangeRate: rate,
-      paidAmounts: getPaidCurrencies().map((p: any) => ({
-        currencyId: p.currencyId,
-        amount: p.amount,
-        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
-      })),
+      paidAmounts: [
+        ...getPaidCurrencies().map((p: any) => ({
+          currencyId: p.currencyId,
+          amount: p.amount,
+          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+        })),
+        ...(toNumber(discountAmount) > 0 ? [{
+          currencyId: activeTargetCurrencyId,
+          amount: toNumber(discountAmount),
+          exchangeRate: 1
+        }] : [])
+      ],
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before
     });
@@ -901,6 +944,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       currencyId: activeTargetCurrencyId,
       exchangeRate: rate,
       totalAmount: totalPaidInTargetCurrency,
+      totalDiscount: toNumber(discountAmount),
       netAmount: 0,
       internalNote: receiptNote,
       printNote,
@@ -973,11 +1017,18 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       netAmount: 0,
       currencyId: activeTargetCurrencyId,
       exchangeRate: rate,
-      paidAmounts: getPaidCurrencies().map((p: any) => ({
-        currencyId: p.currencyId,
-        amount: p.amount,
-        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
-      })),
+      paidAmounts: [
+        ...getPaidCurrencies().map((p: any) => ({
+          currencyId: p.currencyId,
+          amount: p.amount,
+          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+        })),
+        ...(toNumber(discountAmount) > 0 ? [{
+          currencyId: activeTargetCurrencyId,
+          amount: toNumber(discountAmount),
+          exchangeRate: 1
+        }] : [])
+      ],
       extraPaymentHandling: null,
       balanceBeforeByCurrency: before
     });
@@ -1225,7 +1276,13 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
           <div style={totalsCard}>
             <div style={totalGrid}>
               <StatBox title="پارەی دراو" value={getPaidSummaryText()} color="#16a34a" />
-              
+              {toNumber(discountAmount) > 0 && (
+                <StatBox
+                  title="داشکاندن"
+                  value={`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.symbol || "$") : "$"}`}
+                  color="#dc2626"
+                />
+              )}
             </div>
 
             <Field label="قاسە">
@@ -1317,17 +1374,31 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
               })}
             </div>
 
-            <Field label="بەروار">
-              <DateInput
-                value={receiptDate}
-                disabled={isLocked}
-                onChange={(val) => {
-                  if (blockIfLocked()) return;
-                  setReceiptDate(val);
-                }}
-                style={{ ...input, ...lockedFieldStyle }}
-              />
-            </Field>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Field label="بەروار">
+                <DateInput
+                  value={receiptDate}
+                  disabled={isLocked}
+                  onChange={(val) => {
+                    if (blockIfLocked()) return;
+                    setReceiptDate(val);
+                  }}
+                  style={{ ...input, ...lockedFieldStyle }}
+                />
+              </Field>
+              <Field label={`داشکاندن (${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.code || "USD") : "USD"})`}>
+                <FormattedNumberInput
+                  value={discountAmount}
+                  disabled={isLocked}
+                  onChange={(val) => {
+                    if (blockIfLocked()) return;
+                    setDiscountAmount(onlyDecimal(val));
+                  }}
+                  placeholder="0"
+                  style={{ ...input, ...lockedFieldStyle }}
+                />
+              </Field>
+            </div>
 
             <div style={noteToggleBox}>
               <button
@@ -1487,6 +1558,12 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                 bold
               />
               <PrintSummaryLine label="پارەی دراو" value={getPaidSummaryText()} />
+              {toNumber(discountAmount) > 0 && (
+                <PrintSummaryLine
+                  label="داشکاندن"
+                  value={`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.symbol || "$") : "$"}`}
+                />
+              )}
               <PrintSummaryLine
                 label="کۆی گشتی ماوە"
                 value={formatCurrencyMap(accountBalanceAfterByCurrency)}

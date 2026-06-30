@@ -426,13 +426,20 @@ export async function PUT(
           const { ledgerEntries: computedEntries } = calculateLedgerEntries({
             type: updated.type,
             netAmount: updated.netAmount,
-            currencyId: updated.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 5,
+            currencyId: updated.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 11,
             exchangeRate: updated.exchangeRate,
-            paidAmounts: data.paidAmounts ? data.paidAmounts.map((pa: any) => ({
-              currencyId: Number(pa.currencyId),
-              amount: Number(pa.amount),
-              exchangeRate: Number(pa.exchangeRate || 1)
-            })) : [],
+            paidAmounts: [
+              ...(data.paidAmounts ? data.paidAmounts.map((pa: any) => ({
+                currencyId: Number(pa.currencyId),
+                amount: Number(pa.amount),
+                exchangeRate: Number(pa.exchangeRate || 1)
+              })) : []),
+              ...(Number(data.totalDiscount) > 0 ? [{
+                currencyId: updated.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 11,
+                amount: Number(data.totalDiscount),
+                exchangeRate: 1
+              }] : [])
+            ],
             extraPaymentHandling: data.extraPaymentHandling || null,
             balanceBeforeByCurrency,
             currencies: dbCurrencies

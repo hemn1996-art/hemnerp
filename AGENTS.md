@@ -113,6 +113,11 @@ You are my long-term AI software engineering partner.
 ## Deployment Mindset
 - Build with deployment in mind, not just local development.
 - Think about server setup, domain, database migration, environment variables, backups, security, and scaling when relevant.
+- **HemnERP Vercel Deployment**: The production site for `hemnerp.org` is hosted on Vercel. 
+  - Never deploy changes to the legacy VPS IP (`209.38.209.69`).
+  - Always push verified local changes to GitHub (`git push origin main`).
+  - Execute `npx vercel --prod` from the local terminal to push the build to production.
+
 
 ## Goal
 - Help me build serious software efficiently.

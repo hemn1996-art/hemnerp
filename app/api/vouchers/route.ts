@@ -349,13 +349,20 @@ export async function POST(request: Request) {
           const { ledgerEntries: computedEntries } = calculateLedgerEntries({
             type: createdVoucher.type,
             netAmount: createdVoucher.netAmount,
-            currencyId: createdVoucher.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 5,
+            currencyId: createdVoucher.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 11,
             exchangeRate: createdVoucher.exchangeRate,
-            paidAmounts: data.paidAmounts ? data.paidAmounts.map((pa: any) => ({
-              currencyId: Number(pa.currencyId),
-              amount: Number(pa.amount),
-              exchangeRate: Number(pa.exchangeRate || 1)
-            })) : [],
+            paidAmounts: [
+              ...(data.paidAmounts ? data.paidAmounts.map((pa: any) => ({
+                currencyId: Number(pa.currencyId),
+                amount: Number(pa.amount),
+                exchangeRate: Number(pa.exchangeRate || 1)
+              })) : []),
+              ...(Number(data.totalDiscount) > 0 ? [{
+                currencyId: createdVoucher.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 11,
+                amount: Number(data.totalDiscount),
+                exchangeRate: 1
+              }] : [])
+            ],
             extraPaymentHandling: data.extraPaymentHandling || null,
             balanceBeforeByCurrency,
             currencies: dbCurrencies
