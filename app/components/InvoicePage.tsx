@@ -343,12 +343,36 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               if (acc) {
                 setAccountSearch(acc.name);
               }
-            } else if (voucher.isTemporaryCustomer || voucher.temporaryCustomer) {
-              setIsTemporaryCustomer(true);
-              const temp = voucher.temporaryCustomer || {};
-              setTempCustomerName(temp.name || "");
-              setTempCustomerPhone(temp.phone || "");
-              setTempCustomerAddress(temp.address || "");
+            } else {
+              // Find temporary customer details inside voucher.versions
+              let tempCust = null;
+              if (voucher.versions && Array.isArray(voucher.versions)) {
+                for (let i = voucher.versions.length - 1; i >= 0; i--) {
+                  try {
+                    const parsed = JSON.parse(voucher.versions[i].data);
+                    if (parsed) {
+                      if (parsed.temporaryCustomer && (parsed.temporaryCustomer.name || parsed.temporaryCustomer.phone)) {
+                        tempCust = parsed.temporaryCustomer;
+                        break;
+                      }
+                      if (parsed.tempCustomerName || parsed.tempCustomerPhone) {
+                        tempCust = {
+                          name: parsed.tempCustomerName,
+                          phone: parsed.tempCustomerPhone,
+                          address: parsed.tempCustomerAddress
+                        };
+                        break;
+                      }
+                    }
+                  } catch {}
+                }
+              }
+              if (tempCust) {
+                setIsTemporaryCustomer(true);
+                setTempCustomerName(tempCust.name || "");
+                setTempCustomerPhone(tempCust.phone || "");
+                setTempCustomerAddress(tempCust.address || "");
+              }
             }
             
             setCashboxId(voucher.cashboxId || undefined);

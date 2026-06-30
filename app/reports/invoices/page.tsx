@@ -2073,7 +2073,7 @@ function InvoiceReportContent() {
                               {(() => {
                                 const tempCust = getTemporaryCustomer(voucher);
                                 if (tempCust && tempCust.name) {
-                                  return <span>{tempCust.name} <span className="text-[10px] text-gray-400 font-normal">(هەژماری کاتی)</span></span>;
+                                  return <span>{tempCust.name}</span>;
                                 }
                                 if (voucher.account) {
                                   return (
