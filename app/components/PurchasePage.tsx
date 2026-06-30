@@ -839,6 +839,19 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   }, [editId, isEditLoading, currentSnapshot, savedSnapshot]);
 
   const isSaved = rows.length > 0 && savedSnapshot === currentSnapshot;
+  useEffect(() => {
+    const checkFn = () => {
+      const unsaved = !isSaved && !isLocked && hasUnsavedData();
+      return { unsaved, isEdit: !!editId };
+    };
+    checkFn.owner = 'PurchasePage.tsx';
+    (window as any).hasUnsavedChanges = checkFn;
+    return () => {
+      if ((window as any).hasUnsavedChanges && (window as any).hasUnsavedChanges.owner === 'PurchasePage.tsx') {
+        delete (window as any).hasUnsavedChanges;
+      }
+    };
+  }, [isSaved, isLocked, editId, currentSnapshot]);
 
   function showToast(message: string, type: ToastType = "error") {
     setToastMessage(message);

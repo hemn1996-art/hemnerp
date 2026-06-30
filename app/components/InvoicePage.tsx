@@ -8,6 +8,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type CSSProperties,
   type ReactNode,
 } from "react";
@@ -248,6 +249,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   );
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
 
+  const lastLoadedEditIdRef = useRef<string | null>(null);
+
   const [exchangeRate, setExchangeRate] = useState("150000");
 
   const [productSearch, setProductSearch] = useState("");
@@ -332,6 +335,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   useEffect(() => {
     if (editId) {
+      if (lastLoadedEditIdRef.current === editId) return;
+      lastLoadedEditIdRef.current = editId;
       fetch(`/api/vouchers/${editId}`)
         .then((res) => res.json())
         .then((voucher) => {
@@ -868,6 +873,20 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const isInvoiceSaved =
     rows.length > 0 && savedInvoiceSnapshot === currentInvoiceSnapshot;
+
+  useEffect(() => {
+    const checkFn = () => {
+      const unsaved = !isInvoiceSaved && !isInvoiceLocked && (rows.length > 0 || hasUnsavedInvoiceData());
+      return { unsaved, isEdit: !!editId };
+    };
+    checkFn.owner = 'InvoicePage';
+    (window as any).hasUnsavedChanges = checkFn;
+    return () => {
+      if ((window as any).hasUnsavedChanges && (window as any).hasUnsavedChanges.owner === 'InvoicePage') {
+        delete (window as any).hasUnsavedChanges;
+      }
+    };
+  }, [isInvoiceSaved, isInvoiceLocked, rows, editId]);
 
   const salesAccounts = useMemo(() => {
     return accounts.filter((account: any) => {
@@ -1493,6 +1512,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setTempCustomerName("");
     setTempCustomerPhone("");
     setTempCustomerAddress("");
+    lastLoadedEditIdRef.current = null;
   }
 
   function handleNewInvoice() {

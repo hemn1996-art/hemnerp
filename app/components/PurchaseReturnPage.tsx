@@ -505,6 +505,19 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   }, [editId, isEditLoading, currentSnapshot, savedSnapshot]);
 
   const isSaved = rows.length > 0 && savedSnapshot === currentSnapshot;
+  useEffect(() => {
+    const checkFn = () => {
+      const unsaved = !isSaved && !isLocked && hasUnsavedData();
+      return { unsaved, isEdit: !!editId };
+    };
+    checkFn.owner = 'PurchaseReturnPage.tsx';
+    (window as any).hasUnsavedChanges = checkFn;
+    return () => {
+      if ((window as any).hasUnsavedChanges && (window as any).hasUnsavedChanges.owner === 'PurchaseReturnPage.tsx') {
+        delete (window as any).hasUnsavedChanges;
+      }
+    };
+  }, [isSaved, isLocked, editId, currentSnapshot]);
 
   function showToast(message: string, type: ToastType = "error") {
     setToastMessage(message);

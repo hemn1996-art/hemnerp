@@ -101,6 +101,7 @@ function InvoicesRouteContent() {
     return null;
   });
   const [isOpen, setIsOpen]       = useState(false);
+  const [pendingTab, setPendingTab] = useState<{ value: string; isEdit: boolean } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Helper to clear editId from URL and navigate clean
@@ -233,6 +234,19 @@ function InvoicesRouteContent() {
                 <button
                   key={item.value}
                   onClick={() => {
+                    const checkFn = (window as any).hasUnsavedChanges;
+                    if (typeof checkFn === "function") {
+                      const checkResult = checkFn();
+                      if (checkResult.unsaved) {
+                        setPendingTab({
+                          value: item.value,
+                          isEdit: checkResult.isEdit
+                        });
+                        setIsOpen(false);
+                        return;
+                      }
+                    }
+
                     setActiveTab(item.value);
                     setIsOpen(false);
                     if (editId && dbVoucherType === item.value) {
@@ -277,6 +291,109 @@ function InvoicesRouteContent() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
         {renderActiveComponent()}
       </div>
+      {pendingTab && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(15, 23, 42, 0.65)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 99999,
+        }}>
+          <div style={{
+            background: "#ffffff",
+            padding: 30,
+            borderRadius: 20,
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+            width: "90%",
+            maxWidth: 550,
+            textAlign: "center",
+            border: "1px solid #e2e8f0",
+          }}>
+            <div style={{
+              fontSize: 48,
+              marginBottom: 16
+            }}>
+              ⚠️
+            </div>
+
+            <h2 style={{
+              fontSize: 22,
+              fontWeight: 900,
+              color: "#1e293b",
+              margin: "0 0 12px 0",
+              lineHeight: "1.4"
+            }}>
+              {pendingTab.isEdit 
+                ? "تۆ ئەم پسوڵەیەت نوێ نەکردووەتەوە."
+                : "تۆ ئەم پسوڵەیەت خەزن نەکردوە."
+              }
+            </h2>
+            <p style={{
+              fontSize: 16,
+              color: "#64748b",
+              margin: "0 0 28px 0",
+              fontWeight: 500
+            }}>
+              دەتەوێت چی بکەیت؟
+            </p>
+
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12
+            }}>
+              <button
+                onClick={() => {
+                  const targetTab = pendingTab.value;
+                  setPendingTab(null);
+                  setActiveTab(targetTab);
+                  if (editId && dbVoucherType === targetTab) {
+                    router.push(`/invoices?editId=${editId}&type=${targetTab}`);
+                  } else {
+                    router.push(`/invoices?type=${targetTab}`);
+                  }
+                }}
+                style={{
+                  background: "#dc2626",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: "14px 20px",
+                  fontSize: 17,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                  transition: "background 0.2s",
+                }}
+              >
+                بڕۆ بۆ پسووڵەی تر
+              </button>
+              
+              <button
+                onClick={() => setPendingTab(null)}
+                style={{
+                  background: "#f1f5f9",
+                  color: "#475569",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 12,
+                  padding: "14px 20px",
+                  fontSize: 17,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "background 0.2s",
+                }}
+              >
+                بگەڕێوە سەر پسووڵەکە
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

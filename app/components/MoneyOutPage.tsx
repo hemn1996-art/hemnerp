@@ -349,6 +349,26 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
   const isMultiCurrencyAccount = activeBalances.length > 1;
 
+  const getDiscountLedgerPayload = (activeTargetId: number, rate: number) => {
+    const rawDiscount = toNumber(discountAmount);
+    if (rawDiscount <= 0) return null;
+
+    if (!isMultiCurrencyAccount && activeDiscountCurrencyId !== activeTargetId) {
+      const converted = convertCurrency(rawDiscount, activeDiscountCurrencyId, activeTargetId);
+      return {
+        currencyId: activeTargetId,
+        amount: converted,
+        exchangeRate: 1
+      };
+    }
+
+    return {
+      currencyId: activeDiscountCurrencyId,
+      amount: rawDiscount,
+      exchangeRate: (activeDiscountCurrencyId === activeTargetId) ? 1 : rate
+    };
+  };
+
   useEffect(() => {
     if (selectedAccount) {
       if (activeBalances.length > 1) {
@@ -398,66 +418,6 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const activeDiscountCurrencyId = discountCurrencyId || activeTargetCurrencyId || 1;
   const showRate = hasMixedPaidCurrency || paidCurrencyId !== activeTargetCurrencyId;
 
-  const accountBalanceAfterByCurrency = useMemo(() => {
-    if (!selectedAccount) return {};
-    const before = accountBalanceBeforeByCurrency;
-    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
-    const rate = toNumber(exchangeRate) / 100;
-
-    const result = calculateLedgerEntries({
-      type: "money_out",
-      netAmount: 0,
-      currencyId: activeTargetCurrencyId,
-      exchangeRate: rate,
-      paidAmounts: [
-        ...getPaidCurrencies().map((p: any) => ({
-          currencyId: p.currencyId,
-          amount: p.amount,
-          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
-        })),
-        ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeDiscountCurrencyId,
-          amount: toNumber(discountAmount),
-          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
-        }] : [])
-      ],
-      extraPaymentHandling: null,
-      balanceBeforeByCurrency: before
-    });
-
-    return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId]);
-
-  const screenAccountBalanceAfterByCurrency = useMemo(() => {
-    if (!selectedAccount) return {};
-    const before = screenAccountBalanceBeforeByCurrency;
-    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
-    const rate = toNumber(exchangeRate) / 100;
-
-    const result = calculateLedgerEntries({
-      type: "money_out",
-      netAmount: 0,
-      currencyId: activeTargetCurrencyId,
-      exchangeRate: rate,
-      paidAmounts: [
-        ...getPaidCurrencies().map((p: any) => ({
-          currencyId: p.currencyId,
-          amount: p.amount,
-          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
-        })),
-        ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeDiscountCurrencyId,
-          amount: toNumber(discountAmount),
-          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
-        }] : [])
-      ],
-      extraPaymentHandling: null,
-      balanceBeforeByCurrency: before
-    });
-
-    return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId]);
-
   const currentSnapshot = useMemo(() => {
     return JSON.stringify({
       accountId,
@@ -497,6 +457,78 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   }, [editId, isEditLoading, currentSnapshot, savedSnapshot]);
 
   const isSaved = savedSnapshot !== "" && savedSnapshot === currentSnapshot;
+
+  const accountBalanceAfterByCurrency = useMemo(() => {
+    if (!selectedAccount) return {};
+    const before = accountBalanceBeforeByCurrency;
+    if (isSaved && !editId) {
+      return before;
+    }
+    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
+    const rate = toNumber(exchangeRate) / 100;
+
+    const result = calculateLedgerEntries({
+      type: "money_out",
+      netAmount: 0,
+      currencyId: activeTargetCurrencyId,
+      exchangeRate: rate,
+      paidAmounts: [
+        ...getPaidCurrencies().map((p: any) => ({
+          currencyId: p.currencyId,
+          amount: p.amount,
+          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+        })),
+        ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
+      ],
+      extraPaymentHandling: null,
+      balanceBeforeByCurrency: before
+    });
+
+    return result.balanceAfterByCurrency;
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isSaved, editId]);
+
+  const screenAccountBalanceAfterByCurrency = useMemo(() => {
+    if (!selectedAccount) return {};
+    const before = screenAccountBalanceBeforeByCurrency;
+    if (isSaved && !editId) {
+      return before;
+    }
+    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
+    const rate = toNumber(exchangeRate) / 100;
+
+    const result = calculateLedgerEntries({
+      type: "money_out",
+      netAmount: 0,
+      currencyId: activeTargetCurrencyId,
+      exchangeRate: rate,
+      paidAmounts: [
+        ...getPaidCurrencies().map((p: any) => ({
+          currencyId: p.currencyId,
+          amount: p.amount,
+          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+        })),
+        ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
+      ],
+      extraPaymentHandling: null,
+      balanceBeforeByCurrency: before
+    });
+
+    return result.balanceAfterByCurrency;
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isSaved, editId]);
+
+  useEffect(() => {
+    const checkFn = () => {
+      const unsaved = !isSaved && !isLocked && hasUnsavedData();
+      return { unsaved, isEdit: !!editId };
+    };
+    checkFn.owner = 'MoneyOutPage.tsx';
+    (window as any).hasUnsavedChanges = checkFn;
+    return () => {
+      if ((window as any).hasUnsavedChanges && (window as any).hasUnsavedChanges.owner === 'MoneyOutPage.tsx') {
+        delete (window as any).hasUnsavedChanges;
+      }
+    };
+  }, [isSaved, isLocked, editId, currentSnapshot]);
 
   function showToast(message: string, type: ToastType = "error") {
     setToastMessage(message);
@@ -859,11 +891,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           amount: p.amount,
           exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
         })),
-        ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeDiscountCurrencyId,
-          amount: toNumber(discountAmount),
-          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
-        }] : [])
+        ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
       ],
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before
@@ -964,11 +992,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           amount: p.amount,
           exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
         })),
-        ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeDiscountCurrencyId,
-          amount: toNumber(discountAmount),
-          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
-        }] : [])
+        ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
       ],
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before
@@ -1096,11 +1120,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           amount: p.amount,
           exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
         })),
-        ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeDiscountCurrencyId,
-          amount: toNumber(discountAmount),
-          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
-        }] : [])
+        ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
       ],
       extraPaymentHandling: null,
       balanceBeforeByCurrency: accountBalanceBeforeByCurrency

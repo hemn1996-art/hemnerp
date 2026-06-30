@@ -284,6 +284,19 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
   }, [editId, isEditLoading, currentSnapshot, savedSnapshot]);
 
   const isSaved = savedSnapshot !== "" && savedSnapshot === currentSnapshot;
+  useEffect(() => {
+    const checkFn = () => {
+      const unsaved = !isSaved && !isLocked && hasUnsavedData();
+      return { unsaved, isEdit: !!editId };
+    };
+    checkFn.owner = 'QuotationPage.tsx';
+    (window as any).hasUnsavedChanges = checkFn;
+    return () => {
+      if ((window as any).hasUnsavedChanges && (window as any).hasUnsavedChanges.owner === 'QuotationPage.tsx') {
+        delete (window as any).hasUnsavedChanges;
+      }
+    };
+  }, [isSaved, isLocked, editId, currentSnapshot]);
 
   function showToast(message: string, type: ToastType = "error") {
     setToastMessage(message);
