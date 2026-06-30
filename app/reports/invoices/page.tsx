@@ -165,12 +165,21 @@ function InvoiceReportContent() {
       for (let i = v.versions.length - 1; i >= 0; i--) {
         try {
           const parsed = JSON.parse(v.versions[i].data);
-          if (parsed && (parsed.tempCustomerName || parsed.tempCustomerPhone)) {
-            return {
-              name: parsed.tempCustomerName,
-              phone: parsed.tempCustomerPhone,
-              address: parsed.tempCustomerAddress
-            };
+          if (parsed) {
+            if (parsed.temporaryCustomer && (parsed.temporaryCustomer.name || parsed.temporaryCustomer.phone)) {
+              return {
+                name: parsed.temporaryCustomer.name,
+                phone: parsed.temporaryCustomer.phone,
+                address: parsed.temporaryCustomer.address
+              };
+            }
+            if (parsed.tempCustomerName || parsed.tempCustomerPhone) {
+              return {
+                name: parsed.tempCustomerName,
+                phone: parsed.tempCustomerPhone,
+                address: parsed.tempCustomerAddress
+              };
+            }
           }
         } catch {}
       }

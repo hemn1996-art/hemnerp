@@ -1565,6 +1565,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         if (editId) {
           // In edit mode: don't lock, allow further edits
           showToast("پسوڵەکە نوێکرایەوە ✅", "success");
+          router.push(`/reports/invoices?t=${Date.now()}`);
         } else {
           setIsInvoiceLocked(true);
           showToast("پسوڵەکە خەزن کرا ✅ ئەم پسوڵەیە ئیتر قوفڵ کرا.", "success");
