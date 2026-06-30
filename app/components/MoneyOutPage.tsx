@@ -120,7 +120,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     }
 
     if (currencies.length === 0) fetchCurrencies();
-    if (accounts.length === 0) fetchAccounts();
+    fetchAccounts();
     if (cashboxes.length === 0) fetchCashboxes();
   }, [editId]);
 
@@ -164,27 +164,42 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
               if (firstPaidCurrency) {
                 setPaidCurrencyId(firstPaidCurrency.currencyId);
               }
-              setReceiptNote(voucher.internalNote || "");
-              setPrintNote(voucher.printNote || "");
-              if (voucher.internalNote || voucher.printNote) setShowNotes(true);
+            }
+            setReceiptNote(voucher.internalNote || "");
+            setPrintNote(voucher.printNote || "");
+            if (voucher.internalNote || voucher.printNote) setShowNotes(true);
 
-              setDiscountAmount(voucher.totalDiscount ? String(voucher.totalDiscount) : "");
+            setDiscountAmount(voucher.totalDiscount ? String(voucher.totalDiscount) : "");
 
-              if (voucher.exchangeRate) {
-                setExchangeRate(String(voucher.exchangeRate * 100));
+            let loadedDiscountCurId = voucher.currencyId || 1;
+            if (voucher.versions && Array.isArray(voucher.versions)) {
+              for (let i = voucher.versions.length - 1; i >= 0; i--) {
+                try {
+                  const parsed = JSON.parse(voucher.versions[i].data);
+                  if (parsed && parsed.discountCurrencyId) {
+                    loadedDiscountCurId = Number(parsed.discountCurrencyId);
+                    break;
+                  }
+                } catch {}
               }
-              if (voucher.employeeName) {
-                setEmployeeName(voucher.employeeName);
-              }
-              if (voucher.employeePhone) {
-                setEmployeePhone(voucher.employeePhone);
-              }
-              if (voucher.currencyId) {
-                setTargetCurrencyId(voucher.currencyId);
-              }
+            }
+            setDiscountCurrencyId(loadedDiscountCurId);
+
+            if (voucher.exchangeRate) {
+              setExchangeRate(String(voucher.exchangeRate * 100));
+            }
+            if (voucher.employeeName) {
+              setEmployeeName(voucher.employeeName);
+            }
+            if (voucher.employeePhone) {
+              setEmployeePhone(voucher.employeePhone);
+            }
+            if (voucher.currencyId) {
+              setTargetCurrencyId(voucher.currencyId);
             }
 
             setIsLocked(false);
+            fetchAccounts();
           }
         })
         .catch((err) => console.error("Error loading voucher:", err))
@@ -221,6 +236,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const [printNote, setPrintNote] = useState("");
   const [showNotes, setShowNotes] = useState(false);
   const [discountAmount, setDiscountAmount] = useState("");
+  const [discountCurrencyId, setDiscountCurrencyId] = useState<number | undefined>();
 
   const [showSettings, setShowSettings] = useState(false);
   const [showNewReceiptConfirm, setShowNewReceiptConfirm] = useState(false);
@@ -379,6 +395,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     new Set(paidCurrencies.map((x: any) => x.currencyId)).size > 1;
 
   const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
+  const activeDiscountCurrencyId = discountCurrencyId || activeTargetCurrencyId || 1;
   const showRate = hasMixedPaidCurrency || paidCurrencyId !== activeTargetCurrencyId;
 
   const accountBalanceAfterByCurrency = useMemo(() => {
@@ -399,9 +416,9 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
         })),
         ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeTargetCurrencyId,
+          currencyId: activeDiscountCurrencyId,
           amount: toNumber(discountAmount),
-          exchangeRate: 1
+          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
         }] : [])
       ],
       extraPaymentHandling: null,
@@ -409,7 +426,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId]);
 
   const screenAccountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
@@ -429,9 +446,9 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
         })),
         ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeTargetCurrencyId,
+          currencyId: activeDiscountCurrencyId,
           amount: toNumber(discountAmount),
-          exchangeRate: 1
+          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
         }] : [])
       ],
       extraPaymentHandling: null,
@@ -439,7 +456,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId]);
 
   const currentSnapshot = useMemo(() => {
     return JSON.stringify({
@@ -454,6 +471,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
       receiptNote,
       printNote,
       discountAmount,
+      discountCurrencyId,
     });
   }, [
     accountId,
@@ -467,6 +485,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     receiptNote,
     printNote,
     discountAmount,
+    discountCurrencyId,
   ]);
 
   
@@ -841,9 +860,9 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
         })),
         ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeTargetCurrencyId,
+          currencyId: activeDiscountCurrencyId,
           amount: toNumber(discountAmount),
-          exchangeRate: 1
+          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
         }] : [])
       ],
       extraPaymentHandling: extraHandling,
@@ -893,6 +912,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     setIsLocked(false);
     setTargetCurrencyId(undefined);
     setDiscountAmount("");
+    setDiscountCurrencyId(undefined);
   }
 
   function hasUnsavedData() {
@@ -945,9 +965,9 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
         })),
         ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeTargetCurrencyId,
+          currencyId: activeDiscountCurrencyId,
           amount: toNumber(discountAmount),
-          exchangeRate: 1
+          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
         }] : [])
       ],
       extraPaymentHandling: extraHandling,
@@ -997,6 +1017,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
       exchangeRate: rate,
       totalAmount: totalPaidInTargetCurrency,
       totalDiscount: toNumber(discountAmount),
+      discountCurrencyId: activeDiscountCurrencyId,
       netAmount: 0,
       internalNote: receiptNote,
       printNote,
@@ -1032,6 +1053,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
               })
               .catch((err) => console.error("Error refetching updated voucher:", err));
           }
+          fetchAccounts();
           setSavedSnapshot(currentSnapshot);
           showToast(
             editId
@@ -1075,9 +1097,9 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
         })),
         ...(toNumber(discountAmount) > 0 ? [{
-          currencyId: activeTargetCurrencyId,
+          currencyId: activeDiscountCurrencyId,
           amount: toNumber(discountAmount),
-          exchangeRate: 1
+          exchangeRate: (activeDiscountCurrencyId === activeTargetCurrencyId) ? 1 : rate
         }] : [])
       ],
       extraPaymentHandling: null,
@@ -1339,7 +1361,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
               {toNumber(discountAmount) > 0 && (
                 <StatBox
                   title="داشکاندن"
-                  value={`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.symbol || "$") : "$"}`}
+                  value={`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currencies.find((c: any) => c.id === activeDiscountCurrencyId)?.symbol || "$"}`}
                   color="#dc2626"
                 />
               )}
@@ -1446,17 +1468,34 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                   style={{ ...input, ...lockedFieldStyle }}
                 />
               </Field>
-              <Field label={`داشکاندن (${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.code || "USD") : "USD"})`}>
-                <FormattedNumberInput
-                  value={discountAmount}
-                  disabled={isLocked}
-                  onChange={(val) => {
-                    if (blockIfLocked()) return;
-                    setDiscountAmount(onlyDecimal(val));
-                  }}
-                  placeholder="0"
-                  style={{ ...input, ...lockedFieldStyle }}
-                />
+              <Field label="داشکاندن">
+                <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden", width: "100%" }}>
+                  <FormattedNumberInput
+                    value={discountAmount}
+                    disabled={isLocked}
+                    onChange={(val) => {
+                      if (blockIfLocked()) return;
+                      setDiscountAmount(onlyDecimal(val));
+                    }}
+                    placeholder="0"
+                    style={{ ...input, border: "none", flex: 1, outline: "none" }}
+                  />
+                  <select
+                    value={activeDiscountCurrencyId}
+                    disabled={isLocked}
+                    onChange={(e) => {
+                      if (blockIfLocked()) return;
+                      setDiscountCurrencyId(Number(e.target.value));
+                    }}
+                    style={{ border: "none", borderLeft: "1px solid #d1d5db", background: "#f8fafc", padding: "0 12px", outline: "none", fontWeight: "bold", color: "#1e293b", cursor: isLocked ? "not-allowed" : "pointer", minWidth: "90px" }}
+                  >
+                    {currencies.map((curr: any) => (
+                      <option key={curr.id} value={curr.id}>
+                        {curr.symbol} ({curr.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </Field>
             </div>
 
@@ -1676,7 +1715,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
               {toNumber(discountAmount) > 0 && (
                 <PrintSummaryLine
                   label="داشکاندن"
-                  value={`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.symbol || "$") : "$"}`}
+                  value={`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currencies.find((c: any) => c.id === activeDiscountCurrencyId)?.symbol || "$"}`}
                 />
               )}
 
