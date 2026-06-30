@@ -60,13 +60,10 @@ export default function StockSnapshotReportPage() {
     productName: true,
     category: true,
     brand: true,
-    sellPrice: true,
     warehouseName: true,
     quantity: true,
-    purchasePrice: true,
-    expense: true,
-    cost: false,
-    warehouseValue: false,
+    cost: true,
+    warehouseValue: true,
     sellerName: true,
     purchaseDate: true,
   };
@@ -75,7 +72,7 @@ export default function StockSnapshotReportPage() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("__erp_stock_snapshot_report_cols");
+      const stored = localStorage.getItem("__erp_stock_snapshot_report_cols_v2");
       if (stored) {
         setVisibleColumns(prev => ({ ...prev, ...JSON.parse(stored) }));
       }
@@ -88,7 +85,7 @@ export default function StockSnapshotReportPage() {
   useEffect(() => {
     if (!colsLoadedRef.current) return;
     try {
-      localStorage.setItem("__erp_stock_snapshot_report_cols", JSON.stringify(visibleColumns));
+      localStorage.setItem("__erp_stock_snapshot_report_cols_v2", JSON.stringify(visibleColumns));
     } catch (e) {
       console.error(e);
     }
@@ -285,11 +282,8 @@ export default function StockSnapshotReportPage() {
                   {visibleColumns.productName && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">کەرەستە</th>}
                   {visibleColumns.category && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">کاتیگۆری</th>}
                   {visibleColumns.brand && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">براند</th>}
-                  {visibleColumns.sellPrice && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">نرخی فرۆشتن</th>}
                   {visibleColumns.warehouseName && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">کۆگا</th>}
                   {visibleColumns.quantity && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">عدد</th>}
-                  {visibleColumns.purchasePrice && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">نرخی کڕین</th>}
-                  {visibleColumns.expense && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">خەرجی</th>}
                   {visibleColumns.cost && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">کۆست</th>}
                   {visibleColumns.warehouseValue && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">بەهای کۆگا</th>}
                   {visibleColumns.sellerName && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">فرۆشیار</th>}
@@ -319,15 +313,12 @@ export default function StockSnapshotReportPage() {
                       )}
                       {visibleColumns.category && <td className="px-2 py-2 text-center text-gray-600">{item.category}</td>}
                       {visibleColumns.brand && <td className="px-2 py-2 text-center text-gray-600">{item.brand}</td>}
-                      {visibleColumns.sellPrice && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{item.sellPrice === 0 ? "0" : formatMoney(item.sellPrice)}</td>}
                       {visibleColumns.warehouseName && <td className="px-2 py-2 text-center text-gray-600">{item.warehouseName}</td>}
                       {visibleColumns.quantity && (
                         <td className="px-2 py-2 text-center text-gray-800 font-bold">
                           {item.quantity} <span className="text-gray-400 font-normal text-[10px]">دانە</span>
                         </td>
                       )}
-                      {visibleColumns.purchasePrice && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.purchasePrice)}</td>}
-                      {visibleColumns.expense && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.expense)}</td>}
                       {visibleColumns.cost && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.cost)}</td>}
                       {visibleColumns.warehouseValue && <td className="px-2 py-2 text-center text-gray-800 font-bold" dir="ltr">{formatMoney(item.cost * item.quantity)}</td>}
                       {visibleColumns.sellerName && (
@@ -384,11 +375,8 @@ export default function StockSnapshotReportPage() {
                   { key: 'productName', label: 'کەرەستە' },
                   { key: 'category', label: 'کاتیگۆری' },
                   { key: 'brand', label: 'براند' },
-                  { key: 'sellPrice', label: 'نرخی فرۆشتن' },
                   { key: 'warehouseName', label: 'کۆگا' },
                   { key: 'quantity', label: 'عدد' },
-                  { key: 'purchasePrice', label: 'نرخی کڕین' },
-                  { key: 'expense', label: 'خەرجی' },
                   { key: 'cost', label: 'کۆست' },
                   { key: 'warehouseValue', label: 'بەهای کۆگا' },
                   { key: 'sellerName', label: 'فرۆشیار' },
