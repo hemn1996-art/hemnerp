@@ -928,7 +928,9 @@ function InvoiceReportContent() {
           (tempCust && tempCust.name && tempCust.name.toLowerCase().includes(search)) ||
           (v.account && v.account.phone && v.account.phone.toLowerCase().includes(search)) ||
           (tempCust && tempCust.phone && tempCust.phone.toLowerCase().includes(search)) ||
-          (v.driverPhone && v.driverPhone.toLowerCase().includes(search));
+          (v.driverPhone && v.driverPhone.toLowerCase().includes(search)) ||
+          (v.internalNote && v.internalNote.toLowerCase().includes(search)) ||
+          (v.printNote && v.printNote.toLowerCase().includes(search));
         if (!match) return false;
       }
 
@@ -1086,7 +1088,9 @@ function InvoiceReportContent() {
           (tempCust && tempCust.name && tempCust.name.toLowerCase().includes(search)) ||
           (v.account && v.account.phone && v.account.phone.toLowerCase().includes(search)) ||
           (tempCust && tempCust.phone && tempCust.phone.toLowerCase().includes(search)) ||
-          (v.driverPhone && v.driverPhone.toLowerCase().includes(search))
+          (v.driverPhone && v.driverPhone.toLowerCase().includes(search)) ||
+          (v.internalNote && v.internalNote.toLowerCase().includes(search)) ||
+          (v.printNote && v.printNote.toLowerCase().includes(search))
         );
       });
     }
