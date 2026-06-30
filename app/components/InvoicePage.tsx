@@ -195,7 +195,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [employeePhone, setEmployeePhone] = useState("");
 
   useEffect(() => {
-    if (accounts.length === 0) fetchAccounts();
+    fetchAccounts();
     if (storeCurrencies.length === 0) fetchCurrencies();
     if (cashboxes.length === 0) fetchCashboxes();
     if (products.length === 0) fetchProducts();
@@ -203,6 +203,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (accountTypesStore.length === 0) fetchAccountTypes();
     if (warehousesFromStore.length === 0) fetchWarehouses();
   }, []);
+
+  useEffect(() => {
+    if (!editId && defaultCurrency?.id) {
+      setInvoiceDiscountCurrencyId(defaultCurrency.id);
+    }
+  }, [defaultCurrency, editId]);
 
   useEffect(() => {
     setInvoiceNumber("");
@@ -278,6 +284,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [showInvoiceDiscount, setShowInvoiceDiscount] = useState(false);
   const [invoiceDiscountMode, setInvoiceDiscountMode] = useState<DiscountMode>("amount");
   const [invoiceDiscountValue, setInvoiceDiscountValue] = useState("");
+  const [invoiceDiscountCurrencyId, setInvoiceDiscountCurrencyId] = useState<number>(1);
 
   const [hasDelivery, setHasDelivery] = useState(false);
   const [deliveryName, setDeliveryName] = useState("");
@@ -445,6 +452,20 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               setInvoiceDiscountValue(String(voucher.totalDiscount));
               setInvoiceDiscountMode("amount");
               setShowInvoiceDiscount(true);
+
+              let loadedDiscountCurId = voucher.currencyId || 1;
+              if (voucher.versions && Array.isArray(voucher.versions)) {
+                for (let i = voucher.versions.length - 1; i >= 0; i--) {
+                  try {
+                    const parsed = JSON.parse(voucher.versions[i].data);
+                    if (parsed && parsed.invoiceDiscountCurrencyId) {
+                      loadedDiscountCurId = Number(parsed.invoiceDiscountCurrencyId);
+                      break;
+                    }
+                  } catch {}
+                }
+              }
+              setInvoiceDiscountCurrencyId(loadedDiscountCurId);
             }
             if (voucher.employeeName) {
               setEmployeeName(voucher.employeeName);
@@ -454,6 +475,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             }
             setOriginalVoucher(voucher);
             setIsInvoiceLocked(false);
+            fetchAccounts();
           }
         })
         .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
@@ -679,13 +701,28 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const itemCount = rows.reduce((sum, row) => sum + toNumber(row.qty), 0);
   const itemsSubtotal = rows.reduce((sum, row) => sum + getRowTotal(row), 0);
 
-  const invoiceDiscountAmount = getDiscountAmount(
-    itemsSubtotal,
-    invoiceDiscountMode,
-    invoiceDiscountValue
-  );
-
   const iqdCurrencyId = currencies.find((c: any) => c.code === "IQD")?.id || 12;
+
+  const invoiceDiscountAmount = useMemo(() => {
+    const rawDiscount = getDiscountAmount(
+      itemsSubtotal,
+      invoiceDiscountMode,
+      invoiceDiscountValue
+    );
+    if (invoiceDiscountMode === "percent") {
+      return rawDiscount;
+    }
+    if (invoiceDiscountCurrencyId === invoiceCurrencyId) {
+      return rawDiscount;
+    }
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
+    if (invoiceCurrencyId === iqdCurrencyId) {
+      return rawDiscount * rate;
+    } else {
+      return rawDiscount / rate;
+    }
+  }, [itemsSubtotal, invoiceDiscountMode, invoiceDiscountValue, invoiceDiscountCurrencyId, invoiceCurrencyId, exchangeRate, iqdCurrencyId]);
+
   const rateForDelivery = (toNumber(exchangeRate) / 100) || 1500;
 
   const deliveryFeeAmount = useMemo(() => {
@@ -777,6 +814,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       rows,
       invoiceDiscountMode,
       invoiceDiscountValue,
+      invoiceDiscountCurrencyId,
       paidAmounts,
       paidCurrencyId,
       exchangeRate,
@@ -803,6 +841,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     rows,
     invoiceDiscountMode,
     invoiceDiscountValue,
+    invoiceDiscountCurrencyId,
     paidAmounts,
     paidCurrencyId,
     exchangeRate,
@@ -1584,7 +1623,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         name: tempCustomerName,
         phone: tempCustomerPhone,
         address: tempCustomerAddress
-      } : undefined
+      } : undefined,
+      invoiceDiscountCurrencyId: invoiceDiscountCurrencyId
     };
 
     const savePromise = editId
@@ -1594,6 +1634,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     savePromise.then((res) => {
       setIsSaving(false);
       if (res && !res.error) {
+        fetchAccounts();
         setSavedInvoiceSnapshot(currentInvoiceSnapshot);
         if (editId) {
           // In edit mode: don't lock, allow further edits
@@ -2146,7 +2187,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
               {showInvoiceDiscount && (
                 <div style={discountInsidePayment}>
-                  <div style={twoCol}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                     <select
                       value={invoiceDiscountMode}
                       disabled={isInvoiceLocked}
@@ -2154,7 +2195,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         if (blockIfLocked()) return;
                         setInvoiceDiscountMode(e.target.value as DiscountMode);
                       }}
-                      style={{ ...input, ...lockedFieldStyle }}
+                      style={{ ...input, ...lockedFieldStyle, width: "70px" }}
                     >
                       <option value="amount">بڕ</option>
                       <option value="percent">%</option>
@@ -2168,8 +2209,26 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         setInvoiceDiscountValue(val);
                       }}
                       placeholder="0"
-                      style={{ ...input, ...lockedFieldStyle }}
+                      style={{ ...input, ...lockedFieldStyle, flex: 1 }}
                     />
+
+                    {invoiceDiscountMode === "amount" && (
+                      <select
+                        value={invoiceDiscountCurrencyId}
+                        disabled={isInvoiceLocked}
+                        onChange={(e) => {
+                          if (blockIfLocked()) return;
+                          setInvoiceDiscountCurrencyId(Number(e.target.value));
+                        }}
+                        style={{ ...input, ...lockedFieldStyle, width: "100px", fontWeight: "bold" }}
+                      >
+                        {currencies.map((curr: any) => (
+                          <option key={curr.id} value={curr.id}>
+                            {curr.symbol} ({curr.code})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
               )}
