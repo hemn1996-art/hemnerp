@@ -299,6 +299,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   } | null>(null);
   const [isInvoiceLocked, setIsInvoiceLocked] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showUnsavedConfirmModal, setShowUnsavedConfirmModal] = useState(false);
 
   const [activeTemplate, setActiveTemplate] = useState<any>(null);
 
@@ -439,6 +440,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             
             if (voucher.exchangeRate) {
               setExchangeRate(String(voucher.exchangeRate * 100));
+            }
+            if (voucher.totalDiscount > 0) {
+              setInvoiceDiscountValue(String(voucher.totalDiscount));
+              setInvoiceDiscountMode("amount");
+              setShowInvoiceDiscount(true);
             }
             if (voucher.employeeName) {
               setEmployeeName(voucher.employeeName);
@@ -814,7 +820,10 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   useEffect(() => {
     if (editId && !isEditLoading && !savedInvoiceSnapshot) {
-      setSavedInvoiceSnapshot(currentInvoiceSnapshot);
+      const timer = setTimeout(() => {
+        setSavedInvoiceSnapshot(currentInvoiceSnapshot);
+      }, 300);
+      return () => clearTimeout(timer);
     }
   }, [editId, isEditLoading, currentInvoiceSnapshot, savedInvoiceSnapshot]);
 
@@ -1448,8 +1457,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function handleNewInvoice() {
-    if (hasUnsavedInvoiceData() && !isInvoiceSaved && !isInvoiceLocked) {
-      showToast("پسوڵەکەت خەزن نەکردووە! یەکەم جار خەزنی بکە یان داتاکان بسڕەوە.", "info");
+    if (!isInvoiceSaved && !isInvoiceLocked && (rows.length > 0 || hasUnsavedInvoiceData())) {
+      setShowUnsavedConfirmModal(true);
       return;
     }
 
@@ -3425,6 +3434,54 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 onClick={() => setExcessModalConfig(null)}
               >
                 پاشگەزبوونەوە
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUnsavedConfirmModal && (
+        <div style={modalOverlay}>
+          <div style={{ ...confirmBox, width: 450 }}>
+            <h2 style={{ marginTop: 0, color: "#e11d48", fontWeight: 900, textAlign: "right" }}>ئاگاداری: پسوڵەکەت خەزن نەکردووە!</h2>
+            <p style={{ ...confirmText, color: "#374151", fontSize: 15, fontWeight: 700, lineHeight: 1.8, textAlign: "right" }}>
+              تۆ ئەم پسوڵەیەت خەزن یان نوێ نەکردووەتەوە. دەتەوێت چی بکەیت؟
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+              <button
+                style={{
+                  ...primaryBtn,
+                  background: "#dc2626",
+                  color: "white",
+                  padding: "12px",
+                  fontSize: 14,
+                  fontWeight: 900,
+                  borderRadius: 12,
+                  border: 0,
+                  cursor: "pointer"
+                }}
+                onClick={() => {
+                  setShowUnsavedConfirmModal(false);
+                  resetInvoice();
+                }}
+              >
+                ١. پسووڵەی نوێم بۆ بکەوە
+              </button>
+              <button
+                style={{
+                  ...outlineBlueBtn,
+                  background: "white",
+                  color: "#2563eb",
+                  border: "1px solid #2563eb",
+                  padding: "12px",
+                  fontSize: 14,
+                  fontWeight: 900,
+                  borderRadius: 12,
+                  cursor: "pointer"
+                }}
+                onClick={() => setShowUnsavedConfirmModal(false)}
+              >
+                ٢. بگەڕێوە سەر پسووڵەکە
               </button>
             </div>
           </div>
