@@ -161,10 +161,11 @@ function InvoiceReportContent() {
 
   const getTemporaryCustomer = (v: any) => {
     if (v.accountId) return null;
-    if (v.versions && Array.isArray(v.versions)) {
-      for (let i = v.versions.length - 1; i >= 0; i--) {
+    if (v.versions && Array.isArray(v.versions) && v.versions.length > 0) {
+      const sortedVersions = [...v.versions].sort((a: any, b: any) => b.version - a.version);
+      for (const ver of sortedVersions) {
         try {
-          const parsed = JSON.parse(v.versions[i].data);
+          const parsed = JSON.parse(ver.data);
           if (parsed) {
             if (parsed.temporaryCustomer && (parsed.temporaryCustomer.name || parsed.temporaryCustomer.phone)) {
               return {

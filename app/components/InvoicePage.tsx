@@ -3442,23 +3442,29 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
       {showUnsavedConfirmModal && (
         <div style={modalOverlay}>
-          <div style={{ ...confirmBox, width: 450 }}>
-            <h2 style={{ marginTop: 0, color: "#e11d48", fontWeight: 900, textAlign: "right" }}>ئاگاداری: پسوڵەکەت خەزن نەکردووە!</h2>
-            <p style={{ ...confirmText, color: "#374151", fontSize: 15, fontWeight: 700, lineHeight: 1.8, textAlign: "right" }}>
-              تۆ ئەم پسوڵەیەت خەزن یان نوێ نەکردووەتەوە. دەتەوێت چی بکەیت؟
+          <div style={{ ...confirmBox, width: 550, padding: "30px 40px", borderRadius: 16 }}>
+            <h2 style={{ marginTop: 0, color: "#e11d48", fontWeight: 900, fontSize: 22, textAlign: "center" }}>
+              ئاگاداری
+            </h2>
+            <p style={{ ...confirmText, color: "#1f2937", fontSize: 18, fontWeight: 700, lineHeight: 1.8, textAlign: "center", margin: "20px 0" }}>
+              {editId 
+                ? "تۆ ئەم پسوڵەیەت نوێ نەکردووەتەوە. دەتەوێت چی بکەیت؟" 
+                : "تۆ ئەم پسوڵەیەت خەزن نەکردوە دەتەوێت چی بکەیت؟"}
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 25 }}>
               <button
                 style={{
                   ...primaryBtn,
                   background: "#dc2626",
                   color: "white",
-                  padding: "12px",
-                  fontSize: 14,
+                  padding: "14px",
+                  fontSize: 16,
                   fontWeight: 900,
-                  borderRadius: 12,
+                  borderRadius: 14,
                   border: 0,
-                  cursor: "pointer"
+                  cursor: "pointer",
+                  width: "100%",
+                  textAlign: "center"
                 }}
                 onClick={() => {
                   setShowUnsavedConfirmModal(false);
@@ -3472,12 +3478,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   ...outlineBlueBtn,
                   background: "white",
                   color: "#2563eb",
-                  border: "1px solid #2563eb",
-                  padding: "12px",
-                  fontSize: 14,
+                  border: "2px solid #2563eb",
+                  padding: "14px",
+                  fontSize: 16,
                   fontWeight: 900,
-                  borderRadius: 12,
-                  cursor: "pointer"
+                  borderRadius: 14,
+                  cursor: "pointer",
+                  width: "100%",
+                  textAlign: "center"
                 }}
                 onClick={() => setShowUnsavedConfirmModal(false)}
               >
