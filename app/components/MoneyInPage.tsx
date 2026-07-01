@@ -1629,14 +1629,14 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                         <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>
                           {getPaidSummaryText()}
                         </td>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>پارەی دراو</td>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
                       </tr>
                       {toNumber(discountAmount) > 0 && (
                         <tr>
                           <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
                             {`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.symbol || "$") : "$"}`}
                           </td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>داشکاندن</td>
+                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>داشکاندن</td>
                         </tr>
                       )}
                       {showRate && (
@@ -1644,7 +1644,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                           <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
                             {`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}
                           </td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>ڕەیتی 100 دۆلار</td>
+                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ڕەیتی 100 دۆلار</td>
                         </tr>
                       )}
                     </tbody>
@@ -1659,13 +1659,13 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                         <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
                           {formatCurrencyMap(accountBalanceBeforeByCurrency)}
                         </td>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151" }}>قەرزی پێشوو</td>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>قەرزی پێشوو</td>
                       </tr>
                       <tr>
                         <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
                           {formatCurrencyMap(editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency)}
                         </td>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151" }}>کۆی گشتی قەرز</td>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>کۆی گشتی قەرز</td>
                       </tr>
                     </tbody>
                   </table>

@@ -1,7 +1,7 @@
 "use client";
 import DateInput from "./DateInput";
 import FormattedNumberInput from "./FormattedNumberInput";
-import PrintHeader, { PrintWatermark } from "./PrintHeader";
+
 import { useRouter } from "next/navigation";
 
 import {
@@ -1805,11 +1805,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     ? { background: "#f3f4f6", cursor: "not-allowed" }
     : {};
 
-  const dynamicThStyle: CSSProperties = {
-    ...printTh,
-    ...(activeTemplate?.tableHeaderBg ? { backgroundColor: activeTemplate.tableHeaderBg } : {}),
-    ...(activeTemplate?.tableHeaderColor ? { color: activeTemplate.tableHeaderColor } : {}),
-  };
+
 
   let hideZero = false;
   let primaryCode = "USD";
@@ -1848,11 +1844,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   };
 
   const prevBalances = getCurrencyBalancesList(accountBalanceBeforeByCurrency);
-  const newBalances = getCurrencyBalancesList(
-    editId && selectedAccount
-      ? getAccountBalanceBeforeMap(selectedAccount)
-      : accountBalanceAfterByCurrency
-  );
+  const newBalances = getCurrencyBalancesList(accountBalanceAfterByCurrency);
 
   return (
     <div style={page}>
@@ -1892,7 +1884,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           </span>
         </div>
       )}
-      <style>{printCss}</style>
+
 
       {toastMessage && (
         <div
@@ -3003,277 +2995,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         </main>
       </div>
 
-      <div id="invoice-print-area" style={printArea}>
-        <div style={{
-          ...printPage,
-          ...(activeTemplate?.watermarkImage ? {
-            backgroundImage: `url(${activeTemplate.watermarkImage})`,
-            backgroundSize: "300px 300px",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-          } : {})
-        }}>
-          <PrintWatermark />
-          <PrintHeader />
 
-                    {(printOptions.showInvoiceInfo || printOptions.showAccountInfo) && (
-            <div style={printInfoGrid}>
-              {/* Right Column: Invoice Info Box */}
-              {printOptions.showInvoiceInfo ? (
-                <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                  <PrintInfoLine label="جۆری پسوڵە" value={invoiceType} />
-                  <PrintInfoLine label="ژمارەی پسوڵە" value={invoiceNumber} />
-                  <PrintInfoLine
-                      label="بەروار"
-                      value={formatDate(invoiceDate)}
-                    />
-                  <PrintInfoLine label="کاتژمێر" value={createdTime} />
-                  <PrintInfoLine
-                      label="قاسە"
-                      value={selectedCashbox?.name || "-"}
-                    />
-                </div>
-              ) : (
-                <div />
-              )}
-
-              {/* Left Column: Stack of Account Info & Employee Info */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-                {printOptions.showAccountInfo && (
-                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                    <PrintInfoLine
-                      label={isTemporaryCustomer ? "کڕیار" : "هەژمار"}
-                      value={
-                        isTemporaryCustomer
-                          ? tempCustomerName || "-"
-                          : selectedAccount?.name || "-"
-                      }
-                    />
-                    <PrintInfoLine
-                      label="ژمارەی تەلەفۆن"
-                      value={
-                        isTemporaryCustomer
-                          ? tempCustomerPhone || "-"
-                          : selectedAccount?.phone || "-"
-                      }
-                    />
-                    <PrintInfoLine
-                      label="ناونیشان"
-                      value={
-                        isTemporaryCustomer
-                          ? tempCustomerAddress || "-"
-                          : [selectedAccount?.city, selectedAccount?.address]
-                              .filter(Boolean)
-                              .join(" - ") || "-"
-                      }
-                    />
-                  </div>
-                )}
-
-                {/* Employee Info Box */}
-                {printOptions.showEmployeeName || printOptions.showEmployeePhone && (employeeName || employeePhone) && (
-                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                    <PrintInfoLine
-                      label="کارمەند"
-                      value={employeeName}
-                    />
-                    <PrintInfoLine
-                      label="ژمارەی تەلەفۆن"
-                      value={employeePhone}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <table style={printTable}>
-            <thead>
-              <tr>
-                <th style={dynamicThStyle}>#</th>
-                <th style={dynamicThStyle}>کەرەستە</th>
-                {printOptions.showCode && <th style={dynamicThStyle}>کۆد</th>}
-                <th style={dynamicThStyle}>عەدد</th>
-                <th style={dynamicThStyle}>نرخ</th>
-                {printOptions.showDiscount &&
-                  rows.some((r) => getRowDiscountAmount(r) > 0) && (
-                    <th style={dynamicThStyle}>داشکاندن</th>
-                  )}
-                {printOptions.showPriceType && (
-                  <th style={dynamicThStyle}>جۆری نرخ</th>
-                )}
-                <th style={dynamicThStyle}>کۆ</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={row.id}>
-                  <td style={printTd}>{index + 1}</td>
-
-                  <td style={printTdWide}>
-                    <div>{row.productName}</div>
-
-                    {printOptions.showNotes && row.note && (
-                      <div style={printSmallNote}>{row.note}</div>
-                    )}
-                  </td>
-
-                  {printOptions.showCode && (
-                    <td style={printTd}>{row.code || "-"}</td>
-                  )}
-
-                  <td style={printTd}>
-                    {row.qty} {row.packageName}
-                  </td>
-
-                  <td style={printTd}>
-                    {formatMoney(
-                      toNumber(row.price),
-                      getCurrencySymbol(row.currencyId)
-                    )}
-                  </td>
-
-                  {printOptions.showDiscount &&
-                    rows.some((r) => getRowDiscountAmount(r) > 0) && (
-                      <td style={printTd}>
-                        {getRowDiscountAmount(row) > 0
-                          ? formatMoney(
-                              getRowDiscountAmount(row),
-                              getCurrencySymbol(row.currencyId)
-                            )
-                          : ""}
-                      </td>
-                    )}
-
-                  {printOptions.showPriceType && (
-                    <td style={printTd}>{row.priceType}</td>
-                  )}
-
-                  <td style={printTd}>
-                    {formatMoney(
-                      getRowNetTotalInRowCurrency(row),
-                      getCurrencySymbol(row.currencyId)
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <table style={{ width: "100%", borderCollapse: "collapse", border: "none", marginTop: 8 }}>
-            <tbody>
-              <tr>
-                {/* Right Box: Invoice Totals (First column, renders on the right in RTL) */}
-                <td style={{ width: "50%", paddingRight: 6, verticalAlign: "top", border: "none" }}>
-                  <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
-                    <tbody>
-                      <tr>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatMoney(total)}</td>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی گشتی</td>
-                      </tr>
-
-                      {invoiceDiscountAmount > 0 && (
-                        <tr>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatMoney(invoiceDiscountAmount)}</td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>داشکاندن</td>
-                        </tr>
-                      )}
-
-                      {hasDelivery && printOptions.showDelivery && deliveryFeeAmount > 0 && (
-                        <tr>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatMoney(deliveryFeeAmount)}</td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کرێی دلیڤەری</td>
-                        </tr>
-                      )}
-
-                      {getPaidSummaryText() !== "0" && (
-                        <tr>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{getPaidSummaryText()}</td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
-                        </tr>
-                      )}
-
-                      <tr>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatMoney(remaining)}</td>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ماوە</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </td>
-
-                {/* Left Box: Account Balances (Second column, renders on the left in RTL) */}
-                <td style={{ width: "50%", paddingLeft: 6, verticalAlign: "top", border: "none" }}>
-                  {printOptions.showPrintBalance && !isTemporaryCustomer && selectedAccount && (
-                    <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
-                      <tbody>
-                        {/* Previous Debt */}
-                        <tr>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace", whiteSpace: "nowrap" }}>
-                            {prevBalances.map((b, i) => (
-                              <div key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b" }}>{b.formatted}</div>
-                            ))}
-                          </td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>
-                            قەرزی پێشوو
-                          </td>
-                        </tr>
-                        {/* New Debt */}
-                        <tr>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace", whiteSpace: "nowrap" }}>
-                            {newBalances.map((b, i) => (
-                              <div key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b" }}>{b.formatted}</div>
-                            ))}
-                          </td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>
-                            کۆی گشتی قەرز
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          {/* Delivery info below the summary tables */}
-          {printOptions.showDelivery && hasDelivery && (
-            <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%", marginTop: 8 }}>
-              <tbody>
-                <tr>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{deliveryName || "-"}</td>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ناوی دلیڤەری</td>
-                </tr>
-                <tr>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{deliveryPhone || "-"}</td>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ژمارە</td>
-                </tr>
-                <tr>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{[deliveryCity, deliveryAddress].filter(Boolean).join(" - ") || "-"}</td>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ناونیشانی دلیڤەری</td>
-                </tr>
-              </tbody>
-            </table>
-          )}
-
-          {printOptions.showNotes && printNote && (
-            <div style={{
-              marginTop: 12,
-              border: "1px solid #cbd5e1",
-              borderRadius: "8px",
-              padding: "10px 14px",
-              background: "white",
-              fontSize: "12px",
-              width: "100%",
-              boxSizing: "border-box"
-            }}>
-              <b>تێبینی:</b>
-              <div style={{ marginTop: 4, whiteSpace: "pre-line" }}>{printNote}</div>
-            </div>
-          )}
-        </div>
-      </div>
 
       {showSettings && (
         <div style={modalOverlay}>
@@ -3673,48 +3395,7 @@ function SummaryItem({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ ...printInfoRow, justifyContent: "flex-start", gap: "6px" }}>
-      <b style={{ marginLeft: "4px" }}>{label}:</b>
-      <span>{value}</span>
-    </div>
-  );
-}
 
-function PrintSummaryLine({
-  label,
-  value,
-  bold,
-}: {
-  label: string;
-  value: string;
-  bold?: boolean;
-}) {
-  let hideZero = false;
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem("general_settings");
-    if (saved) {
-      try {
-        hideZero = !!JSON.parse(saved).hideZeroBalance;
-      } catch (e) {}
-    }
-  }
-
-  if (hideZero) {
-    const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
-    if (clean === "0" || clean === "" || Number(clean) === 0) {
-      return null;
-    }
-  }
-
-  return (
-    <div style={{ ...printSummaryLine, justifyContent: "flex-start", gap: "8px" }}>
-      <span style={{ display: "inline-block", width: "135px", fontWeight: bold ? 900 : 700, textAlign: "right" }}>{label}</span>
-      <span style={{ fontWeight: bold ? 900 : 500 }}>{value}</span>
-    </div>
-  );
-}
 
 function SettingCheck({
   label,
@@ -3737,35 +3418,6 @@ function SettingCheck({
 
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
-const printCss = `
-@media print {
-  @page { size: auto; margin: 0 !important; }
-
-  body * {
-    visibility: hidden !important;
-  }
-
-  #invoice-print-area,
-  #invoice-print-area * {
-    visibility: visible !important;
-  }
-
-  #invoice-print-area {
-    display: block !important;
-    position: relative !important;
-    width: 100% !important;
-    background: white !important;
-    z-index: 999999 !important;
-  }
-
-  button,
-  input,
-  select,
-  textarea {
-    display: none !important;
-  }
-}
-`;
 
 const page: CSSProperties = {
   direction: "rtl",
@@ -4515,119 +4167,4 @@ const priceTypeBtnActive: CSSProperties = {
   color: "white",
   borderColor: "#2563eb",
 };
-
-const printArea: CSSProperties = {
-  display: "none",
-};
-
-const printPage: CSSProperties = {
-  width: "100%",
-  minHeight: "auto",
-  background: "white",
-  padding: "0 4mm 4mm 4mm",
-  boxSizing: "border-box",
-  direction: "rtl",
-  fontFamily: appFont,
-  color: "#111827",
-  position: "relative",
-};
-
-const printHeaderBlankSpace: CSSProperties = {
-  height: "60mm",
-  borderBottom: "1px solid #e5e7eb",
-  marginBottom: 8,
-};
-
-const printInfoGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 8,
-  marginBottom: 8,
-};
-
-const printInfoBox: CSSProperties = {
-  border: "1px solid #d1d5db",
-  padding: 8,
-  fontSize: 11,
-  minHeight: 54,
-  backgroundColor: "#f9fafb",
-  borderRadius: 4,
-  display: "flex",
-  flexDirection: "column",
-  gap: 4,
-};
-
-const printInfoRow: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 10,
-  lineHeight: 1.8,
-};
-
-const printTable: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-  fontSize: 10,
-  marginTop: 6,
-};
-
-const printTh: CSSProperties = {
-  border: "1px solid #ffffff",
-  background: "#0b5ed7",
-  color: "white",
-  padding: "6px 5px",
-  textAlign: "center",
-  fontWeight: 800,
-};
-
-const printTd: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  padding: "6px 5px",
-  textAlign: "center",
-  verticalAlign: "middle",
-};
-
-const printTdWide: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  padding: "6px 5px",
-  textAlign: "right",
-  verticalAlign: "middle",
-  minWidth: 150,
-};
-
-const printSmallNote: CSSProperties = {
-  color: "#6b7280",
-  fontSize: 9,
-  marginTop: 3,
-};
-
-const printBottomGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 0,
-  marginTop: 8,
-};
-
-const printSummaryBox: CSSProperties = {
-  border: "1px solid #cbd5e1",
-  padding: 0,
-  minHeight: 40,
-  fontSize: 12,
-};
-
-const printSummaryLine: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 0,
-  borderBottom: "1px solid #cbd5e1",
-  padding: "6px 10px",
-};
-
-const printNoteBox: CSSProperties = {
-  marginTop: 8,
-  lineHeight: 1.8,
-};
-
-const printSectionSmall: CSSProperties = {
-  marginBottom: 8,
-};
+
