@@ -658,17 +658,23 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   }
 
   function getSingleAccountBalanceCurrencyId(account?: AccountLike): number {
+    const defaultId = defaultCurrency.id || 11;
+    const isValidId = (id?: number) => id && currencies.some((c: any) => c.id === id);
+
     if (!account?.balanceByCurrency) {
-      return account?.balanceCurrencyId || account?.creditLimitCurrencyId || defaultCurrency.id || 1;
+      const targetId = account?.balanceCurrencyId || account?.creditLimitCurrencyId;
+      return isValidId(targetId) ? targetId! : defaultId;
     }
 
     const activeCurrencies = Object.entries(account.balanceByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText]) => Number(currencyIdText));
+      .map(([currencyIdText]) => Number(currencyIdText))
+      .filter(id => isValidId(id));
 
     if (activeCurrencies.length === 1) return activeCurrencies[0];
 
-    return account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency.id || 1;
+    const targetId = account.balanceCurrencyId || account.creditLimitCurrencyId;
+    return isValidId(targetId) ? targetId! : defaultId;
   }
 
   function normalizeMoneyMapToSingleCurrency(
