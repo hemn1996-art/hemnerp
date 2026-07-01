@@ -785,6 +785,11 @@ function InvoiceReportContent() {
     if (filterCurrencyId !== "all") {
       return Number(filterCurrencyId);
     }
+    if (["money_in", "money_out", "shareholder_deposit", "shareholder_withdrawal"].includes(voucher.type)) {
+      if (voucher.paidAmounts && voucher.paidAmounts.length > 0) {
+        return voucher.paidAmounts[0].currencyId;
+      }
+    }
     return voucher.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1;
   };
 
@@ -1999,16 +2004,20 @@ function InvoiceReportContent() {
                     const voucherCurrencyId = voucher.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1;
                     const iqdIdForDelivery = currencies.find((c: any) => c.code === "IQD")?.id || 12;
 
-                    const valVal = convertBetweenCurrencies(voucher.netAmount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
-                    const discountVal = convertBetweenCurrencies(voucher.totalDiscount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
-                    const deliveryFeeVal = voucher.deliveryFee 
-                      ? convertBetweenCurrencies(voucher.deliveryFee, iqdIdForDelivery, displayCurrencyId, voucher.exchangeRate)
-                      : 0;
-
                     const paidVal = voucher.paidAmounts.reduce((sum, pa) => {
                       const paInDisplay = convertBetweenCurrencies(pa.amount, pa.currencyId, displayCurrencyId, voucher.exchangeRate);
                       return sum + paInDisplay;
                     }, 0);
+
+                    let valVal = convertBetweenCurrencies(voucher.netAmount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
+                    if (["money_in", "money_out", "shareholder_deposit", "shareholder_withdrawal"].includes(voucher.type)) {
+                      valVal = paidVal;
+                    }
+
+                    const discountVal = convertBetweenCurrencies(voucher.totalDiscount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
+                    const deliveryFeeVal = voucher.deliveryFee 
+                      ? convertBetweenCurrencies(voucher.deliveryFee, iqdIdForDelivery, displayCurrencyId, voucher.exchangeRate)
+                      : 0;
 
                     const expensesVal = voucher.expenses.reduce((sum, exp) => {
                       const expInDisplay = convertBetweenCurrencies(exp.amount, exp.currencyId, displayCurrencyId, voucher.exchangeRate);
