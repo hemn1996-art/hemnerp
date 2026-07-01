@@ -1722,6 +1722,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         );
         return;
       }
+
+      if (paidConverted > total + 0.01) {
+        showToast(
+          "نابێت بڕی پارەی دراو لە کۆی گشتی پسووڵەکە زیاتر بێت بۆ کڕیاری کاتی."
+        );
+        return;
+      }
     }
 
     let mappedType = "sales";
