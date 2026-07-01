@@ -3144,72 +3144,76 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             </tbody>
           </table>
 
-          <div style={printBottomGrid}>
-            {/* Left Box: Account Balances — proper table */}
-            {printOptions.showPrintBalance && !isTemporaryCustomer && selectedAccount && (
+          <div style={{ display: "flex", gap: "12px", marginTop: "8px", width: "100%" }}>
+            {/* Right Box: Invoice Totals — proper table */}
+            <div style={{ flex: 1 }}>
               <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
                 <tbody>
-                  {/* Previous Debt */}
                   <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace", whiteSpace: "nowrap" }}>
-                      {prevBalances.map((b, i) => (
-                        <div key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b" }}>{b.formatted}</div>
-                      ))}
-                    </td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>
-                      قەرزی پێشوو
-                    </td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatMoney(total)}</td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی گشتی</td>
                   </tr>
-                  {/* New Debt */}
+
+                  {invoiceDiscountAmount > 0 && (
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatMoney(invoiceDiscountAmount)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>داشکاندن</td>
+                    </tr>
+                  )}
+
+                  {hasDelivery && printOptions.showDelivery && deliveryFeeAmount > 0 && (
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatMoney(deliveryFeeAmount)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کرێی دلیڤەری</td>
+                    </tr>
+                  )}
+
+                  {getPaidSummaryText() !== "0" && (
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{getPaidSummaryText()}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
+                    </tr>
+                  )}
+
                   <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace", whiteSpace: "nowrap" }}>
-                      {newBalances.map((b, i) => (
-                        <div key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b" }}>{b.formatted}</div>
-                      ))}
-                    </td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>
-                      کۆی گشتی قەرز
-                    </td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatMoney(remaining)}</td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ماوە</td>
                   </tr>
                 </tbody>
               </table>
-            )}
+            </div>
 
-            {/* Right Box: Invoice Totals — proper table */}
-            <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
-              <tbody>
-                <tr>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatMoney(total)}</td>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
-                </tr>
-
-                {invoiceDiscountAmount > 0 && (
-                  <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatMoney(invoiceDiscountAmount)}</td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>داشکاندن</td>
-                  </tr>
-                )}
-
-                {hasDelivery && printOptions.showDelivery && deliveryFeeAmount > 0 && (
-                  <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatMoney(deliveryFeeAmount)}</td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کرێی دلیڤەری</td>
-                  </tr>
-                )}
-
-                {getPaidSummaryText() !== "0" && (
-                  <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{getPaidSummaryText()}</td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
-                  </tr>
-                )}
-
-                <tr>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatMoney(remaining)}</td>
-                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ماوە</td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Left Box: Account Balances — proper table */}
+            <div style={{ flex: 1 }}>
+              {printOptions.showPrintBalance && !isTemporaryCustomer && selectedAccount && (
+                <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
+                  <tbody>
+                    {/* Previous Debt */}
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                        {prevBalances.map((b, i) => (
+                          <div key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b" }}>{b.formatted}</div>
+                        ))}
+                      </td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>
+                        قەرزی پێشوو
+                      </td>
+                    </tr>
+                    {/* New Debt */}
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                        {newBalances.map((b, i) => (
+                          <div key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b" }}>{b.formatted}</div>
+                        ))}
+                      </td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>
+                        کۆی گشتی قەرز
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
 
           {/* Delivery info below the summary tables */}
