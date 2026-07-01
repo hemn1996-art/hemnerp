@@ -249,6 +249,19 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     }
   }, [accountId, accounts]);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".account-search-container")) {
+        setShowAccountList(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const [printOptions, setPrintOptions] = useState<PrintOptions>({
     showReceiptInfo: true,
     showReceiptNumber: true,
@@ -1174,7 +1187,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
       <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
-          <div style={{ position: "relative", marginBottom: 12 }}>
+          <div className="account-search-container" style={{ position: "relative", marginBottom: 12 }}>
             <label style={labelStyle}>هەژمار</label>
 
             <div style={accountInputWrap}>

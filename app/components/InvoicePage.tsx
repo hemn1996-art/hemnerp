@@ -280,6 +280,22 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     };
   }, [openedDetailRowId]);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".account-search-container")) {
+        setShowAccountList(false);
+      }
+      if (!target.closest(".product-search-container")) {
+        setShowProductList(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const [showInvoiceNotes, setShowInvoiceNotes] = useState(false);
   const [internalNote, setInternalNote] = useState("");
   const [printNote, setPrintNote] = useState("");
@@ -1926,7 +1942,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>هەژمار</label>
 
-              <div style={{ position: "relative", width: "100%" }}>
+              <div className="account-search-container" style={{ position: "relative", width: "100%" }}>
                 <input
                   value={accountSearch}
                   disabled={isTemporaryCustomer || isInvoiceLocked}
@@ -2450,7 +2466,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           </div>
 
           <div style={tableCard}>
-            <div style={productSearchBox}>
+            <div className="product-search-container" style={productSearchBox}>
               <input
                 value={productSearch}
                 disabled={isInvoiceLocked}

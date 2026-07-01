@@ -323,6 +323,22 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     }
   }, [currencies, editId]);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".account-search-container")) {
+        setShowSupplierList(false);
+      }
+      if (!target.closest(".product-search-container")) {
+        setShowProductList(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierId, setSupplierId] = useState<number | undefined>();
   const [showSupplierList, setShowSupplierList] = useState(false);
@@ -1782,7 +1798,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
       <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
-          <div style={{ position: "relative", marginBottom: 12 }}>
+          <div className="account-search-container" style={{ position: "relative", marginBottom: 12 }}>
             <label style={labelStyle}>دابینکەر</label>
 
             <div style={supplierInputWrap}>
@@ -2150,7 +2166,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           </div>
 
           <div style={tableCard}>
-            <div style={productSearchBox}>
+            <div className="product-search-container" style={productSearchBox}>
               <input
                 value={productSearch}
                 disabled={isLocked}
