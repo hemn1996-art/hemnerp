@@ -963,7 +963,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
       costCurrencyId,
     };
 
-    setRows((prev) => [...prev, newRow]);
+    setRows((prev) => [newRow, ...prev]);
     setProductSearch("");
     setShowProductList(false);
     setOpenedDetailRowId(null);

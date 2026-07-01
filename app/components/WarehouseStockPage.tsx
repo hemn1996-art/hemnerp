@@ -473,7 +473,7 @@ export default function WarehouseStockPage({ headerSelector, editId }: Props) {
       note: "",
     };
 
-    setRows((prev) => [...prev, newRow]);
+    setRows((prev) => [newRow, ...prev]);
     setProductSearch("");
     setShowProductList(false);
   }

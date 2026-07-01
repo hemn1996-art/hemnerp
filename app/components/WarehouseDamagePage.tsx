@@ -493,7 +493,7 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
       note: "",
     };
 
-    setRows((prev) => [...prev, newRow]);
+    setRows((prev) => [newRow, ...prev]);
 
     // گرنگ: وردەکاری کەرەستە یەکسەر دەرناکەوێت
     setOpenDetailRowId(null);

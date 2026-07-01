@@ -928,7 +928,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
       availableStock: product.stock || 0,
     };
 
-    setRows((prev) => [...prev, newRow]);
+    setRows((prev) => [newRow, ...prev]);
     setProductSearch("");
     setShowProductList(false);
     setOpenedDetailRowId(null);

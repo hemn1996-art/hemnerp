@@ -466,7 +466,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
       note: "",
     };
 
-    setRows((prev) => [...prev, newRow]);
+    setRows((prev) => [newRow, ...prev]);
     setProductSearch("");
     setShowProductList(false);
   }

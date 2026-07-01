@@ -1335,7 +1335,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       showCost: false,
     };
 
-    setRows((prev) => [...prev, newRow]);
+    setRows((prev) => [newRow, ...prev]);
     setProductSearch("");
     setShowProductList(false);
     setOpenedDetailRowId(null);

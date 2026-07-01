@@ -1196,7 +1196,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       manualExpensePerUnit: "",
     };
 
-    setRows((prev) => [...prev, newRow]);
+    setRows((prev) => [newRow, ...prev]);
     setProductSearch("");
     setShowProductList(false);
     setOpenedDetailRowId(null);

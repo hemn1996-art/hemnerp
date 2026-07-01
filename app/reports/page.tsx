@@ -66,21 +66,7 @@ export default function ReportsDashboard() {
         </svg>
       )
     },
-    {
-      id: "profit-distribution",
-      title: "ڕاپۆرتی دابەشکردنی قازانج",
-      description: "دابەشکردنی قازانجی ساف بەسەر هاوبەشەکاندا",
-      path: "/reports/profit-distribution",
-      perm: "reports_profit",
-      adminOnly: true,
-      colorClass: { bg: "bg-purple-500/10", text: "text-purple-600" },
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.003 9.003 0 1020.945 13H11V3.055z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-        </svg>
-      )
-    },
+
     {
       id: "debts",
       title: "ڕاپۆرتی قەرز",
@@ -170,7 +156,7 @@ export default function ReportsDashboard() {
     {
       id: "finance",
       title: "دارایی",
-      reportIds: ["balance-sheet", "profit", "profit-distribution", "debts"]
+      reportIds: ["balance-sheet", "profit", "debts"]
     },
     {
       id: "warehouse",
