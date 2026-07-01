@@ -35,6 +35,34 @@ export default function DebtReportPage() {
   const [loading, setLoading] = useState(true);
   const [showReportStats, setShowReportStats] = useState(true);
 
+  // Sorting
+  const [sortField, setSortField] = useState<"totalDebt" | null>("totalDebt"); // Default sort by totalDebt
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc"); // Default descending
+
+  const toggleSortDebt = () => {
+    if (sortField === "totalDebt") {
+      setSortDirection(prev => prev === "desc" ? "asc" : "desc");
+    } else {
+      setSortField("totalDebt");
+      setSortDirection("desc");
+    }
+  };
+
+  const sortedData = useMemo(() => {
+    if (!sortField) return data;
+    const sorted = [...data];
+    sorted.sort((a, b) => {
+      const valA = a[sortField] || 0;
+      const valB = b[sortField] || 0;
+      if (sortDirection === "asc") {
+        return valA - valB;
+      } else {
+        return valB - valA;
+      }
+    });
+    return sorted;
+  }, [data, sortField, sortDirection]);
+
   useEffect(() => {
     fetchAccounts();
     fetchAccountTypes();
@@ -308,7 +336,20 @@ export default function DebtReportPage() {
                 {visibleColumns.debtBeforeLastPayment && <th className="p-3 font-bold text-sm">قەرزی پێش کۆتا پارەدان</th>}
                 {visibleColumns.lastPaymentAmount && <th className="p-3 font-bold text-sm">کۆتا پارەدان</th>}
                 {visibleColumns.lastPaymentDate && <th className="p-3 font-bold text-sm">بەرواری کۆتایی پارەدان</th>}
-                {visibleColumns.totalDebt && <th className="p-3 font-bold text-sm">گشتی قەرز</th>}
+                {visibleColumns.totalDebt && (
+                  <th 
+                    onClick={toggleSortDebt}
+                    className="p-3 font-bold text-sm cursor-pointer select-none hover:bg-[#061f5f] transition-colors"
+                    title="کلیک بکە بۆ ڕیزکردنی قەرزەکان"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>گشتی قەرز</span>
+                      {sortField === "totalDebt" && (
+                        <span className="text-xs">{sortDirection === "desc" ? "▼" : "▲"}</span>
+                      )}
+                    </div>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -316,12 +357,12 @@ export default function DebtReportPage() {
                 <tr>
                   <td colSpan={10} className="p-4 text-center text-gray-500">لە بارکردندایە...</td>
                 </tr>
-              ) : data.length === 0 ? (
+              ) : sortedData.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="p-4 text-center text-gray-500">هیچ داتایەک نەدۆزرایەوە</td>
                 </tr>
               ) : (
-                data.map((item, index) => (
+                sortedData.map((item, index) => (
                   <tr key={item.id} className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                     {visibleColumns.account && (
                       <td className="p-3 text-sm font-bold">
