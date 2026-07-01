@@ -415,6 +415,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   return tx ? tx.unitCost : (line.product?.costPrice || 0);
                 })(),
                 showCost: false,
+                previousPrice: getPreviousPrice(line.productId),
               }));
               setRows(mappedRows);
             }
@@ -1350,11 +1351,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       if (invoice.type !== "فرۆشتن") continue;
       if (invoice.accountId !== accountId) continue;
 
-      const foundItem = invoice.items?.find(
+      const foundItem = invoice.lines?.find(
         (item: any) => item.productId === productId
       );
 
-      if (foundItem) return Number(foundItem.price || 0);
+      if (foundItem) return Number(foundItem.unitPrice || 0);
     }
 
     return undefined;
