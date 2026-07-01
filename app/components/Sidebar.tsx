@@ -8,6 +8,11 @@ const menuItems = [
   { name: "داشبۆرد", icon: "📊", path: "/dashboard", perm: "dashboard" },
   { name: "پسوڵە", icon: "🧾", path: "/invoices", perm: "vouchers" },
   {
+    name: "ڕاپۆرت",
+    icon: "📈",
+    path: "/reports",
+  },
+  {
     name: "هەژمار",
     icon: "👤",
     children: [
@@ -56,12 +61,6 @@ const menuItems = [
     children: [
       { name: "کارمەندەکان", path: "/employees" },
     ],
-  },
-
-  {
-    name: "ڕاپۆرت",
-    icon: "📈",
-    path: "/reports",
   },
 
   {
