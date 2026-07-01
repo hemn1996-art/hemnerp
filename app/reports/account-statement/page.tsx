@@ -24,14 +24,33 @@ function AccountStatementContent() {
 
   // Date Filters
   const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("__erp_statement_start_date");
+      if (saved) return saved;
+    }
+    const year = new Date().getFullYear();
+    return `${year}-01-01`;
   });
   const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("__erp_statement_end_date");
+      if (saved) return saved;
+    }
+    const year = new Date().getFullYear();
+    return `${year}-12-31`;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("__erp_statement_start_date", startDate);
+    }
+  }, [startDate]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("__erp_statement_end_date", endDate);
+    }
+  }, [endDate]);
 
   const [filterCurrencyId, setFilterCurrencyId] = useState<string>("all");
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -53,10 +72,9 @@ function AccountStatementContent() {
     if (filterCurrencyId !== "all") count++;
     if (filterShowItems !== "شاردنەوە") count++;
     
-    const d = new Date();
-    const defaultEndDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    d.setMonth(d.getMonth() - 1);
-    const defaultStartDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const year = new Date().getFullYear();
+    const defaultStartDateStr = `${year}-01-01`;
+    const defaultEndDateStr = `${year}-12-31`;
 
     if (startDate !== defaultStartDateStr) count++;
     if (endDate !== defaultEndDateStr) count++;
@@ -65,10 +83,9 @@ function AccountStatementContent() {
   }, [filterCurrencyId, filterShowItems, startDate, endDate]);
 
   const handleResetFilters = () => {
-    const d = new Date();
-    const defaultEndDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    d.setMonth(d.getMonth() - 1);
-    const defaultStartDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const year = new Date().getFullYear();
+    const defaultStartDateStr = `${year}-01-01`;
+    const defaultEndDateStr = `${year}-12-31`;
     setStartDate(defaultStartDateStr);
     setEndDate(defaultEndDateStr);
     setFilterCurrencyId("all");
