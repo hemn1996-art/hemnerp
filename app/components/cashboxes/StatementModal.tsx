@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { CashboxLike, CurrencyLike } from "./types";
 import DateInput from "../DateInput";
 
@@ -17,6 +18,7 @@ export default function StatementModal({
   closeStatement,
   isFullPage = false,
 }: Props) {
+  const router = useRouter();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
@@ -455,7 +457,21 @@ export default function StatementModal({
                               {formatRowDate(row.dateStr)}
                             </td>
                             <td className="p-4">
-                              <span className="bg-blue-600 text-white font-extrabold px-3.5 py-1 rounded-lg text-sm print:bg-white print:text-black print:border print:border-black">
+                              <button
+                                onClick={() => {
+                                  closeStatement();
+                                  const url = (row.rawType === "cashbox_transfer")
+                                    ? `/currency-transfer?editId=${row.id}`
+                                    : (row.rawType === "cashbox_exchange")
+                                      ? `/currency-exchange?editId=${row.id}`
+                                      : `/invoices?editId=${row.id}&type=${row.rawType}&t=${Date.now()}`;
+                                  router.push(url);
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-3.5 py-1 rounded-lg text-sm transition-all cursor-pointer shadow-sm active:scale-95 print:bg-white print:text-black print:border print:border-black no-print"
+                              >
+                                {row.id}
+                              </button>
+                              <span className="hidden print:inline font-extrabold text-sm text-black">
                                 {row.id}
                               </span>
                             </td>

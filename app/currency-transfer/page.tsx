@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo, CSSProperties } from "react";
+import { useSearchParams } from "next/navigation";
 import { useStore } from "../store/store";
 import FormattedNumberInput from "../components/FormattedNumberInput";
 import AlertModal from "../components/AlertModal";
 
 export default function CurrencyTransferPage() {
+  const searchParams = useSearchParams();
+  const urlEditId = searchParams.get("editId");
   const fetchCashboxes = useStore((s) => s.fetchCashboxes);
   const fetchCurrencies = useStore((s) => s.fetchCurrencies);
   const fetchInvoices = useStore((s) => s.fetchInvoices);
@@ -199,6 +202,15 @@ export default function CurrencyTransferPage() {
       };
     });
   }, [invoices]);
+
+  useEffect(() => {
+    if (urlEditId && transfersList && transfersList.length > 0) {
+      const match = transfersList.find(t => t.id === Number(urlEditId));
+      if (match) {
+        handleEditClick(match);
+      }
+    }
+  }, [urlEditId, transfersList]);
 
   if (isFormOpen) {
     return (
