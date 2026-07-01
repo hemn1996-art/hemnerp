@@ -25,6 +25,7 @@ export async function GET(request: Request) {
       where,
       select: {
         id: true,
+        isDeleted: true,
         type: true,
         referenceNo: true,
         date: true,

@@ -919,6 +919,8 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
         return sum + convertCurrency(amount, Number(curId), defaultCurrency.id);
       }, 0);
     }
+
+    useStore.setState({ accounts: [...accounts] });
   }
 
   function resetReceipt() {
