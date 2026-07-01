@@ -61,16 +61,7 @@ const menuItems = [
   {
     name: "ڕاپۆرت",
     icon: "📈",
-    children: [
-      { name: "ڕاپۆرتی پسووڵە", path: "/reports/invoices", perm: "reports_invoices" },
-      { name: "ڕاپۆرتی قەرز", path: "/reports/debts", perm: "reports_debts" },
-      { name: "ڕاپۆرتی قازانجی گشتی", path: "/reports/profit", perm: "reports_profit" },
-      { name: "ڕاپۆرتی کۆگا", path: "/reports/stock", perm: "reports_stock" },
-      { name: "ڕاپۆرتی ئاستی کۆگا", path: "/reports/stock-snapshot", perm: "reports_stock_snapshot" },
-      { name: "ڕاپۆرتی کەرەستە", path: "/reports/items", perm: "reports_items" },
-      { name: "ڕاپۆرتی جوڵەی کەرەستە", path: "/reports/material-movements", perm: "reports_material_movements" },
-      { name: "ڕاپۆرتی میزانیە", path: "/reports/balance-sheet", perm: "reports_balance" },
-    ],
+    path: "/reports",
   },
 
   {
@@ -229,6 +220,21 @@ export default function Sidebar({
         {menuItems.map((item: any) => {
           // Permission check: filter menu items
           if (item.perm && !hasPermission(item.perm, "canView")) return null;
+
+          if (item.path === "/reports") {
+            const reportsPerms = [
+              "reports_invoices",
+              "reports_debts",
+              "reports_profit",
+              "reports_stock",
+              "reports_stock_snapshot",
+              "reports_items",
+              "reports_material_movements",
+              "reports_balance"
+            ];
+            const canViewAny = reportsPerms.some(p => hasPermission(p, "canView"));
+            if (!canViewAny) return null;
+          }
           
           // Filter children by permission and role (restricted views)
           const visibleChildren = item.children?.filter((c: any) => {
