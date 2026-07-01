@@ -3085,65 +3085,67 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           </table>
 
           <div style={printBottomGrid}>
-            <div style={printSummaryBox}>
-              <PrintSummaryLine label="کۆی کەرەستەکان" value={`${itemCount}`} />
+            <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
+              <tbody>
+                <tr>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{`${itemCount}`}</td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی کەرەستەکان</td>
+                </tr>
 
-              {printOptions.showBalance && (
-                <>
-                  <PrintSummaryLine
-                    label="کۆی بەهای کاڵاکان"
-                    value={formatCurrencyMap(itemsTotalsByCurrency)}
-                  />
-                  <PrintSummaryLine
-                    label="کۆی بڕی خەرجی"
-                    value={formatCurrencyAmount(
-                      finalExpenseTotalInSelectedCurrency,
-                      expenseTotalCurrencyId || defaultCurrency?.id || 5
+                {printOptions.showBalance && (
+                  <>
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyMap(itemsTotalsByCurrency)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی بەهای کاڵاکان</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyAmount(finalExpenseTotalInSelectedCurrency, expenseTotalCurrencyId || defaultCurrency?.id || 5)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی بڕی خەرجی</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatCurrencyMap(costGrandTotalByCurrency)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆستی گشتی کۆگا</td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+
+            <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
+              <tbody>
+                {printOptions.showBalance && (
+                  <>
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyMap(accountBalanceBeforeByCurrency)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>قەرزی پێشوو</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{getPaidSummaryText()}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatCurrencyMap(editId && supplier ? getAccountBalanceBeforeMap(supplier) : accountBalanceAfterByCurrency)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی گشتی ماوە</td>
+                    </tr>
+
+                    {expenseGeneralNote.trim() !== "" && (
+                      <tr>
+                        <td colSpan={2} style={{ border: "1px solid #cbd5e1", padding: "6px 10px" }}>
+                          <b>تێبینی خەرجی:</b> {expenseGeneralNote}
+                        </td>
+                      </tr>
                     )}
-                  />
-                  <PrintSummaryLine
-                    label="کۆستی گشتی کۆگا"
-                    value={formatCurrencyMap(costGrandTotalByCurrency)}
-                    bold
-                  />
-                </>
-              )}
-            </div>
+                  </>
+                )}
 
-            <div style={printSummaryBox}>
-              {printOptions.showBalance && (
-                <>
-                  <PrintSummaryLine
-                    label="قەرزی پێشوو"
-                    value={formatCurrencyMap(accountBalanceBeforeByCurrency)}
-                  />
-                  <PrintSummaryLine
-                    label="پارەی دراو"
-                    value={getPaidSummaryText()}
-                  />
-                  <PrintSummaryLine
-                    label="کۆی گشتی ماوە"
-                    value={formatCurrencyMap(accountBalanceAfterByCurrency)}
-                    bold
-                  />
-
-                  {expenseGeneralNote.trim() !== "" && (
-                    <div style={printExpenseNoteBox}>
-                      <b>تێبینی خەرجی:</b> {expenseGeneralNote}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {shouldShowExchangeRate && (
-                <PrintSummaryLine
-                  label="ڕەیتی 100 دۆلار"
-                  value={`${Number(exchangeRate || 0).toLocaleString(
-                    "en-US"
-                  )} دینار`}
-                />
-              )}
-            </div>
+                {shouldShowExchangeRate && (
+                  <tr>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}</td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ڕەیتی 100 دۆلار</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
 
           {printNote && printNote.trim() !== "" && (
@@ -4446,23 +4448,23 @@ const printSmallNote: CSSProperties = {
 const printBottomGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 8,
+  gap: 0,
   marginTop: 8,
 };
 
 const printSummaryBox: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  padding: 8,
-  minHeight: 70,
-  fontSize: 11,
+  border: "1px solid #cbd5e1",
+  padding: 0,
+  minHeight: 40,
+  fontSize: 12,
 };
 
 const printSummaryLine: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 10,
-  borderBottom: "1px solid #f1f5f9",
-  padding: "4px 0",
+  gap: 0,
+  borderBottom: "1px solid #cbd5e1",
+  padding: "6px 10px",
 };
 
 const printExpenseNoteBox: CSSProperties = {

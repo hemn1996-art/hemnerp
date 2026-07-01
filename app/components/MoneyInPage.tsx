@@ -1625,7 +1625,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
               )}
               <PrintSummaryLine
                 label="کۆی گشتی ماوە"
-                value={formatCurrencyMap(accountBalanceAfterByCurrency)}
+                value={formatCurrencyMap(editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency)}
                 bold
               />
             </div>
@@ -2041,7 +2041,7 @@ const printInfoRow: CSSProperties = { display: "flex", justifyContent: "space-be
 const printMoneyBox: CSSProperties = { border: "1px solid #e5e7eb", padding: 8, minHeight: 45, marginBottom: 8, fontSize: 11 };
 const printBottomGrid: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 8, marginTop: 8 };
 const printSummaryBox: CSSProperties = { border: "1px solid #e5e7eb", padding: 8, minHeight: 70, fontSize: 11 };
-const printSummaryLine: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, borderBottom: "1px solid #f1f5f9", padding: "4px 0" };
+const printSummaryLine: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 0, borderBottom: "1px solid #cbd5e1", padding: "6px 10px" };
 const printExpenseNoteBox: CSSProperties = { marginTop: 8, border: "1px solid #e5e7eb", padding: 8, fontSize: 10, lineHeight: 1.8, background: "#f8fafc" };
 const modalOverlay: CSSProperties = { position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.3)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", zIndex: 99999, justifyContent: "center" };
 const modalBox: CSSProperties = { width: 760, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", background: "white", borderRadius: 16, padding: 20, boxShadow: "0 25px 70px rgba(15,23,42,0.25)" };

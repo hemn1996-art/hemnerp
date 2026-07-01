@@ -1831,7 +1831,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   };
 
   const prevBalances = getCurrencyBalancesList(accountBalanceBeforeByCurrency);
-  const newBalances = getCurrencyBalancesList(accountBalanceAfterByCurrency);
+  const newBalances = getCurrencyBalancesList(
+    editId && selectedAccount
+      ? getAccountBalanceBeforeMap(selectedAccount)
+      : accountBalanceAfterByCurrency
+  );
 
   return (
     <div style={page}>
@@ -3141,117 +3145,92 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           </table>
 
           <div style={printBottomGrid}>
-            {/* Left Box: Account Balances */}
+            {/* Left Box: Account Balances — proper table */}
             {printOptions.showPrintBalance && !isTemporaryCustomer && selectedAccount && (
-              <div style={{
-                border: "1px solid #cbd5e1",
-                borderRadius: "8px",
-                padding: "10px 14px",
-                background: "white",
-                display: "flex",
-                flexDirection: "column",
-                gap: "10px",
-                boxSizing: "border-box",
-                justifyContent: "space-between",
-                fontSize: "12px"
-              }}>
-                {/* Previous Debt (قەرزی پێشوو) */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-                  {/* Left: Stack of currency values */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left", fontWeight: "bold" }}>
-                    {prevBalances.map((b, i) => (
-                      <span key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b", fontFamily: "monospace" }}>
-                        {b.formatted}
-                      </span>
-                    ))}
-                  </div>
-                  {/* Right: Label */}
-                  <span style={{ fontWeight: "bold", color: "#374151" }}>قەرزی پێشوو</span>
-                </div>
-
-                <hr style={{ border: 0, borderTop: "1px solid #e2e8f0", margin: 0 }} />
-
-                {/* New Debt (کۆی گشتی قەرز) */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-                  {/* Left: Stack of currency values */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left", fontWeight: "bold" }}>
-                    {newBalances.map((b, i) => (
-                      <span key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b", fontFamily: "monospace" }}>
-                        {b.formatted}
-                      </span>
-                    ))}
-                  </div>
-                  {/* Right: Label */}
-                  <span style={{ fontWeight: "bold", color: "#374151" }}>کۆی گشتی قەرز</span>
-                </div>
-              </div>
+              <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
+                <tbody>
+                  {/* Previous Debt */}
+                  <tr>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                      {prevBalances.map((b, i) => (
+                        <div key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b" }}>{b.formatted}</div>
+                      ))}
+                    </td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>
+                      قەرزی پێشوو
+                    </td>
+                  </tr>
+                  {/* New Debt */}
+                  <tr>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                      {newBalances.map((b, i) => (
+                        <div key={i} style={{ color: b.val > 0.01 ? "#dc2626" : "#1e293b" }}>{b.formatted}</div>
+                      ))}
+                    </td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>
+                      کۆی گشتی قەرز
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             )}
 
-            {/* Right Box: Invoice Totals */}
-            <div style={{
-              border: "1px solid #cbd5e1",
-              borderRadius: "8px",
-              padding: "10px 14px",
-              background: "white",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-              boxSizing: "border-box",
-              fontSize: "12px",
-              justifyContent: "center"
-            }}>
-              <PrintSummaryLine
-                label="کۆی گشتی"
-                value={formatMoney(total)}
-                bold
-              />
+            {/* Right Box: Invoice Totals — proper table */}
+            <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
+              <tbody>
+                <tr>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatMoney(total)}</td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
+                </tr>
 
-              {invoiceDiscountAmount > 0 && (
-                <PrintSummaryLine
-                  label="داشکاندن"
-                  value={formatMoney(invoiceDiscountAmount)}
-                />
-              )}
+                {invoiceDiscountAmount > 0 && (
+                  <tr>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatMoney(invoiceDiscountAmount)}</td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>داشکاندن</td>
+                  </tr>
+                )}
 
-              {hasDelivery && printOptions.showDelivery && deliveryFeeAmount > 0 && (
-                <PrintSummaryLine
-                  label="کرێی دلیڤەری"
-                  value={formatMoney(deliveryFeeAmount)}
-                />
-              )}
+                {hasDelivery && printOptions.showDelivery && deliveryFeeAmount > 0 && (
+                  <tr>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatMoney(deliveryFeeAmount)}</td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کرێی دلیڤەری</td>
+                  </tr>
+                )}
 
-              {getPaidSummaryText() !== "0" && (
-                <PrintSummaryLine
-                  label="پارەی دراو"
-                  value={getPaidSummaryText()}
-                />
-              )}
+                {getPaidSummaryText() !== "0" && (
+                  <tr>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{getPaidSummaryText()}</td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
+                  </tr>
+                )}
 
-              <PrintSummaryLine
-                label="ماوە"
-                value={formatMoney(remaining)}
-                bold
-              />
-
-              {printOptions.showDelivery && hasDelivery && (
-                <div style={{ marginTop: 8, borderTop: "1px solid #f1f5f9", paddingTop: 8 }}>
-                  <PrintSummaryLine
-                    label="ناوی دلیڤەری"
-                    value={deliveryName || "-"}
-                  />
-                  <PrintSummaryLine label="ژمارە" value={deliveryPhone || "-"} />
-                  <PrintSummaryLine
-                    label="ناونیشانی دلیڤەری"
-                    value={
-                      [deliveryCity, deliveryAddress].filter(Boolean).join(" - ") ||
-                      "-"
-                    }
-                  />
-                </div>
-              )}
-
-            </div>
+                <tr>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatMoney(remaining)}</td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ماوە</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
+
+          {/* Delivery info below the summary tables */}
+          {printOptions.showDelivery && hasDelivery && (
+            <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%", marginTop: 8 }}>
+              <tbody>
+                <tr>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{deliveryName || "-"}</td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ناوی دلیڤەری</td>
+                </tr>
+                <tr>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{deliveryPhone || "-"}</td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ژمارە</td>
+                </tr>
+                <tr>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{[deliveryCity, deliveryAddress].filter(Boolean).join(" - ") || "-"}</td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ناونیشانی دلیڤەری</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
 
           {printOptions.showNotes && printNote && (
             <div style={{
@@ -4600,23 +4579,23 @@ const printSmallNote: CSSProperties = {
 const printBottomGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 8,
+  gap: 0,
   marginTop: 8,
 };
 
 const printSummaryBox: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  padding: 8,
-  minHeight: 70,
-  fontSize: 11,
+  border: "1px solid #cbd5e1",
+  padding: 0,
+  minHeight: 40,
+  fontSize: 12,
 };
 
 const printSummaryLine: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 10,
-  borderBottom: "1px solid #f1f5f9",
-  padding: "4px 0",
+  gap: 0,
+  borderBottom: "1px solid #cbd5e1",
+  padding: "6px 10px",
 };
 
 const printNoteBox: CSSProperties = {

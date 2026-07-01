@@ -1757,15 +1757,15 @@ const printInfoRow: CSSProperties = {
 const printBottomGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 8,
+  gap: 0,
   marginTop: 8,
 };
 
 const printSummaryBox: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  padding: 8,
-  minHeight: 70,
-  fontSize: 11,
+  border: "1px solid #cbd5e1",
+  padding: 0,
+  minHeight: 40,
+  fontSize: 12,
 };
 
 const printSummaryLine: CSSProperties = {
