@@ -1712,57 +1712,61 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: "12px", marginTop: "8px", width: "100%" }}>
-            {/* Right Box: Payment Details */}
-            <div style={{ flex: 1 }}>
-              <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
-                <tbody>
-                  <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>
-                      {getPaidSummaryText()}
-                    </td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>پارەی دراو</td>
-                  </tr>
-                  {toNumber(discountAmount) > 0 && (
-                    <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
-                        {`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currencies.find((c: any) => c.id === activeDiscountCurrencyId)?.symbol || "$"}`}
-                      </td>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>داشکاندن</td>
-                    </tr>
-                  )}
-                  {showRate && (
-                    <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
-                        {`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}
-                      </td>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>ڕەیتی 100 دۆلار</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", border: "none", marginTop: 8 }}>
+            <tbody>
+              <tr>
+                {/* Right Box: Payment Details (First column, renders on the right in RTL) */}
+                <td style={{ width: "50%", paddingRight: 6, verticalAlign: "top", border: "none" }}>
+                  <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>
+                          {getPaidSummaryText()}
+                        </td>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>پارەی دراو</td>
+                      </tr>
+                      {toNumber(discountAmount) > 0 && (
+                        <tr>
+                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
+                            {`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currencies.find((c: any) => c.id === activeDiscountCurrencyId)?.symbol || "$"}`}
+                          </td>
+                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>داشکاندن</td>
+                        </tr>
+                      )}
+                      {showRate && (
+                        <tr>
+                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
+                            {`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}
+                          </td>
+                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold" }}>ڕەیتی 100 دۆلار</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </td>
 
-            {/* Left Box: Account Balances */}
-            <div style={{ flex: 1 }}>
-              <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
-                <tbody>
-                  <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
-                      {formatCurrencyMap(accountBalanceBeforeByCurrency)}
-                    </td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151" }}>قەرزی پێشوو</td>
-                  </tr>
-                  <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
-                      {formatCurrencyMap(editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency)}
-                    </td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151" }}>کۆی گشتی قەرز</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+                {/* Left Box: Account Balances (Second column, renders on the left in RTL) */}
+                <td style={{ width: "50%", paddingLeft: 6, verticalAlign: "top", border: "none" }}>
+                  <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
+                          {formatCurrencyMap(accountBalanceBeforeByCurrency)}
+                        </td>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151" }}>قەرزی پێشوو</td>
+                      </tr>
+                      <tr>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
+                          {formatCurrencyMap(editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency)}
+                        </td>
+                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151" }}>کۆی گشتی قەرز</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
           {printNote && printNote.trim() !== "" && (
             <div style={{
