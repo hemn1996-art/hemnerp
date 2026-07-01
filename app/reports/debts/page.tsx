@@ -36,14 +36,14 @@ export default function DebtReportPage() {
   const [showReportStats, setShowReportStats] = useState(true);
 
   // Sorting
-  const [sortField, setSortField] = useState<"totalDebt" | null>("totalDebt"); // Default sort by totalDebt
+  const [sortField, setSortField] = useState<"totalDebt" | "lastPaymentDate" | null>("totalDebt"); // Default sort by totalDebt
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc"); // Default descending
 
-  const toggleSortDebt = () => {
-    if (sortField === "totalDebt") {
+  const toggleSort = (field: "totalDebt" | "lastPaymentDate") => {
+    if (sortField === field) {
       setSortDirection(prev => prev === "desc" ? "asc" : "desc");
     } else {
-      setSortField("totalDebt");
+      setSortField(field);
       setSortDirection("desc");
     }
   };
@@ -52,13 +52,16 @@ export default function DebtReportPage() {
     if (!sortField) return data;
     const sorted = [...data];
     sorted.sort((a, b) => {
-      const valA = a[sortField] || 0;
-      const valB = b[sortField] || 0;
-      if (sortDirection === "asc") {
-        return valA - valB;
-      } else {
-        return valB - valA;
+      if (sortField === "totalDebt") {
+        const valA = a.totalDebt || 0;
+        const valB = b.totalDebt || 0;
+        return sortDirection === "asc" ? valA - valB : valB - valA;
+      } else if (sortField === "lastPaymentDate") {
+        const timeA = a.lastPaymentDate ? new Date(a.lastPaymentDate).getTime() : 0;
+        const timeB = b.lastPaymentDate ? new Date(b.lastPaymentDate).getTime() : 0;
+        return sortDirection === "asc" ? timeA - timeB : timeB - timeA;
       }
+      return 0;
     });
     return sorted;
   }, [data, sortField, sortDirection]);
@@ -335,10 +338,23 @@ export default function DebtReportPage() {
                 {visibleColumns.creditLimitExceeded && <th className="p-3 font-bold text-sm">سنووری قەرزی تێپەڕاندووە</th>}
                 {visibleColumns.debtBeforeLastPayment && <th className="p-3 font-bold text-sm">قەرزی پێش کۆتا پارەدان</th>}
                 {visibleColumns.lastPaymentAmount && <th className="p-3 font-bold text-sm">کۆتا پارەدان</th>}
-                {visibleColumns.lastPaymentDate && <th className="p-3 font-bold text-sm">بەرواری کۆتایی پارەدان</th>}
+                {visibleColumns.lastPaymentDate && (
+                  <th 
+                    onClick={() => toggleSort("lastPaymentDate")}
+                    className="p-3 font-bold text-sm cursor-pointer select-none hover:bg-[#061f5f] transition-colors"
+                    title="کلیک بکە بۆ ڕیزکردنی بەرواری کۆتا پارەدان"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>بەرواری کۆتایی پارەدان</span>
+                      {sortField === "lastPaymentDate" && (
+                        <span className="text-xs">{sortDirection === "desc" ? "▼" : "▲"}</span>
+                      )}
+                    </div>
+                  </th>
+                )}
                 {visibleColumns.totalDebt && (
                   <th 
-                    onClick={toggleSortDebt}
+                    onClick={() => toggleSort("totalDebt")}
                     className="p-3 font-bold text-sm cursor-pointer select-none hover:bg-[#061f5f] transition-colors"
                     title="کلیک بکە بۆ ڕیزکردنی قەرزەکان"
                   >
