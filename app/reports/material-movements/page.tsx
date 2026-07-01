@@ -459,7 +459,21 @@ export default function ItemsReportPage() {
                       </td>
                     )}
                     {visibleColumns.voucherType && <td className="p-2 border-r border-slate-200 text-center font-medium text-slate-600">{translateVoucherType(item.voucherType)}</td>}
-                    {visibleColumns.accountName && <td className="p-2 border-r border-slate-200 text-center text-blue-700 font-bold">{item.accountName}</td>}
+                    {visibleColumns.accountName && (
+                      <td className="p-2 border-r border-slate-200 text-center">
+                        {item.accountId ? (
+                          <span
+                            onClick={() => router.push(`/reports/account-statement?accountId=${item.accountId}`)}
+                            className="text-blue-700 font-bold hover:underline cursor-pointer transition"
+                            title="پیشاندانی ڕاپۆرتی حیساب"
+                          >
+                            {item.accountName}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 font-medium">{item.accountName}</span>
+                        )}
+                      </td>
+                    )}
                     {visibleColumns.productName && <td className="p-2 border-r border-slate-200 text-center font-bold text-[#334155] allow-wrap">{item.productName}</td>}
                     {visibleColumns.category && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
                     {visibleColumns.brand && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
