@@ -32,6 +32,7 @@ export default function StockReportPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showReportStats, setShowReportStats] = useState(true);
+  const [editingCost, setEditingCost] = useState<Record<string, string>>({});
 
   const {
     warehouses, fetchWarehouses,
@@ -192,6 +193,56 @@ export default function StockReportPage() {
       setErrorMsg("کێشەیەک ڕوویدا لە پەیوەندی کردن بە سێرڤەرەوە");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveCost = async (productId: number, warehouseId: number, newCostStr: string) => {
+    const key = `${productId}-${warehouseId}`;
+    const newCost = parseFloat(newCostStr);
+    if (isNaN(newCost) || newCost < 0) {
+      alert("تکایە نرخێکی دروست بنووسە");
+      return;
+    }
+
+    const currentItem = stockData.find(item => item.productId === productId && item.warehouseId === warehouseId);
+    if (currentItem && Math.abs(currentItem.cost - newCost) < 0.001) {
+      setEditingCost((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/reports/stock", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId,
+          warehouseId,
+          cost: newCost,
+        }),
+      });
+
+      if (res.ok) {
+        setEditingCost((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+        await loadStockData();
+      } else {
+        try {
+          const data = await res.json();
+          alert(data.error || "کێشەیەک لە پاشەکەوتکردنی کۆست ڕوویدا");
+        } catch {
+          alert("کێشەیەک لە پاشەکەوتکردنی کۆست ڕوویدا");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("کێشەی پەیوەندی کردن بە سێرڤەرەوە ڕوویدا");
     }
   };
 
@@ -535,7 +586,48 @@ export default function StockReportPage() {
                       )}
                       {visibleColumns.purchasePrice && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.purchasePrice)}</td>}
                       {visibleColumns.expense && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.expense)}</td>}
-                      {visibleColumns.cost && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.cost)}</td>}
+                      {visibleColumns.cost && (
+                        <td className="px-2 py-1 text-center text-gray-800" dir="ltr">
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-gray-500 font-bold">$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              className="w-20 px-1.5 py-0.5 text-center border border-gray-300 rounded focus:outline-none focus:border-[#0b1f50] font-bold bg-white text-gray-800 shadow-sm"
+                              value={
+                                editingCost[`${item.productId}-${item.warehouseId}`] !== undefined
+                                  ? editingCost[`${item.productId}-${item.warehouseId}`]
+                                  : item.cost.toFixed(2)
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                // Allow numbers and one decimal point
+                                if (val === "" || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                  setEditingCost((prev) => ({
+                                    ...prev,
+                                    [`${item.productId}-${item.warehouseId}`]: val,
+                                  }));
+                                }
+                              }}
+                              onBlur={() => {
+                                const val = editingCost[`${item.productId}-${item.warehouseId}`];
+                                if (val !== undefined) {
+                                  handleSaveCost(item.productId, item.warehouseId, val);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const val = editingCost[`${item.productId}-${item.warehouseId}`];
+                                  if (val !== undefined) {
+                                    handleSaveCost(item.productId, item.warehouseId, val);
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                        </td>
+                      )}
                       {visibleColumns.warehouseValue && <td className="px-2 py-2 text-center text-gray-800 font-bold" dir="ltr">{formatMoney(item.cost * item.quantity)}</td>}
                       {visibleColumns.sellerName && (
                         <td 

@@ -133,3 +133,72 @@ export async function GET(request: Request) {
     }, { status: 500 });
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const data = await request.json();
+    const productId = Number(data.productId);
+    const warehouseId = Number(data.warehouseId);
+    const cost = Number(data.cost);
+
+    if (isNaN(productId) || isNaN(warehouseId) || isNaN(cost)) {
+      return NextResponse.json(
+        { error: "داتای نادروست نێردراوە" },
+        { status: 400 }
+      );
+    }
+
+    // Find all incoming transactions for this product and warehouse
+    const txs = await prisma.inventoryTransaction.findMany({
+      where: {
+        productId,
+        warehouseId,
+        qtyChange: { gt: 0 }
+      },
+      select: { id: true }
+    });
+
+    if (txs.length > 0) {
+      await prisma.inventoryTransaction.updateMany({
+        where: {
+          id: { in: txs.map(t => t.id) }
+        },
+        data: {
+          unitCost: cost
+        }
+      });
+    } else {
+      // If no incoming transactions, try to find any transaction to update
+      const latestTx = await prisma.inventoryTransaction.findFirst({
+        where: {
+          productId,
+          warehouseId
+        },
+        orderBy: {
+          id: "desc"
+        },
+        select: { id: true }
+      });
+
+      if (latestTx) {
+        await prisma.inventoryTransaction.update({
+          where: { id: latestTx.id },
+          data: { unitCost: cost }
+        });
+      } else {
+        return NextResponse.json(
+          { error: "هیچ مامەڵەیەک نەدۆزرایەوە بۆ ئەم کاڵایە لەم کۆگایەدا" },
+          { status: 404 }
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Error updating stock cost:", error);
+    return NextResponse.json(
+      { error: "Failed to update stock cost", details: error?.message || "Unknown error" },
+      { status: 500 }
+    );
+  }
+}

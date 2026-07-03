@@ -51,6 +51,7 @@ interface VoucherExpense {
 
 interface LedgerEntry {
   id: number;
+  accountId: number;
   debit: number;
   credit: number;
   currencyId: number;
@@ -785,6 +786,23 @@ function InvoiceReportContent() {
     if (filterCurrencyId !== "all") {
       return Number(filterCurrencyId);
     }
+    
+    // Expense vouchers should not change: they show in their paid amount currency
+    if (voucher.type === "expense") {
+      if (voucher.paidAmounts && voucher.paidAmounts.length > 0) {
+        return voucher.paidAmounts[0].currencyId;
+      }
+      return voucher.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1;
+    }
+
+    // For other vouchers: if there's a ledger entry for the account, show in that currency
+    if (voucher.accountId) {
+      const accountLedgerEntry = voucher.ledgerEntries?.find(le => le.accountId === voucher.accountId);
+      if (accountLedgerEntry) {
+        return accountLedgerEntry.currencyId;
+      }
+    }
+
     if (["money_in", "money_out", "shareholder_deposit", "shareholder_withdrawal"].includes(voucher.type)) {
       if (voucher.paidAmounts && voucher.paidAmounts.length > 0) {
         return voucher.paidAmounts[0].currencyId;
