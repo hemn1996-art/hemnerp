@@ -92,7 +92,7 @@ export async function GET(request: Request) {
       if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
         const line = t.voucher.lines?.find((l: any) => l.productId === t.productId);
         const originalPrice = line ? line.unitPrice : t.unitCost;
-        const unitExpense = Math.max(0, t.unitCost - originalPrice);
+        const unitExpense = t.unitCost - originalPrice;
 
         stockMap[key].totalPurchaseValue += (t.qtyChange * t.unitCost);
         stockMap[key].totalPurchaseQty += t.qtyChange;
@@ -105,7 +105,7 @@ export async function GET(request: Request) {
         } else {
           const avgCost = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : t.unitCost;
           const avgExpense = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalExpenseValue / stockMap[key].totalPurchaseQty) : unitExpense;
-          const avgPrice = Math.max(0, avgCost - avgExpense);
+          const avgPrice = avgCost - avgExpense;
           
           stockMap[key].purchasePrice = avgPrice;
           stockMap[key].cost = avgCost;
