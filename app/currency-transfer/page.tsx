@@ -42,6 +42,9 @@ export default function CurrencyTransferPage() {
   
   const [iqdAmount, setIqdAmount] = useState("");
   const [usdAmount, setUsdAmount] = useState("");
+  const [originalFromCashboxId, setOriginalFromCashboxId] = useState("");
+  const [originalIqdAmount, setOriginalIqdAmount] = useState(0);
+  const [originalUsdAmount, setOriginalUsdAmount] = useState(0);
   
   const [note, setNote] = useState("");
   const [isNoteEdited, setIsNoteEdited] = useState(false);
@@ -81,10 +84,14 @@ export default function CurrencyTransferPage() {
     if (fromCashbox) {
       const fromIqdBal = fromCashbox.balances.find((b: any) => b.currencyId === iqdCurrency?.id)?.amount || 0;
       const fromUsdBal = fromCashbox.balances.find((b: any) => b.currencyId === usdCurrency?.id)?.amount || 0;
-      if (numIqd > fromIqdBal) {
+      
+      const origIqd = (editId && fromCashboxId === originalFromCashboxId) ? originalIqdAmount : 0;
+      const origUsd = (editId && fromCashboxId === originalFromCashboxId) ? originalUsdAmount : 0;
+
+      if (numIqd > (fromIqdBal + origIqd)) {
         return showAlert("warning", "ئاگاداری", "باڵانسی دینار لە قاسەی سەرچاوە بەشی ئەم گواستنەوەیە ناکات.");
       }
-      if (numUsd > fromUsdBal) {
+      if (numUsd > (fromUsdBal + origUsd)) {
         return showAlert("warning", "ئاگاداری", "باڵانسی دۆلار لە قاسەی سەرچاوە بەشی ئەم گواستنەوەیە ناکات.");
       }
     }
@@ -144,6 +151,9 @@ export default function CurrencyTransferPage() {
     setEditId(null);
     setIqdAmount("");
     setUsdAmount("");
+    setOriginalFromCashboxId("");
+    setOriginalIqdAmount(0);
+    setOriginalUsdAmount(0);
     setIsNoteEdited(false);
     setFromCashboxId("");
     setToCashboxId("");
@@ -154,6 +164,9 @@ export default function CurrencyTransferPage() {
     setEditId(row.id);
     setFromCashboxId(row.fromCashboxId?.toString() || "");
     setToCashboxId(row.toCashboxId?.toString() || "");
+    setOriginalFromCashboxId(row.fromCashboxId?.toString() || "");
+    setOriginalIqdAmount(Number(row.rawIqdAmount) || 0);
+    setOriginalUsdAmount(Number(row.rawUsdAmount) || 0);
     setNote(row.note);
     setIsNoteEdited(true);
     
