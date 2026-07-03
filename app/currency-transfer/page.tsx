@@ -159,6 +159,11 @@ export default function CurrencyTransferPage() {
     setToCashboxId("");
   }
 
+  function openAddForm() {
+    closeForm();
+    setIsFormOpen(true);
+  }
+
   // Handle Edit Click
   function handleEditClick(row: any) {
     setEditId(row.id);
@@ -250,7 +255,7 @@ export default function CurrencyTransferPage() {
               <label style={label}>لە قاسەی <span style={{ color: "red" }}>*</span></label>
               <select style={select} value={fromCashboxId} onChange={e => setFromCashboxId(e.target.value)}>
                 <option value="">هەڵبژێرە...</option>
-                {cashboxes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {cashboxes.map(c => <option key={c.id} value={c.id.toString()}>{c.name}</option>)}
               </select>
             </div>
 
@@ -292,7 +297,7 @@ export default function CurrencyTransferPage() {
               <label style={label}>بۆ قاسەی <span style={{ color: "red" }}>*</span></label>
               <select style={select} value={toCashboxId} onChange={e => setToCashboxId(e.target.value)}>
                 <option value="">هەڵبژێرە...</option>
-                {cashboxes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {cashboxes.map(c => <option key={c.id} value={c.id.toString()}>{c.name}</option>)}
               </select>
             </div>
 
@@ -352,7 +357,7 @@ export default function CurrencyTransferPage() {
           >
             ☰
           </button>
-          <button style={btnPrimary} onClick={() => setIsFormOpen(true)}>زیادکردن</button>
+          <button style={btnPrimary} onClick={openAddForm}>زیادکردن</button>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flex: 1, maxWidth: 400 }}>
           <input style={searchInput} placeholder="گەڕان..." />

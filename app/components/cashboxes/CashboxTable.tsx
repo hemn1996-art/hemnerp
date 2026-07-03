@@ -79,9 +79,6 @@ export default function CashboxTable({
         <thead>
           <tr>
             <th className="bg-[#08265a] text-white border-b border-gray-200 p-4 text-center font-black rounded-tr-xl">
-              کۆد
-            </th>
-            <th className="bg-[#08265a] text-white border-b border-gray-200 p-4 text-center font-black">
               ناوی قاسە
             </th>
             <th className="bg-[#08265a] text-white border-b border-gray-200 p-4 text-center font-black">
@@ -102,7 +99,7 @@ export default function CashboxTable({
           {filtered.length === 0 ? (
             <tr>
               <td
-                colSpan={6}
+                colSpan={5}
                 className="p-10 text-center text-gray-400 font-bold border-b border-gray-100"
               >
                 <div className="flex flex-col items-center gap-2">
@@ -124,9 +121,7 @@ export default function CashboxTable({
                   key={cashbox.id}
                   className="hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0"
                 >
-                  <td className="p-4 text-center text-gray-500 font-medium align-middle">
-                    {cashbox.id}
-                  </td>
+
                   <td className="p-4 text-right min-w-[220px] font-bold text-gray-800 align-middle">
                     {cashbox.name}
                   </td>
