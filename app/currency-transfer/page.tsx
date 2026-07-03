@@ -172,8 +172,14 @@ export default function CurrencyTransferPage() {
       v.paidAmounts?.forEach((pa: any) => {
         const amt = Number(pa.amount);
         if (amt > 0) { // Since transfer creates negative and positive matching pairs, just read positive
-          const sym = pa.currency?.symbol || pa.currency?.name || "";
-          amountsArr.push(`${amt.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${sym}`);
+          if (pa.currency?.code === "IQD") {
+            amountsArr.push(`دینار ${amt.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+          } else if (pa.currency?.code === "USD") {
+            amountsArr.push(`$ ${amt.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+          } else {
+            const sym = pa.currency?.symbol || pa.currency?.name || "";
+            amountsArr.push(`${amt.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${sym}`);
+          }
           if (pa.currency?.code === "USD") usdAm = amt;
           if (pa.currency?.code === "IQD") iqdAm = amt;
         }
