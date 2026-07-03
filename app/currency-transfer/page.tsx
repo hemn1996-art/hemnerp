@@ -193,6 +193,7 @@ export default function CurrencyTransferPage() {
         user: "بەڕێوەبەر", // Default user since auth isn't hooked up yet
         note: v.internalNote,
         amountStr: amountsArr.join(" و "),
+        amountList: amountsArr,
         fromStr: v.fromCashbox?.name || "",
         toStr: v.toCashbox?.name || "",
         fromCashboxId: v.fromCashboxId,
@@ -373,7 +374,13 @@ export default function CurrencyTransferPage() {
                     <td style={tdCenter}>گواستنەوەی پارە</td>
                     <td style={tdCenter}>{row.fromStr}</td>
                     <td style={tdCenter}>{row.toStr}</td>
-                    <td style={tdCenter} dir="ltr">{row.amountStr}</td>
+                    <td style={tdCenter} dir="ltr">
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "center", justifyContent: "center" }}>
+                        {row.amountList.map((amt: string, aIdx: number) => (
+                          <div key={aIdx} style={{ whiteSpace: "nowrap" }}>{amt}</div>
+                        ))}
+                      </div>
+                    </td>
                     <td style={tdCenter}>{row.note}</td>
                     <td style={tdCenter}>
                       <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>{row.user}</div>

@@ -135,7 +135,7 @@ export async function PUT(
 
     const dbCurrencies = await prisma.currency.findMany();
     let autoNote = "";
-    if (data.paidAmounts && Array.isArray(data.paidAmounts)) {
+    if (data.type !== "cashbox_transfer" && data.paidAmounts && Array.isArray(data.paidAmounts)) {
       const nonZeroPayments = data.paidAmounts.filter((p: any) => Number(p.amount) !== 0);
       if (nonZeroPayments.length > 1) {
         const parts = nonZeroPayments.map((p: any) => {
