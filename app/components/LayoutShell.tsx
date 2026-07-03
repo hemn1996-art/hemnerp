@@ -244,7 +244,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
           >
             ☰
           </button>
-          <span className="font-black text-lg text-gray-900">ERP System</span>
+          <span className="font-black text-lg text-gray-900">کۆگای دۆستان</span>
           <div className="w-10"></div>
         </div>
       )}

@@ -206,8 +206,8 @@ export default function Sidebar({
 
       {isExpanded && (
         <div className="flex flex-col items-center py-4 mb-4 border-b border-white/5">
-          <span className="font-extrabold text-2xl tracking-wider bg-gradient-to-r from-white to-[#a5b4fc] bg-clip-text text-transparent font-mono">
-            HEMN ERP
+          <span className="font-extrabold text-2xl tracking-wider bg-gradient-to-r from-white to-[#a5b4fc] bg-clip-text text-transparent">
+            کۆگای دۆستان
           </span>
           <span className="text-[10px] font-bold text-[#818cf8] mt-1 tracking-widest font-mono">
             V 1

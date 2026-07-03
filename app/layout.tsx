@@ -3,8 +3,8 @@ import "./globals.css";
 import LayoutShell from "./components/LayoutShell";
 
 export const metadata: Metadata = {
-  title: "ERP System",
-  description: "ERP and POS System",
+  title: "کۆگای دۆستان",
+  description: "POS and ERP System",
 };
 
 export const viewport: Viewport = {
