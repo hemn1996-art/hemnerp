@@ -33,6 +33,7 @@ export default function StockReportPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showReportStats, setShowReportStats] = useState(true);
   const [editingCost, setEditingCost] = useState<Record<string, string>>({});
+  const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
 
   const {
     warehouses, fetchWarehouses,
@@ -587,46 +588,68 @@ export default function StockReportPage() {
                       {visibleColumns.purchasePrice && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.purchasePrice)}</td>}
                       {visibleColumns.expense && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.expense)}</td>}
                       {visibleColumns.cost && (
-                        <td className="px-2 py-1 text-center text-gray-800" dir="ltr">
-                          <div className="flex items-center justify-center gap-1">
-                            <span className="text-gray-500 font-bold">$</span>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              className="w-20 px-1.5 py-0.5 text-center border border-gray-300 rounded focus:outline-none focus:border-[#0b1f50] font-bold bg-white text-gray-800 shadow-sm"
-                              value={
-                                editingCost[`${item.productId}-${item.warehouseId}`] !== undefined
-                                  ? editingCost[`${item.productId}-${item.warehouseId}`]
-                                  : item.cost.toFixed(2)
-                              }
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                // Allow numbers and one decimal point
-                                if (val === "" || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                                  setEditingCost((prev) => ({
-                                    ...prev,
-                                    [`${item.productId}-${item.warehouseId}`]: val,
-                                  }));
-                                }
-                              }}
-                              onBlur={() => {
-                                const val = editingCost[`${item.productId}-${item.warehouseId}`];
-                                if (val !== undefined) {
-                                  handleSaveCost(item.productId, item.warehouseId, val);
-                                }
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  const val = editingCost[`${item.productId}-${item.warehouseId}`];
-                                  if (val !== undefined) {
-                                    handleSaveCost(item.productId, item.warehouseId, val);
-                                    (e.target as HTMLInputElement).blur();
-                                  }
-                                }
-                              }}
-                            />
-                          </div>
-                        </td>
+                        (() => {
+                          const key = `${item.productId}-${item.warehouseId}`;
+                          const isEditing = editingCellKey === key;
+                          return (
+                            <td className="px-2 py-1 text-center text-gray-800" dir="ltr">
+                              {isEditing ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-gray-500 font-bold">$</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    autoFocus
+                                    className="w-20 px-1.5 py-0.5 text-center border border-gray-300 rounded focus:outline-none focus:border-[#0b1f50] font-bold bg-white text-gray-800 shadow-sm"
+                                    value={
+                                      editingCost[key] !== undefined
+                                        ? editingCost[key]
+                                        : item.cost.toFixed(2)
+                                    }
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === "" || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                        setEditingCost((prev) => ({
+                                          ...prev,
+                                          [key]: val,
+                                        }));
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      const val = editingCost[key];
+                                      if (val !== undefined) {
+                                        handleSaveCost(item.productId, item.warehouseId, val);
+                                      }
+                                      setEditingCellKey(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        const val = editingCost[key];
+                                        if (val !== undefined) {
+                                          handleSaveCost(item.productId, item.warehouseId, val);
+                                        }
+                                        setEditingCellKey(null);
+                                      } else if (e.key === "Escape") {
+                                        setEditingCellKey(null);
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div
+                                  onClick={() => {
+                                    setEditingCellKey(key);
+                                    setEditingCost((prev) => ({ ...prev, [key]: item.cost.toString() }));
+                                  }}
+                                  className="cursor-pointer hover:bg-gray-100 rounded px-2 py-0.5 inline-block font-bold"
+                                  title="کلیک بکە بۆ دەستکاریکردن"
+                                >
+                                  {formatMoney(item.cost)}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })()
                       )}
                       {visibleColumns.warehouseValue && <td className="px-2 py-2 text-center text-gray-800 font-bold" dir="ltr">{formatMoney(item.cost * item.quantity)}</td>}
                       {visibleColumns.sellerName && (
