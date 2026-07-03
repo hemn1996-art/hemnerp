@@ -168,18 +168,15 @@ export default function CurrencyTransferPage() {
     return invoices.filter(v => v.type === "cashbox_transfer").map(v => {
       // Find amounts
       let iqdAm = 0, usdAm = 0;
-      const amountsArr: string[] = [];
+       const amountsArr: { symbol: string, amount: string }[] = [];
       v.paidAmounts?.forEach((pa: any) => {
         const amt = Number(pa.amount);
         if (amt > 0) { // Since transfer creates negative and positive matching pairs, just read positive
-          if (pa.currency?.code === "IQD") {
-            amountsArr.push(`دینار ${amt.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
-          } else if (pa.currency?.code === "USD") {
-            amountsArr.push(`$ ${amt.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
-          } else {
-            const sym = pa.currency?.symbol || pa.currency?.name || "";
-            amountsArr.push(`${amt.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${sym}`);
-          }
+          const sym = pa.currency?.symbol || pa.currency?.name || "";
+          amountsArr.push({
+            symbol: pa.currency?.code === "IQD" ? "دینار" : (pa.currency?.code === "USD" ? "$" : sym),
+            amount: amt.toLocaleString(undefined, { maximumFractionDigits: 2 })
+          });
           if (pa.currency?.code === "USD") usdAm = amt;
           if (pa.currency?.code === "IQD") iqdAm = amt;
         }
@@ -198,7 +195,7 @@ export default function CurrencyTransferPage() {
         date: dateStr,
         user: "بەڕێوەبەر", // Default user since auth isn't hooked up yet
         note: v.internalNote,
-        amountStr: amountsArr.join(" و "),
+        amountStr: amountsArr.map(a => `${a.symbol} ${a.amount}`).join(" و "),
         amountList: amountsArr,
         fromStr: v.fromCashbox?.name || "",
         toStr: v.toCashbox?.name || "",
@@ -382,8 +379,11 @@ export default function CurrencyTransferPage() {
                     <td style={tdCenter}>{row.toStr}</td>
                     <td style={tdCenter} dir="ltr">
                       <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "center", justifyContent: "center" }}>
-                        {row.amountList.map((amt: string, aIdx: number) => (
-                          <div key={aIdx} style={{ whiteSpace: "nowrap" }}>{amt}</div>
+                        {row.amountList.map((amtObj: any, aIdx: number) => (
+                          <div key={aIdx} style={{ display: "flex", gap: "4px", direction: "ltr", alignItems: "center", whiteSpace: "nowrap" }}>
+                            <span>{amtObj.symbol}</span>
+                            <span>{amtObj.amount}</span>
+                          </div>
                         ))}
                       </div>
                     </td>
