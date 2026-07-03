@@ -591,6 +591,7 @@ export default function StockReportPage() {
                         (() => {
                           const key = `${item.productId}-${item.warehouseId}`;
                           const isEditing = editingCellKey === key;
+                          const decimals = (item.cost >= 1 && item.cost < 10) ? 3 : 2;
                           return (
                             <td className="px-2 py-1 text-center text-gray-800" dir="ltr">
                               {isEditing ? (
@@ -604,7 +605,7 @@ export default function StockReportPage() {
                                     value={
                                       editingCost[key] !== undefined
                                         ? editingCost[key]
-                                        : item.cost.toFixed(2)
+                                        : item.cost.toFixed(decimals)
                                     }
                                     onChange={(e) => {
                                       const val = e.target.value;
@@ -639,12 +640,12 @@ export default function StockReportPage() {
                                 <div
                                   onClick={() => {
                                     setEditingCellKey(key);
-                                    setEditingCost((prev) => ({ ...prev, [key]: item.cost.toString() }));
+                                    setEditingCost((prev) => ({ ...prev, [key]: item.cost.toFixed(decimals) }));
                                   }}
                                   className="cursor-pointer hover:bg-gray-100 rounded px-2 py-0.5 inline-block font-bold"
                                   title="کلیک بکە بۆ دەستکاریکردن"
                                 >
-                                  {formatMoney(item.cost)}
+                                  <FormattedNumber value={item.cost} currencySymbol="$" decimals={decimals} />
                                 </div>
                               )}
                             </td>
