@@ -25,6 +25,7 @@ export async function GET(request: Request) {
           productId: true,
           qtyChange: true,
           unitCost: true,
+          date: true,
           voucher: { select: { type: true } },
         },
       }),
@@ -112,13 +113,54 @@ export async function GET(request: Request) {
     }, 0);
 
     // 2. Warehouse Value
-    const productStock: Record<number, number> = {};
-    inventoryTrans.forEach(t => {
-      productStock[t.productId] = (productStock[t.productId] || 0) + t.qtyChange * t.unitCost;
+    const productStats: Record<number, {
+      totalPurchaseValue: number;
+      totalPurchaseQty: number;
+      currentQty: number;
+      fallbackCost: number;
+    }> = {};
+
+    // Sort transactions by date ascending to match Stock Report fallback logic
+    const sortedTrans = [...inventoryTrans].sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      return dateA - dateB;
+    });
+
+    sortedTrans.forEach(t => {
+      const pId = t.productId;
+      if (!productStats[pId]) {
+        productStats[pId] = {
+          totalPurchaseValue: 0,
+          totalPurchaseQty: 0,
+          currentQty: 0,
+          fallbackCost: 0
+        };
+      }
+      
+      const stats = productStats[pId];
+      stats.currentQty += t.qtyChange;
+
+      if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
+        stats.totalPurchaseValue += (t.qtyChange * t.unitCost);
+        stats.totalPurchaseQty += t.qtyChange;
+      }
+
+      if (t.unitCost > 0 && stats.fallbackCost === 0) {
+        stats.fallbackCost = t.unitCost;
+      }
     });
 
     let totalWarehouseValueInUsd = 0;
-    Object.values(productStock).forEach(val => {
+    Object.values(productStats).forEach(stats => {
+      let cost = 0;
+      if (stats.totalPurchaseQty > 0) {
+        cost = stats.totalPurchaseValue / stats.totalPurchaseQty;
+      } else {
+        cost = stats.fallbackCost;
+      }
+      
+      const val = stats.currentQty * cost;
       if (val > 0) {
         totalWarehouseValueInUsd += val;
       }
