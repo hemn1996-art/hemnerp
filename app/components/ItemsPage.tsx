@@ -322,9 +322,9 @@ function AddItemForm({
     },
   ]);
 
-  const [lowStockAlert, setLowStockAlert] = useState("");
-  const [hasExpiry, setHasExpiry] = useState(false);
-  const [expiryAlertDays, setExpiryAlertDays] = useState("10");
+  const [lowStockAlert, setLowStockAlert] = useState(productToEdit?.lowStockAlert !== undefined ? String(productToEdit.lowStockAlert) : "");
+  const [hasExpiry, setHasExpiry] = useState(productToEdit?.hasExpiry ?? false);
+  const [expiryAlertDays, setExpiryAlertDays] = useState(productToEdit?.expiryAlertDays !== undefined ? String(productToEdit.expiryAlertDays) : "10");
   const [isMultiBatch, setIsMultiBatch] = useState(productToEdit?.isMultiBatch || false);
 
   const [isActive, setIsActive] = useState(productToEdit?.isActive ?? true);
@@ -525,6 +525,9 @@ function AddItemForm({
         priceType: sp.priceType,
         amount: Number(sp.amount) || 0,
       })),
+      lowStockAlert: Number(lowStockAlert) || 0,
+      hasExpiry,
+      expiryAlertDays: Number(expiryAlertDays) || 0,
     };
 
     const result = productToEdit

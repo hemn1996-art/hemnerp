@@ -32,6 +32,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const fetchAccounts = useStore((state) => state.fetchAccounts);
   const currencies = useStore((state) => state.currencies) || [];
   const fetchCurrencies = useStore((state) => state.fetchCurrencies);
+  const products = useStore((state) => state.products) || [];
+  const fetchProducts = useStore((state) => state.fetchProducts);
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [customNotifications, setCustomNotifications] = useState<any[]>([]);
@@ -83,7 +85,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     fetchInvoices();
     fetchAccounts();
     fetchCurrencies();
-  }, [fetchInvoices, fetchAccounts, fetchCurrencies]);
+    fetchProducts();
+  }, [fetchInvoices, fetchAccounts, fetchCurrencies, fetchProducts]);
 
   const iqdRate = currencies.find((c: any) => c.code === "IQD")?.rate || 1500;
 
@@ -324,6 +327,21 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     }
   });
 
+  // 3. Low Stock Check
+  products.forEach((prod: any) => {
+    if (!prod.isExpense && !prod.isService && prod.lowStockAlert > 0) {
+      if (prod.stock <= prod.lowStockAlert) {
+        alerts.push({
+          id: `lowstock-${prod.id}`,
+          type: "lowstock",
+          title: "کاڵای کەمبووەوە",
+          message: `کەرەستەی "${prod.name}" بڕی لە کۆگا کەمبووەتەوە. بڕی ئێستا: ${prod.stock}، کەمترین ئاست: ${prod.lowStockAlert}`,
+          severity: "warning",
+        });
+      }
+    }
+  });
+
   customNotifications.forEach((n: any) => {
     alerts.push({
       id: `announcement-${n.id}`,
@@ -446,6 +464,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                               const updated = customNotifications.filter((n: any) => n.id !== targetId);
                               localStorage.setItem("__dismissed_notifications", JSON.stringify(updated));
                               setCustomNotifications(updated);
+                            } else if (alert.type === "lowstock") {
+                              router.push(`/materials`);
                             } else if (alert.accountId) {
                               router.push(`/reports/account-statement?accountId=${alert.accountId}`);
                             }

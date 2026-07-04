@@ -133,6 +133,9 @@ model Product {
   inventoryTransactions InventoryTransaction[]
   voucherLines          VoucherLine[]
   salePrices            String?
+  lowStockAlert         Float                  @default(0)
+  hasExpiry             Boolean                @default(false)
+  expiryAlertDays       Int                    @default(0)
 }
 
 model Voucher {

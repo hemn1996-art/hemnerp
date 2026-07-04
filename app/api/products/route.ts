@@ -80,6 +80,9 @@ export async function GET(request: Request) {
         isDeletable: !hasTransactions,
         salePrices: p.salePrices ? JSON.parse(p.salePrices) : [],
         warehouseStocks,
+        lowStockAlert: p.lowStockAlert,
+        hasExpiry: p.hasExpiry,
+        expiryAlertDays: p.expiryAlertDays,
       };
     });
 
@@ -109,6 +112,9 @@ export async function POST(request: Request) {
         isService: data.isService || false,
         isActive: data.isActive ?? true,
         salePrices: data.salePrices ? JSON.stringify(data.salePrices) : null,
+        lowStockAlert: data.lowStockAlert || 0,
+        hasExpiry: data.hasExpiry || false,
+        expiryAlertDays: data.expiryAlertDays || 0,
       },
     });
 
@@ -137,6 +143,9 @@ export async function PUT(request: Request) {
     if (data.isService !== undefined) updateData.isService = data.isService;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.salePrices !== undefined) updateData.salePrices = data.salePrices ? JSON.stringify(data.salePrices) : null;
+    if (data.lowStockAlert !== undefined) updateData.lowStockAlert = data.lowStockAlert;
+    if (data.hasExpiry !== undefined) updateData.hasExpiry = data.hasExpiry;
+    if (data.expiryAlertDays !== undefined) updateData.expiryAlertDays = data.expiryAlertDays;
 
     const updatedProduct = await prisma.product.update({
       where: { id: Number(data.id) },
