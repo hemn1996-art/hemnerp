@@ -40,11 +40,27 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const [chartCurrency, setChartCurrency] = useState<"all" | "USD" | "IQD">("all");
 
   const [mounted, setMounted] = useState(false);
+  const [companyName, setCompanyName] = useState("کۆگای دۆستان");
   const [kpiPeriod, setKpiPeriod] = useState<string>("today");
   const [donutPeriod, setDonutPeriod] = useState<string>("today");
 
   useEffect(() => {
     setMounted(true);
+    const saved = localStorage.getItem("general_settings");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.companyName === "سەنتەری کارەبای لەندەن") {
+          parsed.companyName = "کۆگای دۆستان";
+          localStorage.setItem("general_settings", JSON.stringify(parsed));
+        }
+        if (parsed.companyName) {
+          setCompanyName(parsed.companyName);
+        }
+      } catch (e) {
+        console.error("Failed to parse settings", e);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -456,7 +472,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
           </div>
 
           <span className="bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] px-4 py-1.5 rounded-full text-xs font-semibold">
-            سەنتەری کارەبای لەندەن
+            {companyName}
           </span>
         </div>
       </div>
