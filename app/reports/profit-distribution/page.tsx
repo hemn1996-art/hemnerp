@@ -20,6 +20,147 @@ const formatRateWithCommas = (val: string) => {
   return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
+function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentDate, setCurrentDate] = useState(() => new Date(value || Date.now()));
+
+  useEffect(() => {
+    if (value) {
+      setCurrentDate(new Date(value));
+    }
+  }, [value]);
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(year, month - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(year, month + 1, 1));
+  };
+
+  const handleDayClick = (day: number) => {
+    const selectedDate = new Date(year, month, day);
+    const y = selectedDate.getFullYear();
+    const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const d = String(selectedDate.getDate()).padStart(2, '0');
+    onChange(`${y}-${m}-${d}`);
+    setIsOpen(false);
+  };
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+
+  const kurdishMonths = [
+    "کانوونی دووەم (١)",
+    "شوبات (٢)",
+    "ئازار (٣)",
+    "نیسان (٤)",
+    "ئایار (٥)",
+    "حوزەیران (٦)",
+    "تەمووز (٧)",
+    "ئاب (٨)",
+    "ئەیلوول (٩)",
+    "تشرینی یەکەم (١٠)",
+    "تشرینی دووەم (١١)",
+    "کانوونی یەکەم (١٢)"
+  ];
+
+  const days = [];
+  for (let i = 0; i < firstDayIndex; i++) {
+    days.push(<div key={`empty-${i}`} className="w-8 h-8"></div>);
+  }
+
+  const selectedDayNum = value ? new Date(value).getDate() : null;
+  const selectedMonthNum = value ? new Date(value).getMonth() : null;
+  const selectedYearNum = value ? new Date(value).getFullYear() : null;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const isSelected = d === selectedDayNum && month === selectedMonthNum && year === selectedYearNum;
+    days.push(
+      <button
+        key={`day-${d}`}
+        type="button"
+        onClick={() => handleDayClick(d)}
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${
+          isSelected 
+            ? "bg-[#0b1f50] text-white shadow" 
+            : "hover:bg-slate-100 text-slate-700"
+        }`}
+      >
+        {d}
+      </button>
+    );
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.custom-calendar-container')) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [isOpen]);
+
+  return (
+    <div className="relative custom-calendar-container">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm hover:border-[#0b1f50] transition-colors bg-white cursor-pointer select-none"
+      >
+        <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-l border-gray-300">
+          بەروار
+        </span>
+        <span className="px-3 py-2 text-sm text-gray-700 font-bold text-center w-36">
+          {formatDateToDMY(value)}
+        </span>
+      </div>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-50 w-64 text-right select-none animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between mb-3 flex-row-reverse">
+            <button 
+              type="button" 
+              onClick={handlePrevMonth} 
+              className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+            >
+              ◀
+            </button>
+            <div className="text-sm font-black text-slate-800">
+              {kurdishMonths[month]} {year}
+            </div>
+            <button 
+              type="button" 
+              onClick={handleNextMonth} 
+              className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+            >
+              ▶
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center font-bold text-slate-400 text-[10px] mb-2 flex-row-reverse">
+            <div>ی</div>
+            <div>د</div>
+            <div>س</div>
+            <div>چ</div>
+            <div>پ</div>
+            <div>ه</div>
+            <div>ش</div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center justify-items-center">
+            {days}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProfitDistributionPage() {
   const router = useRouter();
   const currentUser = useStore((s: any) => s.currentUser);
@@ -260,25 +401,13 @@ export default function ProfitDistributionPage() {
             <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 flex-row-reverse text-right font-bold">
               <div className="flex items-center gap-3 flex-row-reverse">
                 {/* Date Input */}
-                <div 
-                  className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm hover:border-[#0b1f50] transition-colors bg-white relative cursor-pointer"
-                >
-                  <input 
-                    type="date" 
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" 
-                    value={asOfDate}
-                    onChange={(e) => {
-                      setAsOfDate(e.target.value);
-                      setUserEditedRate(false); // Reset userEditedRate so it pulls the day's default rate
-                    }}
-                  />
-                  <span className="px-3 py-2 text-sm text-gray-700 font-bold text-center w-36">
-                    {formatDateToDMY(asOfDate)}
-                  </span>
-                  <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-l border-gray-300">
-                    بەروار
-                  </span>
-                </div>
+                <CustomDatePicker 
+                  value={asOfDate}
+                  onChange={(val) => {
+                    setAsOfDate(val);
+                    setUserEditedRate(false); // Reset userEditedRate so it pulls the day's default rate
+                  }}
+                />
 
                 {/* Dollar Rate Input */}
                 <div className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white flex-row-reverse">
