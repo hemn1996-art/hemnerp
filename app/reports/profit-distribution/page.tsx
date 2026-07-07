@@ -28,10 +28,12 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
     const d = new Date(value || Date.now());
     return d.getFullYear() - 5;
   });
+  const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
     if (value) {
       setCurrentDate(new Date(value));
+      setInputValue(formatDateToDMY(value));
     }
   }, [value]);
 
@@ -70,7 +72,7 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
 
   const handleYearClick = (yVal: number) => {
     setCurrentDate(new Date(yVal, month, 1));
-    setView("days");
+    setView("months"); // Go back to months view after choosing a year
   };
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -103,7 +105,6 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
     );
   }
 
-  // Generate 12 years for the grid
   const yearsGrid = [];
   for (let y = yearPageStart; y < yearPageStart + 12; y++) {
     const isSelected = y === selectedYearNum;
@@ -123,7 +124,6 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
     );
   }
 
-  // Format month list
   const monthsGrid = [];
   for (let m = 0; m < 12; m++) {
     const isSelected = m === selectedMonthNum && year === selectedYearNum;
@@ -161,20 +161,62 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
         setYearPageStart(new Date(value).getFullYear() - 5);
       }
     }
-  }, [isOpen, value]);
+  }, [isOpen]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value;
+    val = val.replace(/[^0-9.]/g, "");
+
+    const digits = val.replace(/\./g, "");
+    let formatted = "";
+    if (digits.length > 0) {
+      formatted += digits.substring(0, 2);
+    }
+    if (digits.length > 2) {
+      formatted += "." + digits.substring(2, 4);
+    }
+    if (digits.length > 4) {
+      formatted += "." + digits.substring(4, 8);
+    }
+
+    setInputValue(formatted);
+
+    if (formatted.length === 10) {
+      const parts = formatted.split(".");
+      const day = parseInt(parts[0], 10);
+      const monthVal = parseInt(parts[1], 10) - 1;
+      const yearVal = parseInt(parts[2], 10);
+
+      const dateObj = new Date(yearVal, monthVal, day);
+      if (
+        dateObj.getFullYear() === yearVal &&
+        dateObj.getMonth() === monthVal &&
+        dateObj.getDate() === day
+      ) {
+        const yyyy = yearVal;
+        const mm = String(monthVal + 1).padStart(2, '0');
+        const dd = String(day).padStart(2, '0');
+        onChange(`${yyyy}-${mm}-${dd}`);
+      }
+    }
+  };
 
   return (
     <div className="relative custom-calendar-container">
       <div 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setIsOpen(true)}
         className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm hover:border-[#0b1f50] transition-colors bg-white cursor-pointer select-none"
       >
-        <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-l border-gray-300">
+        <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-l border-gray-300 font-sans">
           بەروار
         </span>
-        <span className="px-3 py-2 text-sm text-gray-700 font-bold text-center w-36">
-          {formatDateToDMY(value)}
-        </span>
+        <input
+          type="text"
+          className="px-3 py-2 text-sm text-gray-700 font-bold text-center w-36 outline-none cursor-text font-sans"
+          value={inputValue}
+          onChange={handleInputChange}
+          placeholder="ڕڕ.مم.سسسس"
+        />
       </div>
 
       {isOpen && (
@@ -192,7 +234,7 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
               <div className="w-6"></div>
             )}
             
-            <div className="text-sm font-black text-slate-800 flex items-center gap-1.5 flex-row-reverse">
+            <div className="text-sm font-black text-slate-800 flex items-center gap-1.5 flex-row-reverse font-sans">
               {view === "days" && (
                 <>
                   <button 
@@ -216,7 +258,20 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
                 </>
               )}
               {view === "months" && (
-                <span className="text-slate-800">هەڵبژاردنی مانگ</span>
+                <>
+                  <span className="text-slate-800">هەڵبژاردنی مانگ</span>
+                  <span>-</span>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setYearPageStart(year - 5);
+                      setView("years");
+                    }}
+                    className="hover:text-[#0b1f50] hover:underline cursor-pointer"
+                  >
+                    {year}
+                  </button>
+                </>
               )}
               {view === "years" && (
                 <span className="text-slate-800">هەڵبژاردنی ساڵ ({yearPageStart} - {yearPageStart + 11})</span>
