@@ -220,7 +220,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const [accountSearch, setAccountSearch] = useState("");
   const [accountId, setAccountId] = useState<number | undefined>();
   const [showAccountList, setShowAccountList] = useState(false);
-  const [showAccountInfo, setShowAccountInfo] = useState(false);
+  const [showAccountInfo, setShowAccountInfo] = useState(true);
 
   const [cashboxId, setCashboxId] = useState<number | undefined>(
     cashboxes[0]?.id
@@ -1278,7 +1278,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                   setAccountSearch(e.target.value);
                   setAccountId(undefined);
                   setShowAccountList(true);
-                  setShowAccountInfo(false);
+                  setShowAccountInfo(true);
                 }}
                 placeholder="هەژمار"
                 style={{
@@ -1318,7 +1318,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                         setAccountId(account.id);
                         setAccountSearch(account.name);
                         setShowAccountList(false);
-                        setShowAccountInfo(false);
+                        setShowAccountInfo(true);
                       }}
                     >
                       <strong>{account.name}</strong>
@@ -1404,7 +1404,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
               </InfoRow>
 
               <InfoRow label="باڵانس">
-                {formatCurrencyMapWithColors(isLocked ? screenAccountBalanceAfterByCurrency : screenAccountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(selectedAccount))}
               </InfoRow>
             </div>
           )}

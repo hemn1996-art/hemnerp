@@ -20,6 +20,13 @@ export default function ProfitDistributionPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [profitBreakdownExpanded, setProfitBreakdownExpanded] = useState(false);
 
+  // Custom Date and Rate filters
+  const [asOfDate, setAsOfDate] = useState(() => {
+    return new Date().toISOString().slice(0, 10);
+  });
+  const [dollarRate, setDollarRate] = useState<string>("");
+  const [userEditedRate, setUserEditedRate] = useState(false);
+
   // State for history
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -38,9 +45,12 @@ export default function ProfitDistributionPage() {
 
   useEffect(() => {
     fetchCurrencies?.();
-    fetchData();
     fetchHistory();
   }, []);
+
+  useEffect(() => {
+    fetchData(asOfDate, dollarRate);
+  }, [asOfDate]);
 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToastMessage(msg);
@@ -48,20 +58,26 @@ export default function ProfitDistributionPage() {
     setTimeout(() => setToastMessage(""), 3500);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (targetDate?: string, targetRate?: string) => {
     try {
       setLoading(true);
-      const res = await fetch("/api/reports/balance-sheet");
+      const dateToUse = targetDate || asOfDate;
+      const rateToUse = targetRate || dollarRate;
+
+      let url = `/api/reports/balance-sheet?asOfDate=${dateToUse}`;
+      if (rateToUse) {
+        url += `&exchangeRate=${parseFloat(rateToUse) / 100}`;
+      }
+
+      const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
         setData(json);
-        // Calculate default profit
-        const warehouseValue = json.assets.warehouseValue || 0;
-        const cash = json.assets.cash || 0;
-        const accountsReceivable = json.assets.accountsReceivable || 0;
-        const otherAssets = json.assets.allInventory || 0;
-        const myDebts = json.liabilitiesEquity.myDebts || 0;
-        const capital = json.liabilitiesEquity.capital || 0;
+        if (!userEditedRate && json.exchangeRate) {
+          setDollarRate(String(json.exchangeRate));
+        } else if (json.exchangeRate && !rateToUse) {
+          setDollarRate(String(json.exchangeRate));
+        }
       }
     } catch (e) {
       console.error("Error fetching data:", e);
@@ -121,6 +137,7 @@ export default function ProfitDistributionPage() {
           distributedProfit,
           note: distributionNote,
           items,
+          date: asOfDate,
         })
       });
 
@@ -222,6 +239,60 @@ export default function ProfitDistributionPage() {
             {/* Header info */}
             <div className="text-right border-b pb-4">
               <h2 className="text-lg font-bold text-slate-800">حیسابکردنی قازانجی دابەشکار پێش چوونە ناو هەژماری هاوبەشەکان</h2>
+            </div>
+
+            {/* Date and Rate Selector */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 flex-row-reverse text-right font-bold">
+              <div className="flex items-center gap-3 flex-row-reverse">
+                {/* Date Input */}
+                <div 
+                  className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors bg-white flex-row-reverse"
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).tagName !== 'INPUT') {
+                      (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker();
+                    }
+                  }}
+                >
+                  <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-r border-gray-300">بەروار</span>
+                  <input 
+                    type="date" 
+                    className="px-3 py-2 text-sm text-gray-700 outline-none cursor-pointer w-40 font-bold text-right" 
+                    value={asOfDate}
+                    onChange={(e) => {
+                      setAsOfDate(e.target.value);
+                      setUserEditedRate(false); // Reset userEditedRate so it pulls the day's default rate
+                    }}
+                  />
+                </div>
+
+                {/* Dollar Rate Input */}
+                <div className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white flex-row-reverse">
+                  <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-r border-gray-300">ڕەیتی دۆلار (١٠٠$)</span>
+                  <input 
+                    type="number" 
+                    className="px-3 py-2 text-sm text-gray-700 outline-none w-32 font-bold text-center" 
+                    value={dollarRate}
+                    onChange={(e) => {
+                      setDollarRate(e.target.value);
+                      setUserEditedRate(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        fetchData(asOfDate, dollarRate);
+                      }
+                    }}
+                  />
+                  <button 
+                    onClick={() => fetchData(asOfDate, dollarRate)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 text-xs transition cursor-pointer border-none h-full"
+                  >
+                    بەکارهێنان
+                  </button>
+                </div>
+              </div>
+              <div className="text-right text-xs text-slate-400 font-bold">
+                وردەکارییەکانی قازانج بەپێی بەروار و ڕەیتی دیاریکراو حیساب دەکرێن
+              </div>
             </div>
 
             {/* Calculated profit */}

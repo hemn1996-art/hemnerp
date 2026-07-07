@@ -77,6 +77,34 @@ export async function GET(request: Request) {
     const usdCurrency = currencies.find((c: any) => c.code === "USD");
     const usdId = usdCurrency ? usdCurrency.id : 1;
 
+    // Retrieve custom exchangeRate if provided
+    const queryRate = searchParams.get("exchangeRate");
+    let customIQDRate: number | null = null;
+    if (queryRate) {
+      const parsed = parseFloat(queryRate);
+      if (parsed > 0) {
+        customIQDRate = parsed > 10000 ? parsed / 100 : parsed;
+      }
+    }
+
+    // Find the last voucher rate for IQD on or before the dateFilter to return as the default rate
+    const lastVoucher = await prisma.voucher.findFirst({
+      where: {
+        date: { lte: dateFilter },
+        exchangeRate: { gt: 1 },
+        isDeleted: false,
+      },
+      orderBy: { date: 'desc' },
+      select: { exchangeRate: true },
+    });
+    
+    const dbIQD = currencies.find((c: any) => c.code === "IQD");
+    const fallbackRate = dbIQD ? dbIQD.rate : 1535;
+    const defaultRate = lastVoucher ? lastVoucher.exchangeRate : fallbackRate;
+    let normalizedDefaultRate = defaultRate;
+    if (normalizedDefaultRate > 10000) normalizedDefaultRate = normalizedDefaultRate / 100;
+    if (normalizedDefaultRate < 10) normalizedDefaultRate = normalizedDefaultRate * 100;
+
     // Define target currency for the report
     let targetCurrency = currencies.find((c: any) => c.code === "USD"); // Default to USD for consolidated view
     if (currencyId && currencyId !== "all") {
@@ -93,14 +121,21 @@ export async function GET(request: Request) {
 
     const convertToTarget = (amount: number, fromCurrencyId: number) => {
       const fromCur = currencies.find((c: any) => c.id === fromCurrencyId);
-      const fromRate = fromCur ? fromCur.rate : 1.0;
+      let fromRate = fromCur ? fromCur.rate : 1.0;
+      if (fromCur && fromCur.code === "IQD" && customIQDRate !== null) {
+        fromRate = customIQDRate;
+      }
       const usdAmount = amount / fromRate;
       return usdAmount * targetRate;
     };
 
     const convertVoucherToTarget = (amount: number, voucherCurId: number, exchangeRate: number) => {
       if (voucherCurId === usdId) return amount * targetRate;
+      const fromCur = currencies.find((c: any) => c.id === voucherCurId);
       let rate = exchangeRate || 1500;
+      if (fromCur && fromCur.code === "IQD" && customIQDRate !== null) {
+        rate = exchangeRate || customIQDRate;
+      }
       if (rate > 10000) rate = rate / 100; // 155000 -> 1550
       if (rate < 10) rate = rate * 100;    // 15.5 -> 1550
       const usdAmount = amount / rate;
@@ -333,6 +368,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       asOfDate,
+      exchangeRate: normalizedDefaultRate * 100,
       currencySymbol: targetCurrency?.symbol || "$",
       currencyCode: targetCurrency?.code || "USD",
       shareholders,

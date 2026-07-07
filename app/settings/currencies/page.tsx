@@ -185,7 +185,7 @@ export default function CurrenciesPage() {
     setFormName(curr.name);
     setFormCode(curr.code);
     setFormSymbol(curr.symbol);
-    setFormRate(String(curr.rate));
+    setFormRate(String((curr.rate ?? 0) * 100));
     setFormMode(curr.mode || "1");
     setFormRounding(curr.rounding);
     setFormIsActive(curr.isActive);
@@ -199,7 +199,7 @@ export default function CurrenciesPage() {
     setFormName("");
     setFormCode("");
     setFormSymbol("");
-    setFormRate("1");
+    setFormRate("100");
     setFormMode("1");
     setFormRounding(false);
     setFormIsActive(true);
@@ -219,7 +219,7 @@ export default function CurrenciesPage() {
       name: formName,
       code: formCode,
       symbol: formSymbol,
-      rate: Number(formRate),
+      rate: Number(formRate) / 100,
       mode: formMode,
       rounding: formRounding,
       color: formColor,
@@ -238,9 +238,9 @@ export default function CurrenciesPage() {
         const saved: Currency = await res.json();
         
         // Log rate change in history if rate was changed
-        if (selectedCurrency && selectedCurrency.rate !== Number(formRate)) {
-          const oldRate = selectedCurrency.rate;
-          const newRate = Number(formRate);
+        const oldRate = (selectedCurrency?.rate ?? 0) * 100;
+        const newRate = Number(formRate);
+        if (selectedCurrency && oldRate !== newRate) {
           const change = newRate - oldRate;
           const changePercent = oldRate !== 0 ? Number(((change / oldRate) * 100).toFixed(2)) : 0;
           
@@ -384,7 +384,7 @@ export default function CurrenciesPage() {
               <thead className="bg-[#0f172a] text-white">
                 <tr>
                   <th className="px-6 py-4 text-sm font-bold">ناو</th>
-                  <th className="px-6 py-4 text-sm font-bold text-center">نرخ</th>
+                  <th className="px-6 py-4 text-sm font-bold text-center">نرخ بۆ ١٠٠ $</th>
                   <th className="px-6 py-4 text-sm font-bold text-center">مۆد</th>
                   <th className="px-6 py-4 text-sm font-bold text-center">نزیککردنەوە</th>
                   <th className="px-6 py-4 text-sm font-bold text-center">ڕەنگ</th>
@@ -414,7 +414,7 @@ export default function CurrenciesPage() {
                         <span className="text-xs text-slate-400 font-medium">({curr.symbol})</span>
                       </td>
                       <td className="px-6 py-4 text-center font-black">
-                        {(curr.rate ?? 0).toLocaleString("en-US")}
+                        {((curr.rate ?? 0) * 100).toLocaleString("en-US")}
                       </td>
                       <td className="px-6 py-4 text-center text-slate-500 font-bold">
                         {curr.mode || "-"}
@@ -722,22 +722,29 @@ export default function CurrenciesPage() {
                   </tr>
                 ) : (
                   filteredHistory.map((item) => {
-                    const isIncrease = item.change > 0;
+                    const scaleRate = (val: number) => {
+                      if (val > 0 && val < 10000) return val * 100;
+                      return val;
+                    };
+                    const oRate = scaleRate(item.oldRate ?? 0);
+                    const nRate = scaleRate(item.newRate ?? 0);
+                    const chg = nRate - oRate;
+                    const isIncrease = chg > 0;
                     return (
                       <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 text-slate-900 font-extrabold">
                           {item.currencyName}
                         </td>
                         <td className="px-6 py-4 text-center font-black">
-                          {(item.oldRate ?? 0).toLocaleString("en-US")}
+                          {oRate.toLocaleString("en-US")}
                         </td>
                         <td className="px-6 py-4 text-center font-black text-slate-900">
-                          {(item.newRate ?? 0).toLocaleString("en-US")}
+                          {nRate.toLocaleString("en-US")}
                         </td>
                         <td className={`px-6 py-4 text-center font-black ${
-                          item.change === 0 ? "text-slate-500" : isIncrease ? "text-emerald-600" : "text-rose-600"
+                          chg === 0 ? "text-slate-500" : isIncrease ? "text-emerald-600" : "text-rose-600"
                         }`}>
-                          {item.change === 0 ? "0" : `${isIncrease ? "+" : ""}${(item.change ?? 0).toLocaleString("en-US")}`}
+                          {chg === 0 ? "0" : `${isIncrease ? "+" : ""}${chg.toLocaleString("en-US")}`}
                         </td>
                         <td className={`px-6 py-4 text-center font-black ${
                           item.changePercent === 0 ? "text-slate-500" : isIncrease ? "text-emerald-600" : "text-rose-600"
