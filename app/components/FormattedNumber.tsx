@@ -19,13 +19,17 @@ export default function FormattedNumber({
     return <span className={className}>{value} {currencySymbol}</span>;
   }
 
+  const isIQD = currencySymbol === "دینار" || currencySymbol.includes("دینار") || currencySymbol.includes("IQD");
+  const actualDecimals = isIQD ? 0 : decimals;
+  const processedValue = isIQD ? Math.round(numValue) : numValue;
+
   // Format to string with fixed decimals
-  const isInteger = numValue % 1 === 0;
+  const isInteger = processedValue % 1 === 0;
   // If it's an integer, maybe we don't want decimals? 
   // Let's use toLocaleString with minimumFractionDigits: 0, maximumFractionDigits: decimals
-  const formatted = numValue.toLocaleString('en-US', {
-    minimumFractionDigits: isInteger ? 0 : decimals,
-    maximumFractionDigits: decimals
+  const formatted = processedValue.toLocaleString('en-US', {
+    minimumFractionDigits: isInteger ? 0 : actualDecimals,
+    maximumFractionDigits: actualDecimals
   });
 
   const parts = formatted.split('.');

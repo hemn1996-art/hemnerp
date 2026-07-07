@@ -49,7 +49,7 @@ export default function StatementModal({
     const symbol = getCurrencySymbol(currencyId);
     const code = getCurrencyCode(currencyId);
     if (code === "IQD") {
-      return `${Number(amount || 0).toLocaleString("en-US")} دینار`;
+      return `${Math.round(Number(amount || 0)).toLocaleString("en-US")} دینار`;
     }
     return `${Number(amount || 0).toLocaleString("en-US")} ${symbol}`;
   }
