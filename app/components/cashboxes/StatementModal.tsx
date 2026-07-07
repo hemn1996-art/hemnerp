@@ -19,8 +19,14 @@ export default function StatementModal({
   isFullPage = false,
 }: Props) {
   const router = useRouter();
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(() => {
+    const year = new Date().getFullYear();
+    return `${year}-01-01`;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const year = new Date().getFullYear();
+    return `${year}-12-31`;
+  });
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
   const [isMovementsExpanded, setIsMovementsExpanded] = useState(true);
 
@@ -175,7 +181,13 @@ export default function StatementModal({
   // 2. Filter movements by date
   const filteredMovements = useMemo(() => {
     const list = allMovements.filter((m) => {
-      const mDateOnly = new Date(m.dateStr).toISOString().slice(0, 10);
+      if (!m.dateStr) return false;
+      const d = new Date(m.dateStr);
+      if (isNaN(d.getTime())) return false;
+      const y = d.getFullYear();
+      const mon = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const mDateOnly = `${y}-${mon}-${day}`;
       if (startDate && mDateOnly < startDate) return false;
       if (endDate && mDateOnly > endDate) return false;
       return true;

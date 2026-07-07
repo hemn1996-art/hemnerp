@@ -30,15 +30,25 @@ export default function DateInput({
   placeholder,
   label = "بەروار",
 }: DateInputProps) {
+  const parseLocalDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const parsed = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    const parsed = new Date(dateStr);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  };
+
   const [isOpen, setIsOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(() => {
-    const parsed = value ? new Date(value) : new Date();
-    return isNaN(parsed.getTime()) ? new Date() : parsed;
+    return parseLocalDate(value);
   });
   const [view, setView] = useState<"days" | "months" | "years">("days");
   const [yearPageStart, setYearPageStart] = useState(() => {
-    const parsed = value ? new Date(value) : new Date();
-    const yearVal = isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear();
+    const parsed = parseLocalDate(value);
+    const yearVal = parsed.getFullYear();
     return yearVal - 5;
   });
   const [inputValue, setInputValue] = useState("");
@@ -46,11 +56,9 @@ export default function DateInput({
 
   useEffect(() => {
     if (value) {
-      const parsed = new Date(value);
-      if (!isNaN(parsed.getTime())) {
-        setCurrentDate(parsed);
-        setInputValue(formatDateToDMY(value));
-      }
+      const parsed = parseLocalDate(value);
+      setCurrentDate(parsed);
+      setInputValue(formatDateToDMY(value));
     } else {
       setInputValue("");
     }
@@ -59,12 +67,10 @@ export default function DateInput({
   useEffect(() => {
     if (isOpen) {
       setView("days");
-      const parsed = value ? new Date(value) : new Date();
-      const yearVal = isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear();
+      const parsed = parseLocalDate(value);
+      const yearVal = parsed.getFullYear();
       setYearPageStart(yearVal - 5);
-      if (!isNaN(parsed.getTime())) {
-        setCurrentDate(parsed);
-      }
+      setCurrentDate(parsed);
     }
   }, [isOpen, value]);
 
