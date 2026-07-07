@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "../../store/store";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
+import DateInput from "../../components/DateInput";
 
 interface Product { id: number; name: string; code: string | null; costPrice: number | null; }
 interface VoucherLine { id: number; productId: number; qty: number; unitPrice: number; discountAmount: number; lineTotal: number; note: string | null; product: Product; }
@@ -528,20 +529,8 @@ function AccountStatementContent() {
           </div>
 
           <div className="flex gap-4 items-center flex-wrap">
-            <div 
-              className="flex items-center border border-gray-200 rounded-xl overflow-hidden h-12 shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors"
-              onClick={(e) => (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker()}
-            >
-              <span className="bg-gray-50 px-4 py-3 text-sm font-bold text-gray-500 border-l border-gray-200 h-full flex items-center">بەرواری دەستپێک</span>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-4 py-3 text-sm font-bold text-gray-700 outline-none w-40 bg-white cursor-pointer h-full" />
-            </div>
-            <div 
-              className="flex items-center border border-gray-200 rounded-xl overflow-hidden h-12 shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors"
-              onClick={(e) => (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker()}
-            >
-              <span className="bg-gray-50 px-4 py-3 text-sm font-bold text-gray-500 border-l border-gray-200 h-full flex items-center">بەرواری کۆتایی</span>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-4 py-3 text-sm font-bold text-gray-700 outline-none w-40 bg-white cursor-pointer h-full" />
-            </div>
+            <DateInput value={startDate} onChange={setStartDate} label="بەرواری دەستپێک" className="h-12" />
+            <DateInput value={endDate} onChange={setEndDate} label="بەرواری کۆتایی" className="h-12" />
           </div>
         </div>
 

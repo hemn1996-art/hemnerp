@@ -6,6 +6,7 @@ import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
+import DateInput from "../../components/DateInput";
 
 interface DropdownOption {
   value: string | number;
@@ -406,16 +407,8 @@ export default function ItemsReportPage() {
       <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 no-print">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Dates */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-500">بەرواری دەستپێک</span>
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-              className="border border-slate-300 p-1.5 text-xs rounded" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-500">بەرواری کۆتایی</span>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-              className="border border-slate-300 p-1.5 text-xs rounded" />
-          </div>
+          <DateInput value={startDate} onChange={setStartDate} label="لە بەرواری" />
+          <DateInput value={endDate} onChange={setEndDate} label="تا بەرواری" />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -653,14 +646,8 @@ export default function ItemsReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">مەودای بەروار <span>📅</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>بەرواری دەستپێک</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                  </div>
-                  <div className="mui-outline">
-                    <label>بەرواری کۆتایی</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                  </div>
+                  <DateInput value={startDate} onChange={setStartDate} label="بەرواری دەستپێک" />
+                  <DateInput value={endDate} onChange={setEndDate} label="بەرواری کۆتایی" />
                 </div>
               </div>
 

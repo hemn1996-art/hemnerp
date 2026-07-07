@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "../store/store";
+import DateInput from "../components/DateInput";
 
 interface Category {
   id: number;
@@ -527,12 +528,11 @@ export default function FixedAssetsPage() {
                 {/* Purchase Date */}
                 <div className="space-y-1 text-right">
                   <label className="text-xs font-bold text-slate-500">بەرواری کڕین:</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={purchaseDateInput}
-                    onChange={(e) => setPurchaseDateInput(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-[#0b1f50] text-sm font-bold bg-white text-right"
-                    required
+                    onChange={setPurchaseDateInput}
+                    label={false}
+                    className="w-full"
                   />
                 </div>
 
@@ -611,12 +611,11 @@ export default function FixedAssetsPage() {
                 {/* Change Date */}
                 <div className="space-y-1 text-right">
                   <label className="text-xs font-bold text-slate-500">بەرواری گۆڕین:</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={changeDateInput}
-                    onChange={(e) => setChangeDateInput(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-[#0b1f50] text-sm font-bold bg-white text-right"
-                    required
+                    onChange={setChangeDateInput}
+                    label={false}
+                    className="w-full"
                   />
                 </div>
 

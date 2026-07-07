@@ -6,6 +6,7 @@ import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
+import DateInput from "../../components/DateInput";
 
 interface DropdownOption {
   value: string | number;
@@ -319,10 +320,8 @@ export default function ItemsReportPage() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Quick Dates */}
           <div className="flex items-center gap-2 ml-4">
-            <label className="text-xs text-slate-500">بەرواری دەستپێک</label>
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="border p-1.5 text-xs rounded-md" />
-            <label className="text-xs text-slate-500">بەرواری کۆتایی</label>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="border p-1.5 text-xs rounded-md" />
+            <DateInput value={startDate} onChange={setStartDate} label="لە بەرواری" />
+            <DateInput value={endDate} onChange={setEndDate} label="تا بەرواری" />
           </div>
 
           <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-xs hover:bg-slate-700 transition">
@@ -585,14 +584,8 @@ export default function ItemsReportPage() {
               <div>
                 <div className="section-title text-slate-600 flex-row-reverse">مەودای بەروار <span className="text-lg">📅</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>بەرواری دەستپێک</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                  </div>
-                  <div className="mui-outline">
-                    <label>بەرواری کۆتایی</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                  </div>
+                  <DateInput value={startDate} onChange={setStartDate} label="بەرواری دەستپێک" />
+                  <DateInput value={endDate} onChange={setEndDate} label="بەرواری کۆتایی" />
                 </div>
               </div>
 

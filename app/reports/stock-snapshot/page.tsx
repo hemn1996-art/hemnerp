@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
+import DateInput from "../../components/DateInput";
 
 interface StockItem {
   productId: number;
@@ -207,18 +208,7 @@ export default function StockSnapshotReportPage() {
         <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-6 no-print">
           
           {/* As Of Date Picker */}
-          <div 
-            className="flex items-center border border-gray-300 rounded overflow-hidden shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors bg-white mr-auto"
-            onClick={(e) => (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker()}
-          >
-            <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-l border-gray-300">بەروار</span>
-            <input 
-              type="date" 
-              className="px-3 py-2 text-sm text-gray-700 outline-none cursor-pointer w-40" 
-              value={asOfDate}
-              onChange={(e) => setAsOfDate(e.target.value)}
-            />
-          </div>
+          <DateInput value={asOfDate} onChange={setAsOfDate} label="بەروار" className="mr-auto" />
 
           <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
             <span>فلتەرەکان ☰</span>
@@ -425,18 +415,7 @@ export default function StockSnapshotReportPage() {
                 <h4 className="font-bold text-gray-800 text-sm mb-2 flex items-center gap-2 justify-end">
                   <span>📅</span> بەروار
                 </h4>
-                <div 
-                  className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors bg-white w-full md:w-1/2 min-h-[46px]"
-                  onClick={(e) => (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker()}
-                >
-                  <span className="bg-gray-50 px-3 py-2.5 text-sm font-bold text-gray-500 border-l border-gray-300 w-24">بەروار</span>
-                  <input 
-                    type="date" 
-                    className="flex-1 px-3 py-2.5 text-sm text-gray-700 outline-none cursor-pointer font-bold" 
-                    value={asOfDate}
-                    onChange={(e) => setAsOfDate(e.target.value)}
-                  />
-                </div>
+                <DateInput value={asOfDate} onChange={setAsOfDate} label="بەروار" className="w-full md:w-1/2 min-h-[46px]" />
               </div>
 
               <div className="mb-4">

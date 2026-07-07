@@ -5,6 +5,7 @@ import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
+import DateInput from "../../components/DateInput";
 
 export default function BalanceSheetPage() {
   const router = useRouter();
@@ -569,10 +570,7 @@ export default function BalanceSheetPage() {
               {/* Date */}
               <div>
                 <div className="section-title flex-row-reverse">بەروار <span>📅</span></div>
-                <div className="mui-outline">
-                  <label>بەرواری</label>
-                  <input type="date" value={asOfDate} onChange={e => setAsOfDate(e.target.value)} />
-                </div>
+                <DateInput value={asOfDate} onChange={setAsOfDate} label="بەرواری" />
               </div>
 
               {/* Currency */}

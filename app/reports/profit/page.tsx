@@ -500,24 +500,8 @@ export default function ProfitReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">مەودای بەروار <span>📅</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>بەرواری دەستپێک</label>
-                    <input 
-                      type="date" 
-                      value={startDate} 
-                      onChange={e => setStartDate(e.target.value)} 
-                      className="w-full border-none outline-none text-[13px] font-bold text-slate-800"
-                    />
-                  </div>
-                  <div className="mui-outline">
-                    <label>بەرواری کۆتایی</label>
-                    <input 
-                      type="date" 
-                      value={endDate} 
-                      onChange={e => setEndDate(e.target.value)} 
-                      className="w-full border-none outline-none text-[13px] font-bold text-slate-800"
-                    />
-                  </div>
+                  <DateInput value={startDate} onChange={setStartDate} label="بەرواری دەستپێک" />
+                  <DateInput value={endDate} onChange={setEndDate} label="بەرواری کۆتایی" />
                 </div>
               </div>
 
