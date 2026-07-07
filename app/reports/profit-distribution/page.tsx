@@ -146,7 +146,11 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
   useEffect(() => {
     if (!isOpen) return;
     const handleOutsideClick = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('.custom-calendar-container')) {
+      const target = e.target as HTMLElement;
+      if (target && !document.body.contains(target)) {
+        return;
+      }
+      if (!target.closest('.custom-calendar-container')) {
         setIsOpen(false);
       }
     };
