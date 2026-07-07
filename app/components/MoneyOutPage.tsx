@@ -640,7 +640,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
