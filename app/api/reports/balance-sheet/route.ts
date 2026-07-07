@@ -12,12 +12,13 @@ export async function GET(request: Request) {
     const dateFilter = new Date(asOfDate);
     dateFilter.setHours(23, 59, 59, 999);
 
-    // Run database queries in parallel
-    const [cashboxVouchers, inventoryTrans, ledgerAggs, vouchers, currencies] = await Promise.all([
-      // 1. Historical Cash Vouchers
+    const [cashboxBalances, futureVouchers, inventoryTrans, ledgerAggs, vouchers, currencies] = await Promise.all([
+      // 1. Current Cashbox Balances
+      prisma.cashboxBalance.findMany(),
+      // 2. Future Cash Vouchers (vouchers after dateFilter)
       prisma.voucher.findMany({
         where: {
-          date: { lte: dateFilter },
+          date: { gt: dateFilter },
           isDeleted: false,
         },
         select: {
@@ -154,16 +155,33 @@ export async function GET(request: Request) {
       return usdAmount * targetRate;
     };
 
-    // 1. Total Cash
+    // 1. Total Cash from CashboxBalance table (reverted by future vouchers if viewing a past date)
     const cashBalances: Record<number, number> = {};
-    cashboxVouchers.forEach((v) => {
+
+    // Initialize with current cashbox balances
+    cashboxBalances.forEach((cb) => {
+      cashBalances[cb.currencyId] = (cashBalances[cb.currencyId] || 0) + cb.amount;
+    });
+
+    // Subtract future voucher movements (vouchers dated after dateFilter)
+    futureVouchers.forEach((v: any) => {
       if (v.type === "cashbox_transfer") {
-        // transfers cancel out for total cash
+        v.paidAmounts.forEach((pa: any) => {
+          if (v.fromCashboxId) {
+            cashBalances[pa.currencyId] = (cashBalances[pa.currencyId] || 0) + pa.amount;
+          }
+          if (v.toCashboxId) {
+            cashBalances[pa.currencyId] = (cashBalances[pa.currencyId] || 0) - pa.amount;
+          }
+        });
       } else {
         const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange"].includes(v.type);
         const sign = isIncoming ? 1 : -1;
-        v.paidAmounts.forEach((pa) => {
-          cashBalances[pa.currencyId] = (cashBalances[pa.currencyId] || 0) + (pa.amount * sign);
+        v.paidAmounts.forEach((pa: any) => {
+          const change = pa.amount * sign;
+          if (v.cashboxId) {
+            cashBalances[pa.currencyId] = (cashBalances[pa.currencyId] || 0) - change;
+          }
         });
       }
     });
