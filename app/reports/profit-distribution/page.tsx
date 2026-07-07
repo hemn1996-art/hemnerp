@@ -5,6 +5,21 @@ import { useStore } from "../../store/store";
 import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 
+const formatDateToDMY = (dateStr: string) => {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}.${parts[1]}.${parts[0]}`; // DD.MM.YYYY
+  }
+  return dateStr;
+};
+
+const formatRateWithCommas = (val: string) => {
+  if (!val) return "";
+  const clean = val.replace(/,/g, "");
+  return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
 export default function ProfitDistributionPage() {
   const router = useRouter();
   const currentUser = useStore((s: any) => s.currentUser);
@@ -246,35 +261,38 @@ export default function ProfitDistributionPage() {
               <div className="flex items-center gap-3 flex-row-reverse">
                 {/* Date Input */}
                 <div 
-                  className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm cursor-pointer hover:border-[#0b1f50] transition-colors bg-white flex-row-reverse"
-                  onClick={(e) => {
-                    if ((e.target as HTMLElement).tagName !== 'INPUT') {
-                      (e.currentTarget.querySelector('input[type="date"]') as HTMLInputElement)?.showPicker();
-                    }
-                  }}
+                  className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm hover:border-[#0b1f50] transition-colors bg-white relative cursor-pointer"
                 >
-                  <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-r border-gray-300">بەروار</span>
                   <input 
                     type="date" 
-                    className="px-3 py-2 text-sm text-gray-700 outline-none cursor-pointer w-40 font-bold text-right" 
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" 
                     value={asOfDate}
                     onChange={(e) => {
                       setAsOfDate(e.target.value);
                       setUserEditedRate(false); // Reset userEditedRate so it pulls the day's default rate
                     }}
                   />
+                  <span className="px-3 py-2 text-sm text-gray-700 font-bold text-center w-36">
+                    {formatDateToDMY(asOfDate)}
+                  </span>
+                  <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-l border-gray-300">
+                    بەروار
+                  </span>
                 </div>
 
                 {/* Dollar Rate Input */}
                 <div className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white flex-row-reverse">
                   <span className="bg-gray-50 px-3 py-2 text-sm font-bold text-gray-500 border-r border-gray-300">ڕەیتی دۆلار (١٠٠$)</span>
                   <input 
-                    type="number" 
+                    type="text" 
                     className="px-3 py-2 text-sm text-gray-700 outline-none w-32 font-bold text-center" 
-                    value={dollarRate}
+                    value={formatRateWithCommas(dollarRate)}
                     onChange={(e) => {
-                      setDollarRate(e.target.value);
-                      setUserEditedRate(true);
+                      const raw = e.target.value.replace(/,/g, "");
+                      if (/^\d*$/.test(raw)) {
+                        setDollarRate(raw);
+                        setUserEditedRate(true);
+                      }
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -284,7 +302,7 @@ export default function ProfitDistributionPage() {
                   />
                   <button 
                     onClick={() => fetchData(asOfDate, dollarRate)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 text-xs transition cursor-pointer border-none h-full"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 text-sm transition cursor-pointer border-none h-full"
                   >
                     بەکارهێنان
                   </button>

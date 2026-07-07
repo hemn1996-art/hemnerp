@@ -13,10 +13,22 @@ export async function GET(request: Request) {
     dateFilter.setHours(23, 59, 59, 999);
 
     // Run database queries in parallel
-    const [cashboxBalances, inventoryTrans, ledgerAggs, vouchers, currencies] = await Promise.all([
-      // 1. Cash balances
-      prisma.cashboxBalance.findMany({
-        select: { amount: true, currencyId: true },
+    const [cashboxVouchers, inventoryTrans, ledgerAggs, vouchers, currencies] = await Promise.all([
+      // 1. Historical Cash Vouchers
+      prisma.voucher.findMany({
+        where: {
+          date: { lte: dateFilter },
+          isDeleted: false,
+        },
+        select: {
+          type: true,
+          cashboxId: true,
+          fromCashboxId: true,
+          toCashboxId: true,
+          paidAmounts: {
+            select: { amount: true, currencyId: true }
+          }
+        }
       }),
       // 2. Inventory transactions
       prisma.inventoryTransaction.findMany({
@@ -143,8 +155,21 @@ export async function GET(request: Request) {
     };
 
     // 1. Total Cash
-    const totalCash = cashboxBalances.reduce((sum, b) => {
-      return sum + convertToTarget(b.amount, b.currencyId);
+    const cashBalances: Record<number, number> = {};
+    cashboxVouchers.forEach((v) => {
+      if (v.type === "cashbox_transfer") {
+        // transfers cancel out for total cash
+      } else {
+        const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange"].includes(v.type);
+        const sign = isIncoming ? 1 : -1;
+        v.paidAmounts.forEach((pa) => {
+          cashBalances[pa.currencyId] = (cashBalances[pa.currencyId] || 0) + (pa.amount * sign);
+        });
+      }
+    });
+
+    const totalCash = Object.entries(cashBalances).reduce((sum, [curIdStr, amount]) => {
+      return sum + convertToTarget(amount, Number(curIdStr));
     }, 0);
 
     // 2. Warehouse Value
