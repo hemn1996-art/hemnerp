@@ -23,6 +23,11 @@ const formatRateWithCommas = (val: string) => {
 function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(() => new Date(value || Date.now()));
+  const [view, setView] = useState<"days" | "months" | "years">("days");
+  const [yearPageStart, setYearPageStart] = useState(() => {
+    const d = new Date(value || Date.now());
+    return d.getFullYear() - 5;
+  });
 
   useEffect(() => {
     if (value) {
@@ -31,14 +36,22 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
   }, [value]);
 
   const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
+  const month = currentDate.getMonth(); // 0-11
 
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
+  const handlePrev = () => {
+    if (view === "days") {
+      setCurrentDate(new Date(year, month - 1, 1));
+    } else if (view === "years") {
+      setYearPageStart(yearPageStart - 12);
+    }
   };
 
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
+  const handleNext = () => {
+    if (view === "days") {
+      setCurrentDate(new Date(year, month + 1, 1));
+    } else if (view === "years") {
+      setYearPageStart(yearPageStart + 12);
+    }
   };
 
   const handleDayClick = (day: number) => {
@@ -50,23 +63,18 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
     setIsOpen(false);
   };
 
+  const handleMonthClick = (mIdx: number) => {
+    setCurrentDate(new Date(year, mIdx, 1));
+    setView("days");
+  };
+
+  const handleYearClick = (yVal: number) => {
+    setCurrentDate(new Date(yVal, month, 1));
+    setView("days");
+  };
+
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayIndex = new Date(year, month, 1).getDay();
-
-  const kurdishMonths = [
-    "کانوونی دووەم (١)",
-    "شوبات (٢)",
-    "ئازار (٣)",
-    "نیسان (٤)",
-    "ئایار (٥)",
-    "حوزەیران (٦)",
-    "تەمووز (٧)",
-    "ئاب (٨)",
-    "ئەیلوول (٩)",
-    "تشرینی یەکەم (١٠)",
-    "تشرینی دووەم (١١)",
-    "کانوونی یەکەم (١٢)"
-  ];
 
   const days = [];
   for (let i = 0; i < firstDayIndex; i++) {
@@ -95,6 +103,46 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
     );
   }
 
+  // Generate 12 years for the grid
+  const yearsGrid = [];
+  for (let y = yearPageStart; y < yearPageStart + 12; y++) {
+    const isSelected = y === selectedYearNum;
+    yearsGrid.push(
+      <button
+        key={`year-${y}`}
+        type="button"
+        onClick={() => handleYearClick(y)}
+        className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+          isSelected 
+            ? "bg-[#0b1f50] text-white" 
+            : "hover:bg-slate-100 text-slate-700"
+        }`}
+      >
+        {y}
+      </button>
+    );
+  }
+
+  // Format month list
+  const monthsGrid = [];
+  for (let m = 0; m < 12; m++) {
+    const isSelected = m === selectedMonthNum && year === selectedYearNum;
+    monthsGrid.push(
+      <button
+        key={`month-${m}`}
+        type="button"
+        onClick={() => handleMonthClick(m)}
+        className={`px-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+          isSelected 
+            ? "bg-[#0b1f50] text-white" 
+            : "hover:bg-slate-100 text-slate-700"
+        }`}
+      >
+        مانگی {m + 1}
+      </button>
+    );
+  }
+
   useEffect(() => {
     if (!isOpen) return;
     const handleOutsideClick = (e: MouseEvent) => {
@@ -105,6 +153,15 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
     document.addEventListener('click', handleOutsideClick);
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setView("days");
+      if (value) {
+        setYearPageStart(new Date(value).getFullYear() - 5);
+      }
+    }
+  }, [isOpen, value]);
 
   return (
     <div className="relative custom-calendar-container">
@@ -123,38 +180,91 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
       {isOpen && (
         <div className="absolute right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-50 w-64 text-right select-none animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between mb-3 flex-row-reverse">
-            <button 
-              type="button" 
-              onClick={handlePrevMonth} 
-              className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-            >
-              ◀
-            </button>
-            <div className="text-sm font-black text-slate-800">
-              {kurdishMonths[month]} {year}
+            {(view === "days" || view === "years") ? (
+              <button 
+                type="button" 
+                onClick={handlePrev} 
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+              >
+                ◀
+              </button>
+            ) : (
+              <div className="w-6"></div>
+            )}
+            
+            <div className="text-sm font-black text-slate-800 flex items-center gap-1.5 flex-row-reverse">
+              {view === "days" && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => setView("months")}
+                    className="hover:text-[#0b1f50] hover:underline cursor-pointer"
+                  >
+                    مانگی {month + 1}
+                  </button>
+                  <span>-</span>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setYearPageStart(year - 5);
+                      setView("years");
+                    }}
+                    className="hover:text-[#0b1f50] hover:underline cursor-pointer"
+                  >
+                    {year}
+                  </button>
+                </>
+              )}
+              {view === "months" && (
+                <span className="text-slate-800">هەڵبژاردنی مانگ</span>
+              )}
+              {view === "years" && (
+                <span className="text-slate-800">هەڵبژاردنی ساڵ ({yearPageStart} - {yearPageStart + 11})</span>
+              )}
             </div>
-            <button 
-              type="button" 
-              onClick={handleNextMonth} 
-              className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-            >
-              ▶
-            </button>
+
+            {(view === "days" || view === "years") ? (
+              <button 
+                type="button" 
+                onClick={handleNext} 
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+              >
+                ▶
+              </button>
+            ) : (
+              <div className="w-6"></div>
+            )}
           </div>
 
-          <div className="grid grid-cols-7 gap-1 text-center font-bold text-slate-400 text-[10px] mb-2 flex-row-reverse">
-            <div>ی</div>
-            <div>د</div>
-            <div>س</div>
-            <div>چ</div>
-            <div>پ</div>
-            <div>ه</div>
-            <div>ش</div>
-          </div>
+          {view === "days" && (
+            <>
+              <div className="grid grid-cols-7 gap-1 text-center font-bold text-slate-400 text-[10px] mb-2 flex-row-reverse">
+                <div>ی</div>
+                <div>د</div>
+                <div>س</div>
+                <div>چ</div>
+                <div>پ</div>
+                <div>ه</div>
+                <div>ش</div>
+              </div>
 
-          <div className="grid grid-cols-7 gap-1 text-center justify-items-center">
-            {days}
-          </div>
+              <div className="grid grid-cols-7 gap-1 text-center justify-items-center">
+                {days}
+              </div>
+            </>
+          )}
+
+          {view === "months" && (
+            <div className="grid grid-cols-3 gap-2 py-2 text-center">
+              {monthsGrid}
+            </div>
+          )}
+
+          {view === "years" && (
+            <div className="grid grid-cols-3 gap-2 py-2 text-center">
+              {yearsGrid}
+            </div>
+          )}
         </div>
       )}
     </div>
