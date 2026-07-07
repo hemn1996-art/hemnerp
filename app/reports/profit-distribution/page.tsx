@@ -202,7 +202,7 @@ function CustomDatePicker({ value, onChange }: { value: string; onChange: (val: 
   };
 
   return (
-    <div className="relative custom-calendar-container">
+    <div className="relative custom-calendar-container" onClick={(e) => e.stopPropagation()}>
       <div 
         onClick={() => setIsOpen(true)}
         className="flex items-center border border-gray-300 rounded-xl overflow-hidden shadow-sm hover:border-[#0b1f50] transition-colors bg-white cursor-pointer select-none"
