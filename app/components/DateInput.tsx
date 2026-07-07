@@ -237,7 +237,6 @@ export default function DateInput({
     borderRadius: "12px",
     border: "1px solid #cbd5e1",
     background: "white",
-    overflow: "hidden",
     cursor: disabled ? "not-allowed" : "pointer",
     userSelect: "none",
     ...style,
@@ -256,7 +255,13 @@ export default function DateInput({
       } ${className || ""}`}
     >
       {label && (
-        <span className="bg-slate-50 px-3 py-2 text-sm font-bold text-slate-500 border-e border-slate-200 font-sans flex items-center justify-center whitespace-nowrap select-none">
+        <span
+          style={{
+            borderStartStartRadius: "11px",
+            borderEndStartRadius: "11px",
+          }}
+          className="bg-slate-50 px-3 py-2 text-sm font-bold text-slate-500 border-e border-slate-200 font-sans flex items-center justify-center whitespace-nowrap select-none"
+        >
           {label}
         </span>
       )}
