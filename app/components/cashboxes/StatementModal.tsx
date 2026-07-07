@@ -290,10 +290,10 @@ export default function StatementModal({
       {/* Modal Body */}
       <div className="p-6 grid gap-6 print:overflow-visible print:p-4">
         {/* Filters Card */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden no-print">
+        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-visible no-print">
           <button
             onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
-            className="w-full px-5 py-4 bg-slate-50/60 border-b border-slate-100 flex justify-between items-center text-slate-700 hover:bg-slate-50 transition-all"
+            className="w-full px-5 py-4 bg-slate-50/60 border-b border-slate-100 flex justify-between items-center text-slate-700 hover:bg-slate-50 transition-all rounded-t-2xl"
           >
             <div className="flex items-center gap-2 font-bold">
               <span>🔍</span> فلتەرەکان
