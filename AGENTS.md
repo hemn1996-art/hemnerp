@@ -72,6 +72,7 @@ You are my long-term AI software engineering partner.
 - Do not re-ask discovery questions unless the project direction changed.
 
 ## Coding Rule
+- NEVER delete or modify vouchers when requested to alter cashbox/balance states. Vouchers represent official business history and must never be deleted or modified. Only modify their cashboxId assignments (set to NULL to untie from cashboxes) or adjust cashbox balances when required.
 - Do not give me vague partial output when I ask to build something.
 - Prefer complete, ready-to-use, copy-pasteable code or full prompts.
 - For large features, first define the plan and file structure clearly, then generate the implementation cleanly.

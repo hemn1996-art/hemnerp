@@ -133,6 +133,36 @@ export async function PUT(
     const voucherId = Number(id);
     const data = await request.json();
 
+    if (data.accountId) {
+      const account = await prisma.account.findUnique({
+        where: { id: Number(data.accountId) },
+        select: { isShareholder: true },
+      });
+      const isShareholder = account?.isShareholder === true;
+      const isShareholderVoucher = data.type === "shareholder_deposit" || data.type === "shareholder_withdrawal";
+
+      if (isShareholder && !isShareholderVoucher) {
+        return NextResponse.json(
+          { error: "هەژماری خاوەن پشک تەنها لە پسووڵەکانی دانانی پارە (deposit) و کشانەوەی پارە (withdrawal) ڕێگەپێدراوە." },
+          { status: 400 }
+        );
+      }
+      if (!isShareholder && isShareholderVoucher) {
+        return NextResponse.json(
+          { error: "پسوولەی دانانی پارە و کشانەوەی پارە تەنها بۆ هەژماری خاوەن پشک ڕێگەپێدراوە." },
+          { status: 400 }
+        );
+      }
+    } else {
+      const isShareholderVoucher = data.type === "shareholder_deposit" || data.type === "shareholder_withdrawal";
+      if (isShareholderVoucher) {
+        return NextResponse.json(
+          { error: "دیاریکردنی هەژماری خاوەن پشک ناچارییە بۆ ئەم پسووڵەیە." },
+          { status: 400 }
+        );
+      }
+    }
+
     const dbCurrencies = await prisma.currency.findMany();
     let autoNote = "";
     if (data.type !== "cashbox_transfer" && data.paidAmounts && Array.isArray(data.paidAmounts)) {
