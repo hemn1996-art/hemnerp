@@ -42,7 +42,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const [chartCurrency, setChartCurrency] = useState<"all" | "USD" | "IQD">("all");
 
   const [mounted, setMounted] = useState(false);
-  const [companyName, setCompanyName] = useState("کۆگای دۆستان");
+  const [companyName, setCompanyName] = useState("سەنتەری کارەبای لەندەن");
   const [kpiPeriod, setKpiPeriod] = useState<string>("today");
   const [donutPeriod, setDonutPeriod] = useState<string>("today");
 
@@ -52,10 +52,6 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.companyName === "سەنتەری کارەبای لەندەن") {
-          parsed.companyName = "کۆگای دۆستان";
-          localStorage.setItem("general_settings", JSON.stringify(parsed));
-        }
         if (parsed.companyName) {
           setCompanyName(parsed.companyName);
         }

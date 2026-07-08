@@ -13,7 +13,7 @@ interface GeneralSettings {
 
 export default function PrintHeader() {
   const [settings, setSettings] = useState<GeneralSettings>({
-    companyName: "کۆگای دۆستان",
+    companyName: "سەنتەری کارەبای لەندەن",
     about: "",
     address: "سلێمانی کۆگانی ژووری بازرگانی 456",
     phones: ["07501734006", "07701403038"],
@@ -68,7 +68,7 @@ export default function PrintHeader() {
           <img src={settings.logo} alt="Logo" style={logoStyle} />
         )}
         <h1 style={companyNameStyle}>
-          {settings.companyName || "کۆگای دۆستان"}
+          {settings.companyName || "سەنتەری کارەبای لەندەن"}
         </h1>
         {settings.about && (
           <p style={companyAboutStyle}>
@@ -88,7 +88,7 @@ export default function PrintHeader() {
 }
 
 export function PrintWatermark() {
-  const [companyName, setCompanyName] = useState("کۆگای دۆستان");
+  const [companyName, setCompanyName] = useState("سەنتەری کارەبای لەندەن");
 
   useEffect(() => {
     const saved = localStorage.getItem("general_settings");

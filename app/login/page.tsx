@@ -578,7 +578,7 @@ export default function LoginPage() {
                 animation: "text-gradient-shift 6s ease infinite",
                 lineHeight: 1.2,
               }}>
-                کۆگای دۆستان
+                سەنتەری کارەبای لەندەن
               </h1>
 
               {/* Tagline */}
