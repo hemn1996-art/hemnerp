@@ -28,55 +28,11 @@ const HeartIcon = () => (
   </svg>
 );
 
-const CodeSnippets = [
-  `// ژمێرینی هاوسەنگی دەفتەری گشتی\nconst balance = await prisma.ledgerEntry.groupBy({\n  by: ['accountId', 'currencyId'],\n  _sum: { debit: true, credit: true }\n});`,
-  `// دڵنیابوونەوە لە هاوسەنگی باڵانس\nlet assets = debitSum;\nlet liabilities = creditSum + equity;\nif (assets === liabilities) {\n  console.log("سیستەمەکە هاوسەنگە! ⚖️");\n}`,
-  `// خولی دابەشکردنی قازانج\nconst profit = revenue - expenses;\nshareholders.forEach(partner => {\n  const share = profit * partner.percentage;\n  pay(partner.id, share);\n});`,
-  `// داگرتنی ڕاپۆرتی دارایی\nconst generateBalanceSheet = (asOfDate) => {\n  return executeConsolidatedReport(asOfDate);\n};`
-];
-
 export default function ContactPage() {
-  // Code typewriter effect states
-  const [snippetIndex, setSnippetIndex] = useState(0);
-  const [displayText, setDisplayText] = useState("");
-  const [charIndex, setCharIndex] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
-
   // Accounting numbers states
   const [debitCount, setDebitCount] = useState(0);
   const [creditCount, setCreditCount] = useState(0);
   const [isBalancing, setIsBalancing] = useState(true);
-
-  // Generate code writing animation
-  useEffect(() => {
-    const currentSnippet = CodeSnippets[snippetIndex];
-    let timer: NodeJS.Timeout;
-
-    if (!isDeleting && charIndex < currentSnippet.length) {
-      // Typing
-      timer = setTimeout(() => {
-        setDisplayText((prev) => prev + currentSnippet[charIndex]);
-        setCharIndex((prev) => prev + 1);
-      }, 35);
-    } else if (isDeleting && charIndex > 0) {
-      // Deleting
-      timer = setTimeout(() => {
-        setDisplayText((prev) => prev.slice(0, -1));
-        setCharIndex((prev) => prev - 1);
-      }, 15);
-    } else if (charIndex === currentSnippet.length && !isDeleting) {
-      // Stay on full snippet
-      timer = setTimeout(() => {
-        setIsDeleting(true);
-      }, 3500);
-    } else if (charIndex === 0 && isDeleting) {
-      // Switch snippet
-      setIsDeleting(false);
-      setSnippetIndex((prev) => (prev + 1) % CodeSnippets.length);
-    }
-
-    return () => clearTimeout(timer);
-  }, [charIndex, isDeleting, snippetIndex]);
 
   // Accounting calculator loop
   useEffect(() => {
@@ -191,28 +147,124 @@ export default function ContactPage() {
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch z-10 flex-grow">
-        {/* Left Column: Motion Graphics Terminal */}
+        {/* Left Column: Motion Graphics Charts */}
         <div className="flex flex-col gap-5 justify-between bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 backdrop-blur-md relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
           
-          {/* Mock Code Writing Terminal */}
-          <div className="flex-1 flex flex-col min-h-[220px]">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-red-500/80" />
-                <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                <span className="w-3 h-3 rounded-full bg-green-500/80" />
+          {/* Visual Charts Container */}
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[220px]">
+            {/* Chart 1: Revenue vs Expenses */}
+            <div className="bg-slate-950/55 border border-slate-800/60 rounded-2xl p-4 flex flex-col justify-between">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-bold text-slate-400">گەشەی داهات و خەرجی (Trend)</span>
+                <div className="flex gap-2 text-[8px] font-bold">
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> داهات
+                  </span>
+                  <span className="flex items-center gap-1 text-rose-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> خەرجی
+                  </span>
+                </div>
               </div>
-              <span className="text-[10px] font-mono text-slate-500 tracking-wider">
-                ledger-balance.ts — VS Code
-              </span>
+              
+              <div className="flex-1 flex items-center justify-center">
+                <svg viewBox="0 0 320 120" className="w-full h-full text-slate-400">
+                  <defs>
+                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* Grid Lines */}
+                  <line x1="30" y1="15" x2="300" y2="15" stroke="#334155" strokeWidth="0.5" strokeDasharray="3 3" />
+                  <line x1="30" y1="50" x2="300" y2="50" stroke="#334155" strokeWidth="0.5" strokeDasharray="3 3" />
+                  <line x1="30" y1="85" x2="300" y2="85" stroke="#334155" strokeWidth="0.5" strokeDasharray="3 3" />
+                  <line x1="30" y1="105" x2="300" y2="105" stroke="#475569" strokeWidth="1" />
+                  
+                  {/* Y Axis Labels */}
+                  <text x="5" y="20" className="fill-slate-500 font-mono text-[7px]">$10k</text>
+                  <text x="5" y="55" className="fill-slate-500 font-mono text-[7px]">$5k</text>
+                  <text x="5" y="90" className="fill-slate-500 font-mono text-[7px]">$1k</text>
+                  <text x="5" y="108" className="fill-slate-500 font-mono text-[7px]">$0</text>
+
+                  {/* X Axis Labels */}
+                  <text x="45" y="116" className="fill-slate-400 text-[7px]">کانوون</text>
+                  <text x="95" y="116" className="fill-slate-400 text-[7px]">شوبات</text>
+                  <text x="145" y="116" className="fill-slate-400 text-[7px]">ئادار</text>
+                  <text x="195" y="116" className="fill-slate-400 text-[7px]">نیسان</text>
+                  <text x="245" y="116" className="fill-slate-400 text-[7px]">ئایار</text>
+                  <text x="290" y="116" className="fill-slate-400 text-[7px]">حوزەیران</text>
+
+                  {/* Revenue Line */}
+                  <path d="M 45 90 Q 95 65 145 40 T 245 25 T 290 15" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+                  <path d="M 45 90 Q 95 65 145 40 T 245 25 T 290 15 L 290 105 L 45 105 Z" fill="url(#revGrad)" />
+
+                  {/* Expenses Line */}
+                  <path d="M 45 98 Q 95 85 145 70 T 245 60 T 290 55" fill="none" stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" />
+                  
+                  {/* Interactive points */}
+                  <circle cx="290" cy="15" r="3.5" fill="#10b981" />
+                  <circle cx="290" cy="55" r="3.5" fill="#f43f5e" />
+                </svg>
+              </div>
             </div>
-            
-            <div className="font-mono text-xs text-indigo-300 bg-slate-950/80 rounded-2xl p-4 flex-grow overflow-auto border border-slate-900/60 shadow-inner relative">
-              <pre className="whitespace-pre-wrap leading-relaxed select-none">
-                {displayText}
-                <span className="inline-block w-1.5 h-4 ml-0.5 bg-indigo-400 animate-pulse vertical-middle" />
-              </pre>
+
+            {/* Chart 2: Financial Allocation (Doughnut) */}
+            <div className="bg-slate-950/55 border border-slate-800/60 rounded-2xl p-4 flex flex-col justify-between">
+              <span className="text-[10px] font-bold text-slate-400 mb-2 block">دابەشبوونی سەرمایە و دارایی (Allocation)</span>
+              
+              <div className="flex-grow flex items-center justify-between gap-3">
+                {/* SVG Doughnut */}
+                <div className="w-20 h-20 relative flex items-center justify-center flex-shrink-0">
+                  <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                    {/* Background circle */}
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#1e293b" strokeWidth="3.5" />
+                    
+                    {/* Capital section (60%) */}
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#6366f1" strokeWidth="3.5" 
+                            strokeDasharray="60 40" strokeDashoffset="0" />
+                    
+                    {/* Profit section (25%) */}
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="3.5" 
+                            strokeDasharray="25 75" strokeDashoffset="-60" />
+                    
+                    {/* Liabilities section (15%) */}
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f43f5e" strokeWidth="3.5" 
+                            strokeDasharray="15 85" strokeDashoffset="-85" />
+                  </svg>
+                  {/* Inner text */}
+                  <div className="absolute flex flex-col items-center">
+                    <span className="text-xs font-black text-slate-200">٨٥٪</span>
+                    <span className="text-[6px] text-slate-500">هاوسەنگ</span>
+                  </div>
+                </div>
+
+                {/* Legends */}
+                <div className="flex-1 flex flex-col gap-1 justify-center">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded bg-indigo-500" />
+                    <div className="flex flex-col">
+                      <span className="text-[7px] text-slate-500 leading-none">سەرمایە</span>
+                      <span className="text-[8px] font-bold text-slate-300 font-mono">60%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded bg-emerald-500" />
+                    <div className="flex flex-col">
+                      <span className="text-[7px] text-slate-500 leading-none">قازانج</span>
+                      <span className="text-[8px] font-bold text-slate-300 font-mono">25%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded bg-rose-500" />
+                    <div className="flex flex-col">
+                      <span className="text-[7px] text-slate-500 leading-none">قەرزەکان</span>
+                      <span className="text-[8px] font-bold text-slate-300 font-mono">15%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
