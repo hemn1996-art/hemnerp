@@ -1,7 +1,33 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CashboxLike, CurrencyLike } from "./types";
 import DateInput from "../DateInput";
+
+function getResetDates(movementsList: any[]) {
+  if (!movementsList || movementsList.length === 0) {
+    return { start: "", end: "" };
+  }
+
+  const lastM = movementsList[movementsList.length - 1];
+  if (!lastM.dateStr) return { start: "", end: "" };
+  const lastDateStr = lastM.dateStr.slice(0, 10); // YYYY-MM-DD
+
+  // Count how many movements occurred on the last day
+  const lastDayMovementsCount = movementsList.filter(
+    (m) => m.dateStr && m.dateStr.startsWith(lastDateStr)
+  ).length;
+
+  if (lastDayMovementsCount > 10) {
+    // If there are more than 10 movements on the last day, show all of them (filter only for the last day)
+    return { start: lastDateStr, end: lastDateStr };
+  } else {
+    // Show the last 10 movements, regardless of how many days they span
+    const targetIdx = Math.max(0, movementsList.length - 10);
+    const startM = movementsList[targetIdx];
+    const startSplit = startM.dateStr ? startM.dateStr.slice(0, 10) : "";
+    return { start: startSplit, end: lastDateStr };
+  }
+}
 
 type Props = {
   statementCashbox: CashboxLike | null;
@@ -19,14 +45,8 @@ export default function StatementModal({
   isFullPage = false,
 }: Props) {
   const router = useRouter();
-  const [startDate, setStartDate] = useState(() => {
-    const year = new Date().getFullYear();
-    return `${year}-01-01`;
-  });
-  const [endDate, setEndDate] = useState(() => {
-    const year = new Date().getFullYear();
-    return `${year}-12-31`;
-  });
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
   const [isMovementsExpanded, setIsMovementsExpanded] = useState(true);
 
@@ -177,6 +197,27 @@ export default function StatementModal({
 
     return list;
   }, [vouchers, statementCashbox.id]);
+
+  const lastCashboxIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (statementCashbox) {
+      if (lastCashboxIdRef.current !== statementCashbox.id) {
+        lastCashboxIdRef.current = statementCashbox.id;
+        const { start, end } = getResetDates(allMovements);
+        setStartDate(start);
+        setEndDate(end);
+        setCurrentPage(1);
+      }
+    }
+  }, [statementCashbox?.id, allMovements]);
+
+  const handleReset = () => {
+    const { start, end } = getResetDates(allMovements);
+    setStartDate(start);
+    setEndDate(end);
+    setCurrentPage(1);
+  };
 
   // 2. Filter movements by date
   const filteredMovements = useMemo(() => {
@@ -331,15 +372,11 @@ export default function StatementModal({
               </div>
               <div className="md:col-span-2 flex gap-3">
                 <button
-                  onClick={() => {
-                    setStartDate("");
-                    setEndDate("");
-                    setCurrentPage(1);
-                  }}
+                  onClick={handleReset}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-750 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-slate-200 cursor-pointer"
-                  title="پاککردنەوە"
+                  title="ڕێکخستنەوە"
                 >
-                  🔄 پاککردنەوە
+                  🔄 ڕێکخستنەوە
                 </button>
                 <button
                   onClick={() => window.print()}
