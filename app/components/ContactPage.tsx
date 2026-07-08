@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useMemo } from "react";
 
 // Lucide-style SVG Icons as react components (meeting rule: no emojis)
 const PhoneIcon = () => (
@@ -29,54 +29,12 @@ const HeartIcon = () => (
 );
 
 export default function ContactPage() {
-  // Accounting numbers states
-  const [debitCount, setDebitCount] = useState(0);
-  const [creditCount, setCreditCount] = useState(0);
-  const [isBalancing, setIsBalancing] = useState(true);
-
-  // Accounting calculator loop
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isBalancing) {
-      interval = setInterval(() => {
-        setDebitCount((prev) => {
-          const next = prev + Math.floor(Math.random() * 15000) + 1200;
-          if (next > 450000) {
-            setIsBalancing(false);
-            setCreditCount(next); // Auto Balance at peak
-            return next;
-          }
-          return next;
-        });
-
-        setCreditCount((prev) => {
-          // Lag slightly behind to create accounting visual
-          const next = prev + Math.floor(Math.random() * 14000) + 800;
-          return next;
-        });
-      }, 80);
-    } else {
-      // Stay balanced for a while, then reset
-      interval = setTimeout(() => {
-        setDebitCount(0);
-        setCreditCount(0);
-        setIsBalancing(true);
-      }, 5000);
-    }
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(interval);
-    };
-  }, [isBalancing]);
-
-  // Floating mathematical particles
+  // Floating mathematical particles (only mathematical operators and currency signs, no numbers)
   const particles = useMemo(() => {
-    return Array.from({ length: 15 }).map((_, i) => ({
+    return Array.from({ length: 12 }).map((_, i) => ({
       id: i,
       left: `${5 + Math.random() * 90}%`,
-      symbol: ["+", "-", "×", "÷", "=", "∑", "%", "$", "IQD", "0", "1"][i % 11],
+      symbol: ["+", "-", "×", "÷", "=", "∑", "%", "$", "IQD"][i % 9],
       delay: `${Math.random() * 8}s`,
       duration: `${6 + Math.random() * 8}s`,
       size: `${12 + Math.random() * 20}px`
@@ -84,7 +42,7 @@ export default function ContactPage() {
   }, []);
 
   return (
-    <div className="min-height-[calc(100vh-80px)] p-6 bg-slate-950 text-slate-100 flex flex-col justify-between rtl font-sans overflow-hidden relative">
+    <div className="min-h-[calc(100vh-80px)] p-6 bg-slate-950 text-slate-100 flex flex-col justify-between rtl font-sans overflow-hidden relative">
       {/* Background radial glow */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.08),transparent_70%)] pointer-events-none" />
 
@@ -140,23 +98,22 @@ export default function ContactPage() {
             پەیوەندی کردن
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            زانیاری گەشەپێدەر و گۆشەی جوڵەی ئەزموونی ژمێریاری
+            زانیاری گەشەپێدەر و ئامارە گرافیکییە ژمێریارییەکان
           </p>
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch z-10 flex-grow">
-        {/* Left Column: Motion Graphics Charts */}
-        <div className="flex flex-col gap-5 justify-between bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 backdrop-blur-md relative overflow-hidden shadow-2xl">
+      {/* Main Grid: Left spans 5 columns, Right spans 7 columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch z-10 flex-grow">
+        {/* Left Column: Visual Charts (col-span-5) */}
+        <div className="lg:col-span-5 flex flex-col gap-4 justify-between bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 backdrop-blur-md relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
           
-          {/* Visual Charts Container */}
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[220px]">
+          <div className="flex-1 flex flex-col gap-4">
             {/* Chart 1: Revenue vs Expenses */}
-            <div className="bg-slate-950/55 border border-slate-800/60 rounded-2xl p-4 flex flex-col justify-between">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-bold text-slate-400">گەشەی داهات و خەرجی (Trend)</span>
+            <div className="bg-slate-950/55 border border-slate-850/60 rounded-2xl p-4 flex flex-col justify-between flex-1">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-bold text-slate-450">ئاراستەی گشتی چالاکی (Trend)</span>
                 <div className="flex gap-2 text-[8px] font-bold">
                   <span className="flex items-center gap-1 text-emerald-400">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> داهات
@@ -182,19 +139,19 @@ export default function ContactPage() {
                   <line x1="30" y1="85" x2="300" y2="85" stroke="#334155" strokeWidth="0.5" strokeDasharray="3 3" />
                   <line x1="30" y1="105" x2="300" y2="105" stroke="#475569" strokeWidth="1" />
                   
-                  {/* Y Axis Labels */}
-                  <text x="5" y="20" className="fill-slate-500 font-mono text-[7px]">$10k</text>
-                  <text x="5" y="55" className="fill-slate-500 font-mono text-[7px]">$5k</text>
-                  <text x="5" y="90" className="fill-slate-500 font-mono text-[7px]">$1k</text>
-                  <text x="5" y="108" className="fill-slate-500 font-mono text-[7px]">$0</text>
+                  {/* Y Axis Labels (Only currency signs to avoid confusing with account numbers) */}
+                  <text x="15" y="20" className="fill-slate-500 font-mono text-[8px]">$</text>
+                  <text x="15" y="55" className="fill-slate-500 font-mono text-[8px]">$</text>
+                  <text x="15" y="90" className="fill-slate-500 font-mono text-[8px]">$</text>
+                  <text x="15" y="108" className="fill-slate-500 font-mono text-[8px]">$</text>
 
                   {/* X Axis Labels */}
-                  <text x="45" y="116" className="fill-slate-400 text-[7px]">کانوون</text>
-                  <text x="95" y="116" className="fill-slate-400 text-[7px]">شوبات</text>
-                  <text x="145" y="116" className="fill-slate-400 text-[7px]">ئادار</text>
-                  <text x="195" y="116" className="fill-slate-400 text-[7px]">نیسان</text>
-                  <text x="245" y="116" className="fill-slate-400 text-[7px]">ئایار</text>
-                  <text x="290" y="116" className="fill-slate-400 text-[7px]">حوزەیران</text>
+                  <text x="45" y="116" className="fill-slate-450 text-[7px]">کانوون</text>
+                  <text x="95" y="116" className="fill-slate-450 text-[7px]">شوبات</text>
+                  <text x="145" y="116" className="fill-slate-450 text-[7px]">ئادار</text>
+                  <text x="195" y="116" className="fill-slate-450 text-[7px]">نیسان</text>
+                  <text x="245" y="116" className="fill-slate-450 text-[7px]">ئایار</text>
+                  <text x="290" y="116" className="fill-slate-450 text-[7px]">حوزەیران</text>
 
                   {/* Revenue Line */}
                   <path d="M 45 90 Q 95 65 145 40 T 245 25 T 290 15" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
@@ -203,7 +160,7 @@ export default function ContactPage() {
                   {/* Expenses Line */}
                   <path d="M 45 98 Q 95 85 145 70 T 245 60 T 290 55" fill="none" stroke="#f43f5e" strokeWidth="2" strokeLinecap="round" />
                   
-                  {/* Interactive points */}
+                  {/* Ticks */}
                   <circle cx="290" cy="15" r="3.5" fill="#10b981" />
                   <circle cx="290" cy="55" r="3.5" fill="#f43f5e" />
                 </svg>
@@ -211,148 +168,96 @@ export default function ContactPage() {
             </div>
 
             {/* Chart 2: Financial Allocation (Doughnut) */}
-            <div className="bg-slate-950/55 border border-slate-800/60 rounded-2xl p-4 flex flex-col justify-between">
-              <span className="text-[10px] font-bold text-slate-400 mb-2 block">دابەشبوونی سەرمایە و دارایی (Allocation)</span>
+            <div className="bg-slate-950/55 border border-slate-850/60 rounded-2xl p-4 flex flex-col justify-between flex-1">
+              <span className="text-xs font-bold text-slate-450 mb-3 block">دابەشبوونی ڕێژەیی دارایی (Allocation)</span>
               
-              <div className="flex-grow flex items-center justify-between gap-3">
+              <div className="flex-grow flex items-center justify-between gap-4">
                 {/* SVG Doughnut */}
-                <div className="w-20 h-20 relative flex items-center justify-center flex-shrink-0">
+                <div className="w-24 h-24 relative flex items-center justify-center flex-shrink-0">
                   <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                     {/* Background circle */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#1e293b" strokeWidth="3.5" />
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#1e293b" strokeWidth="4" />
                     
                     {/* Capital section (60%) */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#6366f1" strokeWidth="3.5" 
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#6366f1" strokeWidth="4" 
                             strokeDasharray="60 40" strokeDashoffset="0" />
                     
                     {/* Profit section (25%) */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="3.5" 
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="4" 
                             strokeDasharray="25 75" strokeDashoffset="-60" />
                     
                     {/* Liabilities section (15%) */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f43f5e" strokeWidth="3.5" 
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f43f5e" strokeWidth="4" 
                             strokeDasharray="15 85" strokeDashoffset="-85" />
                   </svg>
                   {/* Inner text */}
                   <div className="absolute flex flex-col items-center">
-                    <span className="text-xs font-black text-slate-200">٨٥٪</span>
-                    <span className="text-[6px] text-slate-500">هاوسەنگ</span>
+                    <span className="text-base font-black text-slate-200">⚖️</span>
+                    <span className="text-[7px] text-slate-500 font-bold uppercase">هاوسەنگ</span>
                   </div>
                 </div>
 
                 {/* Legends */}
-                <div className="flex-1 flex flex-col gap-1 justify-center">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded bg-indigo-500" />
+                <div className="flex-1 flex flex-col gap-2 justify-center">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded bg-indigo-500" />
                     <div className="flex flex-col">
-                      <span className="text-[7px] text-slate-500 leading-none">سەرمایە</span>
-                      <span className="text-[8px] font-bold text-slate-300 font-mono">60%</span>
+                      <span className="text-[9px] text-slate-450">سەرمایە $</span>
+                      <span className="text-[10px] font-bold text-slate-300 font-mono">60%</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded bg-emerald-500" />
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded bg-emerald-500" />
                     <div className="flex flex-col">
-                      <span className="text-[7px] text-slate-500 leading-none">قازانج</span>
-                      <span className="text-[8px] font-bold text-slate-300 font-mono">25%</span>
+                      <span className="text-[9px] text-slate-450">قازانج $</span>
+                      <span className="text-[10px] font-bold text-slate-300 font-mono">25%</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded bg-rose-500" />
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded bg-rose-500" />
                     <div className="flex flex-col">
-                      <span className="text-[7px] text-slate-500 leading-none">قەرزەکان</span>
-                      <span className="text-[8px] font-bold text-slate-300 font-mono">15%</span>
+                      <span className="text-[9px] text-slate-450">قەرزەکان $</span>
+                      <span className="text-[10px] font-bold text-slate-300 font-mono">15%</span>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Ledger Balancer Graphics */}
-          <div className="bg-slate-950/60 border border-slate-800/50 rounded-2xl p-4">
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-xs font-bold text-slate-400">هاوسەنگکەری ئەلیکترۆنی دەفتەری گشتی</span>
-              {isBalancing ? (
-                <span className="text-[10px] bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded-full animate-pulse font-bold">
-                  لە ئەژمارکردندایە...
-                </span>
-              ) : (
-                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">
-                  هاوسەنگ بوو ✓
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Debit visual */}
-              <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center">
-                <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">کۆی لایەنی قەرزدار (Debit)</div>
-                <div className="text-lg font-black text-rose-400 font-mono">
-                  {debitCount.toLocaleString("en-US")} $
-                </div>
-              </div>
-              
-              {/* Credit visual */}
-              <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-center">
-                <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">کۆی لایەنی داواکار (Credit)</div>
-                <div className="text-lg font-black text-emerald-400 font-mono">
-                  {creditCount.toLocaleString("en-US")} $
-                </div>
-              </div>
-            </div>
-
-            {/* Differential Bar */}
-            <div className="mt-3">
-              <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden flex">
-                <div 
-                  className="bg-rose-500 h-full transition-all duration-300"
-                  style={{ width: `${isBalancing ? Math.max(20, Math.min(80, (debitCount / (debitCount + creditCount || 1)) * 100)) : 50}%` }}
-                />
-                <div 
-                  className="bg-emerald-500 h-full transition-all duration-300"
-                  style={{ width: `${isBalancing ? Math.max(20, Math.min(80, (creditCount / (debitCount + creditCount || 1)) * 100)) : 50}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[9px] text-slate-600 mt-1 font-mono">
-                <span>تەفاوت: {(debitCount - creditCount).toLocaleString("en-US")} USD</span>
-                <span>هاوسەنگی: {isBalancing ? "0%" : "100%"}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Contact Details Card */}
-        <div className="bg-gradient-to-b from-slate-900 to-indigo-950/40 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-md flex flex-col justify-between shadow-2xl relative">
+        {/* Right Column: Contact Details Card (col-span-7) */}
+        <div className="lg:col-span-7 bg-gradient-to-b from-slate-900 to-indigo-950/40 border border-slate-800/80 rounded-3xl p-7 backdrop-blur-md flex flex-col justify-between shadow-2xl relative">
           <div className="absolute top-0 left-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
           
-          <div className="space-y-5">
-            <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-4">
-              <div className="text-xs text-indigo-400 font-extrabold mb-1">زانیاری سەرەکی پرۆژە</div>
-              <p className="text-sm leading-relaxed text-slate-300 font-medium">
+          <div className="space-y-6">
+            <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-6">
+              <div className="text-xs text-indigo-400 font-extrabold mb-1.5">زانیاری سەرەکی پرۆژە</div>
+              <p className="text-sm lg:text-base leading-relaxed text-slate-300 font-medium">
                 ئەم پڕۆژەیە بە دیزاینێکی پێشکەوتوو و کۆدە پپتەوکانی بەکارخراوە و جێبەجێ کراوە لە لایەن:
               </p>
               
-              <div className="mt-3 flex items-center gap-3 bg-slate-950/40 p-3 rounded-xl border border-slate-800">
-                <div className="w-11 h-11 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center font-black text-white text-lg shadow-lg">
+              <div className="mt-4 flex items-center gap-4 bg-slate-950/40 p-4 rounded-xl border border-slate-800">
+                <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center font-black text-white text-xl shadow-lg flex-shrink-0">
                   HF
                 </div>
                 <div>
-                  <div className="text-base font-black text-slate-100">هێمن فەرهاد حسێن</div>
-                  <div className="text-xs text-indigo-400 font-bold">ژمێریاری ئەزموونی و گەشەپێدەر</div>
+                  <div className="text-xl lg:text-2xl font-black text-slate-100">هێمن فەرهاد حسێن</div>
+                  <div className="text-xs lg:text-sm text-indigo-400 font-bold mt-1">ژمێریاری ئەزموونی و گەشەپێدەر</div>
                 </div>
               </div>
             </div>
 
             {/* List details */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               {/* Phone item */}
-              <div className="flex items-center gap-3.5 bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800 hover:border-indigo-500/40 transition-colors">
-                <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+              <div className="flex items-center gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 hover:border-indigo-500/40 transition-colors">
+                <div className="p-2.5 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
                   <PhoneIcon />
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-500 font-bold">ژمارەی پەیوەندی کردن</div>
-                  <div className="text-sm font-black text-slate-200 font-mono tracking-wide mt-0.5">
+                  <div className="text-sm lg:text-base font-black text-slate-200 font-mono tracking-wide mt-0.5">
                     ٠٧٧٠١٤٠٣٠٣٨ - ٠٧٥٠١٧٣٤٠٠٦
                   </div>
                 </div>
@@ -361,27 +266,27 @@ export default function ContactPage() {
               {/* Email item */}
               <a 
                 href="mailto:Hemn1996@gmail.com" 
-                className="flex items-center gap-3.5 bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800 hover:border-purple-500/40 transition-colors no-underline block"
+                className="flex items-center gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 hover:border-purple-500/40 transition-colors no-underline block"
               >
-                <div className="p-2 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                <div className="p-2.5 bg-purple-500/10 rounded-xl border border-purple-500/20">
                   <EmailIcon />
                 </div>
                 <div className="flex-grow">
                   <div className="text-[10px] text-slate-500 font-bold">ناونیشانی ئیمەیڵ</div>
-                  <div className="text-sm font-black text-slate-200 font-mono mt-0.5">
+                  <div className="text-sm lg:text-base font-black text-slate-200 font-mono mt-0.5">
                     Hemn1996@gmail.com
                   </div>
                 </div>
               </a>
 
               {/* Address item */}
-              <div className="flex items-center gap-3.5 bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800 hover:border-pink-500/40 transition-colors">
-                <div className="p-2 bg-pink-500/10 rounded-xl border border-pink-500/20">
+              <div className="flex items-center gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 hover:border-pink-500/40 transition-colors">
+                <div className="p-2.5 bg-pink-500/10 rounded-xl border border-pink-500/20">
                   <MapIcon />
                 </div>
                 <div>
                   <div className="text-[10px] text-slate-500 font-bold">ناونیشان</div>
-                  <div className="text-sm font-black text-slate-200 mt-0.5">
+                  <div className="text-sm lg:text-base font-black text-slate-200 mt-0.5">
                     سلێمانی
                   </div>
                 </div>
@@ -390,7 +295,7 @@ export default function ContactPage() {
           </div>
 
           {/* Quick Buttons */}
-          <div className="mt-6 pt-4 border-t border-slate-800 flex gap-3">
+          <div className="mt-6 pt-5 border-t border-slate-800 flex gap-4">
             <a
               href="tel:07701403038"
               className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-center shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm no-underline flex items-center justify-center gap-2"
@@ -408,7 +313,7 @@ export default function ContactPage() {
       </div>
 
       {/* Footer credits */}
-      <div className="flex items-center justify-center gap-2 text-xs text-slate-600 mt-6 pt-4 border-t border-slate-900 z-10">
+      <div className="flex items-center justify-center gap-2 text-xs text-slate-650 mt-6 pt-4 border-t border-slate-900 z-10">
         <span>دروستکراوە بە</span>
         <HeartIcon />
         <span>بۆ بەڕێوەبردنی ژمێریاری کۆگا و دارایی</span>
