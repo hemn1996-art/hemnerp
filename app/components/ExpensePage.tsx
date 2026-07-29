@@ -91,6 +91,44 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     setIsEditLoading(!!editId);
     if (editId) {
       setSavedSnapshot("");
+      fetch(`/api/vouchers/${editId}`)
+        .then((res) => res.json())
+        .then((voucher) => {
+          if (voucher) {
+            setReceiptNumber(String(voucher.id));
+            setReceiptDate(voucher.date ? voucher.date.slice(0, 10) : "");
+            const d = voucher.date ? new Date(voucher.date) : new Date();
+            setCreatedTime(
+              d.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            );
+            if (voucher.accountId) setAccountId(voucher.accountId);
+            if (voucher.cashboxId) setCashboxId(voucher.cashboxId);
+            setReceiptNote(voucher.internalNote || "");
+            setPrintNote(voucher.printNote || "");
+            if (voucher.internalNote || voucher.printNote) setShowNotes(true);
+            if (voucher.exchangeRate) {
+              setExchangeRate(String(voucher.exchangeRate * 100));
+            }
+
+            if (voucher.items && Array.isArray(voucher.items)) {
+              const loadedRows: ExpenseRow[] = voucher.items.map((item: any, idx: number) => ({
+                id: item.id || Date.now() + idx,
+                productId: item.productId || item.product?.id || 0,
+                productName: item.productName || item.product?.name || "",
+                code: item.code || item.product?.code || "",
+                amount: String(item.total || item.totalPrice || item.price || 0),
+                currencyId: item.currencyId || voucher.currencyId || 1,
+                note: item.note || ""
+              }));
+              setRows(loadedRows);
+            }
+          }
+        })
+        .catch((err: any) => console.error("Error loading expense voucher:", err))
+        .finally(() => setIsEditLoading(false));
     }
   }, [editId]);
 
