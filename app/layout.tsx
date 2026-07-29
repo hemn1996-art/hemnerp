@@ -3,7 +3,7 @@ import "./globals.css";
 import LayoutShell from "./components/LayoutShell";
 
 export const metadata: Metadata = {
-  title: "سەنتەری کارەبای لەندەن",
+  title: "کۆگای دۆستان",
   description: "POS and ERP System",
 };
 

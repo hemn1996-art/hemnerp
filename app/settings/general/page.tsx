@@ -32,13 +32,13 @@ export default function GeneralSettingsPage() {
     hideZeroBalance: true,
     showReportStats: true,
     logo: "",
-    companyName: "سەنتەری کارەبای لەندەن",
+    companyName: "کۆگای دۆستان",
     companyNameLang: "ku",
     about: "",
     aboutLang: "ku",
     address: "سلێمانی کۆگانی ژووری بازرگانی 456",
     addressLang: "ku",
-    emails: ["info@londoncenter.com"],
+    emails: ["info@dostan.com"],
     phones: ["07501734006", "07701403038"],
     primaryCurrency: "$",
     notificationLanguage: "کوردی",
@@ -87,8 +87,8 @@ export default function GeneralSettingsPage() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.companyName === "کۆگای دۆستان") {
-          parsed.companyName = "سەنتەری کارەبای لەندەن";
+        if (parsed.companyName === "سەنتەری کارەبای لەندەن") {
+          parsed.companyName = "کۆگای دۆستان";
           localStorage.setItem("general_settings", JSON.stringify(parsed));
         }
         setSettings((prev) => ({
@@ -284,7 +284,7 @@ export default function GeneralSettingsPage() {
                     <img src={settings.logo} alt="Company Logo" className="w-full h-full object-contain" />
                   ) : (
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <span className="text-blue-600 text-sm font-bold">{settings.companyName || "سەنتەری کارەبای لەندەن"}</span>
+                      <span className="text-blue-600 text-sm font-bold">{settings.companyName || "کۆگای دۆستان"}</span>
                     </div>
                   )}
                 </div>

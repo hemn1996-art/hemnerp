@@ -119,6 +119,10 @@ You are my long-term AI software engineering partner.
   - Always push verified local changes to GitHub (`git push origin main`).
   - Execute `npx vercel --prod` from the local terminal to push the build to production.
 
+## Client 1 Branding Rule
+- **Company Name Requirement**: This project belongs to Client 1 ("کۆگای دۆستان"). NEVER use "سەنتەری کارەبای لەندەن" anywhere in the application (UI, Login page, Sidebar, Chrome toolbar/Metadata title, Print headers, Fallbacks, or Settings). The company name MUST ALWAYS be "کۆگای دۆستان".
+
+
 
 ## Goal
 - Help me build serious software efficiently.
