@@ -110,9 +110,10 @@ export async function GET(request: Request) {
         }
       }
 
-      // Filter by debtType using net balance in USD
-      if (debtType === "people" && totalDebtInUsd <= 0.01) return null;
-      if (debtType === "mine" && totalDebtInUsd >= -0.01) return null;
+      // Filter out small micro-balances (< $1 USD equivalent) from debt report
+      if (debtType === "people" && totalDebtInUsd < 1.0) return null;
+      if (debtType === "mine" && totalDebtInUsd > -1.0) return null;
+      if ((!debtType || debtType === "all") && Math.abs(totalDebtInUsd) < 1.0) return null;
 
       const lastPaymentVoucher = account.vouchers[0];
       let lastPaymentAmount = 0;

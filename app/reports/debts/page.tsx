@@ -104,8 +104,14 @@ export default function DebtReportPage() {
     );
   };
 
+  const isMicroBalance = (val: number, curIdText: string) => {
+    const curId = Number(curIdText);
+    if (curId === 12) return Math.abs(val) < 1000;
+    return Math.abs(val) < 1.0;
+  };
+
   const renderBalance = (map: Record<string, number>) => {
-    const entries = Object.entries(map || {}).filter(([, val]) => Math.abs(val) > 0.01);
+    const entries = Object.entries(map || {}).filter(([curIdText, val]) => !isMicroBalance(val, curIdText));
     if (entries.length === 0) return <span className="text-gray-500 font-bold">0</span>;
     return (
       <div className="flex flex-col gap-1 items-center">
@@ -218,7 +224,7 @@ export default function DebtReportPage() {
   }, [data]);
 
   const formatTotalOverallJSX = (map: Record<string, number>) => {
-    const entries = Object.entries(map).filter(([, val]) => Math.abs(val) > 0.01);
+    const entries = Object.entries(map).filter(([curIdText, val]) => !isMicroBalance(val, curIdText));
     if (entries.length === 0) return <span className="text-gray-500 font-bold">0</span>;
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "8px" }} dir="ltr">
