@@ -999,21 +999,6 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     const rate = toNumber(exchangeRate) / 100;
 
     let finalNote = receiptNote;
-    const iqdCurrency = currencies.find((c: any) => c.code === "IQD");
-    const usdCurrency = currencies.find((c: any) => c.code === "USD");
-    const iqdPaid = getPaidCurrencies().find((p: any) => p.currencyId === iqdCurrency?.id);
-    const isTargetUSD = activeTargetCurrencyId === usdCurrency?.id;
-
-    if (iqdPaid && isTargetUSD) {
-      const formattedAmount = Number(iqdPaid.amount).toLocaleString("en-US");
-      const formattedRate = Number(exchangeRate).toLocaleString("en-US");
-      const autoNote = `${formattedAmount} دینار بە ڕەیتی ${formattedRate}`;
-      if (!finalNote.includes(autoNote)) {
-        finalNote = finalNote ? `${finalNote} (${autoNote})` : autoNote;
-        setReceiptNote(finalNote);
-        setShowNotes(true);
-      }
-    }
 
     const extraHandling = action === "cross_deduct"
       ? "convert_to_other_currency"
