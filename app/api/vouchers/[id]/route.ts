@@ -252,7 +252,7 @@ export async function PUT(
               data: { amount: { decrement: pa.amount } },
             });
           } else if (existingVoucher.cashboxId) {
-            const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange"].includes(existingVoucher.type);
+            const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange", "purchase_return"].includes(existingVoucher.type);
             const amountChange = isIncoming ? -Number(pa.amount) : Number(pa.amount); // Opposite of original
 
             await tx.cashboxBalance.update({
@@ -416,7 +416,7 @@ export async function PUT(
           } else if (updated.cashboxId && updated.type !== "quotation") {
             // For sales / money_in / exchange: increment cashbox balance
             // For purchase / money_out / expense: decrement cashbox balance
-            const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange"].includes(updated.type);
+            const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange", "purchase_return"].includes(updated.type);
             const amountChange = isIncoming ? Number(pa.amount) : -Number(pa.amount);
 
             await tx.cashboxBalance.upsert({
@@ -625,7 +625,7 @@ export async function DELETE(
               data: { amount: { decrement: pa.amount } },
             });
           } else if (existingVoucher.cashboxId) {
-            const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange"].includes(existingVoucher.type);
+            const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange", "purchase_return"].includes(existingVoucher.type);
             const amountChange = isIncoming ? -Number(pa.amount) : Number(pa.amount); // Opposite of original
 
             await tx.cashboxBalance.update({

@@ -345,7 +345,7 @@ export async function POST(request: Request) {
               create: { cashboxId: createdVoucher.toCashboxId, currencyId: Number(pa.currencyId), amount: Number(pa.amount) },
             });
           } else if (createdVoucher.cashboxId && createdVoucher.type !== "quotation") {
-            const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange"].includes(createdVoucher.type);
+            const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange", "purchase_return"].includes(createdVoucher.type);
             const amountChange = isIncoming ? Number(pa.amount) : -Number(pa.amount);
 
             await tx.cashboxBalance.upsert({
