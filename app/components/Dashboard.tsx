@@ -52,6 +52,10 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (parsed.companyName === "کۆگای دۆستان") {
+          parsed.companyName = "سەنتەری کارەبای لەندەن";
+          localStorage.setItem("general_settings", JSON.stringify(parsed));
+        }
         if (parsed.companyName) {
           setCompanyName(parsed.companyName);
         }

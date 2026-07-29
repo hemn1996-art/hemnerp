@@ -87,6 +87,10 @@ export default function GeneralSettingsPage() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (parsed.companyName === "کۆگای دۆستان") {
+          parsed.companyName = "سەنتەری کارەبای لەندەن";
+          localStorage.setItem("general_settings", JSON.stringify(parsed));
+        }
         setSettings((prev) => ({
           ...prev,
           ...parsed,
