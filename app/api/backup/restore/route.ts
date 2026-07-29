@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { verifyPassword } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +12,26 @@ export async function POST(request: Request) {
     const username = usernameHeader ? decodeURIComponent(usernameHeader) : "";
     const password = passwordHeader ? decodeURIComponent(passwordHeader) : "";
 
-    const expectedUsername = process.env.APP_USERNAME || "admin";
-    const expectedPassword = process.env.APP_PASSWORD || "admin123";
+    if (!username || !password) {
+      return NextResponse.json(
+        { error: "یوزەرنەیم و پاسوۆردی بەڕێوبەر پێویستن ❌" },
+        { status: 401 }
+      );
+    }
 
-    if (username !== expectedUsername || password !== expectedPassword) {
+    const adminUser = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    if (!adminUser || !adminUser.isActive || adminUser.role !== "admin") {
+      return NextResponse.json(
+        { error: "دەسەڵاتی بەڕێوەبەرت نییە یان زانیارییەکان هەڵەن ❌" },
+        { status: 401 }
+      );
+    }
+
+    const isValidPassword = await verifyPassword(password, adminUser.password);
+    if (!isValidPassword) {
       return NextResponse.json(
         { error: "یوزەرنەیم یان پاسوۆردی بەڕێوبەر هەڵەیە ❌" },
         { status: 401 }

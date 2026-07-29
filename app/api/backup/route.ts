@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
+import { getCurrentUser } from "../../lib/auth";
 import fs from "fs";
 import path from "path";
 
@@ -7,6 +8,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Export all tables
     const [
       currencies,
@@ -95,6 +101,11 @@ export async function GET() {
 // POST: Save backup to server file system
 export async function POST() {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Export all tables
     const [
       currencies,
