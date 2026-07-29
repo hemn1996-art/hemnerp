@@ -104,7 +104,13 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
                 minute: "2-digit",
               })
             );
-            if (voucher.accountId) setAccountId(voucher.accountId);
+            if (voucher.accountId) {
+              setAccountId(voucher.accountId);
+              if (voucher.account?.name) {
+                setAccountSearch(voucher.account.name);
+                setShowAccountInfo(true);
+              }
+            }
             if (voucher.cashboxId) setCashboxId(voucher.cashboxId);
             setReceiptNote(voucher.internalNote || "");
             setPrintNote(voucher.printNote || "");
@@ -113,15 +119,16 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
               setExchangeRate(String(voucher.exchangeRate * 100));
             }
 
-            if (voucher.items && Array.isArray(voucher.items)) {
-              const loadedRows: ExpenseRow[] = voucher.items.map((item: any, idx: number) => ({
-                id: item.id || Date.now() + idx,
-                productId: item.productId || item.product?.id || 0,
-                productName: item.productName || item.product?.name || "",
-                code: item.code || item.product?.code || "",
-                amount: String(item.total || item.totalPrice || item.price || 0),
-                currencyId: item.currencyId || voucher.currencyId || 1,
-                note: item.note || ""
+            const dbLines = voucher.lines || voucher.items || voucher.expenses || [];
+            if (Array.isArray(dbLines)) {
+              const loadedRows: ExpenseRow[] = dbLines.map((line: any, idx: number) => ({
+                id: line.id || Date.now() + idx,
+                productId: line.productId || line.product?.id || 0,
+                productName: line.productName || line.product?.name || (line.product ? line.product.name : ""),
+                code: line.code || line.product?.code || "",
+                amount: String(line.total || line.totalPrice || line.price || line.amount || 0),
+                currencyId: line.currencyId || voucher.currencyId || 1,
+                note: line.note || ""
               }));
               setRows(loadedRows);
             }
