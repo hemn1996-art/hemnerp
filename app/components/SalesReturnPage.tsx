@@ -252,7 +252,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
         })
         .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
     }
-  }, [editId, accounts]);
+  }, [editId]);
 
   useEffect(() => {
     if (!editId && currencies && currencies.length > 0) {

@@ -190,7 +190,7 @@ export default function ProductTransferPage({ headerSelector, editId }: Props) {
         })
         .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
     }
-  }, [editId, warehouses]);
+  }, [editId]);
 
   const [fromWarehouseId, setFromWarehouseId] = useState<number | undefined>(
     warehouses[0]?.id

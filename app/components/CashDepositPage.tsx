@@ -157,7 +157,7 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
         })
         .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
     }
-  }, [editId, accounts]);
+  }, [editId]);
 
   const [accountSearch, setAccountSearch] = useState("");
   const [accountId, setAccountId] = useState<number | undefined>();

@@ -128,69 +128,17 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     }
   }, [editId]);
 
-  useEffect(() => {
-    if (editId) {
-      fetch(`/api/vouchers/${editId}`)
-        .then((res) => res.json())
-        .then((voucher) => {
-          if (voucher) {
-            setReceiptNumber(String(voucher.id));
-            setReceiptDate(voucher.date.slice(0, 10));
-            const d = new Date(voucher.date);
-            setCreatedTime(
-              d.toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            );
-            if (voucher.accountId) {
-              setAccountId(voucher.accountId);
-              const acc = accounts.find((a: any) => a.id === voucher.accountId);
-              if (acc) setAccountSearch(acc.name);
-            }
-            if (voucher.cashboxId) setCashboxId(voucher.cashboxId);
-
-            if (voucher.lines && Array.isArray(voucher.lines)) {
-              const mappedRows = voucher.lines.map((line: any) => ({
-                id: line.id,
-                productId: line.productId,
-                productName: line.product?.name || "نەناسراو",
-                code: line.product?.code || "",
-                amount: String(line.unitPrice),
-                currencyId: line.currencyId || voucher.currencyId || 1,
-                note: line.note || "",
-              }));
-              setRows(mappedRows);
-            }
-
-            setReceiptNote(voucher.internalNote || "");
-            setPrintNote(voucher.printNote || "");
-            if (voucher.internalNote || voucher.printNote) setShowNotes(true);
-
-            if (voucher.exchangeRate) {
-              setExchangeRate(String(voucher.exchangeRate * 100));
-            }
-
-            setIsLocked(false);
-          }
-        })
-        .catch((err: any) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
-    }
-  }, [editId, accounts]);
-
-  useEffect(() => {
-    if (!editId && currencies && currencies.length > 0) {
-      const iqd = currencies.find((c: any) => c.code === "IQD");
-      if (iqd && iqd.rate) {
-        setExchangeRate(String(iqd.rate * 100));
-      }
-    }
-  }, [currencies, editId]);
-
   const [accountSearch, setAccountSearch] = useState("");
   const [accountId, setAccountId] = useState<number | undefined>();
   const [showAccountList, setShowAccountList] = useState(false);
   const [showAccountInfo, setShowAccountInfo] = useState(false);
+
+  useEffect(() => {
+    if (accountId && accounts && accounts.length > 0 && !accountSearch) {
+      const acc = accounts.find((a: any) => a.id === accountId);
+      if (acc) setAccountSearch(acc.name);
+    }
+  }, [accountId, accounts, accountSearch]);
 
   const [cashboxId, setCashboxId] = useState<number | undefined>(
     cashboxes[0]?.id

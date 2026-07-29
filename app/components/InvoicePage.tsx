@@ -350,6 +350,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   });
 
   useEffect(() => {
+    if (accountId && accounts && accounts.length > 0 && !accountSearch) {
+      const acc = accounts.find((a: any) => a.id === accountId);
+      if (acc) setAccountSearch(acc.name);
+    }
+  }, [accountId, accounts, accountSearch]);
+
+  useEffect(() => {
     if (editId) {
       if (lastLoadedEditIdRef.current === editId) return;
       lastLoadedEditIdRef.current = editId;

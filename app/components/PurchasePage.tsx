@@ -312,7 +312,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           setIsEditLoading(false);
         });
     }
-  }, [editId, accounts]);
+  }, [editId]);
 
   useEffect(() => {
     if (!editId && currencies && currencies.length > 0) {

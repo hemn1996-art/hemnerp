@@ -197,7 +197,7 @@ export default function WarehouseStockPage({ headerSelector, editId }: Props) {
         })
         .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
     }
-  }, [editId, warehouses]);
+  }, [editId]);
 
   const [warehouseId, setWarehouseId] = useState<number | undefined>(
     warehouses[0]?.id

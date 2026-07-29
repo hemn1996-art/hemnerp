@@ -219,7 +219,7 @@ export default function MaterialIssuePage({ headerSelector, editId }: Props) {
         })
         .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
     }
-  }, [editId, accounts, warehouses]);
+  }, [editId]);
 
   const [accountSearch, setAccountSearch] = useState("");
   const [accountId, setAccountId] = useState<number | undefined>();
