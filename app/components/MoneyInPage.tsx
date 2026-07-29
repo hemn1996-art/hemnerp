@@ -1356,6 +1356,87 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
           <div style={totalsCard}>
             <div style={totalGrid}>
               <StatBox title="پارەی دراو" value={getPaidSummaryText()} color="#16a34a" />
+              {(() => {
+                const paidEntries = Object.entries(paidAmounts).filter(([_, amt]) => toNumber(amt) > 0);
+                if (paidEntries.length < 2) return null;
+
+                const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
+                const targetCurObj = currencies.find((c: any) => c.id === activeTargetCurrencyId) || defaultCurrency;
+                const targetSymbol = targetCurObj.symbol || (targetCurObj.code === "IQD" ? "دینار" : "$");
+
+                let totalEquivalentInTarget = 0;
+                paidEntries.forEach(([curIdText, amtText]) => {
+                  const curId = Number(curIdText);
+                  const amt = toNumber(amtText);
+                  totalEquivalentInTarget += convertCurrency(amt, curId, activeTargetCurrencyId);
+                });
+
+                const displayTotal = totalEquivalentInTarget > 0 ? (Math.round(totalEquivalentInTarget * 100) / 100).toString() : "";
+
+                return (
+                  <div
+                    style={{
+                      border: "1px solid #bfdbfe",
+                      borderRadius: 12,
+                      padding: "8px 12px",
+                      background: "#eff6ff",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: "bold", color: "#1e40af" }}>
+                      کۆی گشتی بە ({targetSymbol})
+                    </div>
+                    <FormattedNumberInput
+                      value={displayTotal}
+                      disabled={isLocked}
+                      onChange={(newTotalStr) => {
+                        if (blockIfLocked()) return;
+                        const newTotal = toNumber(newTotalStr);
+                        if (newTotal <= 0) return;
+
+                        const usdCur = currencies.find((c: any) => c.code === "USD") || { id: 1 };
+                        const iqdCur = currencies.find((c: any) => c.code === "IQD") || { id: 12 };
+
+                        const usdAmt = toNumber(paidAmounts[usdCur.id]);
+                        const iqdAmt = toNumber(paidAmounts[iqdCur.id]);
+
+                        if (usdAmt > 0 && iqdAmt > 0) {
+                          if (activeTargetCurrencyId === usdCur.id) {
+                            const diffUsd = newTotal - usdAmt;
+                            if (diffUsd > 0) {
+                              const newRatePer1USD = iqdAmt / diffUsd;
+                              const newRatePer100USD = Math.round(newRatePer1USD * 100);
+                              setExchangeRate(String(newRatePer100USD));
+                            }
+                          } else if (activeTargetCurrencyId === iqdCur.id) {
+                            const diffIqd = newTotal - iqdAmt;
+                            if (diffIqd > 0) {
+                              const newRatePer1USD = diffIqd / usdAmt;
+                              const newRatePer100USD = Math.round(newRatePer1USD * 100);
+                              setExchangeRate(String(newRatePer100USD));
+                            }
+                          }
+                        }
+                      }}
+                      placeholder="0"
+                      style={{
+                        width: "100%",
+                        border: "1px solid #93c5fd",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        background: "white",
+                        color: "#1e3a8a",
+                        fontWeight: "900",
+                        fontSize: "15px",
+                        outline: "none",
+                        textAlign: "left"
+                      }}
+                    />
+                  </div>
+                );
+              })()}
               {toNumber(discountAmount) > 0 && (
                 <StatBox
                   title="داشکاندن"
