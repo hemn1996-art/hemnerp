@@ -1418,11 +1418,14 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
               />
               {(() => {
                 const paidEntries = Object.entries(paidAmounts).filter(([_, amt]) => toNumber(amt) > 0);
-                if (paidEntries.length < 2) return null;
+                if (paidEntries.length === 0) return null;
 
                 const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
                 const targetCurObj = currencies.find((c: any) => c.id === activeTargetCurrencyId) || defaultCurrency;
                 const targetSymbol = targetCurObj.symbol || (targetCurObj.code === "IQD" ? "دینار" : "$");
+
+                const showCustomTotal = paidEntries.length >= 2 || (paidEntries.length === 1 && Number(paidEntries[0][0]) !== activeTargetCurrencyId);
+                if (!showCustomTotal) return null;
 
                 let totalEquivalentInTarget = 0;
                 paidEntries.forEach(([curIdText, amtText]) => {
@@ -1462,21 +1465,19 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                         const usdAmt = toNumber(paidAmounts[usdCur.id]);
                         const iqdAmt = toNumber(paidAmounts[iqdCur.id]);
 
-                        if (usdAmt > 0 && iqdAmt > 0) {
-                          if (activeTargetCurrencyId === usdCur.id) {
-                            const diffUsd = newTotal - usdAmt;
-                            if (diffUsd > 0) {
-                              const newRatePer1USD = iqdAmt / diffUsd;
-                              const newRatePer100USD = Math.round(newRatePer1USD * 100);
-                              setExchangeRate(String(newRatePer100USD));
-                            }
-                          } else if (activeTargetCurrencyId === iqdCur.id) {
-                            const diffIqd = newTotal - iqdAmt;
-                            if (diffIqd > 0) {
-                              const newRatePer1USD = diffIqd / usdAmt;
-                              const newRatePer100USD = Math.round(newRatePer1USD * 100);
-                              setExchangeRate(String(newRatePer100USD));
-                            }
+                        if (activeTargetCurrencyId === usdCur.id) {
+                          const diffUsd = newTotal - usdAmt;
+                          if (diffUsd > 0 && iqdAmt > 0) {
+                            const newRatePer1USD = iqdAmt / diffUsd;
+                            const newRatePer100USD = Math.round(newRatePer1USD * 100);
+                            setExchangeRate(String(newRatePer100USD));
+                          }
+                        } else if (activeTargetCurrencyId === iqdCur.id) {
+                          const diffIqd = newTotal - iqdAmt;
+                          if (diffIqd > 0 && usdAmt > 0) {
+                            const newRatePer1USD = diffIqd / usdAmt;
+                            const newRatePer100USD = Math.round(newRatePer1USD * 100);
+                            setExchangeRate(String(newRatePer100USD));
                           }
                         }
                       }}
