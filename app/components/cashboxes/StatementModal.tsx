@@ -3,30 +3,8 @@ import { useRouter } from "next/navigation";
 import { CashboxLike, CurrencyLike } from "./types";
 import DateInput from "../DateInput";
 
-function getResetDates(movementsList: any[]) {
-  if (!movementsList || movementsList.length === 0) {
-    return { start: "", end: "" };
-  }
-
-  const lastM = movementsList[movementsList.length - 1];
-  if (!lastM.dateStr) return { start: "", end: "" };
-  const lastDateStr = lastM.dateStr.slice(0, 10); // YYYY-MM-DD
-
-  // Count how many movements occurred on the last day
-  const lastDayMovementsCount = movementsList.filter(
-    (m) => m.dateStr && m.dateStr.startsWith(lastDateStr)
-  ).length;
-
-  if (lastDayMovementsCount > 10) {
-    // If there are more than 10 movements on the last day, show all of them (filter only for the last day)
-    return { start: lastDateStr, end: lastDateStr };
-  } else {
-    // Show the last 10 movements, regardless of how many days they span
-    const targetIdx = Math.max(0, movementsList.length - 10);
-    const startM = movementsList[targetIdx];
-    const startSplit = startM.dateStr ? startM.dateStr.slice(0, 10) : "";
-    return { start: startSplit, end: lastDateStr };
-  }
+function getResetDates(_movementsList?: any[]) {
+  return { start: "", end: "" };
 }
 
 type Props = {
@@ -204,18 +182,16 @@ export default function StatementModal({
     if (statementCashbox) {
       if (lastCashboxIdRef.current !== statementCashbox.id) {
         lastCashboxIdRef.current = statementCashbox.id;
-        const { start, end } = getResetDates(allMovements);
-        setStartDate(start);
-        setEndDate(end);
+        setStartDate("");
+        setEndDate("");
         setCurrentPage(1);
       }
     }
-  }, [statementCashbox?.id, allMovements]);
+  }, [statementCashbox?.id]);
 
   const handleReset = () => {
-    const { start, end } = getResetDates(allMovements);
-    setStartDate(start);
-    setEndDate(end);
+    setStartDate("");
+    setEndDate("");
     setCurrentPage(1);
   };
 
