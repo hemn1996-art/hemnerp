@@ -121,15 +121,18 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
 
             const dbLines = voucher.lines || voucher.items || voucher.expenses || [];
             if (Array.isArray(dbLines)) {
-              const loadedRows: ExpenseRow[] = dbLines.map((line: any, idx: number) => ({
-                id: line.id || Date.now() + idx,
-                productId: line.productId || line.product?.id || 0,
-                productName: line.productName || line.product?.name || (line.product ? line.product.name : ""),
-                code: line.code || line.product?.code || "",
-                amount: String(line.total || line.totalPrice || line.price || line.amount || 0),
-                currencyId: line.currencyId || voucher.currencyId || 1,
-                note: line.note || ""
-              }));
+              const loadedRows: ExpenseRow[] = dbLines.map((line: any, idx: number) => {
+                const rawAmount = line.lineTotal ?? line.total ?? line.totalPrice ?? line.price ?? line.amount ?? line.unitPrice ?? 0;
+                return {
+                  id: line.id || Date.now() + idx,
+                  productId: line.productId || line.product?.id || 0,
+                  productName: line.productName || line.product?.name || (line.product ? line.product.name : ""),
+                  code: line.code || line.product?.code || "",
+                  amount: String(rawAmount),
+                  currencyId: line.currencyId || voucher.currencyId || 1,
+                  note: line.note || ""
+                };
+              });
               setRows(loadedRows);
             }
           }
