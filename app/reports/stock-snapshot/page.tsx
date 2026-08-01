@@ -352,8 +352,8 @@ export default function StockSnapshotReportPage() {
 
       {/* Columns Modal */}
       {showColumnModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm" onClick={() => setShowColumnModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="bg-[#0b1f50] text-white p-4 flex justify-between items-center">
               <h3 className="font-bold text-lg m-0">کۆڵۆمە دیاریکراوەکان</h3>
               <button onClick={() => setShowColumnModal(false)} className="text-white hover:text-gray-300 text-2xl font-bold cursor-pointer">×</button>
@@ -398,8 +398,8 @@ export default function StockSnapshotReportPage() {
 
       {/* Filter Modal */}
       {showFilterModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm" onClick={() => setShowFilterModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="bg-[#0b1f50] text-white p-4 flex justify-between items-center">
               <h3 className="font-bold text-lg m-0">ئۆپشنەکانی فلتەرکردن</h3>
               <div className="flex gap-4 items-center">

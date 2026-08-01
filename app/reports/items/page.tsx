@@ -582,8 +582,8 @@ export default function ItemsReportPage() {
 
       {/* Columns Modal */}
       {showColumnsModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowColumnsModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="bg-[#0b1f50] p-3 flex items-center justify-between text-white">
               <h2 className="font-bold text-sm">کۆڵۆمە دیاریکراوەکان</h2>
               <button onClick={() => setShowColumnsModal(false)} className="text-slate-300 hover:text-white">✕</button>
@@ -619,8 +619,8 @@ export default function ItemsReportPage() {
 
       {/* Filters Modal */}
       {showFilterModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowFilterModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="bg-[#0b1f50] p-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-3">

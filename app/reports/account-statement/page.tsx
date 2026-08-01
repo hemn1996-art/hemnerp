@@ -813,8 +813,8 @@ function AccountStatementContent() {
 
       {/* Filter Modal - For remaining options */}
       {showFilterModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm" onClick={() => setShowFilterModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="bg-[#0b1f50] text-white p-4 flex justify-between items-center">
               <h3 className="font-bold text-lg m-0">ئۆپشنەکانی فلتەرکردن</h3>
               <div className="flex gap-4 items-center">

@@ -275,7 +275,7 @@ export default function StatementModal({
     : "w-full max-w-6xl max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl flex flex-col print:shadow-none print:max-h-none print:overflow-visible print:rounded-none";
 
   const content = (
-    <div id="print-area" className={wrapperClass} dir="rtl">
+    <div id="print-area" className={wrapperClass} dir="rtl" onClick={(e) => e.stopPropagation()}>
       {/* Modal Header */}
       <div className="flex justify-between items-center border-b border-slate-100 p-6 bg-slate-50/50 print:border-b-2 print:border-black rounded-t-2xl">
         <div>

@@ -2520,8 +2520,8 @@ function InvoiceReportContent() {
 
       {/* ── Modal: Filtering Options (ئۆپشنەکانی فلتەرکردن) ── */}
       {showFiltersModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 select-text">
-          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 select-text" onClick={() => setShowFiltersModal(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#03133f] text-white">
               <button
@@ -2796,8 +2796,8 @@ function InvoiceReportContent() {
 
       {/* ── Modal: Selected Columns (کۆڵۆمە دیاریکراوەکان) ── */}
       {showColumnsModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 flex flex-col">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowColumnsModal(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#0f172a] text-white">
               <h2 className="text-lg font-black m-0 flex items-center gap-2">
@@ -3037,8 +3037,8 @@ function InvoiceReportContent() {
         };
 
         return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 select-text">
-          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 select-text" onClick={() => setShowVersionsModal(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#0f172a] text-white">
               <h2 className="text-lg font-black m-0 flex items-center gap-2">
@@ -3238,8 +3238,8 @@ function InvoiceReportContent() {
 
       {/* Delete Confirmation Modal */}
       {deleteVoucherId !== null && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDeleteVoucherId(null)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-slate-800 mb-2">دڵنیایت لە سڕینەوە؟</h2>
             <p className="text-sm text-slate-500 mb-6">ئەم کردارە ناتوانرێت پێچەوانە بکرێتەوە.</p>
             <div className="flex gap-3 justify-center">
