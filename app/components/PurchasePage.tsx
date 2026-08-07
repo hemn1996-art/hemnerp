@@ -1363,7 +1363,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         }
       });
       if (Object.keys(newPaid).length === 0 && paidCurrencyId) {
-        const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
+        const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, itemsSubtotalInBase);
         if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
       }
       setPaidAmounts(newPaid);
@@ -1378,7 +1378,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           }
         });
         if (Object.keys(newPaid).length === 0 && paidCurrencyId) {
-          const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
+          const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, itemsSubtotalInBase);
           if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
         }
       }
