@@ -1,6 +1,7 @@
 "use client";
 import DateInput from "./DateInput";
 import FormattedNumberInput from "./FormattedNumberInput";
+import PrintHeader, { PrintWatermark } from "./PrintHeader";
 
 import { useRouter } from "next/navigation";
 
@@ -9,6 +10,7 @@ import {
   useMemo,
   useState,
   useRef,
+  useCallback,
   type CSSProperties,
   type ReactNode,
 } from "react";
@@ -248,6 +250,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     defaultCurrency.id
   );
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
+  const [paymentTypeMode, setPaymentTypeMode] = useState<"cash" | "partial" | "debt">("cash");
 
   const lastLoadedEditIdRef = useRef<string | null>(null);
 
@@ -297,6 +300,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, []);
 
   const [showInvoiceNotes, setShowInvoiceNotes] = useState(false);
+  const [invoiceLabel, setInvoiceLabel] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [printNote, setPrintNote] = useState("");
 
@@ -763,6 +767,38 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const total =
     Math.max(itemsSubtotal - invoiceDiscountAmount, 0) + deliveryFeeAmount;
+
+  const getFullPaidAmountForCurrency = useCallback((currId: number, invTotal: number) => {
+    if (currId === invoiceCurrencyId) return invTotal;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
+    const usdCurr = currencies.find((c: any) => c.code === "USD");
+    const iqdCurr = currencies.find((c: any) => c.code === "IQD");
+
+    if (invoiceCurrencyId === usdCurr?.id && currId === iqdCurr?.id) {
+      return Math.round(invTotal * rate);
+    }
+    if (invoiceCurrencyId === iqdCurr?.id && currId === usdCurr?.id) {
+      return rate > 0 ? Number((invTotal / rate).toFixed(2)) : invTotal;
+    }
+    return invTotal;
+  }, [invoiceCurrencyId, exchangeRate, currencies]);
+
+  useEffect(() => {
+    if (paymentTypeMode === "cash") {
+      const itemTotals = getItemsTotalsByCurrency();
+      const newPaid: PaidAmounts = {};
+      Object.entries(itemTotals).forEach(([curIdText, amount]) => {
+        if (amount > 0) {
+          newPaid[Number(curIdText)] = String(amount);
+        }
+      });
+      if (Object.keys(newPaid).length === 0) {
+        const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
+        if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
+      }
+      setPaidAmounts(newPaid);
+    }
+  }, [rows, total, paymentTypeMode, paidCurrencyId, getFullPaidAmountForCurrency]);
 
   const accountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
@@ -1466,6 +1502,82 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }));
   }
 
+  function getItemsTotalsByCurrency() {
+    const map: Record<string, number> = {};
+
+    for (const row of rows) {
+      const key = String(row.currencyId || invoiceCurrencyId);
+      map[key] = (map[key] || 0) + getRowNetTotalInRowCurrency(row);
+    }
+
+    return map;
+  }
+
+  function getPaidAmountsByCurrency() {
+    const map: Record<string, number> = {};
+
+    for (const item of getPaidCurrencies()) {
+      const key = String(item.currencyId);
+      map[key] = (map[key] || 0) + item.amount;
+    }
+
+    return map;
+  }
+
+  function getInvoiceRemainingByCurrency() {
+    const totals = getItemsTotalsByCurrency();
+    const paid = getPaidAmountsByCurrency();
+    const result: Record<string, number> = {};
+
+    const currencyKeys = Array.from(
+      new Set([...Object.keys(totals), ...Object.keys(paid)])
+    );
+
+    for (const key of currencyKeys) {
+      result[key] = (totals[key] || 0) - (paid[key] || 0);
+    }
+
+    return result;
+  }
+
+  function handleSelectPaymentMode(mode: "cash" | "partial" | "debt") {
+    if (blockIfLocked()) return;
+    setPaymentTypeMode(mode);
+
+    if (mode === "cash") {
+      const itemTotals = getItemsTotalsByCurrency();
+      const newPaid: PaidAmounts = {};
+      Object.entries(itemTotals).forEach(([curIdText, amount]) => {
+        if (amount > 0) {
+          newPaid[Number(curIdText)] = String(amount);
+        }
+      });
+      if (Object.keys(newPaid).length === 0) {
+        const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
+        if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
+      }
+      setPaidAmounts(newPaid);
+    } else if (mode === "partial") {
+      const itemTotals = getItemsTotalsByCurrency();
+      const newPaid: PaidAmounts = { ...paidAmounts };
+      let hasAny = Object.values(newPaid).some((val) => parseFloat(val || "0") > 0);
+      if (!hasAny) {
+        Object.entries(itemTotals).forEach(([curIdText, amount]) => {
+          if (amount > 0) {
+            newPaid[Number(curIdText)] = String(amount);
+          }
+        });
+        if (Object.keys(newPaid).length === 0) {
+          const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
+          if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
+        }
+      }
+      setPaidAmounts(newPaid);
+    } else if (mode === "debt") {
+      setPaidAmounts({});
+    }
+  }
+
   function hasUnsavedInvoiceData() {
     const hasPaid = Object.values(paidAmounts).some((x: any) => x.trim() !== "");
 
@@ -1801,7 +1913,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }));
   }
 
-  function handlePrint() {
+  const [printPaperSize, setPrintPaperSize] = useState<"A4" | "A5">("A4");
+
+  function handlePrint(size: "A4" | "A5" = "A4") {
     if (rows.length === 0) {
       showToast("هیچ کەرەستەیەک لە پسوڵەکەدا نییە.");
       return;
@@ -1812,7 +1926,123 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    setPrintPaperSize(size);
+    if (typeof document !== "undefined") {
+      let styleTag = document.getElementById("dynamic-print-paper-style");
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = "dynamic-print-paper-style";
+        document.head.appendChild(styleTag);
+      }
+
+      if (size === "A5") {
+        styleTag.innerHTML = `
+          @media print {
+            @page {
+              size: A5 landscape !important;
+              margin: 3mm !important;
+            }
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+            #invoice-print-area, #purchase-print-area, [id$="-print-area"] {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 auto !important;
+              padding: 0 !important;
+              box-sizing: border-box !important;
+              position: relative !important;
+              left: 0 !important;
+              top: 0 !important;
+            }
+            .print-header-spacer {
+              height: 50px !important;
+            }
+            #invoice-print-area div[style*="printInfoRightColStyle"],
+            #invoice-print-area div[style*="printInfoLeftColStyle"],
+            #purchase-print-area div[style*="printInfoRightColStyle"],
+            #purchase-print-area div[style*="printInfoLeftColStyle"] {
+              padding: 3px 6px !important;
+              font-size: 10px !important;
+              line-height: 1.3 !important;
+            }
+            #invoice-print-area div[style*="printInfoRowStyle"],
+            #purchase-print-area div[style*="printInfoRowStyle"] {
+              font-size: 10px !important;
+              line-height: 1.3 !important;
+            }
+            table {
+              width: 100% !important;
+              table-layout: fixed !important;
+              margin-bottom: 4px !important;
+              font-size: 10px !important;
+            }
+            th {
+              padding: 3px 4px !important;
+              font-size: 10px !important;
+            }
+            td {
+              padding: 2px 4px !important;
+              font-size: 9.5px !important;
+            }
+            #invoice-print-area div[style*="printBottomGridStyle"],
+            #purchase-print-area div[style*="printBottomGridStyle"] {
+              margin-top: 4px !important;
+              gap: 6px !important;
+            }
+            #invoice-print-area div[style*="printBottomBoxStyle"],
+            #purchase-print-area div[style*="printBottomBoxStyle"] {
+              padding: 3px 6px !important;
+            }
+            #invoice-print-area div[style*="printSummaryLineStyle"],
+            #purchase-print-area div[style*="printSummaryLineStyle"] {
+              font-size: 10px !important;
+              padding-bottom: 2px !important;
+              margin-bottom: 2px !important;
+            }
+          }
+        `;
+      } else {
+        styleTag.innerHTML = `
+          @media print {
+            @page {
+              size: A4 portrait !important;
+              margin: 6mm !important;
+            }
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+            #invoice-print-area, #purchase-print-area, [id$="-print-area"] {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 auto !important;
+              padding: 0 !important;
+              box-sizing: border-box !important;
+              position: relative !important;
+              left: 0 !important;
+              top: 0 !important;
+            }
+            .print-header-spacer {
+              height: 135px !important;
+            }
+            table {
+              width: 100% !important;
+              table-layout: fixed !important;
+            }
+          }
+        `;
+      }
+    }
+
+    setTimeout(() => {
+      window.print();
+    }, 150);
   }
 
   const lockedFieldStyle: CSSProperties = isInvoiceLocked
@@ -2174,44 +2404,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             <div style={totalGrid}>
               <StatBox
                 title="گشتی"
-                value={formatMoneyJSX(total)}
+                value={formatCurrencyMapJSX(getItemsTotalsByCurrency())}
                 color="#16a34a"
               />
               <StatBox
                 title="کۆی ماوەی ئەم پسووڵە"
-                value={formatMoneyJSX(remaining)}
+                value={formatCurrencyMapWithColors(getInvoiceRemainingByCurrency())}
               />
             </div>
-
-            <Field label="قاسە">
-              <select
-                value={cashboxId || ""}
-                disabled={isInvoiceLocked}
-                onChange={(e) => {
-                  if (blockIfLocked()) return;
-                  setCashboxId(Number(e.target.value));
-                }}
-                style={{ ...input, ...lockedFieldStyle }}
-              >
-                {cashboxes.map((cashbox: any) => (
-                  <option key={cashbox.id} value={cashbox.id}>
-                    {cashbox.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="بەروار">
-              <DateInput
-                value={invoiceDate}
-                disabled={isInvoiceLocked}
-                onChange={(val) => {
-                  if (blockIfLocked()) return;
-                  setInvoiceDate(val);
-                }}
-                style={{ ...input, ...lockedFieldStyle }}
-              />
-            </Field>
 
             <div style={discountToggleBox}>
               <button
@@ -2281,7 +2481,114 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               )}
             </div>
 
-            
+            {/* Payment Mode Selector: بەشێکی دراو | نەقد | قەرز - ALWAYS VISIBLE */}
+            <div
+              style={{
+                display: "flex",
+                width: "100%",
+                borderRadius: 10,
+                background: "#e2e8f0",
+                padding: 4,
+                gap: 4,
+                border: "1px solid #cbd5e1",
+                marginTop: 4,
+                marginBottom: 4,
+              }}
+            >
+              <button
+                type="button"
+                disabled={isInvoiceLocked}
+                onClick={() => handleSelectPaymentMode("partial")}
+                style={{
+                  flex: 1,
+                  padding: "9px 6px",
+                  borderRadius: 7,
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  cursor: isInvoiceLocked ? "not-allowed" : "pointer",
+                  transition: "all 0.15s ease",
+                  background: paymentTypeMode === "partial" ? "#f97316" : "#e2e8f0",
+                  color: paymentTypeMode === "partial" ? "#ffffff" : "#475569",
+                  boxShadow: paymentTypeMode === "partial" ? "0 2px 5px rgba(249, 115, 22, 0.35)" : "none",
+                }}
+              >
+                بەشێکی دراو
+              </button>
+
+              <button
+                type="button"
+                disabled={isInvoiceLocked}
+                onClick={() => handleSelectPaymentMode("cash")}
+                style={{
+                  flex: 1,
+                  padding: "9px 6px",
+                  borderRadius: 7,
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  cursor: isInvoiceLocked ? "not-allowed" : "pointer",
+                  transition: "all 0.15s ease",
+                  background: paymentTypeMode === "cash" ? "#16a34a" : "#e2e8f0",
+                  color: paymentTypeMode === "cash" ? "#ffffff" : "#475569",
+                  boxShadow: paymentTypeMode === "cash" ? "0 2px 5px rgba(22, 163, 74, 0.35)" : "none",
+                }}
+              >
+                نەقد
+              </button>
+
+              <button
+                type="button"
+                disabled={isInvoiceLocked}
+                onClick={() => handleSelectPaymentMode("debt")}
+                style={{
+                  flex: 1,
+                  padding: "9px 6px",
+                  borderRadius: 7,
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  cursor: isInvoiceLocked ? "not-allowed" : "pointer",
+                  transition: "all 0.15s ease",
+                  background: paymentTypeMode === "debt" ? "#ef4444" : "#e2e8f0",
+                  color: paymentTypeMode === "debt" ? "#ffffff" : "#475569",
+                  boxShadow: paymentTypeMode === "debt" ? "0 2px 5px rgba(239, 68, 68, 0.35)" : "none",
+                }}
+              >
+                قەرز
+              </button>
+            </div>
+
+            <Field label="قاسە">
+              <select
+                value={cashboxId || ""}
+                disabled={isInvoiceLocked}
+                onChange={(e) => {
+                  if (blockIfLocked()) return;
+                  setCashboxId(Number(e.target.value));
+                }}
+                style={{ ...input, ...lockedFieldStyle }}
+              >
+                {cashboxes.map((cashbox: any) => (
+                  <option key={cashbox.id} value={cashbox.id}>
+                    {cashbox.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="بەروار">
+              <DateInput
+                value={invoiceDate}
+                disabled={isInvoiceLocked}
+                onChange={(val) => {
+                  if (blockIfLocked()) return;
+                  setInvoiceDate(val);
+                }}
+                style={{ ...input, ...lockedFieldStyle }}
+              />
+            </Field>
+
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
               {currencies.filter((c: any) => c.id === paidCurrencyId || (paidAmounts[c.id] && paidAmounts[c.id].trim() !== "" && parseFloat(paidAmounts[c.id]) !== 0)).map((currency: any) => {
                 const isCurrent = currency.id === paidCurrencyId;
@@ -2387,11 +2694,25 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   setShowInvoiceNotes((prev) => !prev);
                 }}
               >
-                {showInvoiceNotes ? "▲ شاردنەوەی تێبینی" : "▼ زیادکردنی تێبینی"}
+                {showInvoiceNotes ? "▲ شاردنەوەی تێبینی و لەیبڵ" : "▼ تێبینی و لەیبڵ"}
               </button>
 
               {showInvoiceNotes && (
                 <div style={notesInsidePayment}>
+                  <Field label="لەیبڵی پسووڵە">
+                    <input
+                      type="text"
+                      value={invoiceLabel}
+                      disabled={isInvoiceLocked}
+                      onChange={(e) => {
+                        if (blockIfLocked()) return;
+                        setInvoiceLabel(e.target.value);
+                      }}
+                      style={{ ...input, ...lockedFieldStyle }}
+                      placeholder="لەیبڵی پسووڵە بنووسە یان هەڵیبژێرە..."
+                    />
+                  </Field>
+
                   <Field label="تێبینی ناوخۆیی">
                     <textarea
                       value={internalNote}
@@ -2400,7 +2721,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         if (blockIfLocked()) return;
                         setInternalNote(e.target.value);
                       }}
-                      rows={3}
+                      rows={2}
                       style={{ ...textarea, ...lockedFieldStyle }}
                       placeholder="تێبینی ناوخۆیی..."
                     />
@@ -2414,7 +2735,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         if (blockIfLocked()) return;
                         setPrintNote(e.target.value);
                       }}
-                      rows={3}
+                      rows={2}
                       style={{ ...textarea, ...lockedFieldStyle }}
                       placeholder="تێبینی چاپ..."
                     />
@@ -2441,9 +2762,65 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               {isSaving ? "چاوەڕوان بە..." : isInvoiceLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
 
-            <button style={outlineBlueBtn} onClick={handlePrint}>
-              پرێنتکردن
-            </button>
+            <div style={{ display: "flex", gap: 8, width: "100%" }}>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 5px rgba(37, 99, 235, 0.25)"
+                }}
+                onClick={() => handlePrint("A4")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                A4
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#16a34a",
+                  color: "#ffffff",
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 5px rgba(22, 163, 74, 0.25)"
+                }}
+                onClick={() => handlePrint("A5")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                A5
+              </button>
+            </div>
 
             <button style={outlineBlueBtn} onClick={() => setShowSettings(true)}>
               ڕێکخستن
@@ -2467,7 +2844,27 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
         <main style={mainContent}>
           <div style={headerCard}>
-            {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>{invoiceType}</h2>}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>{invoiceType}</h2>}
+              <span
+                style={{
+                  padding: "4px 14px",
+                  borderRadius: 20,
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  color: "#ffffff",
+                  background:
+                    paymentTypeMode === "cash"
+                      ? "#16a34a"
+                      : paymentTypeMode === "partial"
+                      ? "#f97316"
+                      : "#ef4444",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                }}
+              >
+                {invoiceLabel.trim() ? invoiceLabel : (paymentTypeMode === "cash" ? "نەقد" : paymentTypeMode === "partial" ? "بەشێکی دراو" : "قەرز")}
+              </span>
+            </div>
             <div style={currentPriceTypeBadge}>جۆری نرخ: {invoicePriceType}</div>
           </div>
 
@@ -2810,16 +3207,21 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
                         {tableColumns.price && (
                           <td style={tdCenter}>
-                            <FormattedNumberInput
-                              value={row.price}
-                              disabled={isInvoiceLocked}
-                              onChange={(val) =>
-                                updateRow(row.id, {
-                                  price: val,
-                                })
-                              }
-                              style={{ ...smallInput, ...lockedFieldStyle }}
-                            />
+                            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
+                              <FormattedNumberInput
+                                value={row.price}
+                                disabled={isInvoiceLocked}
+                                onChange={(val) =>
+                                  updateRow(row.id, {
+                                    price: val,
+                                  })
+                                }
+                                style={{ ...smallInput, ...lockedFieldStyle }}
+                              />
+                              <span style={{ fontSize: 13, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
+                                {getCurrencySymbol(row.currencyId)}
+                              </span>
+                            </div>
                           </td>
                         )}
 
@@ -3314,6 +3716,167 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           </div>
         </div>
       )}
+      {/* --- INVOICE PRINT AREA --- */}
+      <div id="invoice-print-area">
+        <div style={printSheetStyle}>
+          <PrintWatermark />
+          <PrintHeader />
+
+          {/* 2-Column Info Grid Box */}
+          <div style={printInfoGridStyle}>
+            {/* Right Column: Invoice Details */}
+            <div style={printInfoRightColStyle}>
+              <div style={printInfoRowStyle}>
+                <span style={printLabelBold}>جۆری پسووڵە :</span>
+                <span>فرۆشتن</span>
+              </div>
+              <div style={printInfoRowStyle}>
+                <span style={printLabelBold}>ژمارەی پسووڵە :</span>
+                <span>{editId || "-"}</span>
+              </div>
+              <div style={printInfoRowStyle}>
+                <span style={printLabelBold}>بەروار :</span>
+                <span>{invoiceDate}</span>
+              </div>
+              <div style={printInfoRowStyle}>
+                <span style={printLabelBold}>کاتژمێر :</span>
+                <span>{createdTime || "00:00"}</span>
+              </div>
+              <div style={printInfoRowStyle}>
+                <span style={printLabelBold}>دۆخی پارەدان :</span>
+                <span style={{
+                  fontWeight: 900,
+                  color: paymentTypeMode === "cash" ? "#16a34a" : paymentTypeMode === "partial" ? "#ea580c" : "#dc2626"
+                }}>
+                  {paymentTypeMode === "cash" ? "نەقد" : paymentTypeMode === "partial" ? "بەشێکی دراو" : "قەرز"}
+                </span>
+              </div>
+            </div>
+
+            {/* Left Column: Account Info & Employee Info */}
+            <div style={printInfoLeftColStyle}>
+              <div style={{ borderBottom: "1px solid #000", paddingBottom: 6, marginBottom: 6 }}>
+                <div style={printInfoRowStyle}>
+                  <span style={printLabelBold}>هەژمار :</span>
+                  <span>{isTemporaryCustomer ? (tempCustomerName || "کڕیاری کاتی") : (selectedAccount?.name || "-")}</span>
+                </div>
+                <div style={printInfoRowStyle}>
+                  <span style={printLabelBold}>ژمارە تەلەفۆن :</span>
+                  <span>{isTemporaryCustomer ? (tempCustomerPhone || "-") : (selectedAccount?.phone || "-")}</span>
+                </div>
+                <div style={printInfoRowStyle}>
+                  <span style={printLabelBold}>ناونیشان :</span>
+                  <span>{isTemporaryCustomer ? (tempCustomerAddress || "-") : ([selectedAccount?.city, selectedAccount?.address].filter(Boolean).join(" - ") || "-")}</span>
+                </div>
+              </div>
+              <div>
+                <div style={printInfoRowStyle}>
+                  <span style={printLabelBold}>کارمەند :</span>
+                  <span>{employeeName || loggedInUser?.name || loggedInUser?.username || "هێمن"}</span>
+                </div>
+                <div style={printInfoRowStyle}>
+                  <span style={printLabelBold}>ژمارە تەلەفۆن :</span>
+                  <span>{employeePhone || loggedInUser?.phone || "-"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Items Table */}
+          <table style={printTableStyle}>
+            <thead>
+              <tr style={{ background: "#0f2b5c", color: "#ffffff", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}>
+                <th style={{ ...printThStyle, width: "35px" }}>#</th>
+                {tableColumns.product && <th style={{ ...printThStyle, textAlign: "right", width: "40%" }}>کەرەستە</th>}
+                {tableColumns.code && <th style={{ ...printThStyle, width: "10%" }}>کۆد</th>}
+                {tableColumns.qty && <th style={{ ...printThStyle, width: "10%" }}>عەدد</th>}
+                {tableColumns.price && <th style={{ ...printThStyle, width: "13%" }}>نرخ</th>}
+                {tableColumns.discount && <th style={{ ...printThStyle, width: "12%" }}>داشکاندن</th>}
+                {tableColumns.total && <th style={{ ...printThStyle, width: "15%" }}>گشتی</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr key={row.id || idx}>
+                  <td style={printTdCenterStyle}>{idx + 1}</td>
+                  {tableColumns.product && (
+                    <td style={printTdRightStyle}>
+                      <strong>{row.productName}</strong>
+                      {row.note && <div style={{ fontSize: 11, color: "#4b5563" }}>{row.note}</div>}
+                    </td>
+                  )}
+                  {tableColumns.code && <td style={printTdCenterStyle}>{row.code || "-"}</td>}
+                  {tableColumns.qty && (
+                    <td style={printTdCenterStyle}>
+                      <strong>{row.qty}</strong> <span style={{ fontSize: 11 }}>{row.packageName || "دانە"}</span>
+                    </td>
+                  )}
+                  {tableColumns.price && (
+                    <td style={printTdCenterStyle}>
+                      {formatCurrencyAmount(toNumber(row.price), row.currencyId)}
+                    </td>
+                  )}
+                  {tableColumns.discount && (
+                    <td style={printTdCenterStyle}>
+                      {toNumber(row.discountValue) > 0
+                        ? (row.discountMode === "percent" ? `${row.discountValue}%` : formatCurrencyAmount(toNumber(row.discountValue), row.currencyId))
+                        : "-"}
+                    </td>
+                  )}
+                  {tableColumns.total && (
+                    <td style={printTdCenterStyle}>
+                      <strong>
+                        {formatCurrencyAmount(getRowNetTotalInRowCurrency(row), row.currencyId)}
+                      </strong>
+                    </td>
+                  )}
+                </tr>
+              ))}
+
+              {/* Table Total Qty Footer Row */}
+              <tr style={{ background: "#f8fafc" }}>
+                <td colSpan={visibleColumnCount} style={printTotalQtyTdStyle}>
+                  <strong>کۆی گشتی عەدد :</strong> <span style={{ fontSize: 14, color: "#0055d4", marginRight: 6 }}>{itemCount} دانە</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Bottom Summary Grid (2 Side-by-Side Boxes) */}
+          <div style={printBottomGridStyle}>
+            {/* Right Box: Total & Remaining */}
+            <div style={printBottomBoxStyle}>
+              <div style={printSummaryLineStyle}>
+                <span>کۆی گشتی :</span>
+                <strong style={{ fontSize: 15 }}>{formatCurrencyMap(getItemsTotalsByCurrency())}</strong>
+              </div>
+              <div style={{ ...printSummaryLineStyle, borderBottom: "none" }}>
+                <span>ماوە :</span>
+                <strong style={{ fontSize: 15, color: "#dc2626" }}>{formatCurrencyMap(getInvoiceRemainingByCurrency())}</strong>
+              </div>
+            </div>
+
+            {/* Left Box: Previous Debt & Total Debt */}
+            <div style={printBottomBoxStyle}>
+              <div style={printSummaryLineStyle}>
+                <span>قەرزی پێشوو :</span>
+                <strong>{formatCurrencyMap(accountBalanceBeforeByCurrency)}</strong>
+              </div>
+              <div style={{ ...printSummaryLineStyle, borderBottom: "none" }}>
+                <span>کۆی گشتی قەرز :</span>
+                <strong style={{ fontSize: 15, color: "#16a34a" }}>{formatCurrencyMap(accountBalanceAfterByCurrency)}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Print Note if any */}
+          {printNote.trim() !== "" && (
+            <div style={printNoteBoxStyle}>
+              <strong>تێبینی :</strong> {printNote}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -4180,5 +4743,125 @@ const priceTypeBtnActive: CSSProperties = {
   background: "#2563eb",
   color: "white",
   borderColor: "#2563eb",
+};
+
+const printSheetStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px",
+  boxSizing: "border-box",
+  fontFamily: appFont,
+  direction: "rtl",
+  color: "#000000",
+  background: "#ffffff",
+};
+
+const printInfoGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  border: "2px solid #000000",
+  marginBottom: "10px",
+};
+
+const printInfoRightColStyle: CSSProperties = {
+  borderLeft: "2px solid #000000",
+  padding: "8px 12px",
+  fontSize: "13px",
+  lineHeight: "1.8",
+};
+
+const printInfoLeftColStyle: CSSProperties = {
+  padding: "8px 12px",
+  fontSize: "13px",
+  lineHeight: "1.8",
+};
+
+const printInfoRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "6px",
+  fontSize: "13px",
+  lineHeight: "1.8",
+};
+
+const printLabelBold: CSSProperties = {
+  fontWeight: 700,
+};
+
+const printTableStyle: CSSProperties = {
+  width: "100%",
+  tableLayout: "fixed",
+  borderCollapse: "collapse",
+  border: "2px solid #000000",
+  marginBottom: "10px",
+  fontSize: "12px",
+  boxSizing: "border-box",
+};
+
+const printThStyle: CSSProperties = {
+  border: "1px solid #0f2b5c",
+  padding: "8px 10px",
+  fontWeight: 900,
+  textAlign: "center",
+  background: "#0f2b5c",
+  color: "#ffffff",
+  fontSize: "13px",
+  WebkitPrintColorAdjust: "exact",
+  printColorAdjust: "exact",
+};
+
+const printTdCenterStyle: CSSProperties = {
+  border: "1px solid #000000",
+  padding: "6px 8px",
+  textAlign: "center",
+  wordBreak: "break-word",
+  overflowWrap: "anywhere",
+};
+
+const printTdRightStyle: CSSProperties = {
+  border: "1px solid #000000",
+  padding: "6px 8px",
+  textAlign: "right",
+  wordBreak: "break-word",
+  overflowWrap: "anywhere",
+};
+
+const printTotalQtyTdStyle: CSSProperties = {
+  border: "1px solid #000000",
+  padding: "8px 12px",
+  textAlign: "right",
+  fontSize: "13px",
+  fontWeight: "bold",
+};
+
+const printBottomGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "10px",
+  marginTop: "10px",
+};
+
+const printBottomBoxStyle: CSSProperties = {
+  border: "2px solid #000000",
+  padding: "8px 12px",
+  background: "#ffffff",
+};
+
+const printSummaryLineStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  borderBottom: "1px solid #000000",
+  paddingBottom: "6px",
+  marginBottom: "6px",
+  fontSize: "13px",
+};
+
+const printNoteBoxStyle: CSSProperties = {
+  marginTop: "10px",
+  border: "1px solid #000000",
+  padding: "8px 12px",
+  borderRadius: "4px",
+  fontSize: "12px",
 };
 

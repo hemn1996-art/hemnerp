@@ -362,6 +362,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   }, [defaultCurrency]);
 
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
+  const [paymentTypeMode, setPaymentTypeMode] = useState<"cash" | "partial" | "debt">("cash");
 
   const [exchangeRate, setExchangeRate] = useState("150000");
 
@@ -389,6 +390,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const [employeePhone, setEmployeePhone] = useState("");
 
   const [showInvoiceNotes, setShowInvoiceNotes] = useState(false);
+  const [invoiceLabel, setInvoiceLabel] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [printNote, setPrintNote] = useState("");
 
@@ -1333,6 +1335,59 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     }));
   }
 
+  function getFullPaidAmountForCurrency(currId: number | null, invTotal: number) {
+    if (!currId || currId === purchaseCurrencyId) return invTotal;
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
+    const usdCurr = currencies.find((c: any) => c.code === "USD");
+    const iqdCurr = currencies.find((c: any) => c.code === "IQD");
+
+    if (purchaseCurrencyId === usdCurr?.id && currId === iqdCurr?.id) {
+      return Math.round(invTotal * rate);
+    }
+    if (purchaseCurrencyId === iqdCurr?.id && currId === usdCurr?.id) {
+      return rate > 0 ? Number((invTotal / rate).toFixed(2)) : invTotal;
+    }
+    return invTotal;
+  }
+
+  function handleSelectPaymentMode(mode: "cash" | "partial" | "debt") {
+    if (blockIfLocked()) return;
+    setPaymentTypeMode(mode);
+
+    if (mode === "cash") {
+      const itemTotals = getItemsTotalsByCurrency();
+      const newPaid: PaidAmounts = {};
+      Object.entries(itemTotals).forEach(([curIdText, amount]) => {
+        if (amount > 0) {
+          newPaid[Number(curIdText)] = String(amount);
+        }
+      });
+      if (Object.keys(newPaid).length === 0 && paidCurrencyId) {
+        const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
+        if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
+      }
+      setPaidAmounts(newPaid);
+    } else if (mode === "partial") {
+      const itemTotals = getItemsTotalsByCurrency();
+      const newPaid: PaidAmounts = { ...paidAmounts };
+      let hasAny = Object.values(newPaid).some((val) => parseFloat(val || "0") > 0);
+      if (!hasAny) {
+        Object.entries(itemTotals).forEach(([curIdText, amount]) => {
+          if (amount > 0) {
+            newPaid[Number(curIdText)] = String(amount);
+          }
+        });
+        if (Object.keys(newPaid).length === 0 && paidCurrencyId) {
+          const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
+          if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
+        }
+      }
+      setPaidAmounts(newPaid);
+    } else if (mode === "debt") {
+      setPaidAmounts({});
+    }
+  }
+
   function validateBeforeSave() {
     if (!supplierId) {
       showToast("پسوڵەی کڕین نابێت بێ دابینکەر خەزن بکرێت.");
@@ -1711,7 +1766,9 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     }
   }
 
-  function handlePrint() {
+  const [printPaperSize, setPrintPaperSize] = useState<"A4" | "A5">("A4");
+
+  function handlePrint(size: "A4" | "A5" = "A4") {
     if (rows.length === 0) {
       showToast("هیچ کەرەستەیەک لە پسوڵەکەدا نییە.");
       return;
@@ -1722,7 +1779,112 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    setPrintPaperSize(size);
+    if (typeof document !== "undefined") {
+      let styleTag = document.getElementById("dynamic-print-paper-style");
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = "dynamic-print-paper-style";
+        document.head.appendChild(styleTag);
+      }
+
+      if (size === "A5") {
+        styleTag.innerHTML = `
+          @media print {
+            @page {
+              size: A5 landscape !important;
+              margin: 3mm !important;
+            }
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              font-size: 9px !important;
+            }
+            #invoice-print-area, #purchase-print-area, [id$="-print-area"] {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 auto !important;
+              padding: 0 !important;
+              box-sizing: border-box !important;
+              position: relative !important;
+              left: 0 !important;
+              top: 0 !important;
+              font-size: 9px !important;
+            }
+            .print-header-spacer {
+              height: 45px !important;
+            }
+            #invoice-print-area div,
+            #invoice-print-area span,
+            #purchase-print-area div,
+            #purchase-print-area span {
+              font-size: 9px !important;
+              line-height: 1.25 !important;
+            }
+            #invoice-print-area div > div,
+            #purchase-print-area div > div {
+              padding-top: 1px !important;
+              padding-bottom: 1px !important;
+              margin-top: 0 !important;
+              margin-bottom: 2px !important;
+            }
+            table {
+              width: 100% !important;
+              table-layout: fixed !important;
+              margin-top: 2px !important;
+              margin-bottom: 2px !important;
+              font-size: 9px !important;
+            }
+            th {
+              padding: 2px 3px !important;
+              font-size: 9px !important;
+            }
+            td {
+              padding: 1.5px 3px !important;
+              font-size: 8.5px !important;
+            }
+          }
+        `;
+      } else {
+        styleTag.innerHTML = `
+          @media print {
+            @page {
+              size: A4 portrait !important;
+              margin: 6mm !important;
+            }
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+            #invoice-print-area, #purchase-print-area, [id$="-print-area"] {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 auto !important;
+              padding: 0 !important;
+              box-sizing: border-box !important;
+              position: relative !important;
+              left: 0 !important;
+              top: 0 !important;
+            }
+            .print-header-spacer {
+              height: 135px !important;
+            }
+            table {
+              width: 100% !important;
+              table-layout: fixed !important;
+            }
+          }
+        `;
+      }
+    }
+
+    setTimeout(() => {
+      window.print();
+    }, 150);
   }
 
   function toggleColumn(key: keyof TableColumns) {
@@ -1962,6 +2124,84 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               />
             </div>
 
+            {/* Payment Mode Selector: بەشێکی دراو | نەقد | قەرز - ALWAYS VISIBLE */}
+            <div
+              style={{
+                display: "flex",
+                width: "100%",
+                borderRadius: 10,
+                background: "#e2e8f0",
+                padding: 4,
+                gap: 4,
+                border: "1px solid #cbd5e1",
+                marginTop: 4,
+                marginBottom: 4,
+              }}
+            >
+              <button
+                type="button"
+                disabled={isLocked}
+                onClick={() => handleSelectPaymentMode("partial")}
+                style={{
+                  flex: 1,
+                  padding: "9px 6px",
+                  borderRadius: 7,
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  cursor: isLocked ? "not-allowed" : "pointer",
+                  transition: "all 0.15s ease",
+                  background: paymentTypeMode === "partial" ? "#f97316" : "#e2e8f0",
+                  color: paymentTypeMode === "partial" ? "#ffffff" : "#475569",
+                  boxShadow: paymentTypeMode === "partial" ? "0 2px 5px rgba(249, 115, 22, 0.35)" : "none",
+                }}
+              >
+                بەشێکی دراو
+              </button>
+
+              <button
+                type="button"
+                disabled={isLocked}
+                onClick={() => handleSelectPaymentMode("cash")}
+                style={{
+                  flex: 1,
+                  padding: "9px 6px",
+                  borderRadius: 7,
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  cursor: isLocked ? "not-allowed" : "pointer",
+                  transition: "all 0.15s ease",
+                  background: paymentTypeMode === "cash" ? "#16a34a" : "#e2e8f0",
+                  color: paymentTypeMode === "cash" ? "#ffffff" : "#475569",
+                  boxShadow: paymentTypeMode === "cash" ? "0 2px 5px rgba(22, 163, 74, 0.35)" : "none",
+                }}
+              >
+                نەقد
+              </button>
+
+              <button
+                type="button"
+                disabled={isLocked}
+                onClick={() => handleSelectPaymentMode("debt")}
+                style={{
+                  flex: 1,
+                  padding: "9px 6px",
+                  borderRadius: 7,
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  cursor: isLocked ? "not-allowed" : "pointer",
+                  transition: "all 0.15s ease",
+                  background: paymentTypeMode === "debt" ? "#ef4444" : "#e2e8f0",
+                  color: paymentTypeMode === "debt" ? "#ffffff" : "#475569",
+                  boxShadow: paymentTypeMode === "debt" ? "0 2px 5px rgba(239, 68, 68, 0.35)" : "none",
+                }}
+              >
+                قەرز
+              </button>
+            </div>
+
             <Field label="قاسە">
               <select
                 value={cashboxId || ""}
@@ -2065,11 +2305,25 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                   setShowInvoiceNotes((prev) => !prev);
                 }}
               >
-                {showInvoiceNotes ? "▲ شاردنەوەی تێبینی" : "▼ زیادکردنی تێبینی"}
+                {showInvoiceNotes ? "▲ شاردنەوەی تێبینی و لەیبڵ" : "▼ تێبینی و لەیبڵ"}
               </button>
 
               {showInvoiceNotes && (
                 <div style={notesInsidePayment}>
+                  <Field label="لەیبڵی پسووڵە">
+                    <input
+                      type="text"
+                      value={invoiceLabel}
+                      disabled={isLocked}
+                      onChange={(e) => {
+                        if (blockIfLocked()) return;
+                        setInvoiceLabel(e.target.value);
+                      }}
+                      style={{ ...input, ...lockedFieldStyle }}
+                      placeholder="لەیبڵی پسووڵە بنووسە یان هەڵیبژێرە..."
+                    />
+                  </Field>
+
                   <Field label="تێبینی ناوخۆیی">
                     <textarea
                       value={internalNote}
@@ -2078,7 +2332,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                         if (blockIfLocked()) return;
                         setInternalNote(e.target.value);
                       }}
-                      rows={3}
+                      rows={2}
                       style={{ ...textarea, ...lockedFieldStyle }}
                     />
                   </Field>
@@ -2091,7 +2345,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                         if (blockIfLocked()) return;
                         setPrintNote(e.target.value);
                       }}
-                      rows={3}
+                      rows={2}
                       style={{ ...textarea, ...lockedFieldStyle }}
                     />
                   </Field>
@@ -2117,9 +2371,65 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               {isSaving ? "چاوەڕوان بە..." : isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
 
-            <button style={outlineBlueBtn} onClick={handlePrint}>
-              پرێنتکردن
-            </button>
+            <div style={{ display: "flex", gap: 8, width: "100%" }}>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 5px rgba(37, 99, 235, 0.25)"
+                }}
+                onClick={() => handlePrint("A4")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                A4
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#16a34a",
+                  color: "#ffffff",
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 5px rgba(22, 163, 74, 0.25)"
+                }}
+                onClick={() => handlePrint("A5")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                A5
+              </button>
+            </div>
 
             <button style={outlineBlueBtn} onClick={() => setShowSettings(true)}>
               ڕێکخستن
@@ -2139,7 +2449,27 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
         <main style={mainContent}>
           <div style={headerCard}>
-            {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>پسوڵەی کڕین</h2>}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>پسوڵەی کڕین</h2>}
+              <span
+                style={{
+                  padding: "4px 14px",
+                  borderRadius: 20,
+                  fontWeight: 800,
+                  fontSize: "13px",
+                  color: "#ffffff",
+                  background:
+                    paymentTypeMode === "cash"
+                      ? "#16a34a"
+                      : paymentTypeMode === "partial"
+                      ? "#f97316"
+                      : "#ef4444",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                }}
+              >
+                {invoiceLabel.trim() ? invoiceLabel : (paymentTypeMode === "cash" ? "نەقد" : paymentTypeMode === "partial" ? "بەشێکی دراو" : "قەرز")}
+              </span>
+            </div>
             
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای فرۆشیار:</span>
@@ -2291,16 +2621,21 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
                             {tableColumns.purchasePrice && (
                               <td style={tdCenter}>
-                                <FormattedNumberInput
-                                  value={row.purchasePrice}
-                                  disabled={isLocked}
-                                  onChange={(val) =>
-                                    updateRow(row.id, {
-                                      purchasePrice: val,
-                                    })
-                                  }
-                                  style={{ ...smallInput, ...lockedFieldStyle }}
-                                />
+                                <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
+                                  <FormattedNumberInput
+                                    value={row.purchasePrice}
+                                    disabled={isLocked}
+                                    onChange={(val) =>
+                                      updateRow(row.id, {
+                                        purchasePrice: val,
+                                      })
+                                    }
+                                    style={{ ...smallInput, ...lockedFieldStyle }}
+                                  />
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
+                                    {getCurrencySymbol(row.currencyId)}
+                                  </span>
+                                </div>
                               </td>
                             )}
 

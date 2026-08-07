@@ -21,13 +21,29 @@
 }
 
 html,
+body,
+button,
+input,
+select,
+textarea,
+table,
+th,
+td,
+span,
+div {
+  font-family: "Speda", "Segoe UI", Tahoma, Arial, sans-serif !important;
+  font-variant-numeric: tabular-nums lining-nums !important;
+  font-feature-settings: "tnum" 1, "lnum" 1 !important;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+html,
 body {
   margin: 0;
   padding: 0;
   direction: rtl;
   background: #f3f4f6;
-  font-family: "Speda", "Segoe UI", Tahoma, Arial, sans-serif !important;
-  /* Use zoom on html only - this scales the entire page */
   overflow: auto;
   touch-action: pan-x pan-y pinch-zoom;
 }
@@ -244,6 +260,13 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  table, tr, th, td, div {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Hide sidebar and navigation wrappers */
@@ -277,7 +300,6 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   #print-area,
   #print-report-area,
   [id$="-print-area"] {
-    zoom: 0.70 !important; /* Scale to 70% to behave like A3 space scaled down to A4 */
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
@@ -384,5 +406,18 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   .grid-cols-4 > div span,
   .grid > div span {
     font-size: 11px !important;
+  }
+
+  /* Specific A5 paper size optimization */
+  body.print-paper-a5 #invoice-print-area,
+  body.print-paper-a5 #purchase-print-area,
+  body.print-paper-a5 [id$="-print-area"] {
+    zoom: 0.67 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body.print-paper-a5 .print-header-spacer {
+    height: 80px !important;
   }
 }

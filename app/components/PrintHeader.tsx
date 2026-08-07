@@ -54,36 +54,7 @@ export default function PrintHeader() {
   }
 
   return (
-    <div style={headerContainer}>
-      {/* Left Column: Address */}
-      <div style={leftCol}>
-        <div style={addressText}>
-          {settings.address || "سلێمانی کۆگانی ژووری بازرگانی 456"}
-        </div>
-      </div>
-
-      {/* Center Column: Company Name & About & Logo */}
-      <div style={centerCol}>
-        {settings.logo && (
-          <img src={settings.logo} alt="Logo" style={logoStyle} />
-        )}
-        <h1 style={companyNameStyle}>
-          {settings.companyName || "کۆگای دۆستان"}
-        </h1>
-        {settings.about && (
-          <p style={companyAboutStyle}>
-            {settings.about}
-          </p>
-        )}
-      </div>
-
-      {/* Right Column: Phone numbers */}
-      <div style={rightCol}>
-        {settings.phones && settings.phones.map((phone, idx) => (
-          <div key={idx} style={phoneText}>{phone}</div>
-        ))}
-      </div>
-    </div>
+    <div className="print-header-spacer" style={{ height: "135px", width: "100%", marginBottom: "10px" }} />
   );
 }
 
