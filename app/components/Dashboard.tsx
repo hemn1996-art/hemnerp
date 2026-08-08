@@ -97,7 +97,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     if (paid >= total - 0.01) {
       return { label: "نەقد", color: "bg-emerald-100 text-emerald-700 border-emerald-200" };
     }
-    return { label: "بەشەکی", color: "bg-amber-100 text-amber-700 border-amber-200" };
+    return { label: "بەشێکی دراو", color: "bg-orange-100 text-orange-800 border-orange-300 font-bold" };
   };
 
   const formatInvoiceCurrency = (val: number, currencyCode: string) => {
@@ -236,7 +236,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const chartSumUsd = barData.reduce((sum, item) => sum + item.usd, 0);
   const chartSumIqd = barData.reduce((sum, item) => sum + item.iqd, 0);
 
-  // 3. Chart Data: Vouchers Donut
+  // Donut Chart Data
   const donutInvoices = getFilteredInvoices(donutPeriod);
   const pieData = [
     { name: "فرۆشتن", typeKey: "sales", value: donutInvoices.filter((x: any) => x.type === "فرۆشتن").length, color: "#ef4444" },
@@ -245,15 +245,6 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     { name: "پارەی ڕۆشتوو", typeKey: "money_out", value: donutInvoices.filter((x: any) => x.type === "پارەی ڕۆشتوو").length, color: "#14b8a6" },
     { name: "خەرجی", typeKey: "expense", value: donutInvoices.filter((x: any) => x.type === "خەرجی").length, color: "#f59e0b" },
   ];
-
-  // Colors for styling
-  const COLORS = {
-    sales: "#ef4444", // Red
-    purchases: "#10b981", // Green
-    expenses: "#f59e0b", // Yellow
-    moneyIn: "#8b5cf6", // Purple
-    moneyOut: "#14b8a6", // Teal
-  };
 
   // Calculate Alerts
   const alerts: Array<{
@@ -342,6 +333,26 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     }
   });
 
+  // Daily Exchange Rate Prompt inside Notification Bell
+  const iqdCurrency = currencies.find(
+    (c: any) => c.code === "IQD" || c.name === "دینار" || c.name?.includes("دینار")
+  );
+  const todayStr = new Date().toISOString().split("T")[0];
+  const isDailyRateVerified = typeof window !== "undefined" ? localStorage.getItem("__daily_rate_verified_date") === todayStr : true;
+
+  if (!isDailyRateVerified && iqdCurrency) {
+    let rate100 = Number(iqdCurrency.rate || 1500);
+    if (rate100 < 10000) rate100 = rate100 * 100;
+    
+    alerts.unshift({
+      id: "daily-rate-prompt",
+      type: "daily-rate",
+      title: "ئاگاداری ڕۆژانەی نرخی دۆلار 💵",
+      message: `نرخی ١٠٠ دۆلار: ${rate100.toLocaleString("en-US")} دینار. ئایا ئەمڕۆ هەمان نرخە؟`,
+      severity: "warning",
+    });
+  }
+
   customNotifications.forEach((n: any) => {
     alerts.push({
       id: `announcement-${n.id}`,
@@ -356,10 +367,6 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     const isUsdZero = usd === 0;
     const isIqdZero = iqd === 0;
 
-    // Default sizes:
-    // If both are non-zero: same size (e.g. text-[15px])
-    // If one is zero: the zero one is text-[12px] (smaller), the non-zero one is text-[15px]
-    // If both are zero: same size text-[13px]
     let usdSize = "text-[15px] font-extrabold text-gray-800";
     let iqdSize = "text-[15px] font-extrabold text-gray-855";
 
@@ -393,25 +400,29 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     <div className="p-6 rtl text-gray-900 font-sans min-h-screen bg-[#f4f6fc]">
       
       {/* 1. Welcome Banner */}
-      <div className="bg-white rounded-2xl p-6 mb-6 border border-gray-200 shadow-sm relative flex justify-between items-center z-30">
-        {/* Left-side gradient accent bar matching Geno styling wrapped to handle overflow */}
-        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-0 w-[6px] h-full bg-gradient-to-b from-[#3b82f6] to-[#818cf8]" />
-        </div>
-        
+      <div
+        className="rounded-2xl p-6 mb-6 shadow-lg relative flex justify-between items-center z-[100] text-white"
+      >
+        {/* Background gradient container */}
+        <div
+          className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none"
+          style={{ background: "linear-gradient(135deg, #061f5f 0%, #1e1b4b 50%, #312e81 100%)" }}
+        />
+
         <div className="flex items-center gap-4 z-10">
           <button
             onClick={() => document.dispatchEvent(new CustomEvent("open-sidebar"))}
-            className="sidebar-toggle-btn items-center justify-center w-10 h-10 bg-gray-50 text-gray-500 border border-gray-200 rounded-xl transition-colors hover:bg-gray-100 cursor-pointer"
+            className="sidebar-toggle-btn items-center justify-center w-10 h-10 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl transition-all hover:scale-105 cursor-pointer backdrop-blur-md"
           >
             ☰
           </button>
           
           <div>
-            <h1 className="text-xl md:text-2xl font-bold mb-1 text-gray-800">
-              سڵاو {currentUser?.name || "کارمەند"}، بەخێربێیتەوە!
+            <h1 className="text-xl md:text-2xl font-black mb-1 text-white flex items-center gap-2">
+              <span>سڵاو {currentUser?.name || "کارمەند"}، بەخێربێیتەوە!</span>
+              <span className="text-xl animate-bounce">👋</span>
             </h1>
-            <p className="text-gray-500 text-sm font-normal">ڕاپۆرتی سەرجەم چالاکییە داراییەکان لە یەک چاودێریدا</p>
+            <p className="text-slate-300 text-sm font-semibold">ڕاپۆرتی سەرجەم چالاکییە داراییەکان لە یەک چاودێریدا</p>
           </div>
         </div>
 
@@ -420,18 +431,18 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="flex items-center justify-center w-10 h-10 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:scale-105 active:scale-95 transition-all cursor-pointer relative"
+              className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 hover:scale-105 active:scale-95 transition-all cursor-pointer relative backdrop-blur-md"
             >
               <span className="text-lg">🔔</span>
               {alerts.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white animate-pulse">
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[11px] font-black text-white animate-pulse shadow-md">
                   {alerts.length}
                 </span>
               )}
             </button>
 
             {showNotifications && (
-              <div className="absolute left-0 mt-3 w-80 sm:w-96 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl z-50 overflow-hidden text-right rtl animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="absolute left-0 mt-3 w-80 sm:w-96 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl z-[99999] overflow-hidden text-right rtl animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="bg-slate-950 border-b border-slate-800 px-4 py-3 flex justify-between items-center">
                   <span className="text-sm font-black text-slate-100">ئاگادارییەکان</span>
                   <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">
@@ -448,7 +459,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                       <span className="text-xs text-slate-500">هەموو شتێک بەباشی کاردەکات!</span>
                     </div>
                   ) : (
-                    alerts.map((alert) => {
+                    alerts.map((alert, idx) => {
                       let indicatorColor = "bg-blue-500";
                       if (alert.severity === 'danger') indicatorColor = "bg-red-500 animate-pulse";
                       else if (alert.severity === 'warning') indicatorColor = "bg-amber-500";
@@ -458,6 +469,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                         <div
                           key={alert.id}
                           onClick={() => {
+                            if (alert.type === "daily-rate") return;
                             setShowNotifications(false);
                             if (alert.type === "announcement") {
                               const targetId = Number(alert.id.replace("announcement-", ""));
@@ -470,9 +482,12 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                               router.push(`/reports/account-statement?accountId=${alert.accountId}`);
                             }
                           }}
-                          className="p-4 hover:bg-slate-800/50 transition-colors cursor-pointer block text-right text-slate-100"
+                          className="p-4 hover:bg-slate-800/50 transition-colors cursor-pointer block text-right text-slate-100 relative"
                         >
                           <div className="flex items-center gap-2 mb-1 justify-start">
+                            <span className="bg-indigo-600/40 text-indigo-200 text-[11px] font-black px-1.5 py-0.5 rounded border border-indigo-400/30">
+                              #{idx + 1}
+                            </span>
                             <span className={`w-2.5 h-2.5 rounded-full ${indicatorColor}`} />
                             <span className="font-bold text-sm text-indigo-300">{alert.title}</span>
                             {alert.type === "announcement" && (
@@ -482,6 +497,30 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                             )}
                           </div>
                           <p className="text-xs text-slate-400 leading-relaxed font-semibold">{alert.message}</p>
+                          {alert.type === "daily-rate" && (
+                            <div className="mt-2.5 flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  localStorage.setItem("__daily_rate_verified_date", todayStr);
+                                  setShowNotifications(false);
+                                }}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-lg transition-all"
+                              >
+                                بەڵێ، هەمان نرخە ✔️
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowNotifications(false);
+                                  router.push("/settings/currencies");
+                                }}
+                                className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-3 py-1 rounded-lg transition-all"
+                              >
+                                نرخەکە بگۆڕە ✏️
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -491,19 +530,102 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
             )}
           </div>
 
-          <span className="bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] px-4 py-1.5 rounded-full text-xs font-semibold">
+          <span className="bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 px-4 py-1.5 rounded-full text-xs font-black backdrop-blur-md shadow-sm">
             {companyName}
           </span>
         </div>
       </div>
 
+      {/* Dhikr & Duaa Ticker Bar for Rizq and Barakah */}
+      <div
+        className="rounded-xl px-3.5 py-2 mb-4 shadow-sm flex items-center gap-3 overflow-hidden text-white relative border z-10 h-13"
+        style={{
+          background: "linear-gradient(135deg, #064e3b 0%, #022c22 60%, #061f5f 100%)",
+          borderColor: "rgba(52, 211, 153, 0.3)",
+        }}
+      >
+        <style>{`
+          @keyframes dhikrSeamlessLoop {
+            0% { transform: translateX(-50%); }
+            100% { transform: translateX(0%); }
+          }
+          .dhikr-track {
+            display: flex;
+            width: max-content;
+            animation: dhikrSeamlessLoop 120s linear infinite;
+          }
+          .dhikr-track:hover {
+            animation-play-state: paused;
+          }
+        `}</style>
+
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 shrink-0 z-20 backdrop-blur-md shadow-sm">
+          <span className="text-sm">🤲</span>
+          <span className="text-xs font-black tracking-wide whitespace-nowrap">زیکر و دۆعای بەرەکەت</span>
+        </div>
+
+        <div className="overflow-hidden relative w-full flex items-center h-full" dir="ltr">
+          <div className="dhikr-track text-emerald-100 items-center">
+            {[1, 2].map((loopIdx) => (
+              <div key={loopIdx} className="flex items-center gap-10 whitespace-nowrap pr-10">
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(سەڵاوات)</span>
+                </span>
+                <span className="text-emerald-500/60 font-black">•</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ اكْفِنِي بِحَلَالِكَ عَنْ حَرَامِكَ، وَأَغْنِنِي بِفَضْلِكَ عَمَّنْ سِوَاكَ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(ڕزقی حەڵاڵ)</span>
+                </span>
+                <span className="text-emerald-500/60 font-black">•</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(تەسبیحات)</span>
+                </span>
+                <span className="text-emerald-500/60 font-black">•</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ وَأَتُوبُ إِلَيْهِ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(ئیستغفار)</span>
+                </span>
+                <span className="text-emerald-500/60 font-black">•</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ بَارِكْ لَنَا فِي رِزْقِنَا وَقِنَا عَذَابَ النَّارِ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(بەرەکەتی ڕزق)</span>
+                </span>
+                <span className="text-emerald-500/60 font-black">•</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلًا مُتَقَبَّلًا</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(ڕزقی پاک)</span>
+                </span>
+                <span className="text-emerald-500/60 font-black">•</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(گه‌نجینەی بەهەشت)</span>
+                </span>
+                <span className="text-emerald-500/60 font-black">•</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* KPI Section Header */}
-      <div className="bg-white rounded-2xl p-4 mb-4 border border-gray-200 shadow-sm flex justify-between items-center z-10">
-        <span className="font-bold text-gray-800 text-base">تێڕوانینی پسوولە</span>
+      <div
+        className="rounded-2xl p-4 mb-4 shadow-sm flex justify-between items-center z-10 border"
+        style={{
+          background: "linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%)",
+          borderColor: "#bfdbfe",
+          boxShadow: "0 2px 10px rgba(59, 130, 246, 0.08)"
+        }}
+      >
+        <span className="font-black text-[#1e3a8a] text-base flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-[#2563eb] shadow-sm animate-pulse"></span>
+          تێڕوانینی پسوولەکان
+        </span>
         <select
           value={kpiPeriod}
           onChange={(e) => setKpiPeriod(e.target.value)}
-          className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-bold text-gray-600 outline-none cursor-pointer"
+          className="bg-white/80 border border-[#93c5fd] rounded-xl px-3.5 py-1.5 text-sm font-black text-[#1e3a8a] outline-none cursor-pointer hover:bg-white transition-colors shadow-sm"
         >
           <option value="today">ئەمڕۆ</option>
           <option value="yesterday">دوێنێ</option>
@@ -518,10 +640,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         
         {/* Card 1: Sales (فرۆشتن) */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-250/80 border-b-[4px] border-b-[#ef4444] shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md cursor-pointer" onClick={() => router.push('/reports/invoices?type=sales')}>
+        <div
+          className="rounded-2xl p-5 border shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg cursor-pointer"
+          style={{ background: "linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%)", borderColor: "#fca5a5" }}
+          onClick={() => router.push('/reports/invoices?type=sales')}
+        >
           <div className="flex justify-between items-center mb-4">
-            <span className="text-gray-800 font-bold text-[15px]">فرۆشتن</span>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#fee2e2] text-[#ef4444]">
+            <span className="text-red-900 font-black text-[15px]">فرۆشتن</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-red-600 text-white shadow-md shadow-red-200">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
@@ -531,10 +657,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         </div>
 
         {/* Card 2: Purchases (کڕین) */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-250/80 border-b-[4px] border-b-[#22c55e] shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md cursor-pointer" onClick={() => router.push('/reports/invoices?type=purchase')}>
+        <div
+          className="rounded-2xl p-5 border shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg cursor-pointer"
+          style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)", borderColor: "#86efac" }}
+          onClick={() => router.push('/reports/invoices?type=purchase')}
+        >
           <div className="flex justify-between items-center mb-4">
-            <span className="text-gray-800 font-bold text-[15px]">کڕین</span>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#dcfce7] text-[#22c55e]">
+            <span className="text-emerald-900 font-black text-[15px]">کڕین</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-600 text-white shadow-md shadow-emerald-200">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
@@ -544,10 +674,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         </div>
 
         {/* Card 3: Expenses (خەرجی) */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-250/80 border-b-[4px] border-b-[#f97316] shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md cursor-pointer" onClick={() => router.push('/reports/invoices?type=expense')}>
+        <div
+          className="rounded-2xl p-5 border shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg cursor-pointer"
+          style={{ background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)", borderColor: "#fdba74" }}
+          onClick={() => router.push('/reports/invoices?type=expense')}
+        >
           <div className="flex justify-between items-center mb-4">
-            <span className="text-gray-800 font-bold text-[15px]">خەرجی</span>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#ffedd5] text-[#f97316]">
+            <span className="text-orange-900 font-black text-[15px]">خەرجی</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-orange-600 text-white shadow-md shadow-orange-200">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
@@ -557,10 +691,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         </div>
 
         {/* Card 4: Outgoing Money (پارەی ڕۆشتوو) */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-250/80 border-b-[4px] border-b-[#06b6d4] shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md cursor-pointer" onClick={() => router.push('/reports/invoices?type=money_out')}>
+        <div
+          className="rounded-2xl p-5 border shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg cursor-pointer"
+          style={{ background: "linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)", borderColor: "#67e8f9" }}
+          onClick={() => router.push('/reports/invoices?type=money_out')}
+        >
           <div className="flex justify-between items-center mb-4">
-            <span className="text-gray-800 font-bold text-[15px]">پارەی ڕۆشتوو</span>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#ecfeff] text-[#06b6d4]">
+            <span className="text-cyan-900 font-black text-[15px]">پارەی ڕۆشتوو</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-cyan-600 text-white shadow-md shadow-cyan-200">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
@@ -570,10 +708,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         </div>
 
         {/* Card 5: Incoming Money (پارەی هاتوو) */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-250/80 border-b-[4px] border-b-[#8b5cf6] shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-md cursor-pointer" onClick={() => router.push('/reports/invoices?type=money_in')}>
+        <div
+          className="rounded-2xl p-5 border shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg cursor-pointer"
+          style={{ background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)", borderColor: "#d8b4fe" }}
+          onClick={() => router.push('/reports/invoices?type=money_in')}
+        >
           <div className="flex justify-between items-center mb-4">
-            <span className="text-gray-800 font-bold text-[15px]">پارەی هاتوو</span>
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#f3e8ff] text-[#8b5cf6]">
+            <span className="text-purple-900 font-black text-[15px]">پارەی هاتوو</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-600 text-white shadow-md shadow-purple-200">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
@@ -864,72 +1006,75 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
       {/* 5. Bottom Quick Actions Section */}
       <div className="flex flex-col gap-4">
-        <span className="font-bold text-gray-850 text-base">دروستکردنی پسوولە</span>
+        <span className="font-black text-slate-800 text-base flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+          دروستکردنی پسوولەی خێرا
+        </span>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           
           {/* Action 1: Sale */}
           <button
             onClick={() => openInvoice("فرۆشتن")}
-            className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1 hover:border-[#ef4444] hover:bg-[#fffafb] cursor-pointer group"
+            className="bg-white border-2 border-red-100 hover:border-red-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1.5 hover:shadow-md hover:bg-red-50/40 cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#fee2e2] text-[#ef4444] transition-all group-hover:scale-105">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-red-600 text-white transition-transform group-hover:scale-110 shadow-md shadow-red-200">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
             </div>
-            <span className="font-bold text-[14px] text-gray-800">فرۆشتن</span>
+            <span className="font-black text-[14px] text-slate-800 group-hover:text-red-600">فرۆشتن</span>
           </button>
 
           {/* Action 2: Purchase */}
           <button
             onClick={() => openInvoice("کڕین")}
-            className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1 hover:border-[#22c55e] hover:bg-[#f7fdf9] cursor-pointer group"
+            className="bg-white border-2 border-emerald-100 hover:border-emerald-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1.5 hover:shadow-md hover:bg-emerald-50/40 cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#dcfce7] text-[#22c55e] transition-all group-hover:scale-105">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-600 text-white transition-transform group-hover:scale-110 shadow-md shadow-emerald-200">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
-            <span className="font-bold text-[14px] text-gray-800">کڕین</span>
+            <span className="font-black text-[14px] text-slate-800 group-hover:text-emerald-600">کڕین</span>
           </button>
 
           {/* Action 3: Expense */}
           <button
             onClick={() => openInvoice("خەرجی")}
-            className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1 hover:border-[#f97316] hover:bg-[#fffbf7] cursor-pointer group"
+            className="bg-white border-2 border-orange-100 hover:border-orange-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1.5 hover:shadow-md hover:bg-orange-50/40 cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#ffedd5] text-[#f97316] transition-all group-hover:scale-105">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-orange-600 text-white transition-transform group-hover:scale-110 shadow-md shadow-orange-200">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
             </div>
-            <span className="font-bold text-[14px] text-gray-800">خەرجی</span>
+            <span className="font-black text-[14px] text-slate-800 group-hover:text-orange-600">خەرجی</span>
           </button>
 
           {/* Action 4: Outgoing Money */}
           <button
             onClick={() => openInvoice("پارەی ڕۆشتوو")}
-            className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1 hover:border-[#06b6d4] hover:bg-[#f7fdfd] cursor-pointer group"
+            className="bg-white border-2 border-cyan-100 hover:border-cyan-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1.5 hover:shadow-md hover:bg-cyan-50/40 cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#ecfeff] text-[#06b6d4] transition-all group-hover:scale-105">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-cyan-600 text-white transition-transform group-hover:scale-110 shadow-md shadow-cyan-200">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
             </div>
-            <span className="font-bold text-[14px] text-gray-800">پارەی ڕۆشتوو</span>
+            <span className="font-black text-[14px] text-slate-800 group-hover:text-cyan-600">پارەی ڕۆشتوو</span>
           </button>
 
           {/* Action 5: Incoming Money */}
           <button
             onClick={() => openInvoice("پارەی هاتوو")}
-            className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1 hover:border-[#8b5cf6] hover:bg-[#faf9ff] cursor-pointer group"
+            className="bg-white border-2 border-purple-100 hover:border-purple-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1.5 hover:shadow-md hover:bg-purple-50/40 cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#f3e8ff] text-[#8b5cf6] transition-all group-hover:scale-105">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-purple-600 text-white transition-transform group-hover:scale-110 shadow-md shadow-purple-200">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
             </div>
-            <span className="font-bold text-[14px] text-gray-800">پارەی هاتوو</span>
+            <span className="font-black text-[14px] text-slate-800 group-hover:text-purple-600">پارەی هاتوو</span>
           </button>
 
         </div>
