@@ -3783,64 +3783,80 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           </div>
 
           {/* Items Table */}
-          <table style={printTableStyle}>
-            <thead>
-              <tr style={{ background: "#0f2b5c", color: "#ffffff", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}>
-                <th style={{ ...printThStyle, width: "35px" }}>#</th>
-                {tableColumns.product && <th style={{ ...printThStyle, textAlign: "right", width: "40%" }}>کەرەستە</th>}
-                {tableColumns.code && <th style={{ ...printThStyle, width: "10%" }}>کۆد</th>}
-                {tableColumns.qty && <th style={{ ...printThStyle, width: "10%" }}>عەدد</th>}
-                {tableColumns.price && <th style={{ ...printThStyle, width: "13%" }}>نرخ</th>}
-                {tableColumns.discount && <th style={{ ...printThStyle, width: "12%" }}>داشکاندن</th>}
-                {tableColumns.total && <th style={{ ...printThStyle, width: "15%" }}>گشتی</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, idx) => (
-                <tr key={row.id || idx}>
-                  <td style={printTdCenterStyle}>{idx + 1}</td>
-                  {tableColumns.product && (
-                    <td style={printTdRightStyle}>
-                      <strong>{row.productName}</strong>
-                      {row.note && <div style={{ fontSize: 11, color: "#4b5563" }}>{row.note}</div>}
-                    </td>
-                  )}
-                  {tableColumns.code && <td style={printTdCenterStyle}>{row.code || "-"}</td>}
-                  {tableColumns.qty && (
-                    <td style={printTdCenterStyle}>
-                      <strong>{row.qty}</strong> <span style={{ fontSize: 11 }}>{row.packageName || "دانە"}</span>
-                    </td>
-                  )}
-                  {tableColumns.price && (
-                    <td style={printTdCenterStyle}>
-                      {formatCurrencyAmount(toNumber(row.price), row.currencyId)}
-                    </td>
-                  )}
-                  {tableColumns.discount && (
-                    <td style={printTdCenterStyle}>
-                      {toNumber(row.discountValue) > 0
-                        ? (row.discountMode === "percent" ? `${row.discountValue}%` : formatCurrencyAmount(toNumber(row.discountValue), row.currencyId))
-                        : "-"}
-                    </td>
-                  )}
-                  {tableColumns.total && (
-                    <td style={printTdCenterStyle}>
-                      <strong>
-                        {formatCurrencyAmount(getRowNetTotalInRowCurrency(row), row.currencyId)}
-                      </strong>
-                    </td>
-                  )}
-                </tr>
-              ))}
+          {(() => {
+            const weights = {
+              num: 4,
+              product: tableColumns.product ? 40 : 0,
+              code: tableColumns.code ? 10 : 0,
+              qty: tableColumns.qty ? 10 : 0,
+              price: tableColumns.price ? 13 : 0,
+              discount: tableColumns.discount ? 12 : 0,
+              total: tableColumns.total ? 15 : 0,
+            };
+            const totalW = Object.values(weights).reduce((a, b) => a + b, 0) || 100;
+            const w = (key: keyof typeof weights) => `${((weights[key] / totalW) * 100).toFixed(2)}%`;
 
-              {/* Table Total Qty Footer Row */}
-              <tr style={{ background: "#f8fafc" }}>
-                <td colSpan={visibleColumnCount} style={printTotalQtyTdStyle}>
-                  <strong>کۆی گشتی عەدد :</strong> <span style={{ fontSize: 14, color: "#0055d4", marginRight: 6 }}>{itemCount} دانە</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            return (
+              <table style={printTableStyle}>
+                <thead>
+                  <tr style={{ background: "#0f2b5c", color: "#ffffff", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}>
+                    <th style={{ ...printThStyle, width: w("num") }}>#</th>
+                    {tableColumns.product && <th style={{ ...printThStyle, textAlign: "right", width: w("product") }}>کەرەستە</th>}
+                    {tableColumns.code && <th style={{ ...printThStyle, width: w("code") }}>کۆد</th>}
+                    {tableColumns.qty && <th style={{ ...printThStyle, width: w("qty") }}>عەدد</th>}
+                    {tableColumns.price && <th style={{ ...printThStyle, width: w("price") }}>نرخ</th>}
+                    {tableColumns.discount && <th style={{ ...printThStyle, width: w("discount") }}>داشکاندن</th>}
+                    {tableColumns.total && <th style={{ ...printThStyle, width: w("total") }}>گشتی</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, idx) => (
+                    <tr key={row.id || idx}>
+                      <td style={printTdCenterStyle}>{idx + 1}</td>
+                      {tableColumns.product && (
+                        <td style={printTdRightStyle}>
+                          <strong>{row.productName}</strong>
+                          {row.note && <div style={{ fontSize: 11, color: "#4b5563" }}>{row.note}</div>}
+                        </td>
+                      )}
+                      {tableColumns.code && <td style={printTdCenterStyle}>{row.code || "-"}</td>}
+                      {tableColumns.qty && (
+                        <td style={printTdCenterStyle}>
+                          <strong>{row.qty}</strong> <span style={{ fontSize: 11 }}>{row.packageName || "دانە"}</span>
+                        </td>
+                      )}
+                      {tableColumns.price && (
+                        <td style={printTdCenterStyle}>
+                          {formatCurrencyAmount(toNumber(row.price), row.currencyId)}
+                        </td>
+                      )}
+                      {tableColumns.discount && (
+                        <td style={printTdCenterStyle}>
+                          {toNumber(row.discountValue) > 0
+                            ? (row.discountMode === "percent" ? `${row.discountValue}%` : formatCurrencyAmount(toNumber(row.discountValue), row.currencyId))
+                            : "-"}
+                        </td>
+                      )}
+                      {tableColumns.total && (
+                        <td style={printTdCenterStyle}>
+                          <strong>
+                            {formatCurrencyAmount(getRowNetTotalInRowCurrency(row), row.currencyId)}
+                          </strong>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+
+                  {/* Table Total Qty Footer Row */}
+                  <tr style={{ background: "#f8fafc" }}>
+                    <td colSpan={visibleColumnCount} style={printTotalQtyTdStyle}>
+                      <strong>کۆی گشتی عەدد :</strong> <span style={{ fontSize: 14, color: "#0055d4", marginRight: 6 }}>{itemCount} دانە</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            );
+          })()}
 
           {/* Bottom Summary Grid (2 Side-by-Side Boxes) */}
           <div style={printBottomGridStyle}>
