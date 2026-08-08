@@ -422,3 +422,13 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     height: 80px !important;
   }
 }
+
+/* Dhikr & Duaa Calligraphic Font Override */
+.arabic-dhikr-font,
+.arabic-dhikr-font * {
+  font-family: 'Amiri', 'Noto Naskh Arabic', 'Scheherazade New', 'Traditional Arabic', serif !important;
+  letter-spacing: 0.2px !important;
+  line-height: 2 !important;
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
