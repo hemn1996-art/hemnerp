@@ -1090,7 +1090,7 @@ const section: CSSProperties = {
   border: "1px solid #e5e7eb",
   borderRadius: 14,
   marginBottom: 14,
-  overflow: "hidden",
+  overflow: "visible",
 };
 
 const sectionHeader: CSSProperties = {
@@ -1099,6 +1099,7 @@ const sectionHeader: CSSProperties = {
   display: "flex",
   gap: 10,
   alignItems: "center",
+  borderRadius: "14px 14px 0 0",
 };
 
 const sectionBody: CSSProperties = { padding: 18 };

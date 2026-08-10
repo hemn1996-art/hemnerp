@@ -46,7 +46,7 @@ export default function SingleSelectDropdown({
   }, [options, searchTerm]);
 
   return (
-    <div ref={containerRef} className="relative w-full text-right" dir="rtl">
+    <div ref={containerRef} className={`relative w-full text-right ${isOpen ? "z-[9999]" : "z-10"}`} dir="rtl">
       <div
         onClick={() => {
           setIsOpen(!isOpen);
