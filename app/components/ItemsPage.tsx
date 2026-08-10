@@ -594,7 +594,9 @@ function AddItemForm({
 
   return (
     <div>
-      <div style={notice}>ئەو فیڵدانەی کە بە * نیشانە کراون داواکراون.</div>
+      <div style={notice}>
+        💡 ئەو فیڵدانەی کە بە <span style={{ color: "#ef4444", fontWeight: "black", margin: "0 4px" }}>*</span> نیشانە کراون داواکراون.
+      </div>
 
       <div style={titleBox}>
         <h2 style={{ margin: 0 }}>
@@ -965,9 +967,18 @@ function Section({ title, icon, children }: any) {
 }
 
 function Field({ label, children }: any) {
+  let isRequired = false;
+  let cleanLabel = label;
+  if (typeof label === "string" && label.startsWith("* ")) {
+    isRequired = true;
+    cleanLabel = label.substring(2);
+  }
   return (
     <label>
-      <span style={labelStyle}>{label}</span>
+      <span style={labelStyle}>
+        {isRequired && <span style={{ color: "#ef4444", fontWeight: "black", marginLeft: 4 }}>* </span>}
+        {cleanLabel}
+      </span>
       {children}
     </label>
   );
@@ -1070,11 +1081,14 @@ const smallBtn: CSSProperties = {
 };
 
 const notice: CSSProperties = {
-  background: "#dbeafe",
-  padding: 14,
-  borderRadius: 8,
-  marginBottom: 15,
+  background: "#eff6ff",
+  border: "1px solid #bfdbfe",
+  padding: "12px 18px",
+  borderRadius: 10,
+  marginBottom: 16,
   color: "#1e40af",
+  fontWeight: "bold",
+  fontSize: 14,
 };
 
 const titleBox: CSSProperties = {
