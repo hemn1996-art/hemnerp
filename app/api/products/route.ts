@@ -119,10 +119,16 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(product, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating product:", error);
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        { error: "کۆدی کەرەستە پێشتر بەکارهاتووە. تکایە کۆدێکی تر بەکاربهێنە." },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "Failed to create product" },
+      { error: "زیادکردنی کەرەستە سەرکەوتوو نەبوو. تکایە دووبارە هەوڵ بده." },
       { status: 500 }
     );
   }
@@ -153,10 +159,16 @@ export async function PUT(request: Request) {
     });
 
     return NextResponse.json(updatedProduct);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating product:", error);
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        { error: "کۆدی کەرەستە پێشتر بەکارهاتووە. تکایە کۆدێکی تر بەکاربهێنە." },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "Failed to update product" },
+      { error: "نوێکردنەوەی کەرەستە سەرکەوتوو نەبوو. تکایە دووبارە هەوڵ بده." },
       { status: 500 }
     );
   }

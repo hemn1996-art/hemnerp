@@ -322,18 +322,18 @@ export const useStore = create<StoreState>((set, get) => ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(productData),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const newProduct = await res.json();
         await get().fetchProducts();
-        return newProduct;
+        return { success: true, data };
       } else {
-        const errBody = await res.json().catch(() => ({}));
-        console.error("Add product failed:", res.status, errBody);
+        console.error("Add product failed:", res.status, data);
+        return { success: false, error: data.error || "خەزنکردنی کەرەستە سەرکەوتوو نەبوو" };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create product", err);
+      return { success: false, error: "پەیوەندی لەگەڵ سێرڤەر پچڕا" };
     }
-    return null;
   },
 
   updateProduct: async (productData) => {
@@ -343,18 +343,18 @@ export const useStore = create<StoreState>((set, get) => ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(productData),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const updatedProduct = await res.json();
         await get().fetchProducts();
-        return updatedProduct;
+        return { success: true, data };
       } else {
-        const errBody = await res.json().catch(() => ({}));
-        console.error("Update product failed:", res.status, errBody);
+        console.error("Update product failed:", res.status, data);
+        return { success: false, error: data.error || "نوێکردنەوەی کەرەستە سەرکەوتوو نەبوو" };
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update product", err);
+      return { success: false, error: "پەیوەندی لەگەڵ سێرڤەر پچڕا" };
     }
-    return null;
   },
 
   deleteProduct: async (id) => {

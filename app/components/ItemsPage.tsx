@@ -556,6 +556,19 @@ function AddItemForm({
       }
     }
 
+    const validSalePrices = salePrices
+      .filter((sp) => sp.currencyId && Number(sp.amount) > 0)
+      .map((sp) => ({
+        currencyId: Number(sp.currencyId),
+        priceType: sp.priceType,
+        amount: Number(sp.amount) || 0,
+      }));
+
+    if (!isExpense && validSalePrices.length === 0) {
+      showAlert("warning", "ئاگاداری", "تکایە دراو و نرخی فرۆشتن بە دروستی دیاری بکە");
+      return;
+    }
+
     const productData = {
       id: productToEdit?.id,
       name: name.trim(),
@@ -567,28 +580,24 @@ function AddItemForm({
       isExpense,
       isService,
       isActive,
-      salePrices: salePrices.map((sp) => ({
-        currencyId: Number(sp.currencyId),
-        priceType: sp.priceType,
-        amount: Number(sp.amount) || 0,
-      })),
+      salePrices: validSalePrices,
       lowStockAlert: Number(lowStockAlert) || 0,
       hasExpiry,
       expiryAlertDays: Number(expiryAlertDays) || 0,
     };
 
-    const result = productToEdit
+    const res = productToEdit
       ? await store.updateProduct(productData)
       : await store.addProduct(productData);
 
-    if (result) {
+    if (res && res.success) {
       onSuccess(
         productToEdit
           ? "کەرەستە بە سەرکەوتوویی دەستکاری کرا ✅"
           : "کەرەستە بە سەرکەوتوویی خەزن کرا ✅"
       );
     } else {
-      showAlert("error", "هەڵە", "کەرەستە خەزن نەکرا. تکایە دووبارە هەوڵ بدە.");
+      showAlert("error", "هەڵە", res?.error || "کەرەستە خەزن نەکرا. تکایە دووبارە هەوڵ بدە.");
     }
   }
 
@@ -737,7 +746,7 @@ function AddItemForm({
                 marginBottom: 12,
               }}
             >
-              <Field label="دراو">
+              <Field label="* دراو">
                 <select
                   value={row.currencyId}
                   onChange={(e) =>
@@ -756,7 +765,7 @@ function AddItemForm({
                 </select>
               </Field>
 
-              <Field label="جۆری نرخ">
+              <Field label="* جۆری نرخ">
                 <select
                   value={row.priceType}
                   onChange={(e) =>
@@ -773,7 +782,7 @@ function AddItemForm({
                 </select>
               </Field>
 
-              <Field label="نرخ">
+              <Field label="* نرخ">
                 <input
                   type="text"
                   inputMode="decimal"
@@ -976,8 +985,12 @@ function Field({ label, children }: any) {
   return (
     <label>
       <span style={labelStyle}>
-        {isRequired && <span style={{ color: "#ef4444", fontWeight: "black", marginLeft: 4 }}>* </span>}
-        {cleanLabel}
+        <span>{cleanLabel}</span>
+        {isRequired && (
+          <span style={{ color: "#dc2626", fontWeight: "bold", marginRight: 4, fontSize: 16 }}>
+            {" "}*
+          </span>
+        )}
       </span>
       {children}
     </label>
