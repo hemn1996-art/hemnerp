@@ -45,8 +45,8 @@ export default function ItemsReportPage() {
   // Filters
   const [filterVoucherTypes, setFilterVoucherTypes] = useState<string[]>([]);
   const [filterProductIds, setFilterProductIds] = useState<number[]>([]);
-  const [category, setCategory] = useState("all");
-  const [brand, setBrand] = useState("all");
+  const [filterCategories, setFilterCategories] = useState<string[]>([]);
+  const [filterBrands, setFilterBrands] = useState<string[]>([]);
   const [itemCode, setItemCode] = useState("");
   const [batchCode, setBatchCode] = useState("");
   const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
@@ -194,6 +194,8 @@ export default function ItemsReportPage() {
       if (startDate) query.append("startDate", startDate);
       if (endDate) query.append("endDate", endDate);
       if (filterProductIds.length > 0) query.append("productId", filterProductIds.join(","));
+      if (filterCategories.length > 0) query.append("category", filterCategories.join(","));
+      if (filterBrands.length > 0) query.append("brand", filterBrands.join(","));
       if (filterAccountIds.length > 0) query.append("accountId", filterAccountIds.join(","));
       if (filterAccountTypeIds.length > 0) query.append("accountTypeId", filterAccountTypeIds.join(","));
       if (currencyId !== "all") query.append("currencyId", currencyId);
@@ -226,8 +228,8 @@ export default function ItemsReportPage() {
     let count = 0;
     if (filterVoucherTypes.length > 0) count++;
     if (filterProductIds.length > 0) count++;
-    if (category !== "all" && category !== "") count++;
-    if (brand !== "all" && brand !== "") count++;
+    if (filterCategories.length > 0) count++;
+    if (filterBrands.length > 0) count++;
     if (itemCode) count++;
     if (batchCode) count++;
     if (filterAccountIds.length > 0) count++;
@@ -240,7 +242,7 @@ export default function ItemsReportPage() {
     if (groupReverse !== "all") count++;
     return count;
   }, [
-    filterVoucherTypes, filterProductIds, category, brand, itemCode, batchCode,
+    filterVoucherTypes, filterProductIds, filterCategories, filterBrands, itemCode, batchCode,
     filterAccountIds, filterAccountTypeIds, currencyId, filterWarehouseIds, label,
     filterCreatedBys, isGift, groupReverse
   ]);
@@ -248,8 +250,8 @@ export default function ItemsReportPage() {
   const handleResetFilters = () => {
     setFilterVoucherTypes([]);
     setFilterProductIds([]);
-    setCategory("all");
-    setBrand("all");
+    setFilterCategories([]);
+    setFilterBrands([]);
     setItemCode("");
     setBatchCode("");
     setFilterAccountIds([]);
@@ -307,18 +309,18 @@ export default function ItemsReportPage() {
     let result = items;
 
     // Apply category filter
-    if (category && category !== "all" && category !== "") {
+    if (filterCategories.length > 0) {
       result = result.filter((item: any) => {
-        const prod = products?.find((p: any) => p.id === item.productId || p.name === item.productName);
-        return prod && prod.category === category;
+        const cat = item.category !== "-" ? item.category : products?.find((p: any) => p.id === item.productId || p.name === item.productName)?.category;
+        return cat && filterCategories.includes(cat);
       });
     }
 
     // Apply brand filter
-    if (brand && brand !== "all" && brand !== "") {
+    if (filterBrands.length > 0) {
       result = result.filter((item: any) => {
-        const prod = products?.find((p: any) => p.id === item.productId || p.name === item.productName);
-        return prod && prod.brand === brand;
+        const br = item.brand !== "-" ? item.brand : products?.find((p: any) => p.id === item.productId || p.name === item.productName)?.brand;
+        return br && filterBrands.includes(br);
       });
     }
 
@@ -341,7 +343,7 @@ export default function ItemsReportPage() {
     }
 
     return result;
-  }, [items, searchTerm, category, brand, label, products]);
+  }, [items, searchTerm, filterCategories, filterBrands, label, products]);
 
   const showSalesReturnNotice = React.useMemo(() => {
     return filterVoucherTypes.length === 1 && filterVoucherTypes[0] === "sales" && itemsMatchingNonVoucherFilters.some(item => item.voucherType === "sales_return");
@@ -568,13 +570,13 @@ export default function ItemsReportPage() {
           <thead className="bg-[#1e293b] text-white sticky top-0 z-10">
             <tr>
               {visibleColumns.accountName && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">هەژمار</th>}
+              {visibleColumns.voucherType && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">جۆر</th>}
               {visibleColumns.quantity && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">عدد</th>}
               {visibleColumns.warehouseName && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">کۆگا</th>}
               {visibleColumns.label && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">لەبێڵ</th>}
               {visibleColumns.brand && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">براند</th>}
               {visibleColumns.category && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">کاتیگۆری</th>}
               {visibleColumns.productName && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center min-w-[250px] allow-wrap">کەرەستە</th>}
-              {visibleColumns.voucherType && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center">جۆر</th>}
               {visibleColumns.voucherReference && <th className="p-2.5 border-r border-slate-600 whitespace-nowrap text-center w-24">پسوولە ↑</th>}
             </tr>
           </thead>
@@ -587,6 +589,7 @@ export default function ItemsReportPage() {
               filteredItems.map((item, i) => (
                 <tr key={item.id} className={`border-b border-slate-200 hover:bg-blue-50/50 transition ${i % 2 === 0 ? 'bg-white' : 'bg-[#f8fafc]'}`}>
                   {visibleColumns.accountName && <td className="p-2.5 border-r border-slate-200 text-center text-blue-700 font-medium whitespace-nowrap">{item.accountName}</td>}
+                  {visibleColumns.voucherType && <td className="p-2.5 border-r border-slate-200 text-center text-slate-600 font-medium">{translateVoucherType(item.voucherType)}</td>}
                   {visibleColumns.quantity && (
                     <td className={`p-2.5 border-r border-slate-200 text-center font-bold ${item.quantity < 0 ? "text-rose-600" : "text-slate-700"}`}>
                       {item.quantity.toLocaleString("en-US")} دانە
@@ -597,7 +600,6 @@ export default function ItemsReportPage() {
                   {visibleColumns.brand && <td className="p-2.5 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
                   {visibleColumns.category && <td className="p-2.5 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
                   {visibleColumns.productName && <td className="p-2.5 border-r border-slate-200 text-center text-slate-700 font-medium allow-wrap">{item.productName}</td>}
-                  {visibleColumns.voucherType && <td className="p-2.5 border-r border-slate-200 text-center text-slate-600">{translateVoucherType(item.voucherType)}</td>}
                   {visibleColumns.voucherReference && (
                     <td className="p-2.5 border-r border-slate-200 text-center">
                       <span 
@@ -719,23 +721,23 @@ export default function ItemsReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">فلتەری کەرەستە <span>📦</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>براند</label>
-                    <select value={brand} onChange={e => setBrand(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {brandOptions.map((bName) => (
-                        <option key={bName} value={bName}>{bName}</option>
-                      ))}
-                    </select>
+                  <div>
+                    <MultiSelectDropdown
+                      label="براند"
+                      options={brandOptions.map((bName) => ({ value: bName, label: bName }))}
+                      selectedValues={filterBrands}
+                      onChange={setFilterBrands}
+                      searchable
+                    />
                   </div>
-                  <div className="mui-outline">
-                    <label>کاتیگۆری</label>
-                    <select value={category} onChange={e => setCategory(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {categoryOptions.map((cName) => (
-                        <option key={cName} value={cName}>{cName}</option>
-                      ))}
-                    </select>
+                  <div>
+                    <MultiSelectDropdown
+                      label="کاتیگۆری"
+                      options={categoryOptions.map((cName) => ({ value: cName, label: cName }))}
+                      selectedValues={filterCategories}
+                      onChange={setFilterCategories}
+                      searchable
+                    />
                   </div>
                   <div className="mui-outline">
                     <label>کۆد</label>

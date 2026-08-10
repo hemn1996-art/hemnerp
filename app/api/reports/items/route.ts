@@ -79,10 +79,25 @@ export async function GET(request: Request) {
       if (parsed) where.voucher.employeeName = parsed;
     }
 
+    const category = searchParams.get("category");
+    const brand = searchParams.get("brand");
+
+    where.product = where.product || {};
+    if (category && category !== "all") {
+      const parsed = parseStringArray(category);
+      if (parsed) where.product.category = parsed;
+    }
+    if (brand && brand !== "all") {
+      const parsed = parseStringArray(brand);
+      if (parsed) where.product.brand = parsed;
+    }
+
     if (itemCode && itemCode.trim() !== "") {
-      where.product = {
-        code: { contains: itemCode.trim(), mode: 'insensitive' }
-      };
+      where.product.code = { contains: itemCode.trim(), mode: 'insensitive' };
+    }
+
+    if (Object.keys(where.product).length === 0) {
+      delete where.product;
     }
 
     const txFilter: any = {};
@@ -109,7 +124,7 @@ export async function GET(request: Request) {
         qty: true,
         lineTotal: true,
         productId: true,
-        product: { select: { name: true, code: true } },
+        product: { select: { name: true, code: true, category: true, brand: true } },
         voucher: {
           select: {
             referenceNo: true,
@@ -140,8 +155,8 @@ export async function GET(request: Request) {
         voucherType: line.voucher.type,
         productName: line.product.name,
         productCode: line.product.code || "-",
-        category: "-",
-        brand: "-",
+        category: line.product.category || "-",
+        brand: line.product.brand || "-",
         label: "-",
         warehouseName: matchTx?.warehouse?.name || "-",
         quantity: line.qty || 0,

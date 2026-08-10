@@ -79,6 +79,19 @@ export async function GET(request: Request) {
       if (parsed) where.productId = parsed;
     }
     
+    const category = searchParams.get("category");
+    const brand = searchParams.get("brand");
+
+    if (category && category !== "all") {
+      const parsed = parseStringArray(category);
+      if (parsed) where.product = { ...where.product, category: parsed };
+    }
+
+    if (brand && brand !== "all") {
+      const parsed = parseStringArray(brand);
+      if (parsed) where.product = { ...where.product, brand: parsed };
+    }
+
     if (currencyId && currencyId !== "all") {
       const parsed = parseNumberArray(currencyId);
       if (parsed) where.voucher.currencyId = parsed;
@@ -109,7 +122,7 @@ export async function GET(request: Request) {
         unitPrice: true,
         discountAmount: true,
         lineTotal: true,
-        product: { select: { name: true, code: true } },
+        product: { select: { name: true, code: true, category: true, brand: true } },
         voucher: {
           select: {
             referenceNo: true,
@@ -155,8 +168,8 @@ export async function GET(request: Request) {
         productId: line.productId,
         productName: line.product.name,
         productCode: line.product.code || "-",
-        category: "-", 
-        brand: "-", 
+        category: line.product.category || "-", 
+        brand: line.product.brand || "-", 
         label: "-", 
         warehouseId: invTrans?.warehouseId || null,
         warehouseName: invTrans?.warehouse?.name || "-",
