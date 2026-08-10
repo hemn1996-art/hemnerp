@@ -1080,10 +1080,11 @@ export default function MyDebtPage({ headerSelector, editId }: Props) {
         </aside>
 
         <main style={mainContent}>
-          <div style={headerCard}>
-            {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>من قەرزارم</h2>}
-            
-          </div>
+          {headerSelector && (
+            <div style={headerCard}>
+              {headerSelector}
+            </div>
+          )}
 
           <div style={emptyMainCard}>
             <h2 style={{ marginTop: 0 }}>پسوڵەی هاوپێچکراو</h2>

@@ -73,8 +73,8 @@ export function calculateLedgerEntries({
   currencies,
 }: CalculateLedgerEntriesParams) {
   // Normalize types
-  const incomingTypes = ["sales", "money_in", "purchase_return", "people_debt_discount", "debt_discount", "daشکاندن لە قەرزی خەڵک", "people_debt_discount"];
-  const outgoingTypes = ["purchase", "money_out", "sales_return", "my_debt_discount", "daشکاندن لە قەرزی من", "my_debt_discount"];
+  const incomingTypes = ["sales", "money_in", "purchase_return", "people_debt_discount", "debt_discount", "daشکاندن لە قەرزم لای خەڵکە", "people_debt_discount"];
+  const outgoingTypes = ["purchase", "money_out", "sales_return", "my_debt_discount", "daشکاندن لە من قەرزارم", "my_debt_discount"];
   const openingDebtTypes = ["people_debt", "my_debt", "قەرزم لای خەڵکە", "من قەرزارم"];
 
   const isIncoming = incomingTypes.includes(type);
@@ -134,13 +134,13 @@ export function calculateLedgerEntries({
   }
 
   // 1. Transaction (invoice) balance impact (before payment)
-  if (type === "sales" || type === "purchase_return" || type === "people_debt" || type === "قەرزم لای خەڵکە" || type === "my_debt_discount" || type === "داشکاندن لە قەرزی من") {
+  if (type === "sales" || type === "purchase_return" || type === "people_debt" || type === "قەرزم لای خەڵکە" || type === "my_debt_discount" || type === "داشکاندنم بۆ کراوە") {
     // Debit effect: increases what they owe us
     tempBalance[String(currencyId)] = (tempBalance[String(currencyId)] || 0) + netAmount;
     if (!isOpening && (type === "sales" || type === "purchase_return")) {
       ledgerEntries.push({ currencyId, debit: netAmount, credit: 0, exchangeRate });
     }
-  } else if (type === "purchase" || type === "sales_return" || type === "my_debt" || type === "من قەرزارم" || type === "people_debt_discount" || type === "daشکاندن لە قەرزی خەڵک" || type === "debt_discount") {
+  } else if (type === "purchase" || type === "sales_return" || type === "my_debt" || type === "من قەرزارم" || type === "people_debt_discount" || type === "daشکاندن لە قەرزم لای خەڵکە" || type === "debt_discount") {
     // Credit effect: increases what we owe them
     tempBalance[String(currencyId)] = (tempBalance[String(currencyId)] || 0) - netAmount;
     if (!isOpening && (type === "purchase" || type === "sales_return")) {
@@ -170,7 +170,7 @@ export function calculateLedgerEntries({
   })).filter(p => p.amount > 0);
 
   // If it's a discount, treat it as a payment of netAmount in currencyId
-  if (type === "people_debt_discount" || type === "daشکاندن لە قەرزی خەڵک" || type === "debt_discount" || type === "my_debt_discount" || type === "داشکاندن لە قەرزی من") {
+  if (type === "people_debt_discount" || type === "daشکاندن لە قەرزم لای خەڵکە" || type === "debt_discount" || type === "my_debt_discount" || type === "داشکاندنم بۆ کراوە") {
     payments = [{ currencyId, amount: netAmount, exchangeRate }];
   }
 

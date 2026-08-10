@@ -326,7 +326,7 @@ export default function DebtReportPage() {
          </div>
          {showReportStats && (
            <div className="animate-in fade-in duration-200">
-             <div className="text-sm text-gray-500">گشتی قەرز ({filterDebtType === "people" ? "قەرزی خەڵک" : "قەرزی من"})</div>
+             <div className="text-sm text-gray-500">گشتی قەرز ({filterDebtType === "people" ? "قەرزم لای خەڵکە" : "من قەرزارم"})</div>
               <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>{formatTotalOverallJSX(totalOverallByCurrency)}</div>
            </div>
          )}
@@ -456,8 +456,8 @@ export default function DebtReportPage() {
                         <label>جۆری قەرز</label>
                         <select className="w-full border-none outline-none bg-transparent font-bold cursor-pointer text-sm text-slate-800" value={filterDebtType} onChange={e => setFilterDebtType(e.target.value)}>
                           <option value="all">هەموو</option>
-                          <option value="people">قەرزی خەڵک</option>
-                          <option value="mine">قەرزی من</option>
+                          <option value="people">قەرزم لای خەڵکە</option>
+                          <option value="mine">من قەرزارم</option>
                         </select>
                       </div>
                    </div>

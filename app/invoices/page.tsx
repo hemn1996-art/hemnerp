@@ -30,10 +30,10 @@ const menuItems = [
   { label: "نرخاندن",              value: "quotation" },
   { label: "گەڕانەوەی فرۆشتن",    value: "sales_return" },
   { label: "گەڕانەوەی کڕین",      value: "purchase_return" },
-  { label: "قەرزی من",             value: "my_debt" },
-  { label: "قەرزی خەڵک",          value: "people_debt" },
-  { label: "داشکاندن لە قەرزی من",  value: "my_debt_discount" },
-  { label: "داشکاندن لە قەرزی خەڵک", value: "people_debt_discount" },
+  { label: "من قەرزارم",             value: "my_debt" },
+  { label: "قەرزم لای خەڵکە",          value: "people_debt" },
+  { label: "داشکاندنم بۆ کراوە",  value: "my_debt_discount" },
+  { label: "داشکاندنم کردوە", value: "people_debt_discount" },
   { label: "دانانی پارە",          value: "deposit" },
   { label: "کشانەوەی پارە",        value: "withdrawal" },
   { label: "گواستنەوەی کەرەستە",  value: "product_transfer" },
@@ -79,13 +79,11 @@ function InvoicesRouteContent() {
     "گەڕانەوەی فرۆشتن": "sales_return",
     "گەڕانەوەی کڕین": "purchase_return",
     "نرخاندن": "quotation",
-    "قەرزی من": "my_debt",
     "من قەرزارم": "my_debt",
     "من قەرزدارم": "my_debt",
-    "قەرزی خەڵک": "people_debt",
     "قەرزم لای خەڵکە": "people_debt",
-    "داشکاندن لە قەرزی من": "my_debt_discount",
-    "داشکاندن لە قەرزی خەڵک": "people_debt_discount",
+    "داشکاندنم بۆ کراوە": "my_debt_discount",
+    "داشکاندنم کردوە": "people_debt_discount",
     "دانانی پارە": "deposit",
     "کشانەوەی پارە": "withdrawal",
   };
@@ -205,6 +203,28 @@ function InvoicesRouteContent() {
           </span>
           <span className="text-xs text-gray-400 font-normal">{isOpen ? "▲" : "▼"}</span>
         </button>
+
+        {/* ── Top bar explanation banner for all 4 debt vouchers ── */}
+        {activeTab === "people_debt" && (
+          <div className="mr-2 bg-sky-50 border border-sky-200 text-sky-800 text-xs md:text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs select-none">
+            <span>💡 ئەم باڵانسە کە داغڵ ئەکرێت ئەچێتە سەر باڵانسی هەژمار و ئەو قەرزاری تۆ ئەبێت.</span>
+          </div>
+        )}
+        {activeTab === "my_debt" && (
+          <div className="mr-2 bg-rose-50 border border-rose-200 text-rose-800 text-xs md:text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs select-none">
+            <span>💡 ئەم باڵانسە کە داغڵ ئەکرێت ئەچێتە سەر باڵانسی هەژمار و تۆ قەرزاری ئەو دەبیت.</span>
+          </div>
+        )}
+        {activeTab === "people_debt_discount" && (
+          <div className="mr-2 bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs md:text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs select-none">
+            <span>💡 داشکاندن لە قەرزی کەسێک کە قەرزداری ئێمەیە (زیانی ئێمەیە).</span>
+          </div>
+        )}
+        {activeTab === "my_debt_discount" && (
+          <div className="mr-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs md:text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs select-none">
+            <span>💡 داشکاندن لە قەرزی ئێمە کە قەرزداری کەسێکین (قازانجی ئێمەیە).</span>
+          </div>
+        )}
 
         {/* New invoice button has been removed as requested */}
 

@@ -423,7 +423,7 @@ export default function BalanceSheetPage() {
             <div id="comp-receivable" className="flex items-center justify-between p-3 pr-5 border-b border-slate-100 hover:bg-slate-50 transition">
               <span className="text-sm font-bold text-slate-800">{fmt(data.assets.accountsReceivable)}</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm text-slate-500">قەرزی خەڵک</span>
+                <span className="text-sm text-slate-500">قەرزم لای خەڵکە</span>
                 <span className="text-slate-400 text-xs">📋</span>
               </div>
             </div>
@@ -462,11 +462,11 @@ export default function BalanceSheetPage() {
               قەرزی ئێستا
             </div>
 
-            {/* قەرزی من */}
+            {/* من قەرزارم */}
             <div id="comp-mydebts" className="flex items-center justify-between p-3 pr-8 border-b border-slate-100 hover:bg-slate-50 transition">
               <span className="text-sm text-slate-800">{fmt(data.liabilitiesEquity.myDebts)}</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm text-slate-500">قەرزی من</span>
+                <span className="text-sm text-slate-500">من قەرزارم</span>
                 <span className="text-slate-400 text-xs">💳</span>
               </div>
             </div>
@@ -809,7 +809,7 @@ export default function BalanceSheetPage() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="font-bold text-slate-700" dir="ltr">{fmt(accountsReceivable)}</span>
-                        <span className="text-slate-500 font-bold">قەرزی خەڵک 📋</span>
+                        <span className="text-slate-500 font-bold">قەرزم لای خەڵکە 📋</span>
                       </div>
                       {otherAssets > 0 && (
                         <div className="flex justify-between text-sm">
@@ -819,7 +819,7 @@ export default function BalanceSheetPage() {
                       )}
                       <div className="flex justify-between text-sm">
                         <span className="font-bold text-red-600" dir="ltr">-{fmt(myDebts)}</span>
-                        <span className="text-red-500 font-bold">قەرزی من 💳</span>
+                        <span className="text-red-500 font-bold">من قەرزارم 💳</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="font-bold text-red-600" dir="ltr">-{fmt(capital)}</span>

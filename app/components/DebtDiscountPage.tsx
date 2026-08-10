@@ -654,7 +654,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
 
     const payload = {
       id: Number(receiptNumber || ""),
-      type: "داشکاندن لە قەرزی من",
+      type: "داشکاندنم بۆ کراوە",
       accountId,
       netAmount: toNumber(discountAmount),
       currencyId: discountCurrencyId,
@@ -1028,10 +1028,11 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
         </aside>
 
         <main style={mainContent}>
-          <div style={headerCard}>
-            {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>داشکاندن لە قەرزی من</h2>}
-            
-          </div>
+          {headerSelector && (
+            <div style={headerCard}>
+              {headerSelector}
+            </div>
+          )}
 
           <div style={emptyMainCard}>
             <h2 style={{ marginTop: 0 }}>پسوڵەی هاوپێچکراو</h2>
@@ -1050,7 +1051,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
               {/* Right Column: Invoice Info Box */}
               {printOptions.showReceiptInfo ? (
                 <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                  <PrintInfoLine label="جۆری پسوڵە" value="داشکاندن لە قەرزی من" />
+                  <PrintInfoLine label="جۆری پسوڵە" value="داشکاندنم بۆ کراوە" />
                   <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber} />
                   <PrintInfoLine
                     label="بەروار"

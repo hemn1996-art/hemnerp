@@ -577,6 +577,36 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     );
   }
 
+  function formatPrintBalanceMap(map: Record<string, number>, isSupplier = true) {
+    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    if (activeEntries.length === 0) {
+      return <strong style={{ color: "#374151", fontSize: 14 }}>0 $</strong>;
+    }
+
+    return (
+      <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {activeEntries.map(([curIdText, val]) => {
+          const curId = Number(curIdText);
+          const absVal = Math.abs(val);
+          let isRed = false;
+          if (isSupplier) {
+            isRed = val < -0.01;
+          } else {
+            isRed = val > 0.01;
+          }
+          const color = isRed ? "#dc2626" : "#16a34a";
+          const formattedStr = formatCurrencyAmount(absVal, curId);
+
+          return (
+            <strong key={curIdText} style={{ color, fontSize: 14 }}>
+              {formattedStr}
+            </strong>
+          );
+        })}
+      </span>
+    );
+  }
+
   const accountBalanceBeforeByCurrency = useMemo(() => {
     const currentBalMap = getAccountBalanceBeforeMap(supplier);
     if (!editId) {
@@ -3467,7 +3497,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                 {printOptions.showBalance && (
                   <>
                     <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyMap(accountBalanceBeforeByCurrency)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatPrintBalanceMap(accountBalanceBeforeByCurrency, true)}</td>
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>قەرزی پێشوو</td>
                     </tr>
                     <tr>
@@ -3475,7 +3505,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
                     </tr>
                     <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatCurrencyMap(editId && supplier ? getAccountBalanceBeforeMap(supplier) : accountBalanceAfterByCurrency)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatPrintBalanceMap(editId && supplier ? getAccountBalanceBeforeMap(supplier) : accountBalanceAfterByCurrency, true)}</td>
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی گشتی ماوە</td>
                     </tr>
 

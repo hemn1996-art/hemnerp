@@ -226,8 +226,20 @@ function InvoiceReportContent() {
   const [filterDistrictName, setFilterDistrictName] = useState("all");
   const [filtersLoaded, setFiltersLoaded] = useState(false);
 
-  // Load filters from sessionStorage on mount
+  // Load filters from searchParams or sessionStorage on mount
   useEffect(() => {
+    const paramType = searchParams.get("type");
+    const paramStart = searchParams.get("startDate");
+    const paramEnd = searchParams.get("endDate");
+
+    if (paramType) {
+      setFilterInvoiceTypes(paramType.split(","));
+      if (paramStart) setStartDate(paramStart);
+      if (paramEnd) setEndDate(paramEnd);
+      setFiltersLoaded(true);
+      return;
+    }
+
     try {
       const stored = sessionStorage.getItem("__erp_invoices_report_filters_data");
       if (stored) {
@@ -252,7 +264,7 @@ function InvoiceReportContent() {
       console.error("Failed to load persisted filters:", e);
     }
     setFiltersLoaded(true);
-  }, []);
+  }, [searchParams]);
 
   // Save filters to sessionStorage when they change
   useEffect(() => {
@@ -455,15 +467,15 @@ function InvoiceReportContent() {
       case "shareholder_withdrawal":
         return "کشانەوەی پارە";
       case "people_debt":
-        return "قەرزی خەڵک";
+        return "قەرزم لای خەڵکە";
       case "my_debt":
-        return "قەرزی من";
+        return "من قەرزارم";
       case "my_debt_discount":
-        return "داشکاندن لە قەرزی من";
+        return "داشکاندنم بۆ کراوە";
       case "people_debt_discount":
       case "debt_discount":
       case "debt discount":
-        return "داشکاندن لە قەرزی خەڵک";
+        return "داشکاندنم کردوە";
       case "material_issue":
       case "سەرفی مواد":
       case "سەرفی مەواد":
@@ -825,17 +837,42 @@ function InvoiceReportContent() {
     }>> = {};
 
     vouchers.forEach(v => {
-      if (!v.accountId) return;
-      v.ledgerEntries.forEach(le => {
-        if (!entriesByAccount[v.accountId!]) {
-          entriesByAccount[v.accountId!] = [];
+      if (!v.accountId || v.isDeleted) return;
+      const accId = v.accountId;
+      if (!entriesByAccount[accId]) {
+        entriesByAccount[accId] = [];
+      }
+
+      let entries = v.ledgerEntries && v.ledgerEntries.length > 0 ? v.ledgerEntries : [];
+
+      if (entries.length === 0) {
+        const curId = v.currencyId || 1;
+        const netAmt = v.netAmount || 0;
+        let debit = 0;
+        let credit = 0;
+
+        if (["sales", "purchase_return", "people_debt", "قەرزم لای خەڵکە", "داشکاندنم بۆ کراوە", "my_debt_discount"].includes(v.type)) {
+          debit = netAmt;
+        } else if (["purchase", "sales_return", "my_debt", "من قەرزارم", "people_debt_discount", "debt_discount", "داشکاندنم کردوە"].includes(v.type)) {
+          credit = netAmt;
+        } else if (["money_in", "پارەی هاتوو"].includes(v.type)) {
+          credit = v.paidAmounts?.[0]?.amount || netAmt;
+        } else if (["money_out", "پارەی ڕۆشتوو"].includes(v.type)) {
+          debit = v.paidAmounts?.[0]?.amount || netAmt;
         }
-        entriesByAccount[v.accountId!].push({
+
+        if (debit > 0 || credit > 0) {
+          entries = [{ accountId: accId, currencyId: curId, debit, credit, date: v.date } as any];
+        }
+      }
+
+      entries.forEach(le => {
+        entriesByAccount[accId].push({
           date: new Date(le.date || v.date),
           voucherId: v.id,
           debit: le.debit || 0,
           credit: le.credit || 0,
-          currencyId: le.currencyId,
+          currencyId: le.currencyId || v.currencyId || 1,
         });
       });
     });
@@ -2049,7 +2086,7 @@ function InvoiceReportContent() {
                       "money_in", "money_out", "my_debt_discount", "people_debt_discount",
                       "debt_discount", "debt discount",
                       "people_debt", "my_debt",
-                      "پارەی هاتوو", "پارەی ڕۆشتوو", "داشکاندن لە قەرزی من", "داشکاندن لە قەرزی خەڵک"
+                      "پارەی هاتوو", "پارەی ڕۆشتوو", "داشکاندنم بۆ کراوە", "داشکاندنم کردوە"
                     ].includes(voucher.type);
 
                     return (
@@ -2323,10 +2360,10 @@ function InvoiceReportContent() {
                                         shareholder_withdrawal: { bg: "from-orange-50 to-red-50", border: "border-orange-200", icon: "🏧", desc: "هاوبەش پارەی کشاندووەتەوە" },
                                         sales_return: { bg: "from-amber-50 to-orange-50", border: "border-amber-200", icon: "↩️", desc: "کاڵا گەڕاوەتەوە لە فرۆشتن" },
                                         purchase_return: { bg: "from-teal-50 to-cyan-50", border: "border-teal-200", icon: "↩️", desc: "کاڵا گەڕاوەتەوە لە کڕین" },
-                                        my_debt_discount: { bg: "from-sky-50 to-blue-50", border: "border-sky-200", icon: "✂️", desc: "داشکاندن لە قەرزی ئێمە" },
-                                        people_debt_discount: { bg: "from-indigo-50 to-violet-50", border: "border-indigo-200", icon: "✂️", desc: "داشکاندن لە قەرزی خەڵکی" },
-                                        debt_discount: { bg: "from-sky-50 to-blue-50", border: "border-sky-200", icon: "✂️", desc: "داشکاندن لە قەرزی خەڵکی" },
-                                        "debt discount": { bg: "from-sky-50 to-blue-50", border: "border-sky-200", icon: "✂️", desc: "داشکاندن لە قەرزی خەڵکی" },
+                                        my_debt_discount: { bg: "from-sky-50 to-blue-50", border: "border-sky-200", icon: "✂️", desc: "داشکاندنم بۆ کراوە" },
+                                        people_debt_discount: { bg: "from-indigo-50 to-violet-50", border: "border-indigo-200", icon: "✂️", desc: "داشکاندنم کردوەی" },
+                                        debt_discount: { bg: "from-sky-50 to-blue-50", border: "border-sky-200", icon: "✂️", desc: "داشکاندنم کردوەی" },
+                                        "debt discount": { bg: "from-sky-50 to-blue-50", border: "border-sky-200", icon: "✂️", desc: "داشکاندنم کردوەی" },
                                       };
                                       const style = typeStyles[voucher.type] || { bg: "from-slate-50 to-gray-50", border: "border-slate-200", icon: "📋", desc: "مامەڵەیەک تۆمار کراوە" };
 
@@ -2571,8 +2608,8 @@ function InvoiceReportContent() {
                       { value: "purchase_return", label: "گەڕانەوەی کڕین" },
                       { value: "shareholder_deposit", label: "دانانی پارە" },
                       { value: "shareholder_withdrawal", label: "کشانەوەی پارە" },
-                      { value: "my_debt_discount", label: "داشکاندن لە قەرزی من" },
-                      { value: "people_debt_discount", label: "داشکاندن لە قەرزی خەڵک" },
+                      { value: "my_debt_discount", label: "داشکاندنم بۆ کراوە" },
+                      { value: "people_debt_discount", label: "داشکاندنم کردوە" },
                       { value: "material_issue", label: "سەرفی مەواد" },
                       { value: "warehouse_damage", label: "زیانی کۆگا" },
                       { value: "warehouse_stock", label: "جەردی کۆگا" },

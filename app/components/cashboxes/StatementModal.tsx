@@ -100,9 +100,9 @@ export default function StatementModal({
     if (type === "shareholder_deposit") return "دانانی پارە";
     if (type === "shareholder_withdrawal") return "کشانەوەی پارە";
     if (type === "cashbox_withdrawal") return "کشانەوەی پارە";
-    if (type === "my_debt_discount") return "داشکاندن لە قەرزی من";
-    if (type === "people_debt_discount") return "داشکاندن لە قەرزی خەڵک";
-    if (type === "debt_discount" || type === "debt discount") return "داشکاندن لە قەرزی خەڵک";
+    if (type === "my_debt_discount") return "داشکاندنم بۆ کراوە";
+    if (type === "people_debt_discount") return "داشکاندنم کردوە";
+    if (type === "debt_discount" || type === "debt discount") return "داشکاندنم کردوە";
     if (type === "material_issue" || type === "سەرفی مواد" || type === "سەرفی مەواد") return "سەرفی مەواد";
     if (type === "warehouse_damage" || type === "خەسارەی کۆگا" || type === "زیانی کۆگا") return "زیانی کۆگا";
     if (type === "warehouse_stock" || type === "جەردی کۆگا") return "جەردی کۆگا";

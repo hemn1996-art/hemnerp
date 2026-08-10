@@ -616,7 +616,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
 
   function validateBeforeSave() {
     if (!accountId) {
-      showToast("پسوڵەی داشکاندن لە قەرزی خەڵک نابێت بێ هەژمار خەزن بکرێت.");
+      showToast("پسوڵەی داشکاندنم کردوە نابێت بێ هەژمار خەزن بکرێت.");
       return false;
     }
 
@@ -735,7 +735,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
     );
 
     const payload = {
-      type: "داشکاندن لە قەرزی خەڵک",
+      type: "داشکاندنم کردوە",
       referenceNo: String(receiptNumber),
       date: new Date(receiptDate).toISOString(),
       accountId,
@@ -769,7 +769,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
         setLockedBalanceAfter(balanceAfterAtSave);
         setSavedSnapshot(currentSnapshot);
         setIsLocked(true);
-        showToast("پسوڵەی داشکاندن لە قەرزی خەڵک خەزن کرا ✅", "success");
+        showToast("پسوڵەی داشکاندنم کردوە خەزن کرا ✅", "success");
       } else {
         showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
       }
@@ -1109,10 +1109,11 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
         </aside>
 
         <main style={mainContent}>
-          <div style={headerCard}>
-            {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>داشکاندن لە قەرزی خەڵک</h2>}
-            
-          </div>
+          {headerSelector && (
+            <div style={headerCard}>
+              {headerSelector}
+            </div>
+          )}
 
           <div style={emptyMainCard}>
             <h2 style={{ marginTop: 0 }}>پسوڵەی هاوپێچکراو</h2>
@@ -1131,7 +1132,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
               {/* Right Column: Invoice Info Box */}
               {printOptions.showReceiptInfo ? (
                 <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                  <PrintInfoLine label="جۆری پسوڵە" value="داشکاندن لە قەرزی خەڵک" />
+                  <PrintInfoLine label="جۆری پسوڵە" value="داشکاندنم کردوە" />
                   <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber} />
                   <PrintInfoLine
                     label="بەروار"

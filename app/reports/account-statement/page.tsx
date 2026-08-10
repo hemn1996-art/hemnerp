@@ -12,7 +12,7 @@ interface VoucherPaidAmount { id: number; currencyId: number; amount: number; ex
 interface VoucherExpense { id: number; amount: number; currencyId: number; note: string | null; accountId: number | null; addToAccountDebt?: boolean; }
 interface LedgerEntry { id: number; debit: number; credit: number; currencyId: number; exchangeRate?: number; date?: string; currency: any; accountId?: number | null; }
 interface Account { id: number; name: string; phone?: string; creditLimit?: number; accountTypeId: number; isShareholder: boolean; }
-interface RawVoucher { id: number; referenceNo: string | null; type: string; date: string; accountId: number | null; currencyId: number | null; exchangeRate: number; totalAmount: number; totalDiscount: number; netAmount: number; internalNote: string | null; printNote: string | null; hasDelivery: boolean; deliveryFee: number | null; account: Account | null; lines: VoucherLine[]; paidAmounts: VoucherPaidAmount[]; expenses: VoucherExpense[]; ledgerEntries: LedgerEntry[]; }
+interface RawVoucher { id: number; isDeleted?: boolean; referenceNo: string | null; type: string; date: string; accountId: number | null; currencyId: number | null; exchangeRate: number; totalAmount: number; totalDiscount: number; netAmount: number; internalNote: string | null; printNote: string | null; hasDelivery: boolean; deliveryFee: number | null; account: Account | null; lines: VoucherLine[]; paidAmounts: VoucherPaidAmount[]; expenses: VoucherExpense[]; ledgerEntries: LedgerEntry[]; }
 
 function AccountStatementContent() {
   const router = useRouter();
@@ -140,11 +140,11 @@ function AccountStatementContent() {
       case "cashbox_exchange": return "گۆڕینەوەی پارە";
       case "shareholder_deposit": return "دانانی پارە";
       case "shareholder_withdrawal": return "کشانەوەی پارە";
-      case "my_debt_discount": return "داشکاندن لە قەرزی من";
+      case "my_debt_discount": return "داشکاندنم بۆ کراوە";
       case "people_debt_discount":
       case "debt_discount":
       case "debt discount":
-        return "داشکاندن لە قەرزی خەڵک";
+        return "داشکاندنم کردوە";
       case "material_issue":
       case "سەرفی مواد":
       case "سەرفی مەواد":
@@ -233,8 +233,10 @@ function AccountStatementContent() {
   const processed = useMemo(() => {
     // 1. Filter vouchers related to this account
     let list = vouchers.filter((v) => 
-      v.accountId === Number(accountIdParam) || 
-      (v.ledgerEntries && v.ledgerEntries.some(le => le.accountId === Number(accountIdParam)))
+      !v.isDeleted && (
+        v.accountId === Number(accountIdParam) || 
+        (v.ledgerEntries && v.ledgerEntries.some(le => le.accountId === Number(accountIdParam)))
+      )
     );
     list = list.filter(v => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange");
 
@@ -250,6 +252,28 @@ function AccountStatementContent() {
 
       // A. Main Invoice row (if the invoice is for this account)
       if (v.accountId === targetAccountId) {
+        let entries = mainEntries.filter(le => le.accountId === targetAccountId);
+        if (entries.length === 0) {
+          const curId = v.currencyId || 1;
+          const netAmt = v.netAmount || 0;
+          let debit = 0;
+          let credit = 0;
+
+          if (["sales", "purchase_return", "people_debt", "قەرزم لای خەڵکە", "داشکاندنم بۆ کراوە", "my_debt_discount"].includes(v.type)) {
+            debit = netAmt;
+          } else if (["purchase", "sales_return", "my_debt", "من قەرزارم", "people_debt_discount", "debt_discount", "داشکاندنم کردوە"].includes(v.type)) {
+            credit = netAmt;
+          } else if (["money_in", "پارەی هاتوو"].includes(v.type)) {
+            credit = v.paidAmounts?.[0]?.amount || netAmt;
+          } else if (["money_out", "پارەی ڕۆشتوو"].includes(v.type)) {
+            debit = v.paidAmounts?.[0]?.amount || netAmt;
+          }
+
+          if (debit > 0 || credit > 0) {
+            entries = [{ accountId: targetAccountId, currencyId: curId, debit, credit, exchangeRate: v.exchangeRate } as any];
+          }
+        }
+
         rowsList.push({
           id: `${v.id}-main`,
           voucherId: v.id,
@@ -263,7 +287,7 @@ function AccountStatementContent() {
           totalDiscount: v.totalDiscount,
           paidAmounts: v.paidAmounts ? v.paidAmounts.map(pa => ({ currencyId: pa.currencyId, amount: pa.amount, exchangeRate: pa.exchangeRate })) : [],
           note: v.printNote || v.internalNote || "",
-          ledgerEntries: mainEntries.filter(le => le.accountId === targetAccountId),
+          ledgerEntries: entries,
           hasLines: v.lines && v.lines.length > 0,
           lines: v.lines
         });

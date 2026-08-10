@@ -39,14 +39,15 @@ export async function GET(request: Request) {
     }
 
     const whereClause: any = {
+      isDeleted: false,
       type: {
         in: [
           "sales",
           "sales_return",
           "my_debt_discount",
           "people_debt_discount",
-          "داشکاندن لە قەرزی من",
-          "داشکاندن لە قەرزی خەڵک",
+          "داشکاندنم بۆ کراوە",
+          "داشکاندنم کردوە",
           "expense",
           "gift",
           "warehouse_damage",
@@ -295,13 +296,13 @@ export async function GET(request: Request) {
           }
           totalCOGS -= convertToTarget(cogs, usdId);
         }
-      } else if (v.type === "my_debt_discount" || v.type === "داشکاندن لە قەرزی من") {
+      } else if (v.type === "my_debt_discount" || v.type === "داشکاندنم بۆ کراوە") {
         const hasProductFilter = productIds !== null || categories !== null || brands !== null;
         const hasWarehouseFilter = warehouseIds !== null;
         if (!hasProductFilter && !hasWarehouseFilter) {
           totalMyDebtDiscount += amount;
         }
-      } else if (v.type === "people_debt_discount" || v.type === "داشکاندن لە قەرزی خەڵک") {
+      } else if (v.type === "people_debt_discount" || v.type === "داشکاندنم کردوە") {
         const hasProductFilter = productIds !== null || categories !== null || brands !== null;
         const hasWarehouseFilter = warehouseIds !== null;
         if (!hasProductFilter && !hasWarehouseFilter) {

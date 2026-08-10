@@ -401,17 +401,17 @@ export default function ProfitReportPage() {
               <p className="text-xs text-emerald-500 font-medium m-0">کۆی گشتی قازانجی فرۆش دوای گەڕاندنەوە</p>
             </div>
 
-            {/* داشکاندن لە قەرزی من - My Debt Discount */}
+            {/* داشکاندنم بۆ کراوە - My Debt Discount */}
             <div
               onClick={() => handleCardClick("my_debt_discount")}
               className="bg-emerald-50 p-5 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all cursor-pointer"
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-emerald-900 font-black text-lg m-0">داشکاندن لە قەرزی من</h3>
+                <h3 className="text-emerald-900 font-black text-lg m-0">داشکاندنم بۆ کراوە</h3>
                 <div className="w-11 h-11 bg-emerald-200 text-emerald-700 rounded-xl flex items-center justify-center text-xl shadow-inner">💲</div>
               </div>
               <div className="text-2xl font-black text-emerald-800 mb-2" dir="ltr">{formatCur(data.myDebtDiscount)}</div>
-              <p className="text-xs text-emerald-500 font-medium m-0">بڕی پارەی داشکێنراو لە پسووڵەی کڕین، پارەی ڕۆشتوو و قەرزی من</p>
+              <p className="text-xs text-emerald-500 font-medium m-0">بڕی پارەی داشکێنراو لە پسووڵەی کڕین، پارەی ڕۆشتوو و من قەرزارم</p>
             </div>
           </div>
 
@@ -431,17 +431,17 @@ export default function ProfitReportPage() {
               <p className="text-xs text-rose-500 font-medium m-0">کۆی گشتی (خەرجی، خەسارەی کۆگا، سەرفی مەواد)</p>
             </div>
 
-            {/* داشکاندن لە قەرزی خەڵک - People Debt Discount */}
+            {/* داشکاندنم کردوە - People Debt Discount */}
             <div
               onClick={() => handleCardClick("people_debt_discount")}
               className="bg-rose-50 p-5 rounded-2xl border border-rose-200 shadow-sm hover:shadow-lg hover:border-rose-400 transition-all cursor-pointer"
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-rose-900 font-black text-lg m-0">داشکاندن لە قەرزی خەڵک</h3>
+                <h3 className="text-rose-900 font-black text-lg m-0">داشکاندنم کردوە</h3>
                 <div className="w-11 h-11 bg-rose-200 text-rose-700 rounded-xl flex items-center justify-center text-xl shadow-inner">✂️</div>
               </div>
               <div className="text-2xl font-black text-rose-800 mb-2" dir="ltr">{formatCur(data.peopleDebtDiscount)}</div>
-              <p className="text-xs text-rose-500 font-medium m-0">بڕی پارەی داشکێنراو لە پسووڵەی فرۆشتن، پارەی هاتوو، قەرزی خەڵک</p>
+              <p className="text-xs text-rose-500 font-medium m-0">بڕی پارەی داشکێنراو لە پسووڵەی فرۆشتن، پارەی هاتوو، قەرزم لای خەڵکە</p>
             </div>
 
             {/* قازانجی کۆتایی - Final Profit */}
