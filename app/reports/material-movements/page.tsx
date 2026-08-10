@@ -609,7 +609,6 @@ export default function ItemsReportPage() {
                 >
                   <option value={50}>٥٠ دانە</option>
                   <option value={100}>١٠٠ دانە</option>
-                  <option value={500}>٥٠٠ دانە</option>
                   <option value={1000}>١٠٠٠ دانە</option>
                   <option value={1000000}>هەموو</option>
                 </select>
