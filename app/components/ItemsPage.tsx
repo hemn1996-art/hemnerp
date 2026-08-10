@@ -329,6 +329,7 @@ function AddItemForm({
   const [isMultiBatch, setIsMultiBatch] = useState(productToEdit?.isMultiBatch || false);
 
   const [isActive, setIsActive] = useState(productToEdit?.isActive ?? true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [categories, setCategories] = useState<{ id: number; name: string; isActive: boolean }[]>([]);
   const [brands, setBrands] = useState<{ id: number; name: string; isActive: boolean }[]>([]);
@@ -523,76 +524,90 @@ function AddItemForm({
   }
 
   async function save() {
-    if (!name.trim()) {
-      showAlert("warning", "ئاگاداری", "ناوی کوردی پڕ بکەرەوە");
-      return;
-    }
+    if (isSaving) return;
+    setIsSaving(true);
 
-    const isExpense = itemKind === "expense";
-    const isService = itemKind === "service";
-    const isInventory = itemKind === "inventory";
-
-    // For non-expense items, category, brand, and packaging are mandatory.
-    if (!isExpense) {
-      if (!category) {
-        showAlert("warning", "ئاگاداری", "تکایە کاتێگۆری دیاری بکە");
+    try {
+      if (!name.trim()) {
+        showAlert("warning", "ئاگاداری", "ناوی کوردی پڕ بکەرەوە");
+        setIsSaving(false);
         return;
       }
 
-      if (!brand) {
-        showAlert("warning", "ئاگاداری", "تکایە براند دیاری بکە");
-        return;
+      const isExpense = itemKind === "expense";
+      const isService = itemKind === "service";
+      const isInventory = itemKind === "inventory";
+
+      // For non-expense items, category, brand, and packaging are mandatory.
+      if (!isExpense) {
+        if (!category) {
+          showAlert("warning", "ئاگاداری", "تکایە کاتێگۆری دیاری بکە");
+          setIsSaving(false);
+          return;
+        }
+
+        if (!brand) {
+          showAlert("warning", "ئاگاداری", "تکایە براند دیاری بکە");
+          setIsSaving(false);
+          return;
+        }
+
+        const firstPackage = packages[0];
+        if (!firstPackage || !firstPackage.name) {
+          showAlert("warning", "ئاگاداری", "تکایە پێچانەوە دیاری بکە");
+          setIsSaving(false);
+          return;
+        }
+
+        if (!firstPackage.quantity || Number(firstPackage.quantity) <= 0) {
+          showAlert("warning", "ئاگاداری", "تکایە ژمارەی ناو پێچانەوە بە دروستی بنووسە");
+          setIsSaving(false);
+          return;
+        }
       }
 
-      const firstPackage = packages[0];
-      if (!firstPackage || !firstPackage.name) {
-        showAlert("warning", "ئاگاداری", "تکایە پێچانەوە دیاری بکە");
-        return;
+      const validSalePrices = salePrices
+        .filter((sp) => sp.currencyId && Number(sp.amount) > 0)
+        .map((sp) => ({
+          currencyId: Number(sp.currencyId),
+          priceType: sp.priceType,
+          amount: Number(sp.amount) || 0,
+        }));
+
+      const productData = {
+        id: productToEdit?.id,
+        name: name.trim(),
+        code: code.trim() || null,
+        category: isExpense ? null : category,
+        brand: isExpense ? null : brand,
+        packaging: isExpense ? null : (packages[0]?.name || null),
+        isMultiBatch: isInventory ? isMultiBatch : false,
+        isExpense,
+        isService,
+        isActive,
+        salePrices: validSalePrices,
+        lowStockAlert: Number(lowStockAlert) || 0,
+        hasExpiry,
+        expiryAlertDays: Number(expiryAlertDays) || 0,
+      };
+
+      const res = productToEdit
+        ? await store.updateProduct(productData)
+        : await store.addProduct(productData);
+
+      if (res && res.success) {
+        onSuccess(
+          productToEdit
+            ? "کەرەستە بە سەرکەوتوویی دەستکاری کرا ✅"
+            : "کەرەستە بە سەرکەوتوویی خەزن کرا ✅"
+        );
+      } else {
+        showAlert("error", "هەڵە", res?.error || "کەرەستە خەزن نەکرا. تکایە دووبارە هەوڵ بدە.");
+        setIsSaving(false);
       }
-
-      if (!firstPackage.quantity || Number(firstPackage.quantity) <= 0) {
-        showAlert("warning", "ئاگاداری", "تکایە ژمارەی ناو پێچانەوە بە دروستی بنووسە");
-        return;
-      }
-    }
-
-    const validSalePrices = salePrices
-      .filter((sp) => sp.currencyId && Number(sp.amount) > 0)
-      .map((sp) => ({
-        currencyId: Number(sp.currencyId),
-        priceType: sp.priceType,
-        amount: Number(sp.amount) || 0,
-      }));
-
-    const productData = {
-      id: productToEdit?.id,
-      name: name.trim(),
-      code: code.trim() || null,
-      category: isExpense ? null : category,
-      brand: isExpense ? null : brand,
-      packaging: isExpense ? null : (packages[0]?.name || null),
-      isMultiBatch: isInventory ? isMultiBatch : false,
-      isExpense,
-      isService,
-      isActive,
-      salePrices: validSalePrices,
-      lowStockAlert: Number(lowStockAlert) || 0,
-      hasExpiry,
-      expiryAlertDays: Number(expiryAlertDays) || 0,
-    };
-
-    const res = productToEdit
-      ? await store.updateProduct(productData)
-      : await store.addProduct(productData);
-
-    if (res && res.success) {
-      onSuccess(
-        productToEdit
-          ? "کەرەستە بە سەرکەوتوویی دەستکاری کرا ✅"
-          : "کەرەستە بە سەرکەوتوویی خەزن کرا ✅"
-      );
-    } else {
-      showAlert("error", "هەڵە", res?.error || "کەرەستە خەزن نەکرا. تکایە دووبارە هەوڵ بدە.");
+    } catch (err) {
+      console.error(err);
+      setIsSaving(false);
     }
   }
 
@@ -926,8 +941,16 @@ function AddItemForm({
       </Section>
 
       <div style={footerActions}>
-        <button onClick={save} style={saveBtn}>
-          💾 خەزنکردن
+        <button
+          onClick={save}
+          style={{
+            ...saveBtn,
+            opacity: isSaving ? 0.6 : 1,
+            cursor: isSaving ? "not-allowed" : "pointer",
+          }}
+          disabled={isSaving}
+        >
+          {isSaving ? "تکایە چاوەڕێ بکە..." : "💾 خەزنکردن"}
         </button>
         <button onClick={onBack} style={backBtn}>
           پاشگەزبوونەوە
