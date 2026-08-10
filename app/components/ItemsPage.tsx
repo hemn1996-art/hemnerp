@@ -599,7 +599,7 @@ function AddItemForm({
   return (
     <div>
       <div style={notice}>
-        💡 ئەو فیڵدانەی کە بە <span style={{ color: "#ef4444", fontWeight: "black", margin: "0 4px" }}>*</span> نیشانە کراون داواکراون.
+        💡 ئەو فیڵدانەی کە بە <span style={{ color: "#ef4444", fontWeight: "bold", padding: "0 4px", fontSize: 16 }}>*</span> نیشانە کراون داواکراون.
       </div>
 
       <div style={titleBox}>
@@ -970,19 +970,19 @@ function Section({ title, icon, children }: any) {
   );
 }
 
-function Field({ label, children }: any) {
-  let isRequired = false;
-  let cleanLabel = label;
-  if (typeof label === "string" && label.startsWith("* ")) {
-    isRequired = true;
-    cleanLabel = label.substring(2);
+function Field({ label, required, children }: any) {
+  let isReq = Boolean(required);
+  let text = label;
+  if (typeof label === "string" && label.includes("*")) {
+    isReq = true;
+    text = label.replace(/\*/g, "").trim();
   }
   return (
     <label>
       <span style={labelStyle}>
-        <span>{cleanLabel}</span>
-        {isRequired && (
-          <span style={{ color: "#dc2626", fontWeight: "bold", marginRight: 4, fontSize: 16 }}>
+        <span>{text}</span>
+        {isReq && (
+          <span style={{ color: "#ef4444", fontWeight: "bold", marginLeft: 4, fontSize: 16 }}>
             {" "}*
           </span>
         )}
