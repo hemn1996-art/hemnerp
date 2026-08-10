@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { normalizeKurdishSearchText } from "@/app/utils/digits";
 
 export interface SingleSelectOption {
   value: string;
@@ -40,8 +41,9 @@ export default function SingleSelectDropdown({
 
   const filteredOptions = useMemo(() => {
     if (!searchTerm) return options;
+    const normSearch = normalizeKurdishSearchText(searchTerm);
     return options.filter((opt) =>
-      opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+      normalizeKurdishSearchText(opt.label).includes(normSearch)
     );
   }, [options, searchTerm]);
 

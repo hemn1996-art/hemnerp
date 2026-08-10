@@ -12,3 +12,18 @@ export function convertDigits(str: string): string {
   }
   return res;
 }
+
+/**
+ * Normalizes Kurdish Sorani text for search matching.
+ * Treats 'و' & 'ۆ', 'ر' & 'ڕ', 'ێ' & 'ی', 'ڵ' & 'ل', 'ە' & 'ه' & 'ھ' as equivalent.
+ */
+export function normalizeKurdishSearchText(str: string): string {
+  if (!str) return "";
+  return convertDigits(str)
+    .toLowerCase()
+    .replace(/[ۆو]/g, "و")
+    .replace(/[ڕر]/g, "ر")
+    .replace(/[ێیىي]/g, "ی")
+    .replace(/[ڵل]/g, "ل")
+    .replace(/[ەهھ]/g, "ه");
+}

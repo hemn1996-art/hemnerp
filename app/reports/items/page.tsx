@@ -8,6 +8,8 @@ import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
 
+import { normalizeKurdishSearchText } from "../../utils/digits";
+
 interface DropdownOption {
   value: string | number;
   label: string;
@@ -338,11 +340,11 @@ export default function ItemsReportPage() {
 
     // Apply search term
     if (searchTerm) {
-      const q = searchTerm.toLowerCase();
+      const q = normalizeKurdishSearchText(searchTerm);
       result = result.filter(i =>
-        i.productName?.toLowerCase().includes(q) ||
-        i.accountName?.toLowerCase().includes(q) ||
-        i.voucherReference?.toString().includes(q)
+        normalizeKurdishSearchText(i.productName || "").includes(q) ||
+        normalizeKurdishSearchText(i.accountName || "").includes(q) ||
+        normalizeKurdishSearchText(i.voucherReference?.toString() || "").includes(q)
       );
     }
 
