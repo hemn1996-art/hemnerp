@@ -100,7 +100,9 @@ export default function SingleSelectDropdown({
         <div className="absolute z-[1050] mt-1 right-0 left-0 bg-white border border-slate-200 rounded-xl shadow-2xl p-2 max-h-96 overflow-y-auto flex flex-col text-right">
           <div className="overflow-y-auto flex-1 space-y-1 custom-scrollbar" style={{ maxHeight: "360px" }}>
             <div
-              onClick={() => {
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 onChange("");
                 setIsOpen(false);
                 setSearchTerm("");
@@ -120,7 +122,9 @@ export default function SingleSelectDropdown({
               filteredOptions.map((opt) => (
                 <div
                   key={opt.value}
-                  onClick={() => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     onChange(opt.value);
                     setIsOpen(false);
                     setSearchTerm("");
