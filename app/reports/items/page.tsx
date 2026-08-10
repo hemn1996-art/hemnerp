@@ -49,6 +49,10 @@ export default function ItemsReportPage() {
   const [filterBrands, setFilterBrands] = useState<string[]>([]);
   const [itemCode, setItemCode] = useState("");
   const [batchCode, setBatchCode] = useState("");
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
   const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
   const [filterAccountTypeIds, setFilterAccountTypeIds] = useState<number[]>([]);
   const [currencyId, setCurrencyId] = useState("all");
@@ -372,6 +376,14 @@ export default function ItemsReportPage() {
     });
   }, [itemsMatchingNonVoucherFilters, filterVoucherTypes, products]);
 
+  const paginatedItems = React.useMemo(() => {
+    if (pageSize >= 100000) return filteredItems;
+    const start = (currentPage - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredItems.length / pageSize) || 1;
+
   const getQtyCardLabel = () => {
     const hasSales = filterVoucherTypes.includes("sales") || filterVoucherTypes.includes("sales_return");
     const hasPurchases = filterVoucherTypes.includes("purchase") || filterVoucherTypes.includes("purchase_return");
@@ -586,7 +598,7 @@ export default function ItemsReportPage() {
             ) : filteredItems.length === 0 ? (
               <tr><td colSpan={9} className="p-8 text-center text-slate-500 text-sm">هیچ داتایەک نەدۆزرایەوە.</td></tr>
             ) : (
-              filteredItems.map((item, i) => (
+              paginatedItems.map((item, i) => (
                 <tr key={item.id} className={`border-b border-slate-200 hover:bg-blue-50/50 transition ${i % 2 === 0 ? 'bg-white' : 'bg-[#f8fafc]'}`}>
                   {visibleColumns.accountName && <td className="p-2.5 border-r border-slate-200 text-center text-blue-700 font-medium whitespace-nowrap">{item.accountName}</td>}
                   {visibleColumns.voucherType && <td className="p-2.5 border-r border-slate-200 text-center text-slate-600 font-medium">{translateVoucherType(item.voucherType)}</td>}
@@ -616,6 +628,65 @@ export default function ItemsReportPage() {
             )}
           </tbody>
         </table>
+
+        {/* Pagination Footer */}
+        {!loading && filteredItems.length > 0 && (
+          <div className="p-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-white no-print text-xs">
+            <div className="text-slate-600 font-bold flex items-center gap-2">
+              <span>کۆی گشتی:</span>
+              <span className="bg-slate-100 text-slate-800 px-2.5 py-0.5 rounded font-black border border-slate-200 text-sm">
+                {filteredItems.length.toLocaleString("en-US")}
+              </span>
+              {pageSize < 100000 && (
+                <span className="text-slate-500 font-medium mr-2">
+                  (پیشاندانی {Math.min(filteredItems.length, (currentPage - 1) * pageSize + 1)} تا {Math.min(filteredItems.length, currentPage * pageSize)})
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <button
+                  disabled={currentPage === 1 || pageSize >= 100000}
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  className="w-8 h-8 rounded-lg border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center cursor-pointer shadow-sm text-base"
+                  title="پێشوو"
+                >
+                  ‹
+                </button>
+                <span className="px-3 py-1 text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg">
+                  {currentPage} لە {totalPages}
+                </span>
+                <button
+                  disabled={currentPage === totalPages || pageSize >= 100000}
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  className="w-8 h-8 rounded-lg border border-slate-300 bg-white text-slate-700 font-bold hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center cursor-pointer shadow-sm text-base"
+                  title="دواتر"
+                >
+                  ›
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 border-r border-slate-200 pr-3">
+                <span className="text-slate-600 font-bold">ژمارەی ڕیزەکان:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-sm"
+                >
+                  <option value={50}>٥٠ دانە</option>
+                  <option value={100}>١٠٠ دانە</option>
+                  <option value={500}>٥٠٠ دانە</option>
+                  <option value={1000}>١٠٠٠ دانە</option>
+                  <option value={1000000}>هەموو</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       </div>
