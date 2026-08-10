@@ -49,4 +49,5 @@ next-env.d.ts
 /temp2.json
 /temp3.json
 /seed-admin.js
+.tmp.driveupload
 

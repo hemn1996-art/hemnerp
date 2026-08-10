@@ -109,15 +109,29 @@ export default function ItemsReportPage() {
     fetchWarehouses?.();
     fetchInvoices?.();
 
+    fetch("/api/attributes?type=category")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) setCategoriesList(data);
+      })
+      .catch((err) => console.error(err));
+
+    fetch("/api/attributes?type=brand")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) setBrandsList(data);
+      })
+      .catch((err) => console.error(err));
+
     if (typeof window !== "undefined") {
       try {
         const rawCat = localStorage.getItem("__erp_categories");
-        if (rawCat) setCategoriesList(JSON.parse(rawCat));
+        if (rawCat && categoriesList.length === 0) setCategoriesList(JSON.parse(rawCat));
       } catch (e) { console.error(e); }
 
       try {
         const rawBrand = localStorage.getItem("__erp_brands");
-        if (rawBrand) setBrandsList(JSON.parse(rawBrand));
+        if (rawBrand && brandsList.length === 0) setBrandsList(JSON.parse(rawBrand));
       } catch (e) { console.error(e); }
 
       try {
@@ -140,9 +154,33 @@ export default function ItemsReportPage() {
   const employeeOptions = React.useMemo(() => {
     if (!invoices) return [];
     const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار کۆگای دۆستان", "هێمن حەمە فەرهاد"];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [invoices]);
+
+  const categoryOptions = React.useMemo(() => {
+    const list: string[] = [];
+    categoriesList.forEach((c: any) => {
+      const name = typeof c === "string" ? c : c?.name;
+      if (name && !list.includes(name)) list.push(name);
+    });
+    (products || []).forEach((p: any) => {
+      if (p.category && !list.includes(p.category)) list.push(p.category);
+    });
+    return list;
+  }, [categoriesList, products]);
+
+  const brandOptions = React.useMemo(() => {
+    const list: string[] = [];
+    brandsList.forEach((b: any) => {
+      const name = typeof b === "string" ? b : b?.name;
+      if (name && !list.includes(name)) list.push(name);
+    });
+    (products || []).forEach((p: any) => {
+      if (p.brand && !list.includes(p.brand)) list.push(p.brand);
+    });
+    return list;
+  }, [brandsList, products]);
 
 
   useEffect(() => {
@@ -525,7 +563,7 @@ export default function ItemsReportPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto max-h-[70vh]">
+      <div className="overflow-x-auto">
         <table id="items-report-table" className="w-full text-[11px] text-right">
           <thead className="bg-[#1e293b] text-white sticky top-0 z-10">
             <tr>
@@ -685,8 +723,8 @@ export default function ItemsReportPage() {
                     <label>براند</label>
                     <select value={brand} onChange={e => setBrand(e.target.value)}>
                       <option value="all">هەموو</option>
-                      {brandsList.map((b: any) => (
-                        <option key={b.id} value={b.name}>{b.name}</option>
+                      {brandOptions.map((bName) => (
+                        <option key={bName} value={bName}>{bName}</option>
                       ))}
                     </select>
                   </div>
@@ -694,8 +732,8 @@ export default function ItemsReportPage() {
                     <label>کاتیگۆری</label>
                     <select value={category} onChange={e => setCategory(e.target.value)}>
                       <option value="all">هەموو</option>
-                      {categoriesList.map((c: any) => (
-                        <option key={c.id} value={c.name}>{c.name}</option>
+                      {categoryOptions.map((cName) => (
+                        <option key={cName} value={cName}>{cName}</option>
                       ))}
                     </select>
                   </div>

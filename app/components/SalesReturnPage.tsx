@@ -648,7 +648,10 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
   useEffect(() => {
     if (editId && !isEditLoading && !savedSnapshot) {
-      setSavedSnapshot(currentSnapshot);
+      const timer = setTimeout(() => {
+        setSavedSnapshot(currentSnapshot);
+      }, 300);
+      return () => clearTimeout(timer);
     }
   }, [editId, isEditLoading, currentSnapshot, savedSnapshot]);
 
