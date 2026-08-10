@@ -6,6 +6,7 @@ import { store, useStore } from "../store/store";
 import { currencies as mockCurrencies } from "../data/mockData";
 import { Product } from "../types";
 import AlertModal from "./AlertModal";
+import SingleSelectDropdown from "./SingleSelectDropdown";
 import { convertDigits } from "../utils/digits";
 
 type ItemKind = "inventory" | "service" | "expense";
@@ -406,6 +407,34 @@ function AddItemForm({
     return englishVal.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
   }
 
+  function convertAmountBetweenCurrencies(
+    amountVal: number,
+    fromCurId: string | number,
+    toCurId: string | number
+  ): number {
+    if (!amountVal || isNaN(amountVal) || String(fromCurId) === String(toCurId)) return amountVal;
+    const fromCurr = currencies.find((c: any) => String(c.id) === String(fromCurId));
+    const toCurr = currencies.find((c: any) => String(c.id) === String(toCurId));
+    if (!fromCurr || !toCurr) return amountVal;
+
+    const getPerDollarRate = (curr: any) => {
+      let r = Number(curr.rate) || 1;
+      if (r > 50000) r = r / 100;
+      return r;
+    };
+
+    const fromRate = getPerDollarRate(fromCurr);
+    const toRate = getPerDollarRate(toCurr);
+    const usdAmount = amountVal / fromRate;
+    const targetAmount = usdAmount * toRate;
+
+    if (toRate > 100) {
+      return Math.round(targetAmount);
+    } else {
+      return Number(targetAmount.toFixed(2));
+    }
+  }
+
   function updateSalePrice(
     index: number,
     field: "currencyId" | "priceType" | "amount",
@@ -413,6 +442,24 @@ function AddItemForm({
   ) {
     setSalePrices((prev) => {
       const next = [...prev];
+      const oldRow = next[index];
+
+      if (field === "currencyId" && oldRow && oldRow.currencyId && value && String(oldRow.currencyId) !== String(value) && oldRow.amount) {
+        const numericAmount = parseFloat(oldRow.amount);
+        if (!isNaN(numericAmount) && numericAmount > 0) {
+          const converted = convertAmountBetweenCurrencies(
+            numericAmount,
+            oldRow.currencyId,
+            value
+          );
+          next[index] = {
+            ...oldRow,
+            currencyId: value,
+            amount: String(converted),
+          };
+          return next;
+        }
+      }
 
       next[index] = {
         ...next[index],
@@ -607,35 +654,23 @@ function AddItemForm({
           </Field>
 
           <Field label={itemKind === "expense" ? "براند" : "* براند"}>
-            <select
+            <SingleSelectDropdown
+              options={brands.map((b: any) => ({ value: b.name, label: b.name }))}
               value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              style={input}
-            >
-              <option value="">براند دیاری بکە...</option>
-              {brands.map((b: any) => (
-                <option key={b.id} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setBrand(val)}
+              placeholder="براند دیاری بکە..."
+            />
           </Field>
         </div>
 
         <div style={grid3}>
           <Field label={itemKind === "expense" ? "کاتێگۆری" : "* کاتێگۆری"}>
-            <select
+            <SingleSelectDropdown
+              options={categories.map((c: any) => ({ value: c.name, label: c.name }))}
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              style={input}
-            >
-              <option value="">کاتێگۆری دیاری بکە...</option>
-              {categories.map((c: any) => (
-                <option key={c.id} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setCategory(val)}
+              placeholder="کاتێگۆری دیاری بکە..."
+            />
           </Field>
         </div>
       </Section>
