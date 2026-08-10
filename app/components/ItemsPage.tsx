@@ -564,11 +564,6 @@ function AddItemForm({
         amount: Number(sp.amount) || 0,
       }));
 
-    if (!isExpense && validSalePrices.length === 0) {
-      showAlert("warning", "ئاگاداری", "تکایە دراو و نرخی فرۆشتن بە دروستی دیاری بکە");
-      return;
-    }
-
     const productData = {
       id: productToEdit?.id,
       name: name.trim(),
@@ -746,7 +741,7 @@ function AddItemForm({
                 marginBottom: 12,
               }}
             >
-              <Field label="* دراو">
+              <Field label="دراو">
                 <select
                   value={row.currencyId}
                   onChange={(e) =>
@@ -765,7 +760,7 @@ function AddItemForm({
                 </select>
               </Field>
 
-              <Field label="* جۆری نرخ">
+              <Field label="جۆری نرخ">
                 <select
                   value={row.priceType}
                   onChange={(e) =>
@@ -782,7 +777,7 @@ function AddItemForm({
                 </select>
               </Field>
 
-              <Field label="* نرخ">
+              <Field label="نرخ">
                 <input
                   type="text"
                   inputMode="decimal"
