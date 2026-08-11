@@ -89,21 +89,23 @@ export async function GET(request: Request) {
 
       stockMap[key].quantity += t.qtyChange;
 
-      if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
-        const line = t.voucher.lines?.find((l: any) => l.productId === t.productId);
-        const originalPrice = line ? line.unitPrice : t.unitCost;
-        const unitExpense = t.unitCost - originalPrice;
+      const line = t.voucher?.lines?.find((l: any) => l.productId === t.productId);
+      const originalPrice = (line && line.unitPrice > 0) ? line.unitPrice : (t.unitCost || 0);
+      const costVal = t.unitCost || originalPrice;
 
-        stockMap[key].totalPurchaseValue += (t.qtyChange * t.unitCost);
+      if (t.qtyChange > 0 && costVal > 0) {
+        const unitExpense = Math.max(costVal - originalPrice, 0);
+
+        stockMap[key].totalPurchaseValue += (t.qtyChange * costVal);
         stockMap[key].totalPurchaseQty += t.qtyChange;
         stockMap[key].totalExpenseValue += (t.qtyChange * unitExpense);
         
         if (stockMap[key].isMultiBatch) {
           stockMap[key].purchasePrice = originalPrice;
-          stockMap[key].cost = t.unitCost;
+          stockMap[key].cost = costVal;
           stockMap[key].expense = unitExpense;
         } else {
-          const avgCost = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : t.unitCost;
+          const avgCost = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : costVal;
           const avgExpense = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalExpenseValue / stockMap[key].totalPurchaseQty) : unitExpense;
           const avgPrice = avgCost - avgExpense;
           
@@ -111,9 +113,26 @@ export async function GET(request: Request) {
           stockMap[key].cost = avgCost;
           stockMap[key].expense = avgExpense;
         }
-        stockMap[key].sellerName = t.voucher?.account?.name || "نەزانراو";
-        stockMap[key].sellerId = t.voucher?.account?.id || null;
-        stockMap[key].purchaseDate = t.voucher?.date || "-";
+        if (t.voucher?.account?.name) {
+          stockMap[key].sellerName = t.voucher.account.name;
+          stockMap[key].sellerId = t.voucher.account.id;
+        }
+        if (t.voucher?.date) {
+          stockMap[key].purchaseDate = t.voucher.date;
+        }
+      }
+    });
+
+    // Secondary fallback: if cost is still 0, check if any transaction for this product had unitCost > 0
+    Object.values(stockMap).forEach((item: any) => {
+      if (!item.cost || item.cost === 0) {
+        const txWithCost = transactions.find(
+          (t: any) => t.productId === item.productId && t.unitCost && t.unitCost > 0
+        );
+        if (txWithCost) {
+          item.purchasePrice = txWithCost.unitCost;
+          item.cost = txWithCost.unitCost;
+        }
       }
     });
 
