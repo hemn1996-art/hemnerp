@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Scheherazade+New:wght@700&family=Cairo:wght@700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Naskh+Arabic:wght@500;700&family=Scheherazade+New:wght@600;700&family=Cairo:wght@700;800&display=swap');
 @import "tailwindcss";
 
 @font-face {
@@ -15,6 +15,14 @@
   font-weight: 700;
   font-style: normal;
   font-display: swap;
+}
+
+.dua-font,
+.arabic-dua,
+.tashkeel-font {
+  font-family: 'Amiri', 'Noto Naskh Arabic', 'Scheherazade New', 'Traditional Arabic', 'Arabic Typesetting', serif !important;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1 !important;
+  text-rendering: optimizeLegibility !important;
 }
 
 * {

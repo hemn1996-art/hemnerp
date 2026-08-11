@@ -245,7 +245,7 @@ export default function DebtReportPage() {
     const entries = Object.entries(map).filter(([curIdText, val]) => !isMicroBalance(val, curIdText));
     if (entries.length === 0) return <span className="text-gray-500 font-bold">0</span>;
     return (
-      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "8px" }} dir="ltr">
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: "8px" }} dir="ltr">
         {entries.map(([curIdText, val], index) => {
           const curId = Number(curIdText);
           return (
@@ -337,26 +337,27 @@ export default function DebtReportPage() {
           <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی قەرز</h2>
         </div>
 
-        <div className="bg-white p-4 rounded-xl shadow-sm mb-4 text-left flex justify-between items-center">
-         <div className="flex gap-2">
-           <button onClick={() => setFilterDebtType("people")} className={`px-6 py-2 rounded-lg font-bold transition-colors cursor-pointer border-none ${filterDebtType === "people" ? "bg-[#061f5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>قەرزم لای خەڵک</button>
-           <button onClick={() => setFilterDebtType("mine")} className={`px-6 py-2 rounded-lg font-bold transition-colors cursor-pointer border-none ${filterDebtType === "mine" ? "bg-[#061f5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>من قەرزارم</button>
-         </div>
-         {showReportStats && (
-           <div className="animate-in fade-in duration-200">
-             <div className="text-sm text-gray-500">گشتی قەرز ({filterDebtType === "people" ? "قەرزم لای خەڵکە" : "من قەرزارم"})</div>
-              <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>{formatTotalOverallJSX(totalOverallByCurrency)}</div>
-           </div>
-         )}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
         {(() => {
           const visibleColCount = Object.values(visibleColumns).filter(Boolean).length;
           const containerWidthClass = visibleColCount <= 2 ? "max-w-4xl mx-auto w-full" : visibleColCount <= 4 ? "max-w-5xl mx-auto w-full" : "w-full";
           return (
-            <div className={`overflow-x-auto flex-1 ${containerWidthClass}`}>
-              <table id="debts-report-table" className="w-full text-center border-collapse min-w-[600px]">
+            <>
+              <div className={`bg-white p-4 rounded-xl shadow-sm mb-4 text-left flex justify-between items-center ${containerWidthClass}`}>
+                <div className="flex gap-2">
+                  <button onClick={() => setFilterDebtType("people")} className={`px-6 py-2 rounded-lg font-bold transition-colors cursor-pointer border-none ${filterDebtType === "people" ? "bg-[#061f5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>قەرزم لای خەڵک</button>
+                  <button onClick={() => setFilterDebtType("mine")} className={`px-6 py-2 rounded-lg font-bold transition-colors cursor-pointer border-none ${filterDebtType === "mine" ? "bg-[#061f5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>من قەرزارم</button>
+                </div>
+                {showReportStats && (
+                  <div className="animate-in fade-in duration-200">
+                    <div className="text-sm text-gray-500">گشتی قەرز ({filterDebtType === "people" ? "قەرزم لای خەڵکە" : "من قەرزارم"})</div>
+                    <div className={`text-2xl font-black ${filterDebtType === "people" ? "text-green-600" : "text-red-500"}`}>{formatTotalOverallJSX(totalOverallByCurrency)}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
+                <div className={`overflow-x-auto flex-1 ${containerWidthClass}`}>
+                  <table id="debts-report-table" className="w-full text-center border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-[#03133f] text-white">
                 <th className="p-3 font-bold text-sm text-center w-12">#</th>
@@ -431,10 +432,10 @@ export default function DebtReportPage() {
             </tbody>
           </table>
             </div>
+          </div>
+            </>
           );
         })()}
-      </div>
-
       </div>
 
       {showFilterModal && (

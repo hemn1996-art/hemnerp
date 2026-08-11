@@ -222,7 +222,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
                 ? "✅"
                 : "📢"}
             </span>
-            <span className="text-base md:text-lg font-extrabold tracking-wide select-none leading-normal">
+            <span className="text-base md:text-xl font-bold tracking-wide select-none leading-relaxed dua-font">
               {announcement.message}
             </span>
             <span className="text-xs opacity-60 mr-4 border border-black/10 px-2.5 py-0.5 rounded-full whitespace-nowrap bg-black/5 select-none">
