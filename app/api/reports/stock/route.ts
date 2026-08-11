@@ -43,7 +43,7 @@ export async function GET(request: Request) {
           select: {
             type: true,
             date: true,
-            account: { select: { id: true, name: true, exchangeRateType: true, customExchangeRate: true } },
+            account: { select: { id: true, name: true } },
             versions: { select: { version: true, data: true } },
             lines: {
               select: {
