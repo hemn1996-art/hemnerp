@@ -351,8 +351,12 @@ export default function DebtReportPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
-        <div className="overflow-x-auto flex-1">
-          <table id="debts-report-table" className="w-full text-center border-collapse min-w-[800px]">
+        {(() => {
+          const visibleColCount = Object.values(visibleColumns).filter(Boolean).length;
+          const containerWidthClass = visibleColCount <= 2 ? "max-w-xl mx-auto w-full" : visibleColCount === 3 ? "max-w-3xl mx-auto w-full" : visibleColCount === 4 ? "max-w-4xl mx-auto w-full" : "w-full";
+          return (
+            <div className={`overflow-x-auto flex-1 ${containerWidthClass}`}>
+              <table id="debts-report-table" className={`w-full text-center border-collapse ${visibleColCount <= 3 ? "" : "min-w-[800px]"}`}>
             <thead>
               <tr className="bg-[#03133f] text-white">
                 {visibleColumns.account && <th className="p-3 font-bold text-sm text-center">هەژمار</th>}
@@ -424,7 +428,9 @@ export default function DebtReportPage() {
               )}
             </tbody>
           </table>
-        </div>
+            </div>
+          );
+        })()}
       </div>
 
       </div>
