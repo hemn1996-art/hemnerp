@@ -102,8 +102,8 @@ export async function GET(request: Request) {
       }
 
       const sellerAcc = t.voucher?.account;
-      let rateTypeForProduct = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType || "DAILY_MARKET";
-      let customRateForProduct = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate || 132000;
+      let rateTypeForProduct = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || (sellerAcc as any)?.exchangeRateType || "DAILY_MARKET";
+      let customRateForProduct = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || (sellerAcc as any)?.customExchangeRate || 132000;
 
       if (rateTypeForProduct === "FIXED") {
         stockMap[key].exchangeRateType = "FIXED";
@@ -161,7 +161,7 @@ export async function GET(request: Request) {
           const latestV = sortedV[sortedV.length - 1];
           try { vData = JSON.parse(latestV.data); } catch(e){}
         }
-        return (t.voucher as any)?.exchangeRateType === "FIXED" || vData.exchangeRateType === "FIXED" || t.voucher?.account?.exchangeRateType === "FIXED";
+        return (t.voucher as any)?.exchangeRateType === "FIXED" || vData.exchangeRateType === "FIXED" || (t.voucher?.account as any)?.exchangeRateType === "FIXED";
       });
 
       if (txFixed) {
@@ -172,7 +172,7 @@ export async function GET(request: Request) {
           try { vData = JSON.parse(latestV.data); } catch(e){}
         }
         item.exchangeRateType = "FIXED";
-        item.customExchangeRate = (txFixed.voucher as any)?.customExchangeRate || vData.customExchangeRate || txFixed.voucher?.account?.customExchangeRate || 132000;
+        item.customExchangeRate = (txFixed.voucher as any)?.customExchangeRate || vData.customExchangeRate || (txFixed.voucher?.account as any)?.customExchangeRate || 132000;
       }
     });
 
