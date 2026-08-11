@@ -132,7 +132,7 @@ export default function DebtReportPage() {
     const entries = Object.entries(map || {}).filter(([curIdText, val]) => !isMicroBalance(val, curIdText));
     if (entries.length === 0) return <span className="text-gray-500 font-bold">0</span>;
     return (
-      <div className="flex flex-col gap-1 items-center">
+      <div className="flex flex-col gap-1 items-start text-right">
         {entries.map(([curIdText, val]) => {
           const curId = Number(curIdText);
           const color = val > 0 ? "text-green-600" : val < 0 ? "text-red-500" : "text-gray-700";
@@ -352,20 +352,20 @@ export default function DebtReportPage() {
 
       <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
-          <table id="debts-report-table" className="w-full text-center border-collapse min-w-[800px]">
+          <table id="debts-report-table" className="w-full text-right border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-[#03133f] text-white">
-                {visibleColumns.account && <th className="p-3 font-bold text-sm">هەژمار</th>}
-                {visibleColumns.phone && <th className="p-3 font-bold text-sm">ژمارە تەلەفۆن</th>}
-                {visibleColumns.city && <th className="p-3 font-bold text-sm">شار</th>}
-                {visibleColumns.district && <th className="p-3 font-bold text-sm">گەڕەک</th>}
-                {visibleColumns.creditLimitExceeded && <th className="p-3 font-bold text-sm">سنووری قەرزی تێپەڕاندووە</th>}
-                {visibleColumns.debtBeforeLastPayment && <th className="p-3 font-bold text-sm">قەرزی پێش کۆتا پارەدان</th>}
-                {visibleColumns.lastPaymentAmount && <th className="p-3 font-bold text-sm">کۆتا پارەدان</th>}
+                {visibleColumns.account && <th className="p-3 font-bold text-sm text-right pr-6">هەژمار</th>}
+                {visibleColumns.phone && <th className="p-3 font-bold text-sm text-center">ژمارە تەلەفۆن</th>}
+                {visibleColumns.city && <th className="p-3 font-bold text-sm text-center">شار</th>}
+                {visibleColumns.district && <th className="p-3 font-bold text-sm text-center">گەڕەک</th>}
+                {visibleColumns.creditLimitExceeded && <th className="p-3 font-bold text-sm text-center">سنووری قەرزی تێپەڕاندووە</th>}
+                {visibleColumns.debtBeforeLastPayment && <th className="p-3 font-bold text-sm text-right pr-6">قەرزی پێش کۆتا پارەدان</th>}
+                {visibleColumns.lastPaymentAmount && <th className="p-3 font-bold text-sm text-right pr-6">کۆتا پارەدان</th>}
                 {visibleColumns.lastPaymentDate && (
                   <th 
                     onClick={() => toggleSort("lastPaymentDate")}
-                    className="p-3 font-bold text-sm cursor-pointer select-none hover:bg-[#061f5f] transition-colors"
+                    className="p-3 font-bold text-sm cursor-pointer select-none hover:bg-[#061f5f] transition-colors text-center"
                     title="کلیک بکە بۆ ڕیزکردنی بەرواری کۆتا پارەدان"
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -379,10 +379,10 @@ export default function DebtReportPage() {
                 {visibleColumns.totalDebt && (
                   <th 
                     onClick={() => toggleSort("totalDebt")}
-                    className="p-3 font-bold text-sm cursor-pointer select-none hover:bg-[#061f5f] transition-colors"
+                    className="p-3 font-bold text-sm cursor-pointer select-none hover:bg-[#061f5f] transition-colors text-right pr-6"
                     title="کلیک بکە بۆ ڕیزکردنی قەرزەکان"
                   >
-                    <div className="flex items-center justify-center gap-1">
+                    <div className="flex items-center gap-1 justify-start">
                       <span>گشتی قەرز</span>
                       {sortField === "totalDebt" && (
                         <span className="text-xs">{sortDirection === "desc" ? "▼" : "▲"}</span>
@@ -403,22 +403,22 @@ export default function DebtReportPage() {
                 </tr>
               ) : (
                 sortedData.map((item, index) => (
-                  <tr key={item.id} className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                  <tr key={item.id} className={`border-b border-slate-200 hover:bg-blue-50/60 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-[#f1f5f9]'}`}>
                     {visibleColumns.account && (
-                      <td className="p-3 text-sm font-bold">
+                      <td className="p-3 text-sm font-bold text-right pr-6">
                         <a href={`/reports/account-statement?accountId=${item.id}`} className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
                           {item.name}
                         </a>
                       </td>
                     )}
-                    {visibleColumns.phone && <td className="p-3 text-sm text-gray-600" dir="ltr">{item.phone}</td>}
-                    {visibleColumns.city && <td className="p-3 text-sm text-gray-600">{item.city}</td>}
-                    {visibleColumns.district && <td className="p-3 text-sm text-gray-600">{item.district}</td>}
-                    {visibleColumns.creditLimitExceeded && <td className="p-3 text-sm text-gray-500">نەخێر</td>}
-                    {visibleColumns.debtBeforeLastPayment && <td className="p-3 text-sm font-semibold text-gray-700">{renderBalance(item.debtBeforeLastPaymentByCurrency)}</td>}
-                    {visibleColumns.lastPaymentAmount && <td className="p-3 text-sm font-semibold text-gray-700">{item.lastPaymentAmount > 0 ? formatMoneyJSX(item.lastPaymentAmount, item.lastPaymentCurrencyId) : "—"}</td>}
-                    {visibleColumns.lastPaymentDate && <td className="p-3 text-sm text-gray-600">{item.lastPaymentDate ? new Date(item.lastPaymentDate).toLocaleDateString() : "نییە"}</td>}
-                    {visibleColumns.totalDebt && <td className="p-3 text-sm font-black">{renderBalance(item.balanceByCurrency)}</td>}
+                    {visibleColumns.phone && <td className="p-3 text-sm text-gray-600 text-center" dir="ltr">{item.phone}</td>}
+                    {visibleColumns.city && <td className="p-3 text-sm text-gray-600 text-center">{item.city}</td>}
+                    {visibleColumns.district && <td className="p-3 text-sm text-gray-600 text-center">{item.district}</td>}
+                    {visibleColumns.creditLimitExceeded && <td className="p-3 text-sm text-gray-500 text-center">نەخێر</td>}
+                    {visibleColumns.debtBeforeLastPayment && <td className="p-3 text-sm font-semibold text-gray-700 text-right pr-6">{renderBalance(item.debtBeforeLastPaymentByCurrency)}</td>}
+                    {visibleColumns.lastPaymentAmount && <td className="p-3 text-sm font-semibold text-gray-700 text-right pr-6">{item.lastPaymentAmount > 0 ? formatMoneyJSX(item.lastPaymentAmount, item.lastPaymentCurrencyId) : "—"}</td>}
+                    {visibleColumns.lastPaymentDate && <td className="p-3 text-sm text-gray-600 text-center">{item.lastPaymentDate ? new Date(item.lastPaymentDate).toLocaleDateString() : "نییە"}</td>}
+                    {visibleColumns.totalDebt && <td className="p-3 text-sm font-black text-right pr-6">{renderBalance(item.balanceByCurrency)}</td>}
                   </tr>
                 ))
               )}

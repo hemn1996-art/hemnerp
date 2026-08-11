@@ -328,6 +328,11 @@ export default function BalanceSheetPage() {
     const symbol = data?.currencySymbol || currencyLabel;
     const activeCurrency = currencies?.find((c: any) => c.id.toString() === currencyId.toString() || c.symbol === symbol || c.code === symbol);
     const isRounding = activeCurrency ? activeCurrency.rounding : false;
+    const isIQD = symbol === "دینار" || symbol === "د.ع" || activeCurrency?.code === "IQD";
+    const absVal = Math.abs(n);
+    if (absVal > 0 && (isIQD ? absVal < 1000 : absVal < 1.0)) {
+      return `0 ${symbol}`;
+    }
     return n.toLocaleString("en-US", { 
       minimumFractionDigits: 0, 
       maximumFractionDigits: isRounding ? 0 : 2 
