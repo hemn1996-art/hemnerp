@@ -1502,11 +1502,20 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }));
   }
 
+  function getCanonicalCurrencyId(curId?: number | string) {
+    const rawId = Number(curId || invoiceCurrencyId || 11);
+    const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
+    if (!found) return rawId;
+    const mainCur = (currencies || []).find((c: any) => c.code === found.code && (c.isActive !== false));
+    return mainCur ? Number(mainCur.id) : rawId;
+  }
+
   function getItemsTotalsByCurrency() {
     const map: Record<string, number> = {};
 
     for (const row of rows) {
-      const key = String(row.currencyId || invoiceCurrencyId);
+      const canonicalId = getCanonicalCurrencyId(row.currencyId || invoiceCurrencyId);
+      const key = String(canonicalId);
       map[key] = (map[key] || 0) + getRowNetTotalInRowCurrency(row);
     }
 
@@ -1517,7 +1526,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const map: Record<string, number> = {};
 
     for (const item of getPaidCurrencies()) {
-      const key = String(item.currencyId);
+      const canonicalId = getCanonicalCurrencyId(item.currencyId);
+      const key = String(canonicalId);
       map[key] = (map[key] || 0) + item.amount;
     }
 

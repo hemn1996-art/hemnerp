@@ -6,6 +6,7 @@ import DateInput from "./DateInput";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -180,6 +181,18 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
   const [accountId, setAccountId] = useState<number | undefined>();
   const [showAccountList, setShowAccountList] = useState(false);
   const [showAccountInfo, setShowAccountInfo] = useState(false);
+  const accountContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showAccountList) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (accountContainerRef.current && !accountContainerRef.current.contains(e.target as Node)) {
+        setShowAccountList(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [showAccountList]);
 
   useEffect(() => {
     if (accountId && accounts && accounts.length > 0 && !accountSearch) {
@@ -196,6 +209,18 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
 
   const [productSearch, setProductSearch] = useState("");
   const [showProductList, setShowProductList] = useState(false);
+  const productContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showProductList) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (productContainerRef.current && !productContainerRef.current.contains(e.target as Node)) {
+        setShowProductList(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [showProductList]);
   const [rows, setRows] = useState<ExpenseRow[]>([]);
 
   const [receiptNote, setReceiptNote] = useState("");
@@ -784,7 +809,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
 
       <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
-          <div style={{ position: "relative", marginBottom: 12 }}>
+          <div ref={accountContainerRef} style={{ position: "relative", marginBottom: 12 }}>
             <label style={labelStyle}>هەژمار ـ ئارەزوومەندانە</label>
 
             <div style={accountInputWrap}>
@@ -805,9 +830,23 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
                 style={{
                   ...input,
                   ...lockedFieldStyle,
-                  paddingLeft: accountId && !isLocked ? 44 : 14,
+                  paddingLeft: (accountId || showAccountList) && !isLocked ? 44 : 14,
                 }}
               />
+
+              {showAccountList && !isLocked && !accountId && (
+                <button
+                  type="button"
+                  style={accountClearBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAccountList(false);
+                  }}
+                  title="داخستنی لیست"
+                >
+                  ✕
+                </button>
+              )}
 
               {accountId && !isLocked && (
                 <button
@@ -828,6 +867,33 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
 
             {showAccountList && !isLocked && (
               <div style={dropdownLarge}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc", position: "sticky", top: 0, zIndex: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: "bold", color: "#64748b" }}>هەڵبژاردنی هەژمار</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAccountList(false);
+                    }}
+                    style={{
+                      border: "none",
+                      background: "#e2e8f0",
+                      color: "#334155",
+                      borderRadius: "50%",
+                      width: 22,
+                      height: 22,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 13,
+                      fontWeight: "bold",
+                    }}
+                    title="داخستنی لیست"
+                  >
+                    ✕
+                  </button>
+                </div>
                 {filteredAccounts.length === 0 ? (
                   <div style={emptyText}>هیچ هەژمارێک نەدۆزرایەوە</div>
                 ) : (
@@ -1021,7 +1087,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
           </div>
 
           <div style={tableCard}>
-            <div style={productSearchBox}>
+            <div ref={productContainerRef} style={productSearchBox}>
               <input
                 value={productSearch}
                 disabled={isLocked}
@@ -1039,6 +1105,33 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
 
               {showProductList && !isLocked && (
                 <div style={productDropdown}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc", position: "sticky", top: 0, zIndex: 10 }}>
+                    <span style={{ fontSize: 12, fontWeight: "bold", color: "#64748b" }}>هەڵبژاردنی خەرجی</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowProductList(false);
+                      }}
+                      style={{
+                        border: "none",
+                        background: "#e2e8f0",
+                        color: "#334155",
+                        borderRadius: "50%",
+                        width: 22,
+                        height: 22,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 13,
+                        fontWeight: "bold",
+                      }}
+                      title="داخستنی لیست"
+                    >
+                      ✕
+                    </button>
+                  </div>
                   {expenseProducts.length === 0 ? (
                     <div style={emptyText}>هیچ خەرجییەک نەدۆزرایەوە</div>
                   ) : (

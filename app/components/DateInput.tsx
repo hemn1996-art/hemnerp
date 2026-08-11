@@ -287,8 +287,8 @@ export default function DateInput({
       {isOpen && (
         <div 
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 mt-12 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-50 w-64 text-right select-none animate-in fade-in slide-in-from-top-2 duration-200"
-          style={{ top: "100%" }}
+          className="absolute right-0 left-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 z-50 text-right select-none animate-in fade-in slide-in-from-top-2 duration-200"
+          style={{ top: "calc(100% + 4px)", minWidth: "260px" }}
         >
           <div className="flex items-center justify-between mb-3 flex-row-reverse">
             {view === "days" || view === "years" ? (

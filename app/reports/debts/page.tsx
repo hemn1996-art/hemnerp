@@ -86,20 +86,38 @@ export default function DebtReportPage() {
 
   const formatMoneyJSX = (val: number, curId: number) => {
     const currencyObj = currencies?.find((c: any) => c.id === curId);
-    const isRounding = currencyObj ? currencyObj.rounding : false;
-    const absVal = Math.abs(val);
-    const formatted = absVal.toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: isRounding ? 0 : 2
-    });
-    const symbol = currencyObj?.code === "IQD" || curId === 12 ? "دینار" : "$";
+    const code = currencyObj?.code;
+    const isIQD = code === "IQD" || curId === 12 || currencyObj?.symbol === "دینار";
+    const symbol = isIQD ? "دینار" : (currencyObj?.symbol || "$");
     const isNegative = val < 0;
 
+    if (isIQD) {
+      const roundedVal = Math.round(Math.abs(val)).toLocaleString("en-US");
+      return (
+        <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: "3px" }} dir="ltr">
+          {isNegative && <span>-</span>}
+          <span>{roundedVal}</span>
+          <span style={{ fontSize: "0.85em", opacity: 0.85 }}>{symbol}</span>
+        </span>
+      );
+    }
+
+    const formatted = Math.abs(val).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const parts = formatted.split(".");
+    const whole = parts[0];
+    const dec = parts[1] || "00";
+
     return (
-      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "4px" }} dir="ltr">
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: "2px" }} dir="ltr">
         {isNegative && <span>-</span>}
-        <span>{symbol}</span>
-        <span>{formatted}</span>
+        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{symbol}</span>
+        <span>
+          <span>{whole}</span>
+          <span style={{ fontSize: "0.7em", opacity: 0.8 }}>.{dec}</span>
+        </span>
       </span>
     );
   };

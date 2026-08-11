@@ -24,17 +24,14 @@ export default function FormattedNumber({
   const processedValue = isIQD ? Math.round(numValue) : numValue;
 
   // Format to string with fixed decimals
-  const isInteger = processedValue % 1 === 0;
-  // If it's an integer, maybe we don't want decimals? 
-  // Let's use toLocaleString with minimumFractionDigits: 0, maximumFractionDigits: decimals
   const formatted = processedValue.toLocaleString('en-US', {
-    minimumFractionDigits: isInteger ? 0 : actualDecimals,
+    minimumFractionDigits: actualDecimals,
     maximumFractionDigits: actualDecimals
   });
 
   const parts = formatted.split('.');
   const wholePart = parts[0];
-  const decimalPart = parts[1];
+  const decimalPart = parts[1] || (actualDecimals > 0 ? "0".repeat(actualDecimals) : null);
 
   return (
     <span className={className} dir="ltr" style={{ display: 'inline-flex', flexDirection: 'row', alignItems: 'baseline', gap: '4px' }}>
@@ -42,7 +39,7 @@ export default function FormattedNumber({
       <span>
         <span>{wholePart}</span>
         {decimalPart && (
-          <span className="text-[0.7em] opacity-80" style={{ verticalAlign: 'baseline' }}>
+          <span style={{ fontSize: '0.7em', opacity: 0.8, verticalAlign: 'baseline' }}>
             .{decimalPart}
           </span>
         )}

@@ -130,6 +130,7 @@ export async function GET(request: Request) {
             date: true,
             accountId: true,
             currencyId: true,
+            currency: { select: { id: true, symbol: true, code: true, name: true } },
             exchangeRate: true,
             account: { select: { name: true, accountTypeId: true } },
             inventoryTransactions: {
@@ -183,6 +184,8 @@ export async function GET(request: Request) {
         accountName: line.voucher.account?.name || "نەزانراو",
         accountTypeId: line.voucher.account?.accountTypeId || null,
         currencyId: line.voucher.currencyId,
+        currencySymbol: line.voucher.currency?.symbol || "$",
+        currencyCode: line.voucher.currency?.code || "USD",
         exchangeRate: line.voucher.exchangeRate,
         date: line.voucher.date
       };

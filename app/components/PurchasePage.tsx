@@ -945,8 +945,12 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     return Number.isFinite(n) ? n : 0;
   }
 
-  function getCurrencyKey(currencyId: number) {
-    return String(currencyId);
+  function getCurrencyKey(currencyId?: number) {
+    const rawId = Number(currencyId || purchaseCurrencyId || defaultCurrency?.id || 11);
+    const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
+    if (!found) return String(rawId);
+    const mainCur = (currencies || []).find((c: any) => c.code === found.code && (c.isActive !== false));
+    return String(mainCur ? mainCur.id : rawId);
   }
 
   function getCurrencySymbol(currencyId?: number) {

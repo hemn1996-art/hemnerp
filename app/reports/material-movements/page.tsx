@@ -361,6 +361,52 @@ export default function ItemsReportPage() {
     return d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
+  const formatCurrency = (amount: number | string, itemCurId?: number, itemSymbol?: string, itemCode?: string) => {
+    const num = Number(amount || 0);
+    if (isNaN(num)) return "-";
+    const curObj = (currencies || []).find((c: any) => c.id === itemCurId);
+    const code = itemCode || curObj?.code;
+    const symbol = itemSymbol || curObj?.symbol || curObj?.name || "";
+
+    const isIQD = code === "IQD" || symbol === "دینار" || symbol === "د.ع";
+    if (isIQD) {
+      const roundedVal = Math.round(num).toLocaleString("en-US");
+      return `${roundedVal} دینار`;
+    }
+
+    const isNegative = num < 0;
+    const absNum = Math.abs(num);
+    const formattedNumber = absNum.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+    const parts = formattedNumber.split(".");
+    const whole = parts[0];
+    const decimal = parts[1] || "00";
+    const displaySymbol = symbol || "$";
+
+    return (
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: "2px" }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          <span style={{ fontSize: "0.7em", opacity: 0.8 }}>.{decimal}</span>
+        </span>
+      </span>
+    );
+  };
+
+  const perCurrencyProfit = React.useMemo(() => {
+    const totals: Record<string | number, number> = {};
+    filteredItems.forEach((i: any) => {
+      const curKey = i.currencyId || "USD";
+      totals[curKey] = (totals[curKey] || 0) + (i.profit || 0);
+    });
+    return totals;
+  }, [filteredItems]);
+
   return (
     <div className="p-4 bg-slate-50 min-h-screen font-ckb text-slate-800">
       {/* Header */}
@@ -427,7 +473,15 @@ export default function ItemsReportPage() {
               <p className="text-xs text-slate-500 mt-1">{getQtyCardLabel()}</p>
             </div>
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-green-500 flex flex-col justify-center items-center">
-              <p className="text-2xl font-bold text-green-600">{filteredItems.reduce((s, i) => s + (i.profit || 0), 0).toLocaleString("en-US")} $</p>
+              <div className="text-2xl font-bold text-green-600 flex flex-wrap gap-2 justify-center">
+                {Object.keys(perCurrencyProfit).length > 0 ? (
+                  Object.entries(perCurrencyProfit).map(([cId, val]) => (
+                    <span key={cId}>{formatCurrency(val, Number(cId))}</span>
+                  ))
+                ) : (
+                  <span>$0</span>
+                )}
+              </div>
               <p className="text-xs text-slate-500 mt-1">کۆی قازانج</p>
             </div>
           </div>
@@ -532,23 +586,23 @@ export default function ItemsReportPage() {
                     {visibleColumns.category && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
                     {visibleColumns.brand && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
                     {visibleColumns.warehouseName && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.warehouseName}</td>}
-                    {visibleColumns.cost && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">${Number(item.cost).toLocaleString()}</td>}
+                    {visibleColumns.cost && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">{formatCurrency(item.cost, item.currencyId, item.currencySymbol, item.currencyCode)}</td>}
                     {visibleColumns.quantity && (
                       <td className={`p-2 border-r border-slate-200 text-center font-bold ${item.quantity < 0 ? "text-rose-600" : "text-slate-700"}`}>
                         {item.quantity.toLocaleString("en-US")} دانە
                       </td>
                     )}
-                    {visibleColumns.price && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">${Number(item.price).toLocaleString()}</td>}
+                    {visibleColumns.price && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">{formatCurrency(item.price, item.currencyId, item.currencySymbol, item.currencyCode)}</td>}
                     {visibleColumns.offers && <td className="p-2 border-r border-slate-200 text-center text-slate-400">-</td>}
-                    {visibleColumns.discount && <td className="p-2 border-r border-slate-200 text-center text-slate-600">{item.discount > 0 ? `$${item.discount}` : '-'}</td>}
+                    {visibleColumns.discount && <td className="p-2 border-r border-slate-200 text-center text-slate-600">{item.discount > 0 ? formatCurrency(item.discount, item.currencyId, item.currencySymbol, item.currencyCode) : '-'}</td>}
                     {visibleColumns.lineTotal && (
                       <td className={`p-2 border-r border-slate-200 text-center bg-slate-50 font-bold ${item.lineTotal < 0 ? "text-rose-600" : "text-slate-800"}`}>
-                        ${Number(item.lineTotal).toLocaleString()}
+                        {formatCurrency(item.lineTotal, item.currencyId, item.currencySymbol, item.currencyCode)}
                       </td>
                     )}
                     {visibleColumns.profit && (
                       <td className={`p-2 border-r border-slate-200 text-center bg-green-50 font-bold ${item.profit < 0 ? "text-rose-600" : "text-green-700"}`}>
-                        ${Number(item.profit).toLocaleString()}
+                        {formatCurrency(item.profit, item.currencyId, item.currencySymbol, item.currencyCode)}
                       </td>
                     )}
                     {visibleColumns.date && <td className="p-2 border-r border-slate-200 text-center text-slate-500 text-[10px]">{formatDate(item.date)}</td>}
