@@ -353,12 +353,13 @@ export default function DebtReportPage() {
       <div className="bg-white rounded-xl shadow-sm flex-1 overflow-hidden flex flex-col">
         {(() => {
           const visibleColCount = Object.values(visibleColumns).filter(Boolean).length;
-          const containerWidthClass = visibleColCount <= 2 ? "max-w-xl mx-auto w-full" : visibleColCount === 3 ? "max-w-3xl mx-auto w-full" : visibleColCount === 4 ? "max-w-4xl mx-auto w-full" : "w-full";
+          const containerWidthClass = visibleColCount <= 2 ? "max-w-4xl mx-auto w-full" : visibleColCount <= 4 ? "max-w-5xl mx-auto w-full" : "w-full";
           return (
             <div className={`overflow-x-auto flex-1 ${containerWidthClass}`}>
-              <table id="debts-report-table" className={`w-full text-center border-collapse ${visibleColCount <= 3 ? "" : "min-w-[800px]"}`}>
+              <table id="debts-report-table" className="w-full text-center border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-[#03133f] text-white">
+                <th className="p-3 font-bold text-sm text-center w-12">#</th>
                 {visibleColumns.account && <th className="p-3 font-bold text-sm text-center">هەژمار</th>}
                 {visibleColumns.phone && <th className="p-3 font-bold text-sm text-center">ژمارە تەلەفۆن</th>}
                 {visibleColumns.city && <th className="p-3 font-bold text-sm text-center">شار</th>}
@@ -399,15 +400,16 @@ export default function DebtReportPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="p-4 text-center text-gray-500">لە بارکردندایە...</td>
+                  <td colSpan={11} className="p-4 text-center text-gray-500">لە بارکردندایە...</td>
                 </tr>
               ) : sortedData.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-4 text-center text-gray-500">هیچ داتایەک نەدۆزرایەوە</td>
+                  <td colSpan={11} className="p-4 text-center text-gray-500">هیچ داتایەک نەدۆزرایەوە</td>
                 </tr>
               ) : (
                 sortedData.map((item, index) => (
                   <tr key={item.id} className={`border-b border-slate-200 hover:bg-blue-50/60 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-[#f1f5f9]'}`}>
+                    <td className="p-3 text-sm font-bold text-gray-400 text-center w-12">{index + 1}</td>
                     {visibleColumns.account && (
                       <td className="p-3 text-sm font-bold text-center">
                         <a href={`/reports/account-statement?accountId=${item.id}`} className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
