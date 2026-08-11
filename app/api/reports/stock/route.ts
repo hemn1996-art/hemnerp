@@ -43,7 +43,8 @@ export async function GET(request: Request) {
           select: {
             type: true,
             date: true,
-            account: { select: { id: true, name: true } },
+            account: { select: { id: true, name: true, exchangeRateType: true, customExchangeRate: true } },
+            versions: { select: { version: true, data: true } },
             lines: {
               select: {
                 productId: true,
@@ -93,6 +94,22 @@ export async function GET(request: Request) {
       const originalPrice = (line && line.unitPrice > 0) ? line.unitPrice : (t.unitCost || 0);
       const costVal = t.unitCost || originalPrice;
 
+      let versionData: any = {};
+      if (t.voucher?.versions && t.voucher.versions.length > 0) {
+        const sortedV = [...t.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
+        const latestV = sortedV[sortedV.length - 1];
+        try { versionData = JSON.parse(latestV.data); } catch(e){}
+      }
+
+      const sellerAcc = t.voucher?.account;
+      let rateTypeForProduct = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType || "DAILY_MARKET";
+      let customRateForProduct = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate || 132000;
+
+      if (rateTypeForProduct === "FIXED") {
+        stockMap[key].exchangeRateType = "FIXED";
+        stockMap[key].customExchangeRate = customRateForProduct;
+      }
+
       if (t.qtyChange > 0 && costVal > 0) {
         const unitExpense = Math.max(costVal - originalPrice, 0);
 
@@ -133,6 +150,29 @@ export async function GET(request: Request) {
           item.purchasePrice = txWithCost.unitCost;
           item.cost = txWithCost.unitCost;
         }
+      }
+
+      // If any transaction on this product came from a FIXED rate voucher, propagate FIXED rate to item
+      const txFixed = transactions.find((t: any) => {
+        if (t.productId !== item.productId) return false;
+        let vData: any = {};
+        if (t.voucher?.versions && t.voucher.versions.length > 0) {
+          const sortedV = [...t.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
+          const latestV = sortedV[sortedV.length - 1];
+          try { vData = JSON.parse(latestV.data); } catch(e){}
+        }
+        return (t.voucher as any)?.exchangeRateType === "FIXED" || vData.exchangeRateType === "FIXED" || t.voucher?.account?.exchangeRateType === "FIXED";
+      });
+
+      if (txFixed) {
+        let vData: any = {};
+        if (txFixed.voucher?.versions && txFixed.voucher.versions.length > 0) {
+          const sortedV = [...txFixed.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
+          const latestV = sortedV[sortedV.length - 1];
+          try { vData = JSON.parse(latestV.data); } catch(e){}
+        }
+        item.exchangeRateType = "FIXED";
+        item.customExchangeRate = (txFixed.voucher as any)?.customExchangeRate || vData.customExchangeRate || txFixed.voucher?.account?.customExchangeRate || 132000;
       }
     });
 
