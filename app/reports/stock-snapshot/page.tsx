@@ -277,7 +277,7 @@ export default function StockSnapshotReportPage() {
                   {visibleColumns.cost && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">کۆست</th>}
                   {visibleColumns.warehouseValue && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">بەهای کۆگا</th>}
                   {visibleColumns.sellerName && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center">فرۆشیار</th>}
-                  {visibleColumns.purchaseDate && <th className="px-2 py-2.5 font-bold text-center">بەرواری کڕین</th>}
+                  {visibleColumns.purchaseDate && <th className="px-2 py-2.5 font-bold text-center">بەرواری کۆتا کڕین</th>}
                 </tr>
               </thead>
               <tbody>
@@ -370,7 +370,7 @@ export default function StockSnapshotReportPage() {
                   { key: 'cost', label: 'کۆست' },
                   { key: 'warehouseValue', label: 'بەهای کۆگا' },
                   { key: 'sellerName', label: 'فرۆشیار' },
-                  { key: 'purchaseDate', label: 'بەرواری کڕین' },
+                  { key: 'purchaseDate', label: 'بەرواری کۆتا کڕین' },
                 ].map(col => (
                   <label key={col.key} className="flex items-center justify-between cursor-pointer border-b border-gray-100 pb-1.5">
                     <span className="text-gray-700 font-bold text-[11px]">{col.label}</span>
