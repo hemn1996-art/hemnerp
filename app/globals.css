@@ -250,7 +250,7 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   /* Reset browser margin and page margins */
   @page {
     size: auto;
-    margin: 8mm 6mm !important;
+    margin: 0;
   }
 
   /* Reset layout zoom and dimensions */
@@ -305,24 +305,50 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     visibility: visible;
   }
 
-  /* Position print container absolutely at top-left at full width */
+  /* Position print container fixed at top-left at full width */
   #print-area,
   #print-report-area,
+  #invoice-print-area,
+  #purchase-print-area,
+  #warehouse-stock-print-area,
+  #warehouse-damage-print-area,
+  #sales-return-print-area,
+  #purchase-return-print-area,
+  #product-transfer-print-area,
+  #people-debt-print-area,
+  #people-debt-discount-print-area,
+  #my-debt-print-area,
+  #money-out-print-area,
+  #money-in-print-area,
+  #material-issue-print-area,
+  #expense-print-area,
+  #debt-discount-print-area,
+  #cash-deposit-print-area,
+  #cash-withdrawal-print-area,
+  #quotation-print-area,
   [id$="-print-area"] {
-    position: absolute !important;
+    position: fixed !important;
     left: 0 !important;
     top: 0 !important;
+    right: 0 !important;
     width: 100% !important;
     min-width: 100% !important;
     max-width: 100% !important;
-    padding: 0 !important; /* Page margin handles spacing */
+    padding: 2mm 6mm 6mm 6mm !important; /* Top: 2mm, Left/Right: 6mm, Bottom: 6mm */
     margin: 0 !important;
     box-sizing: border-box !important;
     border: none !important;
     box-shadow: none !important;
     background: white !important;
     display: block !important;
-    z-index: 9999 !important;
+    z-index: 999999 !important;
+  }
+
+  #print-area > div,
+  #print-report-area > div,
+  [id$="-print-area"] > div {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
   }
 
   /* Force all wrapper containers to show overflow instead of clipping on print */

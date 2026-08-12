@@ -54,7 +54,18 @@ export default function PrintHeader() {
   }
 
   return (
-    <div className="print-header-spacer" style={{ height: "135px", width: "100%", marginBottom: "10px" }} />
+    <div style={headerContainer}>
+      <div style={rightCol}>
+        <div style={companyNameStyle}>{settings.companyName}</div>
+        {settings.about && <div style={companyAboutStyle}>{settings.about}</div>}
+        {settings.phones && settings.phones.map((p, idx) => (
+          <div key={idx} style={phoneText}>{p}</div>
+        ))}
+      </div>
+      <div style={leftCol}>
+        {settings.address && <div style={addressText}>{settings.address}</div>}
+      </div>
+    </div>
   );
 }
 
