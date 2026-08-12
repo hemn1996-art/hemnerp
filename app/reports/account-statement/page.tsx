@@ -170,19 +170,19 @@ function AccountStatementContent() {
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   };
 
-  const formatMoney = (amount: number, curId: number) => {
+  const formatMoney = (amount: number, curId: number, showMinus = false) => {
     const cur = currencies.find((c: any) => c.id === curId);
     const isRounding = cur ? cur.rounding : false;
-    const num = Math.abs(amount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: isRounding ? 0 : 2 });
+    const absVal = Math.abs(amount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: isRounding ? 0 : 2 });
     const symbol = cur?.symbol || cur?.code || "";
-    const isNegative = amount < 0;
+    const isNegative = amount < -0.0001;
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "flex-start", direction: "ltr" }}>
-        {isNegative && <span style={{ marginRight: "2px" }}>-</span>}
+        {showMinus && isNegative && <span style={{ marginRight: "2px" }}>-</span>}
         <span style={{ fontSize: "0.8em", opacity: 0.7, marginRight: "4px", alignSelf: "flex-start", paddingTop: "2px" }}>
           {symbol}
         </span>
-        <span>{num}</span>
+        <span>{absVal}</span>
       </span>
     );
   };
@@ -212,13 +212,13 @@ function AccountStatementContent() {
       <div className="flex flex-col gap-1 items-center justify-center">
         {activeEntries.map(([curId, val]) => {
           const isNegative = val < -0.01;
-          let color = isNegative ? "text-red-600 font-bold" : "text-green-600 font-bold";
+          let color = isNegative ? "text-red-600 font-bold" : "text-emerald-600 font-bold";
           if (isFooter) {
-            color = "text-white font-bold";
+            color = isNegative ? "text-red-300 font-bold" : "text-emerald-300 font-bold";
           }
           return (
             <div key={curId} className={`${color} text-sm md:text-base`} dir="ltr">
-              {formatMoney(val, Number(curId))}
+              {formatMoney(val, Number(curId), false)}
             </div>
           );
         })}
@@ -578,9 +578,9 @@ function AccountStatementContent() {
                   {/* Center cell is blank in first row */}
                 </td>
                 <td className="p-3 w-1/3">
-                  <div className="flex items-center justify-between flex-row-reverse w-full">
+                  <div className="flex items-center gap-2">
                     <span className="text-gray-500 font-extrabold">باڵانس:</span>
-                    <span className="font-black text-gray-900 text-sm" dir="ltr">{renderBalances(processed.finalBalances)}</span>
+                    <span className="font-black text-sm" dir="ltr">{renderBalances(processed.finalBalances)}</span>
                   </div>
                 </td>
               </tr>
@@ -598,7 +598,7 @@ function AccountStatementContent() {
                   </div>
                 </td>
                 <td className="p-3">
-                  <div className="flex items-center justify-between flex-row-reverse w-full">
+                  <div className="flex items-center gap-2">
                     <span className="text-gray-500 font-extrabold">بەرواری پرینتکردن:</span>
                     <span className="font-bold text-gray-800 text-xs" dir="ltr">
                       {new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
