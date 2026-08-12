@@ -454,12 +454,26 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             }
             
             const initialPaid: PaidAmounts = {};
+            let totalPaidSum = 0;
             if (voucher.paidAmounts && Array.isArray(voucher.paidAmounts)) {
               voucher.paidAmounts.forEach((pa: any) => {
-                initialPaid[pa.currencyId] = String(pa.amount);
+                const amt = Number(pa.amount || 0);
+                if (amt > 0) {
+                  initialPaid[pa.currencyId] = String(pa.amount);
+                  totalPaidSum += amt;
+                }
               });
             }
             setPaidAmounts(initialPaid);
+
+            const netAmt = Number(voucher.netAmount || 0);
+            if (totalPaidSum === 0 || Object.keys(initialPaid).length === 0) {
+              setPaymentTypeMode("debt");
+            } else if (totalPaidSum >= netAmt - 0.01) {
+              setPaymentTypeMode("cash");
+            } else {
+              setPaymentTypeMode("partial");
+            }
             
             // Set the paid currency dropdown to the currency that was actually paid
             if (voucher.paidAmounts && Array.isArray(voucher.paidAmounts) && voucher.paidAmounts.length > 0) {
@@ -1630,6 +1644,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setProductSearch("");
     setInvoiceDiscountValue("");
     setShowInvoiceDiscount(false);
+    setPaymentTypeMode("cash");
     setPaidAmounts({});
     setPaidCurrencyId(defaultCurrency.id);
     const iqd = currencies.find((c: any) => c.code === "IQD");

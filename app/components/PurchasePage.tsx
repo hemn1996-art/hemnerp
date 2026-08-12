@@ -275,12 +275,26 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             }
 
             const initialPaid: PaidAmounts = {};
+            let totalPaidSum = 0;
             if (voucher.paidAmounts && Array.isArray(voucher.paidAmounts)) {
               voucher.paidAmounts.forEach((pa: any) => {
-                initialPaid[pa.currencyId] = String(pa.amount);
+                const amt = Number(pa.amount || 0);
+                if (amt > 0) {
+                  initialPaid[pa.currencyId] = String(pa.amount);
+                  totalPaidSum += amt;
+                }
               });
             }
             setPaidAmounts(initialPaid);
+
+            const netAmt = Number(voucher.netAmount || 0);
+            if (totalPaidSum === 0 || Object.keys(initialPaid).length === 0) {
+              setPaymentTypeMode("debt");
+            } else if (totalPaidSum >= netAmt - 0.01) {
+              setPaymentTypeMode("cash");
+            } else {
+              setPaymentTypeMode("partial");
+            }
 
             setInternalNote(voucher.internalNote || "");
             setPrintNote(voucher.printNote || "");
