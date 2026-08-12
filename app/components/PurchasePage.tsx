@@ -1187,6 +1187,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   }
 
   function getPaidCurrencies() {
+    if (paymentTypeMode === "debt") return [];
     return Object.entries(paidAmounts)
       .map(([currencyIdText, amountText]) => ({
         currencyId: Number(currencyIdText),
@@ -1647,12 +1648,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       ? "convert_to_other_currency"
       : (action === "keep_credit" ? "keep_as_same_currency_balance" : null);
 
-    const paidList = Object.entries(paidAmounts)
-      .map(([currencyIdText, amountText]) => ({
-        currencyId: Number(currencyIdText),
-        amount: toNumber(amountText),
-      }))
-      .filter((x: any) => x.amount > 0);
+    const paidList = getPaidCurrencies();
 
     const result = calculateLedgerEntries({
       type: "purchase",

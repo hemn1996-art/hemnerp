@@ -798,6 +798,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, [invoiceCurrencyId, exchangeRate, currencies]);
 
   useEffect(() => {
+    if (isEditLoading) return;
     if (paymentTypeMode === "cash") {
       const itemTotals = getItemsTotalsByCurrency();
       const newPaid: PaidAmounts = {};
@@ -812,7 +813,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
       setPaidAmounts(newPaid);
     }
-  }, [rows, total, paymentTypeMode, paidCurrencyId, getFullPaidAmountForCurrency]);
+  }, [rows, total, paymentTypeMode, paidCurrencyId, getFullPaidAmountForCurrency, isEditLoading]);
 
   const accountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
@@ -1088,6 +1089,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function getPaidCurrencies() {
+    if (paymentTypeMode === "debt") return [];
     return Object.entries(paidAmounts)
       .map(([currencyIdText, amountText]) => ({
         currencyId: Number(currencyIdText),
@@ -1709,12 +1711,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       ? "convert_to_other_currency"
       : (action === "keep_credit" ? "keep_as_same_currency_balance" : null);
 
-    const paidList = Object.entries(paidAmounts)
-      .map(([currencyIdText, amountText]) => ({
-        currencyId: Number(currencyIdText),
-        amount: toNumber(amountText),
-      }))
-      .filter((x: any) => x.amount > 0);
+    const paidList = getPaidCurrencies();
 
     const result = calculateLedgerEntries({
       type: mappedType,
