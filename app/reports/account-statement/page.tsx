@@ -199,7 +199,7 @@ function AccountStatementContent() {
     return usd;
   };
 
-  const renderBalances = (balances: Record<string, number>, isFooter = false) => {
+  const renderBalances = (balances: Record<string, number>, isFooter = false, showNote = false) => {
     let entries = Object.entries(balances);
     if (filterCurrencyId !== "all") {
       entries = entries.filter(([curId]) => curId === filterCurrencyId);
@@ -212,13 +212,35 @@ function AccountStatementContent() {
       <div className="flex flex-col gap-1 items-center justify-center">
         {activeEntries.map(([curId, val]) => {
           const isNegative = val < -0.01;
-          let color = isNegative ? "text-red-600 font-bold" : "text-emerald-600 font-bold";
+          
+          let style: React.CSSProperties = {
+            color: isNegative ? "#dc2626" : "#16a34a",
+            fontWeight: 900,
+          };
+
           if (isFooter) {
-            color = isNegative ? "text-red-300 font-bold" : "text-emerald-300 font-bold";
+            style = {
+              color: isNegative ? "#ff6b6b" : "#4ade80",
+              fontWeight: 900,
+              fontSize: "17px",
+              textShadow: isNegative ? "0 0 6px rgba(255, 107, 107, 0.4)" : "0 0 6px rgba(74, 222, 128, 0.4)",
+            };
           }
+
+          const noteText = isNegative
+            ? " (ئەم بڕە ئێمە قەرزارین)"
+            : ` (${account?.name || "هەژمارەکە"} قەرزاری ئێمەیە)`;
+
           return (
-            <div key={curId} className={`${color} text-sm md:text-base`} dir="ltr">
-              {formatMoney(val, Number(curId), false)}
+            <div key={curId} className="flex items-center gap-1.5 flex-wrap justify-center text-sm md:text-base">
+              <span style={style} dir="ltr">
+                {formatMoney(val, Number(curId), false)}
+              </span>
+              {showNote && (
+                <span className={isFooter ? (isNegative ? "text-rose-200 text-xs font-bold" : "text-emerald-200 text-xs font-bold") : (isNegative ? "text-red-600 text-xs font-bold" : "text-emerald-600 text-xs font-bold")}>
+                  {noteText}
+                </span>
+              )}
             </div>
           );
         })}
@@ -580,7 +602,7 @@ function AccountStatementContent() {
                 <td className="p-3 w-1/3">
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500 font-extrabold">باڵانس:</span>
-                    <span className="font-black text-sm" dir="ltr">{renderBalances(processed.finalBalances)}</span>
+                    <span className="font-black text-sm" dir="ltr">{renderBalances(processed.finalBalances, false, true)}</span>
                   </div>
                 </td>
               </tr>
@@ -819,7 +841,7 @@ function AccountStatementContent() {
                 <tr className="border-t-2 border-[#0b1f50] bg-[#0b1f50] text-white">
                   <td colSpan={visibleColCount - (visibleColumns.balance ? 1 : 0) - (visibleColumns.note ? 1 : 0)} className="p-3 text-right font-black text-base">باڵانسی کۆتایی</td>
                   {visibleColumns.balance && (
-                    <td className="p-3 text-center font-black text-xl" dir="ltr">{renderBalances(processed.finalBalances, true)}</td>
+                    <td className="p-3 text-center font-black text-xl" dir="ltr">{renderBalances(processed.finalBalances, true, true)}</td>
                   )}
                   {visibleColumns.note && (
                     <td className="p-3"></td>
