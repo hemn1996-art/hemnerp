@@ -1,3 +1,4 @@
+import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
 import DateInput from "./DateInput";
 import FormattedNumberInput from "./FormattedNumberInput";
@@ -1119,7 +1120,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    openPrintWindow("money-in-print-area");
   }
 
   function togglePrintOption(key: keyof PrintOptions) {

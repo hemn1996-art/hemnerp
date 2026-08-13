@@ -1,3 +1,4 @@
+import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
 import { useRouter } from "next/navigation";
 import FormattedNumberInput from "./FormattedNumberInput";
@@ -1206,7 +1207,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    openPrintWindow("sales-return-print-area");
   }
 
   function togglePrintOption(key: keyof PrintOptions) {

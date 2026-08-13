@@ -1,3 +1,4 @@
+import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
 import DateInput from "./DateInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
@@ -795,7 +796,7 @@ export default function MaterialIssuePage({ headerSelector, editId }: Props) {
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    openPrintWindow("material-issue-print-area");
   }
 
   function togglePrintOption(key: keyof PrintOptions) {

@@ -1,3 +1,4 @@
+import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
 import { useRouter } from "next/navigation";
 import FormattedNumberInput from "./FormattedNumberInput";
@@ -1341,7 +1342,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    openPrintWindow("purchase-return-print-area");
   }
 
   function toggleColumn(key: keyof TableColumns) {

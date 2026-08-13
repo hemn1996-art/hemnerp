@@ -1,3 +1,4 @@
+import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
 import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
@@ -651,7 +652,7 @@ function getShareholderBalanceAfter(baseMap: Record<string, number>) {
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    openPrintWindow("cash-withdrawal-print-area");
   }
 
   function togglePrintOption(key: keyof PrintOptions) {

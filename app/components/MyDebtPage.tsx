@@ -1,3 +1,4 @@
+import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
 import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
@@ -756,7 +757,7 @@ export default function MyDebtPage({ headerSelector, editId }: Props) {
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    openPrintWindow("my-debt-print-area");
   }
 
   function togglePrintOption(key: keyof PrintOptions) {

@@ -1,3 +1,4 @@
+import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
 import DateInput from "./DateInput";
 import FormattedNumberInput from "./FormattedNumberInput";

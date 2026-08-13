@@ -1,3 +1,4 @@
+import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
 import DateInput from "./DateInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
@@ -695,7 +696,7 @@ export default function WarehouseStockPage({ headerSelector, editId }: Props) {
       return;
     }
 
-    setTimeout(() => window.print(), 100);
+    openPrintWindow("warehouse-stock-print-area");
   }
 
   function togglePrintOption(key: keyof PrintOptions) {
