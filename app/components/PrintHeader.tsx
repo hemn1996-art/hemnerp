@@ -22,6 +22,25 @@ export default function PrintHeader() {
   });
   const [activeTemplate, setActiveTemplate] = useState<any>(null);
 
+  const loadActiveTemplate = () => {
+    fetch("/api/invoice-templates")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const savedId = localStorage.getItem("selected_invoice_template_id");
+          let found = null;
+          if (savedId) {
+            found = data.find((t: any) => String(t.id) === savedId);
+          }
+          if (!found) {
+            found = data.find((t: any) => t.isMain && t.isActive) || data[0];
+          }
+          setActiveTemplate(found);
+        }
+      })
+      .catch((err) => console.error("Error loading template in PrintHeader:", err));
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem("general_settings");
     if (saved) {
@@ -30,15 +49,11 @@ export default function PrintHeader() {
       } catch (e) {}
     }
 
-    fetch("/api/invoice-templates")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const main = data.find((t: any) => t.isMain && t.isActive);
-          if (main) setActiveTemplate(main);
-        }
-      })
-      .catch((err) => console.error("Error loading template in PrintHeader:", err));
+    loadActiveTemplate();
+
+    const handleTemplateChange = () => loadActiveTemplate();
+    window.addEventListener("invoice-template-changed", handleTemplateChange);
+    return () => window.removeEventListener("invoice-template-changed", handleTemplateChange);
   }, []);
 
   if (activeTemplate?.headerImage) {

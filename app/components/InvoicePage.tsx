@@ -207,6 +207,27 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (warehousesFromStore.length === 0) fetchWarehouses();
   }, []);
 
+  const [invoiceTemplates, setInvoiceTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | string>("");
+
+  useEffect(() => {
+    fetch("/api/invoice-templates")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setInvoiceTemplates(data);
+          const savedId = localStorage.getItem("selected_invoice_template_id");
+          if (savedId && data.some((t: any) => String(t.id) === savedId)) {
+            setSelectedTemplateId(Number(savedId));
+          } else {
+            const main = data.find((t: any) => t.isMain && t.isActive) || data[0];
+            if (main) setSelectedTemplateId(main.id);
+          }
+        }
+      })
+      .catch((err) => console.error("Error loading invoice templates:", err));
+  }, []);
+
   useEffect(() => {
     if (!editId && defaultCurrency?.id) {
       setInvoiceDiscountCurrencyId(defaultCurrency.id);
@@ -2032,10 +2053,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           @media print {
             @page {
               size: A4 portrait !important;
-              margin: 6mm !important;
+              margin: 5mm !important;
             }
             html, body {
-              width: 210mm !important;
               margin: 0 !important;
               padding: 0 !important;
               background: #ffffff !important;
@@ -2046,6 +2066,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               margin: 0 auto !important;
               padding: 0 !important;
               box-sizing: border-box !important;
+              overflow: hidden !important;
               position: relative !important;
               left: 0 !important;
               top: 0 !important;
@@ -2055,7 +2076,17 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             }
             table {
               width: 100% !important;
+              max-width: 100% !important;
               table-layout: fixed !important;
+              font-size: 11px !important;
+            }
+            th {
+              padding: 4px 6px !important;
+              font-size: 11px !important;
+            }
+            td {
+              padding: 3px 6px !important;
+              font-size: 10.5px !important;
             }
           }
         `;
@@ -3472,6 +3503,41 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 </div>
               </div>
 
+              <div style={settingsSection}>
+                <h3 style={settingsTitle}>کڵێشەی پسووڵە</h3>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    setSelectedTemplateId(id);
+                    localStorage.setItem("selected_invoice_template_id", String(id));
+                    window.dispatchEvent(new Event("invoice-template-changed"));
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px",
+                    fontSize: "13px",
+                    fontWeight: "bold",
+                    color: "#374151",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    backgroundColor: "#ffffff",
+                    outline: "none",
+                    cursor: "pointer"
+                  }}
+                >
+                  {invoiceTemplates.length === 0 ? (
+                    <option value="">کڵێشەی سەرەکی</option>
+                  ) : (
+                    invoiceTemplates.map((tmpl: any) => (
+                      <option key={tmpl.id} value={tmpl.id}>
+                        {tmpl.name}{tmpl.isMain ? " (سەرەکی)" : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
                             <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
@@ -4785,7 +4851,7 @@ const priceTypeBtnActive: CSSProperties = {
 
 const printSheetStyle: CSSProperties = {
   width: "100%",
-  padding: "10px",
+  padding: "0",
   boxSizing: "border-box",
   fontFamily: appFont,
   direction: "rtl",

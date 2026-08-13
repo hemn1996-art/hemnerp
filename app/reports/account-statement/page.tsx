@@ -206,39 +206,68 @@ function AccountStatementContent() {
     }
     const activeEntries = entries.filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
-      return <span className={isFooter ? "text-white font-bold text-sm" : "text-gray-400 font-bold text-sm"}>0</span>;
+      return (
+        <div className="flex items-center gap-2 flex-wrap justify-center">
+          <span className={isFooter ? "text-slate-800 font-black text-base" : "text-gray-400 font-bold text-sm"}>0</span>
+          {showNote && account?.exchangeRateType === "FIXED" && (
+            <span className="text-xs font-black text-purple-950 bg-purple-100 border border-purple-300 px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-sm">
+              📌 (نرخی دۆلاری جێگیر: {(account?.customExchangeRate || 132000).toLocaleString("en-US")} د.ع)
+            </span>
+          )}
+        </div>
+      );
     }
     return (
-      <div className="flex flex-col gap-1 items-center justify-center">
+      <div className="flex flex-col gap-1.5 items-center justify-center">
         {activeEntries.map(([curId, val]) => {
           const isNegative = val < -0.01;
-          
-          let style: React.CSSProperties = {
-            color: isNegative ? "#dc2626" : "#16a34a",
-            fontWeight: 900,
-          };
-
-          if (isFooter) {
-            style = {
-              color: isNegative ? "#ff6b6b" : "#4ade80",
-              fontWeight: 900,
-              fontSize: "17px",
-              textShadow: isNegative ? "0 0 6px rgba(255, 107, 107, 0.4)" : "0 0 6px rgba(74, 222, 128, 0.4)",
-            };
-          }
 
           const noteText = isNegative
             ? " (ئەم بڕە ئێمە قەرزارین)"
             : ` (${account?.name || "هەژمارەکە"} قەرزاری ئێمەیە)`;
 
+          if (isFooter) {
+            return (
+              <div key={curId} className="flex flex-col md:flex-row items-center justify-center gap-1.5 flex-wrap">
+                <div
+                  className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 print:py-0.5 print:px-2 rounded-xl print:rounded-md border-2 print:border shadow-sm whitespace-nowrap print:whitespace-nowrap ${
+                    isNegative
+                      ? "bg-rose-50 border-rose-300 text-rose-950"
+                      : "bg-emerald-50 border-emerald-300 text-emerald-950"
+                  }`}
+                >
+                  <span className={`text-base print:text-[10px] font-black ${isNegative ? "text-rose-700" : "text-emerald-700"}`} dir="ltr">
+                    {formatMoney(val, Number(curId), false)}
+                  </span>
+                  {showNote && (
+                    <span className={`text-xs print:text-[9px] font-black ${isNegative ? "text-rose-900" : "text-emerald-900"}`} dir="rtl">
+                      {noteText}
+                    </span>
+                  )}
+                </div>
+
+                {showNote && account?.exchangeRateType === "FIXED" && (
+                  <div className="inline-flex items-center gap-1 text-xs print:text-[8.5px] font-black text-purple-950 bg-purple-100 border border-purple-300 px-2.5 py-1 print:py-0.5 print:px-1.5 rounded-xl print:rounded-md shadow-sm whitespace-nowrap" title={`نرخی جێگیری 100$: ${(account?.customExchangeRate || 132000).toLocaleString("en-US")} دینار`}>
+                    📌 (دۆلاری جێگیر: {(account?.customExchangeRate || 132000).toLocaleString("en-US")} د.ع)
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           return (
-            <div key={curId} className="flex items-center gap-1.5 flex-wrap justify-center text-sm md:text-base">
-              <span style={style} dir="ltr">
+            <div key={curId} className="flex items-center gap-1.5 flex-wrap justify-center text-sm md:text-base print:text-xs">
+              <span className={`font-black ${isNegative ? "text-rose-600 print:text-rose-900" : "text-emerald-600 print:text-emerald-950"}`} dir="ltr">
                 {formatMoney(val, Number(curId), false)}
               </span>
               {showNote && (
-                <span className={isFooter ? (isNegative ? "text-rose-200 text-xs font-bold" : "text-emerald-200 text-xs font-bold") : (isNegative ? "text-red-600 text-xs font-bold" : "text-emerald-600 text-xs font-bold")}>
+                <span className={`text-xs font-bold ${isNegative ? "text-rose-700" : "text-emerald-700"}`}>
                   {noteText}
+                </span>
+              )}
+              {showNote && account?.exchangeRateType === "FIXED" && (
+                <span className="text-[11px] font-black text-purple-900 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md shadow-sm">
+                  📌 جێگیر: {(account?.customExchangeRate || 132000).toLocaleString("en-US")} د.ع
                 </span>
               )}
             </div>
@@ -470,52 +499,78 @@ function AccountStatementContent() {
       <style jsx global>{`
         @media print {
           @page {
-            size: auto;
-            margin: 8mm 6mm !important;
+            size: A4 portrait;
+            margin: 5mm;
+          }
+          body {
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           body * {
             visibility: hidden;
           }
           #print-area, #print-area * {
             visibility: visible;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           #print-area {
-            zoom: 0.70 !important; /* Scale to 70% to behave like A3 space scaled down to A4 */
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
-            min-width: 100% !important;
             max-width: 100% !important;
-            padding: 0 !important;
+            padding: 0 2mm !important;
             margin: 0 !important;
-            box-sizing: border-box !important;
-            border: none !important;
-            box-shadow: none !important;
             background: white !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
           }
           .overflow-hidden,
           .overflow-x-auto,
           .overflow-y-auto {
-            overflow: visible !important;
-            max-width: none !important;
-            width: auto !important;
+            overflow: hidden !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
           }
           table {
             width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            table-layout: fixed !important;
             border-collapse: collapse !important;
-            table-layout: auto !important;
+            border: 1.5px solid #334155 !important;
+            box-sizing: border-box !important;
           }
-          th, td {
-            padding: 4px 6px !important;
-            font-size: 11px !important;
-            line-height: 1.3 !important;
+          th {
+            border: 1px solid #475569 !important;
+            padding: 3px 2px !important;
+            font-size: 10px !important;
+            line-height: 1.2 !important;
+            background-color: #03133f !important;
+            color: white !important;
+            text-align: center !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            overflow: hidden !important;
             white-space: normal !important;
-            word-break: break-word !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          th:not(.allow-wrap),
-          td:not(.allow-wrap) {
+          td {
+            border: 1px solid #94a3b8 !important;
+            padding: 3px 2px !important;
+            font-size: 9.5px !important;
+            line-height: 1.2 !important;
+            text-align: center !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            overflow: hidden !important;
             white-space: normal !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .no-print {
             display: none !important;
@@ -564,7 +619,8 @@ function AccountStatementContent() {
             >
               گەڕان 🔍
             </button>
-             <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
+
+            <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-lg hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
               پرینت 🖨️
             </button>
 
@@ -581,49 +637,100 @@ function AccountStatementContent() {
         </div>
 
         {/* Print Header */}
-        <div className="hidden print:block mb-6">
+        <div id="pdf-print-header-area" className="hidden print:block mb-6">
           <PrintHeader />
         </div>
 
         {/* Info Header Box */}
-        <div className="w-full border border-gray-300 rounded-lg overflow-hidden mb-6 bg-white text-xs" style={{ direction: "rtl" }}>
+        <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm p-3.5 mb-5 overflow-hidden no-print" style={{ direction: "rtl" }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+            {/* Account Details */}
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200/80">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#061f5f] to-[#03133f] text-white flex items-center justify-center font-black text-sm shadow-sm flex-shrink-0">
+                👤
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[11px] text-gray-500 font-bold">کەشف حسابی</span>
+                <span className="text-sm font-black text-slate-900 truncate">{account?.name || "دیاری نەکراوە"}</span>
+                {account?.phone && <span className="text-xs text-slate-600 font-semibold" dir="ltr">{account.phone}</span>}
+              </div>
+            </div>
+
+            {/* Date Details */}
+            <div className="flex items-center justify-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200/80 text-center">
+              <div className="flex flex-col items-center">
+                <span className="text-[11px] text-gray-500 font-bold">بەرواری کەشف حساب</span>
+                <span className="text-xs font-black text-slate-800">
+                  <span dir="ltr">{formatDate(startDate)}</span> بۆ <span dir="ltr">{formatDate(endDate)}</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium mt-0.5" dir="ltr">
+                  پرینت: {new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                </span>
+              </div>
+            </div>
+
+            {/* Top Balance Box (Clean Light Theme) */}
+            <div className="flex items-center justify-between gap-2.5 p-3 bg-slate-50 rounded-lg border border-slate-200/80">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 font-extrabold flex-shrink-0">باڵانس:</span>
+                <div className="text-base font-black" dir="ltr">
+                  {renderBalances(processed.finalBalances, false, false)}
+                </div>
+              </div>
+              {account?.exchangeRateType === "FIXED" && (
+                <span className="text-[11px] font-black text-purple-950 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md shadow-sm whitespace-nowrap">
+                  📌 جێگیر: {(account.customExchangeRate || 132000).toLocaleString("en-US")} د.ع
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Print-Only Classic Compact Info Header Table */}
+        <div id="pdf-print-info-table" className="hidden print:block w-full border border-[#0b1f50] rounded-lg overflow-hidden mb-3 bg-slate-50 text-[11px] shadow-sm" style={{ direction: "rtl" }}>
           <table className="w-full text-right border-collapse">
             <tbody>
-              <tr className="border-b border-gray-300">
-                <td className="p-3 border-l border-gray-300 w-1/3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-extrabold">کەشف حساب:</span>
-                    <span className="font-black text-slate-900 text-sm">{account.name}</span>
+              <tr className="border-b border-[#0b1f50] bg-[#0b1f50] text-white">
+                <td className="py-2 px-3 border-l border-slate-600 w-1/3 print:whitespace-normal">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-300 font-bold">کەشف حساب:</span>
+                    <span className="font-black text-white text-xs">{account?.name}</span>
                   </div>
                 </td>
-                <td className="p-3 border-l border-gray-300 w-1/3 text-center">
-                  {/* Center cell is blank in first row */}
+                <td className="py-2 px-3 border-l border-slate-600 w-1/3 text-center print:whitespace-normal">
+                  <div className="flex items-center justify-center gap-1.5 font-bold text-white text-xs">
+                    <span className="text-slate-300 font-bold">بەروار</span>
+                    <span dir="ltr">{formatDate(startDate)}</span>
+                    <span className="text-slate-300 font-bold">بۆ</span>
+                    <span dir="ltr">{formatDate(endDate)}</span>
+                  </div>
                 </td>
-                <td className="p-3 w-1/3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-extrabold">باڵانس:</span>
-                    <span className="font-black text-sm" dir="ltr">{renderBalances(processed.finalBalances, false, true)}</span>
+                <td className="py-1.5 px-3 w-1/3 print:whitespace-normal">
+                  <div className="inline-flex items-center gap-1.5 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded-md shadow-sm">
+                    <span className="text-rose-900 font-extrabold text-xs">باڵانس:</span>
+                    <span className="font-black text-xs text-rose-950" dir="ltr">{renderBalances(processed.finalBalances, false, false)}</span>
                   </div>
                 </td>
               </tr>
-              <tr>
-                <td className="p-3 border-l border-gray-300">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-extrabold">ژمارە تەلەفۆن:</span>
-                    <span className="font-bold text-gray-800">{account.phone || "-"}</span>
+              <tr className="bg-slate-50 text-slate-800">
+                <td className="py-1.5 px-3 border-l border-slate-300 print:whitespace-normal">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500 font-bold">ژمارە تەلەفۆن:</span>
+                    <span className="font-bold text-slate-900 text-xs" dir="ltr">{account?.phone || "-"}</span>
                   </div>
                 </td>
-                <td className="p-3 border-l border-gray-300 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-gray-500 font-extrabold">بەروار:</span>
-                    <span className="font-bold text-gray-800">{formatDate(startDate)} - {formatDate(endDate)}</span>
-                  </div>
+                <td className="py-1.5 px-3 border-l border-slate-300 text-center print:whitespace-normal">
+                  {account?.exchangeRateType === "FIXED" && (
+                    <span className="inline-flex items-center gap-1 text-[8.5px] font-black text-purple-950 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md shadow-sm">
+                      📌 دۆلاری جێگیر: {(account.customExchangeRate || 132000).toLocaleString("en-US")} د.ع
+                    </span>
+                  )}
                 </td>
-                <td className="p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-extrabold">بەرواری پرینتکردن:</span>
-                    <span className="font-bold text-gray-800 text-xs" dir="ltr">
-                      {new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                <td className="py-1.5 px-3 print:whitespace-normal">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500 font-bold">پرینتکردن:</span>
+                    <span className="font-bold text-slate-800 text-[9.5px]" dir="ltr">
+                      {new Date().toLocaleDateString('en-GB')} {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
                     </span>
                   </div>
                 </td>
@@ -633,20 +740,20 @@ function AccountStatementContent() {
         </div>
 
         {/* Main Table */}
-        <div className="border border-gray-200 bg-white overflow-hidden print:border-none">
+        <div className="border border-slate-300 bg-white overflow-hidden rounded-xl shadow-sm print:border-none print:shadow-none">
           {/* Table Header */}
           <table id="account-statement-table" className="w-full text-right text-sm print:text-xs">
-            <thead className="bg-[#0b1f50] text-white">
-              <tr>
-                <th className="p-3 font-bold text-center border-x border-[#1a3680] w-10">#</th>
-                {visibleColumns.date && <th className="p-3 font-bold text-center border-x border-[#1a3680]">بەروار</th>}
-                {visibleColumns.voucherId && <th className="p-3 font-bold text-center border-x border-[#1a3680]">پسووڵە</th>}
-                {visibleColumns.type && <th className="p-3 font-bold text-center border-x border-[#1a3680]">جۆری پسووڵە</th>}
-                {visibleColumns.totalAmount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">کۆی گشتی</th>}
-                {visibleColumns.discount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">داشکاندن</th>}
-                {visibleColumns.paidAmount && <th className="p-3 font-bold text-center border-x border-[#1a3680]">پارەی دراو</th>}
-                {visibleColumns.balance && <th className="p-3 font-bold text-center border-x border-[#1a3680]">باڵانس</th>}
-                {visibleColumns.note && <th className="p-3 font-bold text-center border-x border-[#1a3680] allow-wrap">تێبینی</th>}
+            <thead className="bg-[#03133f] text-white">
+              <tr className="divide-x divide-x-reverse divide-[#ffffff20]">
+                <th className="p-2 font-black text-center text-xs w-[4%]">#</th>
+                {visibleColumns.date && <th className="p-2 font-black text-center text-xs w-[11%]">بەروار</th>}
+                {visibleColumns.voucherId && <th className="p-2 font-black text-center text-xs w-[9%]">پسووڵە</th>}
+                {visibleColumns.type && <th className="p-2 font-black text-center text-xs w-[14%]">جۆری پسووڵە</th>}
+                {visibleColumns.totalAmount && <th className="p-2 font-black text-center text-xs w-[11%]">کۆی گشتی</th>}
+                {visibleColumns.discount && <th className="p-2 font-black text-center text-xs w-[9%]">داشکاندن</th>}
+                {visibleColumns.paidAmount && <th className="p-2 font-black text-center text-xs w-[11%]">پارەی دراو</th>}
+                {visibleColumns.balance && <th className="p-2 font-black text-center text-xs w-[13%]">باڵانس</th>}
+                {visibleColumns.note && <th className="p-2 font-black text-center text-xs w-[18%] allow-wrap">تێبینی</th>}
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -660,7 +767,7 @@ function AccountStatementContent() {
                 {visibleColumns.discount && <td className="p-3 text-center text-gray-400">—</td>}
                 {visibleColumns.paidAmount && <td className="p-3 text-center text-gray-400">—</td>}
                 {visibleColumns.balance && <td className="p-3 text-center font-black text-[#0b1f50]" dir="ltr">{renderBalances(processed.previousBalances)}</td>}
-                {visibleColumns.note && <td className="p-3 text-center text-gray-500 font-bold allow-wrap">نەبەستراو نەقدی</td>}
+                {visibleColumns.note && <td className="p-3 text-center text-gray-400">—</td>}
               </tr>
 
               {loading ? (
@@ -701,7 +808,7 @@ function AccountStatementContent() {
                                 e.stopPropagation();
                                 router.push(`/invoices?editId=${v.voucherId}&type=${v.originalType || v.type}`);
                               }}
-                              className={`font-black text-sm px-3 py-1 rounded-lg cursor-pointer hover:opacity-85 transition-opacity ${tc.badge}`}
+                              className={`font-black text-sm px-3 py-1 rounded-lg cursor-pointer hover:opacity-85 transition-opacity print:bg-transparent print:text-slate-900 print:px-0 print:py-0 print:rounded-none print:shadow-none print:font-extrabold ${tc.badge}`}
                             >
                               {v.voucherId}
                             </span>
@@ -838,22 +945,18 @@ function AccountStatementContent() {
 
               {/* Final Balance Row */}
               {!loading && processed.visibleItems.length > 0 && (
-                <tr className="border-t-2 border-[#0b1f50] bg-[#0b1f50] text-white">
-                  <td colSpan={visibleColCount - (visibleColumns.balance ? 1 : 0) - (visibleColumns.note ? 1 : 0)} className="p-3 text-right font-black text-base">باڵانسی کۆتایی</td>
-                  {visibleColumns.balance && (
-                    <td className="p-3 text-center font-black text-xl" dir="ltr">{renderBalances(processed.finalBalances, true, true)}</td>
-                  )}
-                  {visibleColumns.note && (
-                    <td className="p-3"></td>
-                  )}
+                <tr className="border-t-2 border-slate-300 bg-slate-100/90 text-slate-900">
+                  <td colSpan={visibleColCount - (visibleColumns.balance ? 1 : 0) - (visibleColumns.note ? 1 : 0)} className="p-2.5 text-right font-black text-sm print:text-xs">باڵانسی کۆتایی</td>
+                  <td colSpan={(visibleColumns.balance ? 1 : 0) + (visibleColumns.note ? 1 : 0)} className="p-2 text-center font-black" dir="ltr">
+                    {renderBalances(processed.finalBalances, true, true)}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="text-right text-sm font-bold text-gray-700 mt-4 pb-10 flex justify-end items-center gap-2">
-          <span>کۆی گشتی جووڵەکان:</span>
-          <span>{processed.visibleItems.length}</span>
+        <div className="text-right text-xs print:text-[10px] font-bold text-gray-700 mt-2 pb-4 flex justify-between items-center print:px-1">
+          <span>کۆی گشتی جووڵەکان: {processed.visibleItems.length}</span>
         </div>
       </div>
 
