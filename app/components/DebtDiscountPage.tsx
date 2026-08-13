@@ -1,5 +1,5 @@
-import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
+import { openPrintWindow } from "@/app/utils/printWindow";
 import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";

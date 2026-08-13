@@ -1,5 +1,5 @@
-import { openPrintWindow } from "@/app/utils/printWindow";
 "use client";
+import { openPrintWindow } from "@/app/utils/printWindow";
 import { useRouter } from "next/navigation";
 import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
