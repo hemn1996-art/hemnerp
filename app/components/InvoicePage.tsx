@@ -4767,9 +4767,10 @@ const modalOverlay: CSSProperties = {
 };
 
 const settingsModal: CSSProperties = {
-  width: 1100,
+  width: 1150,
   maxWidth: "98vw",
-  maxHeight: "95vh",
+  height: "95vh",
+  maxHeight: "98vh",
   overflowY: "auto",
   background: "white",
   borderRadius: 20,
