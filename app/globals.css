@@ -273,6 +273,11 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     print-color-adjust: exact !important;
   }
 
+  /* ── Critical: kill the 1280px min-width that forces wider-than-A4 layout ── */
+  body, #root, #__next, .app, .main-layout, .dashboard-page {
+    min-width: 0 !important;
+  }
+
   table, tr, th, td, div {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
