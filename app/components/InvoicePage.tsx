@@ -2055,13 +2055,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               size: A4 portrait !important;
               margin: 0 !important;
             }
-            html {
-              width: 210mm !important;
-              min-width: 0 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-            }
-            body {
+            html, body {
               width: 210mm !important;
               min-width: 0 !important;
               margin: 0 !important;
@@ -2077,10 +2071,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               margin: 0 !important;
               padding: 6mm 8mm !important;
               box-sizing: border-box !important;
-              overflow: hidden !important;
-              position: absolute !important;
-              left: 0 !important;
+              overflow: visible !important;
+              position: fixed !important;
               top: 0 !important;
+              left: 50% !important;
+              transform: translateX(-50%) scale(0.91) !important;
+              transform-origin: top center !important;
             }
             .print-header-spacer {
               height: 135px !important;
@@ -2089,15 +2085,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               width: 100% !important;
               max-width: 100% !important;
               table-layout: fixed !important;
-              font-size: 10.5px !important;
+              font-size: 11px !important;
             }
             th {
-              padding: 3px 5px !important;
-              font-size: 10.5px !important;
+              padding: 4px 6px !important;
+              font-size: 11px !important;
             }
             td {
-              padding: 2px 5px !important;
-              font-size: 10px !important;
+              padding: 3px 6px !important;
+              font-size: 10.5px !important;
             }
           }
         `;
