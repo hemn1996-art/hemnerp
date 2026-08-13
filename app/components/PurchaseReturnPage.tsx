@@ -2433,7 +2433,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
               <br />
               چۆن دەتەوێت مامەڵە لەگەڵ پارە زیادەکەدا بکەیت؟
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
               <button
                 style={{
                   ...primaryBtn,
@@ -2643,11 +2643,11 @@ const totalsCard: CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 1
 const totalGrid: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 10 };
 const statBox: CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fbfbfb" };
 const twoCol: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 12 };
-const paidSummaryBox: CSSProperties = { background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, display: "flex", justifyContent: "space-between", gap: 10, color: "#111827" };
+const paidSummaryBox: CSSProperties = { background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, display: "flex", justifyContent: "space-between", gap: 14, color: "#111827" };
 const noteToggleBox: CSSProperties = { borderTop: "1px solid #e5e7eb", paddingTop: 10 };
 const noteToggleBtn: CSSProperties = { width: "100%", border: "1px solid #d1d5db", background: "#f8fafc", color: "#374151", borderRadius: 12, padding: "12px", fontWeight: 800, cursor: "pointer", textAlign: "center", fontFamily: appFont };
 const notesInsidePayment: CSSProperties = { display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 12 };
-const sideActions: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 10, marginTop: 14 };
+const sideActions: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 14, marginTop: 14 };
 const outlineBlueBtn: CSSProperties = { borderRadius: 12, border: "1px solid #2563eb", background: "white", color: "#2563eb", padding: "12px", fontWeight: 800, cursor: "pointer", fontFamily: appFont };
 const primaryBtn: CSSProperties = { borderRadius: 12, border: 0, background: "#2563eb", color: "white", padding: "12px", fontWeight: 800, cursor: "pointer", fontFamily: appFont };
 const dangerBtn: CSSProperties = { borderRadius: 12, border: 0, background: "#dc2626", color: "white", padding: "12px", fontWeight: 900, cursor: "pointer", fontFamily: appFont };
@@ -2686,7 +2686,7 @@ const printInfoBox: CSSProperties = {
   flexDirection: "column",
   gap: 4,
 };
-const printInfoRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, lineHeight: 1.8 };
+const printInfoRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, lineHeight: 1.8 };
 const printTable: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 10, marginTop: 6 };
 const printTh: CSSProperties = { border: "1px solid #0f172a", background: "#0f172a", color: "#ffffff", padding: "7px 5px", textAlign: "center", fontWeight: 900, fontSize: 10, letterSpacing: "0.2px" };
 const printTd: CSSProperties = { border: "1px solid #e5e7eb", padding: "6px 5px", textAlign: "center", verticalAlign: "middle" };
@@ -2710,7 +2710,7 @@ const printBalanceTitle: CSSProperties = { fontWeight: 900, fontSize: 12, margin
 const printSummaryLine: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 0, borderBottom: "1px solid #cbd5e1", padding: "6px 10px" };
 const printExpenseNoteBox: CSSProperties = { marginTop: 8, border: "1px solid #e5e7eb", padding: 8, fontSize: 10, lineHeight: 1.8, background: "#f8fafc" };
 const modalOverlay: CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 };
-const modalBox: CSSProperties = { width: 760, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", background: "white", borderRadius: 16, padding: 20, boxShadow: "0 25px 70px rgba(15,23,42,0.25)" };
+const modalBox: CSSProperties = { width: 1080, maxWidth: "98vw", maxHeight: "95vh", overflowY: "auto", background: "white", borderRadius: 16, padding: 20, boxShadow: "0 25px 70px rgba(15,23,42,0.25)" };
 const confirmBox: CSSProperties = { width: 460, maxWidth: "92vw", background: "white", borderRadius: 18, padding: 22, boxShadow: "0 25px 70px rgba(15,23,42,0.28)" };
 const confirmText: CSSProperties = { color: "#374151", lineHeight: 1.9, fontWeight: 700, marginBottom: 18 };
 const confirmActions: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 12 };

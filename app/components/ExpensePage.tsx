@@ -1845,7 +1845,7 @@ const totalsCard: CSSProperties = {
 const totalGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 10,
+  gap: 14,
 };
 const statBox: CSSProperties = {
   border: "1px solid #e5e7eb",
@@ -1878,7 +1878,7 @@ const notesInsidePayment: CSSProperties = {
 const sideActions: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 10,
+  gap: 14,
   marginTop: 14,
 };
 const outlineBlueBtn: CSSProperties = {
@@ -2114,7 +2114,7 @@ const printInfoBox: CSSProperties = {
 const printInfoRow: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 10,
+  gap: 14,
   lineHeight: 1.8,
 };
 const printTable: CSSProperties = {

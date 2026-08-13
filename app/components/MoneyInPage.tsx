@@ -1827,7 +1827,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
               <br />
               چۆن دەتەوێت مامەڵە لەگەڵ پارە زیادەکەدا بکەیت؟
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
               <button
                 style={{
                   ...primaryBtn,
@@ -2135,7 +2135,7 @@ const twoCol: CSSProperties = { display: "grid", gridTemplateColumns: "var(--gri
 const noteToggleBox: CSSProperties = { borderTop: "1px solid #e5e7eb", paddingTop: 10 };
 const noteToggleBtn: CSSProperties = { width: "100%", border: "1px solid #d1d5db", background: "#f8fafc", color: "#374151", borderRadius: 12, padding: "12px", fontWeight: 800, cursor: "pointer", textAlign: "center", fontFamily: appFont };
 const notesInsidePayment: CSSProperties = { display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 12 };
-const sideActions: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 10, marginTop: 14 };
+const sideActions: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 14, marginTop: 14 };
 const outlineBlueBtn: CSSProperties = { borderRadius: 12, border: "1px solid #2563eb", background: "white", color: "#2563eb", padding: "12px", fontWeight: 800, cursor: "pointer", fontFamily: appFont };
 const primaryBtn: CSSProperties = { borderRadius: 12, border: 0, background: "#2563eb", color: "white", padding: "12px", fontWeight: 800, cursor: "pointer", fontFamily: appFont };
 const printBtn: CSSProperties = { borderRadius: 12, border: 0, background: "#22c55e", color: "white", padding: "12px", fontWeight: 800, cursor: "pointer", fontFamily: appFont };
@@ -2166,14 +2166,14 @@ const printInfoBox: CSSProperties = {
   flexDirection: "column",
   gap: 4,
 };
-const printInfoRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, lineHeight: 1.8 };
+const printInfoRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, lineHeight: 1.8 };
 const printMoneyBox: CSSProperties = { border: "1px solid #e5e7eb", padding: 8, minHeight: 45, marginBottom: 8, fontSize: 11 };
 const printBottomGrid: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 8, marginTop: 8 };
 const printSummaryBox: CSSProperties = { border: "1px solid #e5e7eb", padding: 8, minHeight: 70, fontSize: 11 };
 const printSummaryLine: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 0, borderBottom: "1px solid #cbd5e1", padding: "6px 10px" };
 const printExpenseNoteBox: CSSProperties = { marginTop: 8, border: "1px solid #e5e7eb", padding: 8, fontSize: 10, lineHeight: 1.8, background: "#f8fafc" };
 const modalOverlay: CSSProperties = { position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.3)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", zIndex: 99999, justifyContent: "center" };
-const modalBox: CSSProperties = { width: 760, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", background: "white", borderRadius: 16, padding: 20, boxShadow: "0 25px 70px rgba(15,23,42,0.25)" };
+const modalBox: CSSProperties = { width: 1080, maxWidth: "98vw", maxHeight: "95vh", overflowY: "auto", background: "white", borderRadius: 16, padding: 20, boxShadow: "0 25px 70px rgba(15,23,42,0.25)" };
 const confirmBox: CSSProperties = { width: 460, maxWidth: "92vw", background: "rgba(255, 255, 255, 0.8)", border: "1px solid rgba(255, 255, 255, 0.3)", borderRadius: 24, padding: 24, boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)", backdropFilter: "blur(12px)", textAlign: "center" };
 const confirmText: CSSProperties = { color: "#374151", lineHeight: 1.9, fontWeight: 700, marginBottom: 18 };
 const confirmActions: CSSProperties = { display: "grid", gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)", gap: 12 };

@@ -2495,7 +2495,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
               {showInvoiceDiscount && (
                 <div style={discountInsidePayment}>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                     <select
                       value={invoiceDiscountMode}
                       disabled={isInvoiceLocked}
@@ -3703,7 +3703,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               <br />
               چۆن دەتەوێت مامەڵە لەگەڵ پارە زیادەکەدا بکەیت؟
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
               <button
                 style={{
                   ...primaryBtn,
@@ -4184,7 +4184,7 @@ const mainContent: CSSProperties = {
 const sideHeader: CSSProperties = {
   display: "flex",
   alignItems: "flex-end",
-  gap: 10,
+  gap: 14,
   marginBottom: 12,
 };
 
@@ -4417,7 +4417,7 @@ const totalsCard: CSSProperties = {
 const totalGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 10,
+  gap: 14,
 };
 
 const statBox: CSSProperties = {
@@ -4481,7 +4481,7 @@ const notesInsidePayment: CSSProperties = {
 const sideActions: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 10,
+  gap: 14,
   marginTop: 14,
 };
 
@@ -4767,14 +4767,15 @@ const modalOverlay: CSSProperties = {
 };
 
 const settingsModal: CSSProperties = {
-  width: 760,
-  maxWidth: "95vw",
-  maxHeight: "90vh",
+  width: 1100,
+  maxWidth: "98vw",
+  maxHeight: "95vh",
   overflowY: "auto",
   background: "white",
-  borderRadius: 16,
-  padding: 22,
+  borderRadius: 20,
+  padding: 24,
   fontFamily: appFont,
+  boxShadow: "0 25px 70px rgba(15,23,42,0.28)",
 };
 
 const modalHeader: CSSProperties = {
@@ -4831,7 +4832,7 @@ const settingCheck: CSSProperties = {
 const modalFooter: CSSProperties = {
   marginTop: 20,
   display: "flex",
-  gap: 10,
+  gap: 14,
   justifyContent: "flex-start",
 };
 

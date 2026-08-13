@@ -1934,7 +1934,7 @@ const totalsCard: CSSProperties = {
 const totalGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 10,
+  gap: 14,
 };
 
 const statBox: CSSProperties = {
@@ -1972,7 +1972,7 @@ const notesInsidePayment: CSSProperties = {
 const sideActions: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 10,
+  gap: 14,
   marginTop: 14,
 };
 

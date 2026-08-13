@@ -1908,7 +1908,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
               <br />
               چۆن دەتەوێت مامەڵە لەگەڵ پارە زیادەکەدا بکەیت؟
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
               <button
                 style={{
                   ...primaryBtn,
@@ -2457,7 +2457,7 @@ const totalsCard: CSSProperties = {
 const totalGrid: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 10,
+  gap: 14,
 };
 
 const statBox: CSSProperties = {
@@ -2501,7 +2501,7 @@ const notesInsidePayment: CSSProperties = {
 const sideActions: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 10,
+  gap: 14,
   marginTop: 14,
 };
 
@@ -2652,7 +2652,7 @@ const printInfoBox: CSSProperties = {
 const printInfoRow: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 10,
+  gap: 14,
   lineHeight: 1.8,
 };
 
