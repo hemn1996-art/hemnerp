@@ -2053,7 +2053,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           @media print {
             @page {
               size: A4 portrait !important;
-              margin: 5mm !important;
+              margin: 0 !important;
             }
             html, body {
               margin: 0 !important;
@@ -2063,13 +2063,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             #invoice-print-area, #purchase-print-area, [id$="-print-area"] {
               width: 100% !important;
               max-width: 100% !important;
-              margin: 0 auto !important;
-              padding: 0 !important;
+              margin: 0 !important;
+              padding: 8mm 10mm !important;
               box-sizing: border-box !important;
               overflow: hidden !important;
-              position: relative !important;
+              position: fixed !important;
               left: 0 !important;
               top: 0 !important;
+              right: 0 !important;
             }
             .print-header-spacer {
               height: 135px !important;
