@@ -186,7 +186,8 @@ export default function ProfitDistributionPage() {
   const cash = data?.assets?.cash || 0;
   const accountsReceivable = data?.assets?.accountsReceivable || 0;
   const otherAssets = data?.assets?.allInventory || 0;
-  const myDebts = data?.liabilitiesEquity?.myDebts || 0;
+  const rawMyDebts = data?.liabilitiesEquity?.myDebts || 0;
+  const myDebts = rawMyDebts >= 1 ? rawMyDebts : 0;
   const capital = data?.liabilitiesEquity?.capital || 0;
   const calculatedProfit = warehouseValue + cash + accountsReceivable + otherAssets - myDebts - capital;
   const profitToDistribute = calculatedProfit;
@@ -342,7 +343,7 @@ export default function ProfitDistributionPage() {
                       </div>
                     )}
                     <div className="flex justify-between text-sm">
-                      <span className="font-bold text-red-600" dir="ltr">-{fmt(myDebts)}</span>
+                      <span className="font-bold text-red-600" dir="ltr">{myDebts >= 1 ? `-${fmt(myDebts)}` : fmt(0)}</span>
                       <span className="text-red-500 font-bold">من قەرزارم 💳</span>
                     </div>
                     <div className="flex justify-between text-sm">

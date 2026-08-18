@@ -288,6 +288,9 @@ export async function GET(request: Request) {
       }
     });
 
+    if (accountsPayable < 1) accountsPayable = 0;
+    if (accountsReceivable < 1) accountsReceivable = 0;
+
     Object.values(shareholderBalances).forEach(balance => {
       if (balance > 0.01) {
         totalShareholderWithdrawals += balance;

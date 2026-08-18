@@ -469,7 +469,7 @@ export default function BalanceSheetPage() {
 
             {/* من قەرزارم */}
             <div id="comp-mydebts" className="flex items-center justify-between p-3 pr-8 border-b border-slate-100 hover:bg-slate-50 transition">
-              <span className="text-sm text-slate-800">{fmt(data.liabilitiesEquity.myDebts)}</span>
+              <span className="text-sm text-slate-800">{fmt(data.liabilitiesEquity.myDebts >= 1 ? data.liabilitiesEquity.myDebts : 0)}</span>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm text-slate-500">من قەرزارم</span>
                 <span className="text-slate-400 text-xs">💳</span>
@@ -823,7 +823,7 @@ export default function BalanceSheetPage() {
                         </div>
                       )}
                       <div className="flex justify-between text-sm">
-                        <span className="font-bold text-red-600" dir="ltr">-{fmt(myDebts)}</span>
+                        <span className="font-bold text-red-600" dir="ltr">{myDebts >= 1 ? `-${fmt(myDebts)}` : fmt(0)}</span>
                         <span className="text-red-500 font-bold">من قەرزارم 💳</span>
                       </div>
                       <div className="flex justify-between text-sm">
