@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { getCurrentUser } from "../../../lib/auth";
+import { convertDigits } from "../../../utils/digits";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search") || "";
+    const searchRaw = searchParams.get("search") || "";
+    const search = convertDigits(searchRaw);
     const accountTypeId = searchParams.get("accountTypeId");
     const accountIds = searchParams.get("accountIds");
     const city = searchParams.get("city");
@@ -46,6 +54,8 @@ export async function GET(request: Request) {
           id: true,
           name: true,
           phone: true,
+          
+          
           accountType: { select: { name: true } },
           city: { select: { name: true } },
           district: { select: { name: true } },
@@ -163,6 +173,8 @@ export async function GET(request: Request) {
         city: account.city?.name || "نەزانراو",
         district: account.district?.name || "نەزانراو",
         accountTypeName: account.accountType?.name || "نەزانراو",
+        exchangeRateType: account.exchangeRateType || "DAILY_MARKET",
+        customExchangeRate: account.customExchangeRate || 132000,
         totalDebt: totalDebtInUsd, // keep net USD equivalent for sorting
         balanceByCurrency,
         lastPaymentAmount,

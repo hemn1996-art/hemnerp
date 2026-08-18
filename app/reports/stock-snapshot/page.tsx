@@ -69,6 +69,7 @@ export default function StockSnapshotReportPage() {
     purchaseDate: true,
   };
   const [visibleColumns, setVisibleColumns] = useState(defaultSnapshotCols);
+  const [pendingArrivalValueUsd, setPendingArrivalValueUsd] = useState(0);
   const colsLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -141,6 +142,33 @@ export default function StockSnapshotReportPage() {
   const loadStockData = async () => {
     try {
       setLoading(true);
+      fetch("/api/vouchers?type=purchase")
+        .then((r) => (r.ok ? r.json() : []))
+        .then((vouchers) => {
+          if (Array.isArray(vouchers)) {
+            const pending = vouchers.filter(
+              (v: any) => v.isArrived === false && !v.isDeleted
+            );
+            let totalUsd = 0;
+            pending.forEach((v: any) => {
+              const rate = v.exchangeRate > 100 ? v.exchangeRate / 100 : 1520;
+              if (v.lines && Array.isArray(v.lines) && v.lines.length > 0) {
+                v.lines.forEach((l: any) => {
+                  const isIQD = l.currencyId === 2 || Number(l.unitPrice) > 1000;
+                  const amt = Number(l.lineTotal || (l.qty * l.unitPrice) || 0);
+                  totalUsd += isIQD ? amt / rate : amt;
+                });
+              } else {
+                const amt = Number(v.netAmount || v.totalAmount || 0);
+                const isIQD = v.currencyId === 2 || amt > 10000;
+                totalUsd += isIQD ? amt / rate : amt;
+              }
+            });
+            setPendingArrivalValueUsd(Math.round(totalUsd * 100) / 100);
+          }
+        })
+        .catch(() => setPendingArrivalValueUsd(0));
+
       const res = await fetch(`/api/reports/stock-snapshot?asOfDate=${asOfDate}`);
       if (res.ok) {
         setStockData(await res.json());
@@ -241,23 +269,40 @@ export default function StockSnapshotReportPage() {
 
         {/* Totals Cards */}
         {showReportStats && (
-          <div className={`grid grid-cols-1 ${visibleColumns.warehouseValue ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-6 animate-in fade-in duration-200`}>
-            {visibleColumns.warehouseValue && (
-              <div className="bg-white rounded-md p-5 border-r-4 border-blue-500 shadow-sm flex flex-col items-center justify-center">
-                <span className="text-gray-500 font-bold text-sm mb-2">بەهای کۆگا</span>
-                <span className="text-2xl font-black text-gray-800" dir="ltr">{formatMoney(totalValue)}</span>
+          <div className="flex flex-col gap-4 mb-6 animate-in fade-in duration-200">
+            {pendingArrivalValueUsd > 0 && (
+              <div className="bg-amber-50 border border-amber-300 rounded-md p-4 flex flex-col md:flex-row items-center justify-between shadow-sm">
+                <div className="flex items-center gap-3 mb-2 md:mb-0">
+                  <span className="text-2xl">📦</span>
+                  <div>
+                    <span className="font-black text-amber-900 text-sm block">کۆی کاڵای نەگەیشتوو بە کۆگا (لە ڕێگادایە)</span>
+                    <span className="text-xs text-amber-700 font-medium">ئەم بڕە لە پسووڵەی کڕیندایە بەڵام هێشتا نەگەیشتۆتە کۆگا</span>
+                  </div>
+                </div>
+                <span className="text-2xl font-black text-amber-800" dir="ltr">
+                  $ {pendingArrivalValueUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
               </div>
             )}
-            <div className="bg-white rounded-md p-5 border-r-4 border-green-500 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-gray-500 font-bold text-sm mb-2">گشتی عدد</span>
-              <div className="text-2xl font-black text-gray-800" dir="ltr">
-                <span className="text-sm font-bold text-gray-400 ml-1">دانە</span>
-                {totalQuantity.toLocaleString()}
+
+            <div className={`grid grid-cols-1 ${visibleColumns.warehouseValue ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
+              {visibleColumns.warehouseValue && (
+                <div className="bg-white rounded-md p-5 border-r-4 border-blue-500 shadow-sm flex flex-col items-center justify-center">
+                  <span className="text-gray-500 font-bold text-sm mb-2">بەهای کۆگا</span>
+                  <span className="text-2xl font-black text-gray-800" dir="ltr">{formatMoney(totalValue)}</span>
+                </div>
+              )}
+              <div className="bg-white rounded-md p-5 border-r-4 border-green-500 shadow-sm flex flex-col items-center justify-center">
+                <span className="text-gray-500 font-bold text-sm mb-2">گشتی عدد</span>
+                <div className="text-2xl font-black text-gray-800" dir="ltr">
+                  <span className="text-sm font-bold text-gray-400 ml-1">دانە</span>
+                  {totalQuantity.toLocaleString()}
+                </div>
               </div>
-            </div>
-            <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-gray-500 font-bold text-sm mb-2">گشتی کەرەستە</span>
-              <span className="text-2xl font-black text-gray-800">{totalItems}</span>
+              <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
+                <span className="text-gray-500 font-bold text-sm mb-2">گشتی کەرەستە</span>
+                <span className="text-2xl font-black text-gray-800">{totalItems}</span>
+              </div>
             </div>
           </div>
         )}

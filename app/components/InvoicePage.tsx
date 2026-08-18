@@ -624,8 +624,44 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
   }
 
+  function getCanonicalCurrencyId(curId?: number | string) {
+    const rawId = Number(curId || invoiceCurrencyId || 11);
+    const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
+
+    const getGroupCode = (c: any) => {
+      if (!c) return "";
+      const code = (c.code || "").toUpperCase().trim();
+      const symbol = (c.symbol || "").trim();
+      if (code.includes("USD") || symbol === "$") return "USD";
+      if (code.includes("IQD") || symbol === "دینار" || symbol === "د.ع") return "IQD";
+      return code || symbol;
+    };
+
+    const targetGroup = getGroupCode(found);
+    if (targetGroup) {
+      const mainCur = (currencies || []).find((c: any) => getGroupCode(c) === targetGroup && (c.isActive !== false));
+      if (mainCur) return Number(mainCur.id);
+    }
+
+    const mainCur = (currencies || []).find((c: any) => found && c.code === found.code && (c.isActive !== false));
+    return mainCur ? Number(mainCur.id) : rawId;
+  }
+
+  function normalizeCurrencyMap(map: Record<string, number>): Record<string, number> {
+    if (!map) return {};
+    const normalized: Record<string, number> = {};
+    for (const [curIdText, val] of Object.entries(map)) {
+      if (typeof val !== "number" || isNaN(val)) continue;
+      const canonicalId = getCanonicalCurrencyId(curIdText);
+      const key = String(canonicalId);
+      normalized[key] = (normalized[key] || 0) + val;
+    }
+    return normalized;
+  }
+
   function formatCurrencyMapWithColors(map: Record<string, number>) {
-    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    const normalized = normalizeCurrencyMap(map);
+    const activeEntries = Object.entries(normalized).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -684,7 +720,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function formatCurrencyMapJSX(map: Record<string, number>) {
-    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    const normalized = normalizeCurrencyMap(map);
+    const activeEntries = Object.entries(normalized).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -1538,14 +1575,6 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       ...prev,
       [currencyId]: clean,
     }));
-  }
-
-  function getCanonicalCurrencyId(curId?: number | string) {
-    const rawId = Number(curId || invoiceCurrencyId || 11);
-    const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
-    if (!found) return rawId;
-    const mainCur = (currencies || []).find((c: any) => c.code === found.code && (c.isActive !== false));
-    return mainCur ? Number(mainCur.id) : rawId;
   }
 
   function getItemsTotalsByCurrency() {

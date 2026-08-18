@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
+import { getCurrentUser } from "../../lib/auth";
+import { convertDigits } from "../../utils/digits";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search");
+    const searchRaw = searchParams.get("search");
+    const search = searchRaw ? convertDigits(searchRaw) : null;
 
     const products = await prisma.product.findMany({
       where: search
@@ -98,6 +106,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const data = await request.json();
 
     const product = await prisma.product.create({
@@ -136,6 +149,11 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const data = await request.json();
 
     const updateData: any = {};
@@ -176,6 +194,11 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

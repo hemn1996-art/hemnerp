@@ -296,6 +296,8 @@ export async function PUT(
           deliveryAddress: data.deliveryAddress,
           deliveryFee: data.deliveryFee ? Number(data.deliveryFee) : null,
           extraPaymentHandling: data.extraPaymentHandling || null,
+          isArrived: data.isArrived !== undefined ? Boolean(data.isArrived) : true,
+          arrivalDate: data.arrivalDate ? new Date(data.arrivalDate) : (data.isArrived === false ? null : (data.date ? new Date(data.date) : new Date())),
         },
       });
 
@@ -317,21 +319,23 @@ export async function PUT(
           });
 
           if (["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
-            let qtyChange = Number(line.qty);
-            if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
-              qtyChange = -qtyChange;
-            }
-            if (line.warehouseId) {
-              await tx.inventoryTransaction.create({
-                data: {
-                  voucherId: updated.id,
-                  productId: Number(line.productId),
-                  warehouseId: Number(line.warehouseId),
-                  qtyChange,
-                  unitCost: Number(line.unitCost || line.unitPrice || 0),
-                  date: updated.date,
-                },
-              });
+            const shouldCreateInventory = updated.type !== "purchase" || updated.isArrived !== false;
+            if (shouldCreateInventory) {
+              let qtyChange = Number(line.qty);
+              if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
+                qtyChange = -qtyChange;
+              }
+              if (line.warehouseId) {
+                await tx.inventoryTransaction.create({
+                  data: {
+                    voucherId: updated.id,
+                    productId: Number(line.productId),
+                    warehouseId: Number(line.warehouseId),
+                    qtyChange,
+                    unitCost: Number(line.unitCost || line.unitPrice || 0),
+                    date: updated.arrivalDate || updated.date,
+                  },
+                });
 
               if (qtyChange < 0) {
                 const currentInv = await tx.inventoryTransaction.aggregate({
@@ -355,6 +359,7 @@ export async function PUT(
             }
           }
         }
+      }
       }
 
       // 6. Add new Voucher Expenses if provided

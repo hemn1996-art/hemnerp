@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { getCurrentUser } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const toDate = searchParams.get("toDate") || searchParams.get("date");
     const warehouseId = searchParams.get("warehouseId");
@@ -30,34 +36,46 @@ export async function GET(request: Request) {
       where.productId = parseInt(productId);
     }
 
-    const transactions = await prisma.inventoryTransaction.findMany({
-      where,
-      select: {
-        productId: true,
-        warehouseId: true,
-        qtyChange: true,
-        unitCost: true,
-        product: { select: { name: true, code: true, isMultiBatch: true, salePrices: true } },
-        warehouse: { select: { name: true } },
-        voucher: {
-          select: {
-            type: true,
-            date: true,
-            account: { select: { id: true, name: true } },
-            versions: { select: { version: true, data: true } },
-            lines: {
-              select: {
-                productId: true,
-                unitPrice: true,
-                discountAmount: true,
-                qty: true
+    const category = searchParams.get("category");
+    const brand = searchParams.get("brand");
+    const code = searchParams.get("code");
+    const rateType = searchParams.get("rateType");
+
+    const [transactions, dbCurrencies] = await Promise.all([
+      prisma.inventoryTransaction.findMany({
+        where,
+        select: {
+          productId: true,
+          warehouseId: true,
+          qtyChange: true,
+          unitCost: true,
+          product: { select: { name: true, code: true, category: true, brand: true, isMultiBatch: true, salePrices: true } },
+          warehouse: { select: { name: true } },
+          voucher: {
+            select: {
+              type: true,
+              date: true,
+              account: { select: { id: true, name: true } },
+              versions: { select: { version: true, data: true } },
+              lines: {
+                select: {
+                  productId: true,
+                  unitPrice: true,
+                  discountAmount: true,
+                  qty: true
+                }
               }
-            }
+            },
           },
         },
-      },
-      orderBy: { date: "asc" }
-    });
+        orderBy: { date: "asc" }
+      }),
+      prisma.currency.findMany({ where: { isActive: true } })
+    ]);
+
+    const iqdCur = dbCurrencies.find(c => c.code === "IQD" || c.id === 2 || c.id === 12);
+    const rawRate = iqdCur?.rate || 1520;
+    const marketRatePerDollar = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
 
     const stockMap: Record<string, any> = {};
 
@@ -68,8 +86,8 @@ export async function GET(request: Request) {
           productId: t.productId,
           productName: t.product?.name || "نەزانراو",
           productCode: t.product?.code || "-",
-          category: "-",
-          brand: "-",
+          category: t.product?.category || "-",
+          brand: t.product?.brand || "-",
           sellPrice: 0,
           salePrices: t.product?.salePrices ? JSON.parse(t.product.salePrices) : [],
           warehouseId: t.warehouseId,
@@ -80,6 +98,8 @@ export async function GET(request: Request) {
           cost: 0,
           sellerName: "-",
           sellerId: null as number | null,
+          exchangeRateType: "DAILY_MARKET",
+          customExchangeRate: 132000,
           purchaseDate: "-",
           totalPurchaseValue: 0,
           totalPurchaseQty: 0,
@@ -91,8 +111,11 @@ export async function GET(request: Request) {
       stockMap[key].quantity += t.qtyChange;
 
       const line = t.voucher?.lines?.find((l: any) => l.productId === t.productId);
-      const originalPrice = (line && line.unitPrice > 0) ? line.unitPrice : (t.unitCost || 0);
-      const costVal = t.unitCost || originalPrice;
+      let rawPrice = (line && line.unitPrice > 0) ? line.unitPrice : (t.unitCost || 0);
+      let voucherCurId = (line as any)?.currencyId || (t.voucher as any)?.currencyId || 1;
+      
+      const isIQD = voucherCurId === iqdCur?.id || rawPrice > 1000;
+      let originalPriceUsd = isIQD ? (rawPrice / marketRatePerDollar) : rawPrice;
 
       let versionData: any = {};
       if (t.voucher?.versions && t.voucher.versions.length > 0) {
@@ -110,24 +133,40 @@ export async function GET(request: Request) {
         stockMap[key].customExchangeRate = customRateForProduct;
       }
 
-      if (t.qtyChange > 0 && costVal > 0) {
-        const unitExpense = Math.max(costVal - originalPrice, 0);
+      if (t.qtyChange > 0 && rawPrice > 0) {
+        let effectiveUnitCostUsd = originalPriceUsd;
 
-        stockMap[key].totalPurchaseValue += (t.qtyChange * costVal);
+        if (rateTypeForProduct === "FIXED") {
+          const fixedRatePerDollar = customRateForProduct / 100;
+          effectiveUnitCostUsd = (originalPriceUsd * fixedRatePerDollar) / marketRatePerDollar;
+        }
+
+        const unitExpense = 0;
+
+        stockMap[key].totalPurchaseValue += (t.qtyChange * effectiveUnitCostUsd);
         stockMap[key].totalPurchaseQty += t.qtyChange;
         stockMap[key].totalExpenseValue += (t.qtyChange * unitExpense);
         
+        stockMap[key].exchangeRateType = rateTypeForProduct;
+        stockMap[key].customExchangeRate = customRateForProduct;
+        stockMap[key].isIQD = isIQD;
+        stockMap[key].currencyCode = isIQD ? "IQD" : "USD";
+        stockMap[key].currencySymbol = isIQD ? "دینار" : "$";
+        stockMap[key].rawPurchasePrice = isIQD ? rawPrice : originalPriceUsd;
+        stockMap[key].rawCost = isIQD ? rawPrice : effectiveUnitCostUsd;
+
         if (stockMap[key].isMultiBatch) {
-          stockMap[key].purchasePrice = originalPrice;
-          stockMap[key].cost = costVal;
+          stockMap[key].purchasePrice = isIQD ? rawPrice : originalPriceUsd;
+          stockMap[key].cost = isIQD ? rawPrice : effectiveUnitCostUsd;
           stockMap[key].expense = unitExpense;
         } else {
-          const avgCost = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : costVal;
-          const avgExpense = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalExpenseValue / stockMap[key].totalPurchaseQty) : unitExpense;
-          const avgPrice = avgCost - avgExpense;
+          const avgCostUsd = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : effectiveUnitCostUsd;
+          const avgExpense = 0;
           
-          stockMap[key].purchasePrice = avgPrice;
-          stockMap[key].cost = avgCost;
+          stockMap[key].purchasePrice = isIQD ? rawPrice : originalPriceUsd;
+          stockMap[key].cost = isIQD ? (avgCostUsd * marketRatePerDollar) : avgCostUsd;
+          stockMap[key].costUsd = avgCostUsd;
+          stockMap[key].purchasePriceUsd = originalPriceUsd;
           stockMap[key].expense = avgExpense;
         }
         if (t.voucher?.account?.name) {
@@ -176,11 +215,102 @@ export async function GET(request: Request) {
       }
     });
 
-    let result = Object.values(stockMap).filter((item: any) => item.quantity !== 0);
+    const status = searchParams.get("status") || "available";
 
-    // Apply seller filter if present
+    if (status === "all" || status === "out_of_stock") {
+      const allProducts = await prisma.product.findMany({ 
+        select: { id: true, name: true, code: true, category: true, brand: true, isMultiBatch: true, salePrices: true } 
+      });
+      allProducts.forEach(p => {
+        const key = `${p.id}-default`;
+        if (!stockMap[key]) {
+          stockMap[key] = {
+            productId: p.id,
+            productName: p.name,
+            productCode: p.code || "-",
+            category: p.category || "-",
+            brand: p.brand || "-",
+            sellPrice: 0,
+            salePrices: p.salePrices ? JSON.parse(p.salePrices) : [],
+            warehouseId: 0,
+            warehouseName: "-",
+            quantity: 0,
+            purchasePrice: 0,
+            expense: 0,
+            cost: 0,
+            sellerName: "-",
+            sellerId: null,
+            exchangeRateType: "DAILY_MARKET",
+            customExchangeRate: 132000,
+            purchaseDate: "-",
+            totalPurchaseValue: 0,
+            totalPurchaseQty: 0,
+            totalExpenseValue: 0,
+            isMultiBatch: p.isMultiBatch || false
+          };
+        }
+      });
+    }
+
+    let result = Object.values(stockMap);
+
+    if (status === "available") {
+      result = result.filter((item: any) => item.quantity > 0);
+    } else if (status === "out_of_stock") {
+      result = result.filter((item: any) => item.quantity === 0);
+    }
+
+    // Apply filters (support multi-select comma-separated values)
     if (sellerName && sellerName !== "all" && sellerName !== "") {
-      result = result.filter((item: any) => item.sellerName === sellerName);
+      const list = sellerName.split(",").filter(Boolean);
+      if (list.length > 0) {
+        result = result.filter((item: any) => list.includes(item.sellerName));
+      }
+    }
+
+    if (rateType && rateType !== "all") {
+      result = result.filter((item: any) => item.exchangeRateType === rateType);
+    }
+
+    const currencyFilterParam = searchParams.get("currency");
+    if (currencyFilterParam && currencyFilterParam !== "all") {
+      if (currencyFilterParam === "iqd") {
+        result = result.filter((item: any) => item.isIQD || item.currencyCode === "IQD");
+      } else if (currencyFilterParam === "usd") {
+        result = result.filter((item: any) => !item.isIQD && item.currencyCode !== "IQD");
+      }
+    }
+
+    if (category && category !== "all" && category !== "") {
+      const list = category.split(",").filter(Boolean);
+      if (list.length > 0) {
+        result = result.filter((item: any) => list.includes(item.category));
+      }
+    }
+
+    if (brand && brand !== "all" && brand !== "") {
+      const list = brand.split(",").filter(Boolean);
+      if (list.length > 0) {
+        result = result.filter((item: any) => list.includes(item.brand));
+      }
+    }
+
+    if (warehouseId && warehouseId !== "all" && warehouseId !== "") {
+      const list = warehouseId.split(",").map(Number).filter(n => !isNaN(n));
+      if (list.length > 0) {
+        result = result.filter((item: any) => list.includes(Number(item.warehouseId)));
+      }
+    }
+
+    if (productId && productId !== "all" && productId !== "") {
+      const list = productId.split(",").map(Number).filter(n => !isNaN(n));
+      if (list.length > 0) {
+        result = result.filter((item: any) => list.includes(Number(item.productId)));
+      }
+    }
+
+    if (code && code !== "") {
+      result = result.filter((item: any) => item.productCode?.toLowerCase().includes(code.toLowerCase()));
     }
 
     return NextResponse.json(result);

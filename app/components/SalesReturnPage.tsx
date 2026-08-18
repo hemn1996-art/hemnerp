@@ -395,7 +395,8 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
-    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    const normalized = normalizeCurrencyMap(map);
+    const activeEntries = Object.entries(normalized).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -404,7 +405,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-                    const curObj = currencies.find((c: any) => c.id === Number(curIdText));
+          const curObj = currencies.find((c: any) => c.id === Number(curIdText));
           const code = curObj?.code || "";
           const symbol = curObj?.symbol || "$";
           const displaySymbol = code === "IQD" ? "دینار" : symbol;
@@ -420,7 +421,8 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
-    const parts = Object.entries(map)
+    const normalized = normalizeCurrencyMap(map);
+    const parts = Object.entries(normalized)
       .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
       .map(([currencyIdText, amount]) =>
         formatCurrencyAmount(amount, Number(currencyIdText))
@@ -714,7 +716,37 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
   // Currency helpers
   function getCurrencyKey(currencyId: number) {
-    return String(currencyId);
+    const rawId = Number(currencyId || returnCurrencyId || defaultCurrency?.id || 11);
+    const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
+
+    const getGroupCode = (c: any) => {
+      if (!c) return "";
+      const code = (c.code || "").toUpperCase().trim();
+      const symbol = (c.symbol || "").trim();
+      if (code.includes("USD") || symbol === "$") return "USD";
+      if (code.includes("IQD") || symbol === "دینار" || symbol === "د.ع") return "IQD";
+      return code || symbol;
+    };
+
+    const targetGroup = getGroupCode(found);
+    if (targetGroup) {
+      const mainCur = (currencies || []).find((c: any) => getGroupCode(c) === targetGroup && (c.isActive !== false));
+      if (mainCur) return String(mainCur.id);
+    }
+
+    const mainCur = (currencies || []).find((c: any) => found && c.code === found.code && (c.isActive !== false));
+    return String(mainCur ? mainCur.id : rawId);
+  }
+
+  function normalizeCurrencyMap(map: Record<string, number>): Record<string, number> {
+    if (!map) return {};
+    const normalized: Record<string, number> = {};
+    for (const [curIdText, val] of Object.entries(map)) {
+      if (typeof val !== "number" || isNaN(val)) continue;
+      const canonicalKey = getCurrencyKey(Number(curIdText));
+      normalized[canonicalKey] = (normalized[canonicalKey] || 0) + val;
+    }
+    return normalized;
   }
 
   function getCurrencySymbol(currencyId?: number) {

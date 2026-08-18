@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { calculateLedgerEntries } from "../../utils/ledgerHelper";
+import { getCurrentUser } from "../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
     const accountId = searchParams.get("accountId");
@@ -50,6 +56,8 @@ export async function GET(request: Request) {
         deliveryAddress: true,
         deliveryFee: true,
         extraPaymentHandling: true,
+        isArrived: true,
+        arrivalDate: true,
         account: { select: { id: true, name: true, accountTypeId: true, city: { select: { name: true } }, district: { select: { name: true } } } },
         cashbox: { select: { id: true, name: true } },
         fromCashbox: { select: { id: true, name: true } },
@@ -109,7 +117,48 @@ export async function GET(request: Request) {
       orderBy: [{ date: "desc" }, { id: "desc" }],
     });
 
-    return NextResponse.json(vouchers);
+    // Normalize totalAmount and netAmount for vouchers with mixed IQD/USD lines
+    const normalizedVouchers = vouchers.map((v: any) => {
+      if (v.lines && Array.isArray(v.lines) && v.lines.length > 0) {
+        const hasIqdLine = v.lines.some((l: any) => l.currencyId === 2 || Number(l.unitPrice) > 1000);
+        if (hasIqdLine) {
+          let customRate = 1520;
+          if (v.exchangeRate && v.exchangeRate > 1) {
+            customRate = v.exchangeRate;
+          } else if (v.versions && v.versions.length > 0) {
+            try {
+              const lastData = JSON.parse(v.versions[0].data);
+              if (lastData.customExchangeRate) {
+                customRate = Number(lastData.customExchangeRate) / 100;
+              }
+            } catch (e) {}
+          }
+
+          let realTotalUsd = 0;
+          for (const line of v.lines) {
+            const qty = Number(line.qty || 0);
+            const unitPrice = Number(line.unitPrice || 0);
+            const isIQD = line.currencyId === 2 || unitPrice > 1000;
+            if (isIQD) {
+              realTotalUsd += (qty * unitPrice) / (customRate || 1520);
+            } else {
+              realTotalUsd += qty * unitPrice;
+            }
+          }
+
+          if (v.totalAmount > 2000 && realTotalUsd < 2000) {
+            return {
+              ...v,
+              totalAmount: Math.round(realTotalUsd * 100) / 100,
+              netAmount: Math.round(realTotalUsd * 100) / 100,
+            };
+          }
+        }
+      }
+      return v;
+    });
+
+    return NextResponse.json(normalizedVouchers);
   } catch (error) {
     console.error("Error fetching vouchers:", error);
     return NextResponse.json(
@@ -121,6 +170,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const data = await request.json();
 
     if (data.accountId) {
@@ -233,6 +287,8 @@ export async function POST(request: Request) {
           deliveryAddress: data.deliveryAddress,
           deliveryFee: data.deliveryFee ? Number(data.deliveryFee) : null,
           extraPaymentHandling: data.extraPaymentHandling || null,
+          isArrived: data.isArrived !== undefined ? Boolean(data.isArrived) : true,
+          arrivalDate: data.arrivalDate ? new Date(data.arrivalDate) : (data.isArrived === false ? null : (data.date ? new Date(data.date) : new Date())),
         },
       });
 
@@ -253,21 +309,23 @@ export async function POST(request: Request) {
           });
 
           if (["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
-            let qtyChange = Number(line.qty);
-            if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
-              qtyChange = -qtyChange;
-            }
-            if (line.warehouseId) {
-              await tx.inventoryTransaction.create({
-                data: {
-                  voucherId: createdVoucher.id,
-                  productId: Number(line.productId),
-                  warehouseId: Number(line.warehouseId),
-                  qtyChange,
-                  unitCost: Number(line.unitCost || line.unitPrice || 0),
-                  date: createdVoucher.date,
-                },
-              });
+            const shouldCreateInventory = createdVoucher.type !== "purchase" || createdVoucher.isArrived !== false;
+            if (shouldCreateInventory) {
+              let qtyChange = Number(line.qty);
+              if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
+                qtyChange = -qtyChange;
+              }
+              if (line.warehouseId) {
+                await tx.inventoryTransaction.create({
+                  data: {
+                    voucherId: createdVoucher.id,
+                    productId: Number(line.productId),
+                    warehouseId: Number(line.warehouseId),
+                    qtyChange,
+                    unitCost: Number(line.unitCost || line.unitPrice || 0),
+                    date: createdVoucher.arrivalDate || createdVoucher.date,
+                  },
+                });
 
               if (qtyChange < 0) {
                 const currentInv = await tx.inventoryTransaction.aggregate({
@@ -291,6 +349,7 @@ export async function POST(request: Request) {
             }
           }
         }
+      }
       }
 
       if (data.expenses && Array.isArray(data.expenses)) {
@@ -394,23 +453,30 @@ export async function POST(request: Request) {
             balanceBeforeByCurrency[String(agg.currencyId)] = (agg._sum.debit || 0) - (agg._sum.credit || 0);
           }
 
+          let effectiveVoucherRate = createdVoucher.exchangeRate;
+
           const dbCurrencies = await tx.currency.findMany();
 
           const { ledgerEntries: computedEntries } = calculateLedgerEntries({
             type: createdVoucher.type,
             netAmount: createdVoucher.netAmount,
             currencyId: createdVoucher.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 11,
-            exchangeRate: createdVoucher.exchangeRate,
+            exchangeRate: effectiveVoucherRate,
             paidAmounts: [
-              ...(data.paidAmounts ? data.paidAmounts.map((pa: any) => ({
-                currencyId: Number(pa.currencyId),
-                amount: Number(pa.amount),
-                exchangeRate: Number(pa.exchangeRate || 1)
-              })) : []),
+              ...(data.paidAmounts ? data.paidAmounts.map((pa: any) => {
+                const curId = Number(pa.currencyId);
+                let pRate = Number(pa.exchangeRate || 1);
+
+                return {
+                  currencyId: curId,
+                  amount: Number(pa.amount),
+                  exchangeRate: pRate
+                };
+              }) : []),
               ...(Number(data.totalDiscount) > 0 ? [{
-                currencyId: createdVoucher.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 11,
+                currencyId: createdVoucher.currencyId || 1,
                 amount: Number(data.totalDiscount),
-                exchangeRate: 1
+                exchangeRate: effectiveVoucherRate
               }] : [])
             ],
             extraPaymentHandling: data.extraPaymentHandling || null,

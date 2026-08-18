@@ -1,10 +1,39 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
-import { verifyPassword } from "../../lib/auth";
+import { verifyPassword, signSessionToken } from "../../lib/auth";
+
+// Log login attempts for security monitoring
+async function logLoginAttempt(
+  username: string,
+  success: boolean,
+  ip: string,
+  userAgent: string
+) {
+  try {
+    // Store login attempt in database
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "LoginAttempt" (username, success, "ipAddress", "userAgent", "attemptedAt") VALUES ($1, $2, $3, $4, NOW())`,
+      username,
+      success,
+      ip || "unknown",
+      (userAgent || "unknown").substring(0, 500)
+    );
+  } catch (error) {
+    // Don't let logging failure break login
+    console.error("Login attempt log error:", error);
+  }
+}
 
 export async function POST(request: Request) {
   try {
     const { username, password } = await request.json();
+
+    // Get client info for logging
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+    const userAgent = request.headers.get("user-agent") || "unknown";
 
     if (!username || !password) {
       return NextResponse.json(
@@ -27,6 +56,7 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
+      await logLoginAttempt(username, false, ip, userAgent);
       return NextResponse.json(
         { success: false, error: "یوزەرنەیم یان پاسوۆرد هەڵەیە!" },
         { status: 401 }
@@ -34,6 +64,7 @@ export async function POST(request: Request) {
     }
 
     if (!user.isActive) {
+      await logLoginAttempt(username, false, ip, userAgent);
       return NextResponse.json(
         { success: false, error: "ئەم هەژمارە ناچالاکە" },
         { status: 401 }
@@ -43,18 +74,21 @@ export async function POST(request: Request) {
     // Verify password
     const isValidPassword = await verifyPassword(password, user.password);
     if (!isValidPassword) {
+      await logLoginAttempt(username, false, ip, userAgent);
       return NextResponse.json(
         { success: false, error: "یوزەرنەیم یان پاسوۆرد هەڵەیە!" },
         { status: 401 }
       );
     }
 
-    // Create session data
-    const sessionData = JSON.stringify({
+    // Successful login
+    await logLoginAttempt(username, true, ip, userAgent);
+
+    // Create cryptographically signed session token
+    const signedToken = signSessionToken({
       id: user.id,
       username: user.username,
       name: user.name,
-      role: user.role,
     });
 
     const response = NextResponse.json({
@@ -68,20 +102,22 @@ export async function POST(request: Request) {
       },
     });
 
-    // Set the auth cookie (kept for middleware compatibility)
-    response.cookies.set("auth_token", "authenticated_session", {
-      httpOnly: false,
+    // Set auth_token for proxy/middleware compatibility
+    response.cookies.set("auth_token", signedToken, {
+      httpOnly: true,
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 1 week
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
     });
 
-    // Set user session cookie with user info
-    response.cookies.set("user_session", sessionData, {
-      httpOnly: false,
+    // Set signed user_session cookie
+    response.cookies.set("user_session", signedToken, {
+      httpOnly: true,
       path: "/",
       maxAge: 60 * 60 * 24 * 7, // 1 week
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
     });
 
     return response;

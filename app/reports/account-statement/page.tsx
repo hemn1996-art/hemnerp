@@ -642,43 +642,43 @@ function AccountStatementContent() {
         </div>
 
         {/* Info Header Box */}
-        <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm p-3.5 mb-5 overflow-hidden no-print" style={{ direction: "rtl" }}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+        <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5 overflow-hidden no-print" style={{ direction: "rtl" }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 items-center">
             {/* Account Details */}
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200/80">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#061f5f] to-[#03133f] text-white flex items-center justify-center font-black text-sm shadow-sm flex-shrink-0">
+            <div className="flex items-center gap-3.5 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#061f5f] to-[#03133f] text-white flex items-center justify-center font-black text-lg shadow-sm flex-shrink-0">
                 👤
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-[11px] text-gray-500 font-bold">کەشف حسابی</span>
-                <span className="text-sm font-black text-slate-900 truncate">{account?.name || "دیاری نەکراوە"}</span>
-                {account?.phone && <span className="text-xs text-slate-600 font-semibold" dir="ltr">{account.phone}</span>}
+                <span className="text-xs md:text-sm text-slate-600 font-black">کەشف حسابی</span>
+                <span className="text-base md:text-lg font-black text-slate-900 truncate">{account?.name || "دیاری نەکراوە"}</span>
+                {account?.phone && <span className="text-xs md:text-sm text-slate-700 font-bold" dir="ltr">{account.phone}</span>}
               </div>
             </div>
 
             {/* Date Details */}
-            <div className="flex items-center justify-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200/80 text-center">
+            <div className="flex items-center justify-center gap-2 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200 text-center">
               <div className="flex flex-col items-center">
-                <span className="text-[11px] text-gray-500 font-bold">بەرواری کەشف حساب</span>
-                <span className="text-xs font-black text-slate-800">
+                <span className="text-xs md:text-sm text-slate-600 font-black">بەرواری کەشف حساب</span>
+                <span className="text-sm md:text-base font-black text-slate-900 mt-0.5">
                   <span dir="ltr">{formatDate(startDate)}</span> بۆ <span dir="ltr">{formatDate(endDate)}</span>
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium mt-0.5" dir="ltr">
+                <span className="text-xs text-slate-600 font-bold mt-1" dir="ltr">
                   پرینت: {new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                 </span>
               </div>
             </div>
 
             {/* Top Balance Box (Clean Light Theme) */}
-            <div className="flex items-center justify-between gap-2.5 p-3 bg-slate-50 rounded-lg border border-slate-200/80">
+            <div className="flex items-center justify-between gap-2.5 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 font-extrabold flex-shrink-0">باڵانس:</span>
-                <div className="text-base font-black" dir="ltr">
+                <span className="text-xs md:text-sm text-slate-700 font-black flex-shrink-0">باڵانس:</span>
+                <div className="text-lg md:text-xl font-black text-slate-900" dir="ltr">
                   {renderBalances(processed.finalBalances, false, false)}
                 </div>
               </div>
               {account?.exchangeRateType === "FIXED" && (
-                <span className="text-[11px] font-black text-purple-950 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md shadow-sm whitespace-nowrap">
+                <span className="text-xs font-black text-purple-950 bg-purple-100 border border-purple-300 px-2.5 py-1 rounded-md shadow-sm whitespace-nowrap">
                   📌 جێگیر: {(account.customExchangeRate || 132000).toLocaleString("en-US")} د.ع
                 </span>
               )}

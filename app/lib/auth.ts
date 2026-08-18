@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../lib/prisma";
@@ -24,6 +25,54 @@ export async function verifyPassword(plain: string, hashed: string): Promise<boo
   return bcrypt.compare(plain, hashed);
 }
 
+
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "hemnerp-secure-session-key-2026";
+
+/**
+ * Sign session payload with HMAC-SHA256
+ */
+export function signSessionToken(payload: { id: number; username: string; name: string }): string {
+  const jsonStr = JSON.stringify({ ...payload, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 });
+  const base64Data = Buffer.from(jsonStr).toString("base64url");
+  const hmac = crypto.createHmac("sha256", SESSION_SECRET).update(base64Data).digest("base64url");
+  return `${base64Data}.${hmac}`;
+}
+
+/**
+ * Verify and parse signed session token
+ */
+export function verifySessionToken(token: string): { id: number; username: string; name: string } | null {
+  if (!token || typeof token !== "string" || !token.includes(".")) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 2) return null;
+    const [base64Data, hmac] = parts;
+    if (!base64Data || !hmac) return null;
+
+    const expectedHmac = crypto.createHmac("sha256", SESSION_SECRET).update(base64Data).digest("base64url");
+    
+    // Constant time comparison
+    const bufHmac = Buffer.from(hmac);
+    const bufExpected = Buffer.from(expectedHmac);
+    if (bufHmac.length !== bufExpected.length || !crypto.timingSafeEqual(bufHmac, bufExpected)) {
+      return null;
+    }
+
+    const jsonStr = Buffer.from(base64Data, "base64url").toString("utf8");
+    const parsed = JSON.parse(jsonStr);
+    if (parsed.exp && Date.now() > parsed.exp) return null;
+    if (!parsed.id) return null;
+
+    return {
+      id: Number(parsed.id),
+      username: String(parsed.username || ""),
+      name: String(parsed.name || ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface SessionUser {
   id: number;
   username: string;
@@ -40,34 +89,46 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!sessionCookie?.value) return null;
 
   try {
-    const decodedValue = sessionCookie.value.includes("%")
+    const rawVal = sessionCookie.value.includes("%")
       ? decodeURIComponent(sessionCookie.value)
       : sessionCookie.value;
 
-    const session = JSON.parse(decodedValue);
-    if (!session.id) return null;
+    let userId: number | null = null;
 
-    // Database lookup to verify if the user exists and is active
+    // Try signed token first
+    const verifiedPayload = verifySessionToken(rawVal);
+    if (verifiedPayload) {
+      userId = verifiedPayload.id;
+    } else {
+      // Fallback for transition if payload was raw JSON
+      try {
+        const parsed = JSON.parse(rawVal);
+        if (parsed.id) userId = Number(parsed.id);
+      } catch {
+        return null;
+      }
+    }
+
+    if (!userId) return null;
+
+    // CRITICAL SECURITY FIX: ALWAYS query database for actual active state AND actual role from DB
     const user = await prisma.user.findUnique({
-      where: { id: session.id },
-      select: { isActive: true },
+      where: { id: userId },
+      select: { id: true, username: true, name: true, role: true, isActive: true },
     });
+
     if (!user || !user.isActive) return null;
 
+    // Return exact user record with DB-verified role (cannot be spoofed in cookie)
     return {
-      id: session.id,
-      username: session.username,
-      name: session.name,
-      role: session.role,
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
     };
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      // Invalid JSON in cookie
-      return null;
-    }
-    // For database or other errors, throw so the caller knows it's a server error
     console.error("getCurrentUser error:", error);
-    throw error;
+    return null;
   }
 }
 

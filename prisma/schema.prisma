@@ -83,6 +83,9 @@ model Account {
   district      District?     @relation(fields: [districtId], references: [id])
   ledgerEntries LedgerEntry[]
   vouchers      Voucher[]
+
+  @@index([isActive, accountTypeId])
+  @@index([isShareholder])
 }
 
 model Warehouse {
@@ -177,7 +180,13 @@ model Voucher {
   paidAmounts           VoucherPaidAmount[]
   versions              VoucherVersion[]
   extraPaymentHandling  String?
+  isArrived             Boolean                @default(true)
+  arrivalDate           DateTime?
 
+  @@index([isDeleted, type, date])
+  @@index([isDeleted, date])
+  @@index([accountId, isDeleted])
+  @@index([cashboxId, isDeleted])
   @@index([type, date])
   @@index([accountId])
   @@index([cashboxId])
@@ -425,3 +434,16 @@ model FixedAssetHistory {
   asset        FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 }
 
+
+
+model LoginAttempt {
+  id          Int      @id @default(autoincrement())
+  username    String
+  success     Boolean  @default(false)
+  ipAddress   String?
+  userAgent   String?
+  attemptedAt DateTime @default(now())
+
+  @@index([username])
+  @@index([attemptedAt])
+}
