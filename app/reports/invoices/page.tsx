@@ -3284,7 +3284,7 @@ function InvoiceReportContent() {
                 onClick={handleDeleteVoucher}
                 className="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition cursor-pointer"
               >
-                بەڵێ، بیڕەوە
+                بەڵێ، بیسڕەوە
               </button>
               <button
                 onClick={() => setDeleteVoucherId(null)}
