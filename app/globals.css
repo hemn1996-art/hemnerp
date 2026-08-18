@@ -467,8 +467,9 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
 .arabic-dhikr-font * {
   font-family: 'Amiri Quran', 'Scheherazade New', 'Aref Ruqaa', 'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arabic Typesetting', serif !important;
   font-weight: 700 !important;
+  font-size: 1.4em !important;
   letter-spacing: 0px !important;
-  line-height: 1.6 !important;
+  line-height: 1.5 !important;
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1 !important;
   text-rendering: optimizeLegibility !important;
 }

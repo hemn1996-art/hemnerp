@@ -538,7 +538,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
       {/* Dhikr & Duaa Ticker Bar for Rizq and Barakah */}
       <div
-        className="rounded-xl px-3.5 py-2 mb-4 shadow-sm flex items-center gap-3 overflow-hidden text-white relative border z-10 h-13"
+        className="rounded-xl px-3.5 py-2 mb-4 shadow-sm flex items-center gap-3 overflow-hidden text-white relative border z-10 h-14"
         style={{
           background: "linear-gradient(135deg, #064e3b 0%, #022c22 60%, #061f5f 100%)",
           borderColor: "rgba(52, 211, 153, 0.3)",
@@ -569,38 +569,38 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
             {[1, 2].map((loopIdx) => (
               <div key={loopIdx} className="flex items-center gap-10 whitespace-nowrap pr-10">
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ</span>
-                  <span className="text-emerald-300/80 text-[11px] font-bold">(سەڵاوات)</span>
+                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ</span>
+                  <span className="text-emerald-300/80 text-xs font-bold">(سەڵاوات)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ اكْفِنِي بِحَلَالِكَ عَنْ حَرَامِكَ، وَأَغْنِنِي بِفَضْلِكَ عَمَّنْ سِوَاكَ</span>
-                  <span className="text-emerald-300/80 text-[11px] font-bold">(ڕزقی حەڵاڵ)</span>
+                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ اكْفِنِي بِحَلَالِكَ عَنْ حَرَامِكَ، وَأَغْنِنِي بِفَضْلِكَ عَمَّنْ سِوَاكَ</span>
+                  <span className="text-emerald-300/80 text-xs font-bold">(ڕزقی حەڵاڵ)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ</span>
-                  <span className="text-emerald-300/80 text-[11px] font-bold">(تەسبیحات)</span>
+                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ</span>
+                  <span className="text-emerald-300/80 text-xs font-bold">(تەسبیحات)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ وَأَتُوبُ إِلَيْهِ</span>
-                  <span className="text-emerald-300/80 text-[11px] font-bold">(ئیستغفار)</span>
+                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ وَأَتُوبُ إِلَيْهِ</span>
+                  <span className="text-emerald-300/80 text-xs font-bold">(ئیستغفار)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ بَارِكْ لَنَا فِي رِزْقِنَا وَقِنَا عَذَابَ النَّارِ</span>
-                  <span className="text-emerald-300/80 text-[11px] font-bold">(بەرەکەتی ڕزق)</span>
+                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ بَارِكْ لَنَا فِي رِزْقِنَا وَقِنَا عَذَابَ النَّارِ</span>
+                  <span className="text-emerald-300/80 text-xs font-bold">(بەرەکەتی ڕزق)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلًا مُتَقَبَّلًا</span>
-                  <span className="text-emerald-300/80 text-[11px] font-bold">(ڕزقی پاک)</span>
+                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلًا مُتَقَبَّلًا</span>
+                  <span className="text-emerald-300/80 text-xs font-bold">(ڕزقی پاک)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ</span>
-                  <span className="text-emerald-300/80 text-[11px] font-bold">(گه‌نجینەی بەهەشت)</span>
+                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ</span>
+                  <span className="text-emerald-300/80 text-xs font-bold">(گه‌نجینەی بەهەشت)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
               </div>
