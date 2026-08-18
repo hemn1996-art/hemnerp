@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Naskh+Arabic:wght@500;700&family=Scheherazade+New:wght@600;700&family=Cairo:wght@700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Aref+Ruqaa:wght@700&family=Noto+Naskh+Arabic:wght@500;700&family=Scheherazade+New:wght@600;700&family=Cairo:wght@700;800&display=swap');
 @import "tailwindcss";
 
 @font-face {
@@ -465,8 +465,10 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
 /* Dhikr & Duaa Calligraphic Font Override */
 .arabic-dhikr-font,
 .arabic-dhikr-font * {
-  font-family: 'Amiri', serif !important;
+  font-family: 'Amiri Quran', 'Scheherazade New', 'Aref Ruqaa', 'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arabic Typesetting', serif !important;
   font-weight: 700 !important;
   letter-spacing: 0px !important;
   line-height: 1.6 !important;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1 !important;
+  text-rendering: optimizeLegibility !important;
 }
