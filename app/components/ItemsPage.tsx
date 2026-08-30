@@ -300,21 +300,31 @@ function AddItemForm({
       : "inventory"
   );
 
-  const [salePrices, setSalePrices] = useState(
-    productToEdit?.salePrices && productToEdit.salePrices.length > 0
-      ? productToEdit.salePrices.map((p) => ({
-          currencyId: String(p.currencyId),
-          priceType: p.priceType,
-          amount: String(p.amount),
-        }))
-      : [
-          {
-            currencyId: "1",
-            priceType: "جوملە",
-            amount: "",
-          },
-        ]
-  );
+  const [salePrices, setSalePrices] = useState(() => {
+    if (productToEdit?.salePrices) {
+      if (Array.isArray(productToEdit.salePrices) && productToEdit.salePrices.length > 0) {
+        return productToEdit.salePrices.map((p: any) => ({
+          currencyId: String(p.currencyId || "1"),
+          priceType: p.priceType || "جوملە",
+          amount: String(p.amount || ""),
+        }));
+      }
+      if (typeof productToEdit.salePrices === "object") {
+        return Object.entries(productToEdit.salePrices).map(([cur, amt]) => ({
+          currencyId: cur === "IQD" ? "2" : "1",
+          priceType: "جوملە",
+          amount: String(amt || ""),
+        }));
+      }
+    }
+    return [
+      {
+        currencyId: "1",
+        priceType: "جوملە",
+        amount: "",
+      },
+    ];
+  });
 
   const [packages, setPackages] = useState([
     {
@@ -967,18 +977,30 @@ function getItemType(item: Product) {
   return "کۆگایی";
 }
 
-function formatSalePrices(item: Product) {
-  if (!item.salePrices || item.salePrices.length === 0) {
+function formatSalePrices(item: Product | any) {
+  if (!item) return "-";
+  if (!item.salePrices) {
     return item.salePrice ? `${item.salePrice} $` : "-";
   }
 
-  return item.salePrices
-    .map((price) => {
-      const currency = mockCurrencies.find((x: any) => x.id === price.currencyId);
-      const symbol = currency ? currency.symbol : "";
-      return `${price.amount} ${symbol}`;
-    })
-    .join(" | ");
+  if (Array.isArray(item.salePrices)) {
+    if (item.salePrices.length === 0) return item.salePrice ? `${item.salePrice} $` : "-";
+    return item.salePrices
+      .map((price: any) => {
+        const currency = mockCurrencies.find((x: any) => x.id === price.currencyId);
+        const symbol = currency ? currency.symbol : "$";
+        return `${price.amount} ${symbol}`;
+      })
+      .join(" | ");
+  }
+
+  if (typeof item.salePrices === "object") {
+    const entries = Object.entries(item.salePrices);
+    if (entries.length === 0) return item.salePrice ? `${item.salePrice} $` : "-";
+    return entries.map(([cur, amt]) => `${amt} ${cur === 'USD' ? '$' : cur}`).join(" | ");
+  }
+
+  return item.salePrice ? `${item.salePrice} $` : "-";
 }
 
 function Section({ title, icon, children }: any) {

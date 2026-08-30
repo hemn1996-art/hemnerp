@@ -289,23 +289,49 @@ export default function StockReportPage() {
   };
 
   const formatSalePrices = (item: StockItem | any) => {
-    if (!item.salePrices || item.salePrices.length === 0) {
+    if (!item || !item.salePrices) {
       return <span className="text-gray-400 font-normal">دیاری نەکراوە (کلیک بکە)</span>;
     }
 
-    return (
-      <div className="flex flex-col gap-0.5 items-center">
-        {item.salePrices.map((sp: any, i: number) => {
-          const symbol = getCurrencySymbol(sp.currencyId);
-          return (
-            <div key={i} className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
-              <FormattedNumber value={sp.amount} currencySymbol={symbol} decimals={2} />
-              <span className="text-[10px] text-gray-400 font-normal">({sp.priceType})</span>
-            </div>
-          );
-        })}
-      </div>
-    );
+    if (Array.isArray(item.salePrices)) {
+      if (item.salePrices.length === 0) {
+        return <span className="text-gray-400 font-normal">دیاری نەکراوە (کلیک بکە)</span>;
+      }
+      return (
+        <div className="flex flex-col gap-0.5 items-center">
+          {item.salePrices.map((sp: any, i: number) => {
+            const symbol = getCurrencySymbol(sp.currencyId);
+            return (
+              <div key={i} className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+                <FormattedNumber value={sp.amount} currencySymbol={symbol} decimals={2} />
+                <span className="text-[10px] text-gray-400 font-normal">({sp.priceType || 'جوملە'})</span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    if (typeof item.salePrices === "object") {
+      const entries = Object.entries(item.salePrices);
+      if (entries.length === 0) {
+        return <span className="text-gray-400 font-normal">دیاری نەکراوە (کلیک بکە)</span>;
+      }
+      return (
+        <div className="flex flex-col gap-0.5 items-center">
+          {entries.map(([cur, amt]: any, i: number) => {
+            return (
+              <div key={i} className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
+                <FormattedNumber value={amt} currencySymbol={cur === 'USD' ? '$' : cur} decimals={2} />
+                <span className="text-[10px] text-gray-400 font-normal">(جوملە)</span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    return <span className="text-gray-400 font-normal">دیاری نەکراوە (کلیک بکە)</span>;
   };
 
   // Selling Prices Modal State
