@@ -49,27 +49,30 @@ export async function POST(request: Request) {
 
     const d = backupData.data;
 
-    // Delete all data in correct order (children first, parents last)
-    await prisma.$transaction([
-      prisma.inventoryTransaction.deleteMany(),
-      prisma.ledgerEntry.deleteMany(),
-      prisma.voucherPaidAmount.deleteMany(),
-      prisma.voucherExpense.deleteMany(),
-      prisma.voucherLine.deleteMany(),
-      prisma.voucherVersion.deleteMany(),
-      prisma.voucher.deleteMany(),
-      prisma.cashboxBalance.deleteMany(),
-      prisma.cashbox.deleteMany(),
-      prisma.product.deleteMany(),
-      prisma.invoiceTemplate.deleteMany(),
-      prisma.account.deleteMany(),
-      prisma.accountType.deleteMany(),
-      prisma.district.deleteMany(),
-      prisma.city.deleteMany(),
-      prisma.country.deleteMany(),
-      prisma.warehouse.deleteMany(),
-      prisma.currency.deleteMany(),
-    ]);
+    // Delete all data sequentially in an interactive transaction to prevent deadlock
+    await prisma.$transaction(async (tx) => {
+      await tx.inventoryTransaction.deleteMany();
+      await tx.ledgerEntry.deleteMany();
+      await tx.voucherPaidAmount.deleteMany();
+      await tx.voucherExpense.deleteMany();
+      await tx.voucherLine.deleteMany();
+      await tx.voucherVersion.deleteMany();
+      await tx.voucher.deleteMany();
+      await tx.cashboxBalance.deleteMany();
+      await tx.cashbox.deleteMany();
+      await tx.product.deleteMany();
+      await tx.invoiceTemplate.deleteMany();
+      await tx.account.deleteMany();
+      await tx.accountType.deleteMany();
+      await tx.district.deleteMany();
+      await tx.city.deleteMany();
+      await tx.country.deleteMany();
+      await tx.warehouse.deleteMany();
+      await tx.currency.deleteMany();
+    }, {
+      maxWait: 15000,
+      timeout: 30000
+    });
 
     // Re-insert all data in correct order (parents first, children last)
     // Use createMany with skipDuplicates for safety
