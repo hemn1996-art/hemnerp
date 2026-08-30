@@ -478,9 +478,6 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const accountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
     const before = accountBalanceBeforeByCurrency;
-    if (isSaved && !editId) {
-      return before;
-    }
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const rate = toNumber(exchangeRate) / 100;
 
@@ -502,14 +499,11 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isSaved, editId]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId]);
 
   const screenAccountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
     const before = screenAccountBalanceBeforeByCurrency;
-    if (isSaved && !editId) {
-      return before;
-    }
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const rate = toNumber(exchangeRate) / 100;
 
@@ -531,7 +525,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isSaved, editId]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId]);
 
   useEffect(() => {
     const checkFn = () => {
@@ -1866,7 +1860,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                       </tr>
                       <tr>
                         <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
-                          {formatCurrencyMap(editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency)}
+                          {formatCurrencyMap(accountBalanceAfterByCurrency)}
                         </td>
                         <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>کۆی گشتی قەرز</td>
                       </tr>
