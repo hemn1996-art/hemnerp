@@ -1,6 +1,6 @@
 "use client";
 import { openPrintWindow } from "@/app/utils/printWindow";
-import FormattedNumberInput from "./FormattedNumberInput";
+﻿import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";
 
@@ -68,7 +68,8 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
     }
   }, [editId]);
 
-  const accounts = (store.accounts || []) as AccountLike[];
+  const accounts = (useStore((s) => s.accounts) || []) as AccountLike[];
+  const fetchAccounts = useStore((s: any) => s.fetchAccounts);
   const addVoucher = useStore((s) => s.addVoucher);
   const storeCurrencies = useStore((s: any) => s.currencies) || [];
   const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
@@ -99,6 +100,11 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
   const [receiptDate, setReceiptDate] = useState("");
 
   useEffect(() => {
+    fetchAccounts();
+    fetchCurrencies();
+  }, []);
+
+  useEffect(() => {
     if (!editId) {
       setReceiptNumber("");
       setCreatedTime(
@@ -113,6 +119,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
 
   useEffect(() => {
     if (editId) {
+      fetchAccounts();
       fetch(`/api/vouchers/${editId}`)
         .then((res) => res.json())
         .then((voucher) => {
@@ -425,24 +432,60 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
+    const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
+    const code = getCurrencyCode(currencyId);
+    const symbol = getCurrencySymbol(currencyId);
+    const isIQD = code === "IQD";
+    const absVal = Math.abs(Number(value || 0));
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
+    const formatted = absVal.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: isIQD ? 0 : 2,
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+        </span>
+      </span>
+    );
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
-    const parts = Object.entries(map)
-      .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText, amount]) =>
-        formatCurrencyAmount(amount, Number(currencyIdText))
-      );
-
-    return parts.length ? parts.join(" + ") : "0";
+    const active = Object.entries(map).filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001);
+    if (active.length === 0) {
+      return formatCurrencyAmountJSX(0, defaultCurrency?.id || 1);
+    }
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        {active.map(([currencyIdText, amount], idx) => (
+          <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(amount, Number(currencyIdText))}
+          </span>
+        ))}
+      </span>
+    );
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
-    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -451,21 +494,11 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const symbol = getCurrencySymbol(Number(curIdText));
-          const code = getCurrencyCode(Number(curIdText));
-          const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
-          
-          if (code === "IQD") {
-            return (
-              <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-                {isNegative ? "-" : ""}{formatted} دینار
-              </span>
-            );
-          }
-          
+          const curId = Number(curIdText);
+
           return (
-            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{symbol}{formatted}
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
+              {formatCurrencyAmountJSX(val, curId, isNegative)}
             </span>
           );
         })}
@@ -759,8 +792,10 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
       accountBalanceAfterByCurrency: balanceAfterAtSave,
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res) => {
@@ -780,10 +815,51 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
     });
   }
 
-  function handlePrint() {
+  function handlePrint(size: "A4" | "A5" = "A4") {
     if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
+    }
+
+    if (typeof document !== "undefined") {
+      let styleTag = document.getElementById("dynamic-print-paper-style");
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = "dynamic-print-paper-style";
+        document.head.appendChild(styleTag);
+      }
+
+      if (size === "A5") {
+        styleTag.innerHTML = `
+          @media print {
+            @page {
+              size: A5 landscape !important;
+              margin: 3mm !important;
+            }
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+          }
+        `;
+      } else {
+        styleTag.innerHTML = `
+          @media print {
+            @page {
+              size: auto !important;
+              margin: 4mm !important;
+            }
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+          }
+        `;
+      }
     }
 
     openPrintWindow("people-debt-print-area");
@@ -955,7 +1031,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
               </InfoRow>
 
               <InfoRow label="باڵانس">
-                {formatCurrencyMapWithColors(isLocked ? accountBalanceAfterByCurrency : accountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(selectedAccount))}
               </InfoRow>
             </div>
           )}
@@ -1089,12 +1165,68 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
               {isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
 
+            <div style={{ display: "flex", gap: 8, width: "100%" }}>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 5px rgba(37, 99, 235, 0.25)"
+                }}
+                onClick={() => handlePrint("A4")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                A4
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#16a34a",
+                  color: "#ffffff",
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 5px rgba(22, 163, 74, 0.25)"
+                }}
+                onClick={() => handlePrint("A5")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                A5
+              </button>
+            </div>
+
             <button style={outlineBlueBtn} onClick={() => setShowSettings(true)}>
               ڕێکخستن
-            </button>
-
-            <button style={printBtn} onClick={handlePrint}>
-              پرێنتکردن
             </button>
           </div>
 
@@ -1203,7 +1335,7 @@ export default function PeopleDebtDiscountPage({ headerSelector, editId }: Props
                 label="بڕی داشکاندن"
                 value={
                   toNumber(debtAmount) > 0
-                    ? formatCurrencyAmount(toNumber(debtAmount), debtCurrencyId)
+                    ? formatCurrencyAmountJSX(toNumber(debtAmount), debtCurrencyId)
                     : "0"
                 }
               />
@@ -1425,7 +1557,7 @@ function StatBox({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={printInfoRow}>
       <b>{label}:</b>
@@ -1440,7 +1572,7 @@ function PrintSummaryLine({
   bold,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
 }) {
   let hideZero = false;
@@ -1453,7 +1585,7 @@ function PrintSummaryLine({
     }
   }
 
-  if (hideZero) {
+  if (hideZero && typeof value === "string") {
     const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
     if (clean === "0" || clean === "" || Number(clean) === 0) {
       return null;
@@ -1488,8 +1620,8 @@ function SettingCheck({
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
 
   body * { visibility: hidden !important; }
 
@@ -1921,8 +2053,9 @@ const printEmployeeBox: CSSProperties = {
 
 const printInfoRow: CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
-  gap: 14,
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: 6,
   lineHeight: 1.8,
 };
 

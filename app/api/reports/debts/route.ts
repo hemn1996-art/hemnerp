@@ -54,14 +54,15 @@ export async function GET(request: Request) {
           id: true,
           name: true,
           phone: true,
-          
-          
+          exchangeRateType: true,
+          customExchangeRate: true,
           accountType: { select: { name: true } },
           city: { select: { name: true } },
           district: { select: { name: true } },
           vouchers: {
             where: {
               type: { in: ["money_in", "money_out"] },
+              isDeleted: false,
             },
             orderBy: { date: "desc" },
             take: 1,
@@ -69,11 +70,20 @@ export async function GET(request: Request) {
               id: true,
               type: true,
               netAmount: true,
+              currencyId: true,
               date: true,
               paidAmounts: {
                 select: {
                   currencyId: true,
                   amount: true,
+                }
+              },
+              ledgerEntries: {
+                select: {
+                  accountId: true,
+                  currencyId: true,
+                  debit: true,
+                  credit: true,
                 }
               }
             },
@@ -83,6 +93,9 @@ export async function GET(request: Request) {
       // Aggregate ledger entries by account+currency in DB
       prisma.ledgerEntry.groupBy({
         by: ["accountId", "currencyId"],
+        where: {
+          voucher: { isDeleted: false },
+        },
         _sum: {
           debit: true,
           credit: true,
@@ -133,24 +146,25 @@ export async function GET(request: Request) {
       const debtBeforeLastPaymentByCurrency = { ...balanceByCurrency };
 
       if (lastPaymentVoucher) {
-        lastPaymentAmount = lastPaymentVoucher.netAmount;
-        lastPaymentCurrencyId = lastPaymentVoucher.currencyId || 1;
         lastPaymentDate = lastPaymentVoucher.date;
-        
-        // Reverse last payment effect per currency
         if (lastPaymentVoucher.paidAmounts && lastPaymentVoucher.paidAmounts.length > 0) {
-          for (const pa of lastPaymentVoucher.paidAmounts) {
-            const curKey = String(pa.currencyId);
-            const amt = Number(pa.amount);
-            if (lastPaymentVoucher.type === "money_in") {
-              debtBeforeLastPaymentByCurrency[curKey] = (debtBeforeLastPaymentByCurrency[curKey] || 0) + amt;
-            } else if (lastPaymentVoucher.type === "money_out") {
-              debtBeforeLastPaymentByCurrency[curKey] = (debtBeforeLastPaymentByCurrency[curKey] || 0) - amt;
-            }
+          lastPaymentAmount = Number(lastPaymentVoucher.paidAmounts[0].amount);
+          lastPaymentCurrencyId = lastPaymentVoucher.paidAmounts[0].currencyId || 1;
+        } else {
+          lastPaymentAmount = Number(lastPaymentVoucher.netAmount);
+          lastPaymentCurrencyId = lastPaymentVoucher.currencyId || 1;
+        }
+
+        const accLedgers = (lastPaymentVoucher.ledgerEntries || []).filter((le: any) => le.accountId === account.id);
+        if (accLedgers.length > 0) {
+          for (const le of accLedgers) {
+            const curKey = String(le.currencyId);
+            const netDelta = (le.debit || 0) - (le.credit || 0);
+            debtBeforeLastPaymentByCurrency[curKey] = (debtBeforeLastPaymentByCurrency[curKey] || 0) - netDelta;
           }
         } else {
-          const curKey = String(lastPaymentVoucher.currencyId || 1);
-          const amt = Number(lastPaymentVoucher.netAmount);
+          const curKey = String(lastPaymentCurrencyId);
+          const amt = lastPaymentAmount;
           if (lastPaymentVoucher.type === "money_in") {
             debtBeforeLastPaymentByCurrency[curKey] = (debtBeforeLastPaymentByCurrency[curKey] || 0) + amt;
           } else if (lastPaymentVoucher.type === "money_out") {

@@ -100,6 +100,9 @@ export default function BalanceSheetPage() {
         const json = await res.json();
         setData(json);
         if (json.currencySymbol) setCurrencyLabel(json.currencySymbol);
+      } else if (res.status === 401 || res.status === 403) {
+        router.push("/login");
+        return;
       }
     } catch (e) {
       console.error(e);
@@ -324,19 +327,39 @@ export default function BalanceSheetPage() {
     });
   };
 
-  const fmt = (n: number) => {
+  const fmt = (n: number, showMinus: boolean = false) => {
     const symbol = data?.currencySymbol || currencyLabel;
     const activeCurrency = currencies?.find((c: any) => c.id.toString() === currencyId.toString() || c.symbol === symbol || c.code === symbol);
     const isRounding = activeCurrency ? activeCurrency.rounding : false;
     const isIQD = symbol === "دینار" || symbol === "د.ع" || activeCurrency?.code === "IQD";
     const absVal = Math.abs(n);
     if (absVal > 0 && (isIQD ? absVal < 1000 : absVal < 1.0)) {
-      return `0 ${symbol}`;
+      return (
+        <span className="inline-flex items-baseline gap-1" dir="ltr">
+          <span>0</span>
+          <span>{symbol}</span>
+        </span>
+      );
     }
-    return n.toLocaleString("en-US", { 
+
+    const formattedStr = Math.abs(n).toLocaleString("en-US", { 
       minimumFractionDigits: 0, 
       maximumFractionDigits: isRounding ? 0 : 2 
-    }) + " " + symbol;
+    });
+
+    const isNeg = n < 0 || showMinus;
+    const parts = formattedStr.split(".");
+
+    return (
+      <span className="inline-flex items-baseline gap-1" dir="ltr">
+        {isNeg && <span>-</span>}
+        <span>{parts[0]}</span>
+        {parts.length > 1 && (
+          <span className="text-[0.72em] opacity-80 font-bold">.{parts[1]}</span>
+        )}
+        <span>{symbol}</span>
+      </span>
+    );
   };
 
   return (
@@ -469,7 +492,7 @@ export default function BalanceSheetPage() {
 
             {/* من قەرزارم */}
             <div id="comp-mydebts" className="flex items-center justify-between p-3 pr-8 border-b border-slate-100 hover:bg-slate-50 transition">
-              <span className="text-sm text-slate-800">{fmt(data.liabilitiesEquity.myDebts >= 1 ? data.liabilitiesEquity.myDebts : 0)}</span>
+              <span className="text-sm text-slate-800">{fmt(data.liabilitiesEquity.myDebts)}</span>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm text-slate-500">من قەرزارم</span>
                 <span className="text-slate-400 text-xs">💳</span>
@@ -499,17 +522,20 @@ export default function BalanceSheetPage() {
               const myDebts = data.liabilitiesEquity.myDebts || 0;
               const capital = data.liabilitiesEquity.capital || 0;
               const realProfit = warehouseValue + cash + accountsReceivable + otherAssets - myDebts - capital;
+              const isNegative = realProfit < 0;
 
               return (
                 <div 
                   onClick={highlightComponents}
-                  className="flex items-center justify-between p-3 pr-8 border-b border-slate-100 hover:bg-emerald-50 transition bg-green-50/50 cursor-pointer"
+                  className={`flex items-center justify-between p-3 pr-8 border-b border-slate-100 transition cursor-pointer ${
+                    isNegative ? "bg-red-50/50 hover:bg-red-100/50" : "bg-green-50/50 hover:bg-emerald-50"
+                  }`}
                   title="کلیک بکە بۆ بینینی سەرچاوەکانی ئەم بەهایە"
                 >
-                  <span className="text-sm font-bold text-green-700">{fmt(realProfit)}</span>
+                  <span className={`text-sm font-bold ${isNegative ? "text-red-600" : "text-green-700"}`} dir="ltr">{fmt(realProfit)}</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm text-slate-500">قازانجی فعلی</span>
-                    <span className="text-green-400 text-xs">📈</span>
+                    <span className={`text-xs ${isNegative ? "text-red-400" : "text-green-400"}`}>{isNegative ? "📉" : "📈"}</span>
                   </div>
                 </div>
               );
@@ -741,6 +767,34 @@ export default function BalanceSheetPage() {
                     </tr>
                   )}
                 </tbody>
+                {data?.shareholders && data.shareholders.length > 0 && (() => {
+                  const activeShs = data.shareholders.filter((sh: any) =>
+                    sh.name.toLowerCase().includes(shareholderSearch.toLowerCase()) ||
+                    sh.phone.toLowerCase().includes(shareholderSearch.toLowerCase())
+                  );
+                  const totalPerc = activeShs.reduce((sum: number, sh: any) => sum + (sh.sharePercentage || 0), 0);
+                  const totalCapUSD = activeShs.reduce((sum: number, sh: any) => sum + (sh.balanceUSD || 0), 0);
+
+                  return (
+                    <tfoot className="bg-slate-100 border-t-2 border-slate-300 font-black text-slate-800">
+                      <tr>
+                        <td className="py-3 px-2 text-center">∑</td>
+                        <td className="py-3 px-4 text-right">کۆی گشتی سەرمایە</td>
+                        <td className="py-3 px-4 text-center text-slate-400">—</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full ${Math.round(totalPerc) === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {Number(totalPerc.toFixed(2))}%
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-left font-black text-sm text-slate-900" dir="ltr">
+                          {totalCapUSD < 0 ? '-' : ''}$ {Math.abs(totalCapUSD).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3 px-4 text-center"></td>
+                        <td className="py-3 px-4 text-center"></td>
+                      </tr>
+                    </tfoot>
+                  );
+                })()}
               </table>
             </div>
 
@@ -787,23 +841,29 @@ export default function BalanceSheetPage() {
                 {/* Actual Profit Box - Clickable */}
                 <div
                   onClick={() => setProfitBreakdownExpanded(!profitBreakdownExpanded)}
-                  className="bg-gradient-to-l from-emerald-50 to-green-50 border-2 border-emerald-300 rounded-2xl p-5 mb-5 cursor-pointer hover:border-emerald-500 transition-all"
+                  className={`border-2 rounded-2xl p-5 mb-5 cursor-pointer transition-all ${
+                    calculatedProfit < 0 
+                      ? "bg-gradient-to-l from-red-50 to-rose-50 border-red-300 hover:border-red-500" 
+                      : "bg-gradient-to-l from-emerald-50 to-green-50 border-emerald-300 hover:border-emerald-500"
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-emerald-700 font-bold text-sm mb-1">قازانجی فعلی</div>
-                      <div className="text-3xl font-black text-emerald-800" dir="ltr">
+                      <div className={`font-bold text-sm mb-1 ${calculatedProfit < 0 ? "text-red-700" : "text-emerald-700"}`}>
+                        قازانجی فعلی
+                      </div>
+                      <div className={`text-3xl font-black ${calculatedProfit < 0 ? "text-red-600" : "text-emerald-800"}`} dir="ltr">
                         {fmt(calculatedProfit)}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-emerald-500 text-xs font-bold">
+                    <div className={`flex items-center gap-2 text-xs font-bold ${calculatedProfit < 0 ? "text-red-500" : "text-emerald-500"}`}>
                       <span>{profitBreakdownExpanded ? '▲' : '▼'} کلیک بکە بۆ وردەکاری</span>
                     </div>
                   </div>
 
                   {/* Breakdown - expandable */}
                   {profitBreakdownExpanded && (
-                    <div className="mt-4 pt-4 border-t border-emerald-200 space-y-2">
+                    <div className={`mt-4 pt-4 border-t space-y-2 ${calculatedProfit < 0 ? "border-red-200" : "border-emerald-200"}`}>
                       <div className="flex justify-between text-sm">
                         <span className="font-bold text-slate-700" dir="ltr">{fmt(warehouseValue)}</span>
                         <span className="text-slate-500 font-bold">بەهای کۆگا 📦</span>
@@ -823,16 +883,16 @@ export default function BalanceSheetPage() {
                         </div>
                       )}
                       <div className="flex justify-between text-sm">
-                        <span className="font-bold text-red-600" dir="ltr">{myDebts >= 1 ? `-${fmt(myDebts)}` : fmt(0)}</span>
-                        <span className="text-red-500 font-bold">من قەرزارم 💳</span>
+                        <span className="font-bold text-red-600" dir="ltr">{fmt(myDebts, true)}</span>
+                        <span className="text-red-500 font-bold">من قەرزارم (قەرزی لایەنی تر) 💳</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="font-bold text-red-600" dir="ltr">-{fmt(capital)}</span>
+                        <span className="font-bold text-red-600" dir="ltr">{fmt(capital, true)}</span>
                         <span className="text-red-500 font-bold">سەرمایەی خاوەن پشکەکان 🏦</span>
                       </div>
-                      <div className="flex justify-between text-sm pt-2 border-t border-emerald-300">
-                        <span className="font-black text-emerald-800 text-base" dir="ltr">{fmt(calculatedProfit)}</span>
-                        <span className="text-emerald-700 font-black">کۆی قازانجی فعلی</span>
+                      <div className={`flex justify-between text-sm pt-2 border-t ${calculatedProfit < 0 ? "border-red-300" : "border-emerald-300"}`}>
+                        <span className={`font-black text-base ${calculatedProfit < 0 ? "text-red-600" : "text-emerald-800"}`} dir="ltr">{fmt(calculatedProfit)}</span>
+                        <span className={`font-black ${calculatedProfit < 0 ? "text-red-600" : "text-emerald-700"}`}>کۆی قازانجی فعلی</span>
                       </div>
                     </div>
                   )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { performBackupFlow } from "../../lib/backupClient";
 
 type BackupFile = {
   fileName: string;
@@ -231,23 +232,19 @@ export default function BackupSettingsPage() {
   const createBackup = async (silent = false) => {
     if (!silent) setBackupLoading(true);
     try {
-      // First save to server
-      const res = await fetch("/api/backup", { method: "POST" });
-      const result = await res.json();
-
-      if (result.success) {
-        const now = new Date().toLocaleString("ku", { dateStyle: "medium", timeStyle: "short" });
+      const { success, savedLocally } = await performBackupFlow();
+      
+      if (success) {
+        const now = localStorage.getItem("last_backup_time") || new Date().toLocaleString("ku", { dateStyle: "medium", timeStyle: "short" });
         setLastBackupTime(now);
-        localStorage.setItem("last_backup_time", now);
 
-        // Also write to user-chosen directory if set
-        if (dirHandleRef.current) {
-          const dataRes = await fetch("/api/backup");
-          const data = await dataRes.json();
-          await writeToChosenDir(data);
+        if (!silent) {
+          if (dirHandleRef.current && !savedLocally) {
+            showToast("باکئەپ لە سێرڤەر خەزن کرا بەڵام ڕێگەپێدانی فۆڵدەر پێویستە ⚠️", "error");
+          } else {
+            showToast("باکئەپ بە سەرکەوتوویی دروست کرا ✅", "success");
+          }
         }
-
-        if (!silent) showToast("باکئەپ بە سەرکەوتوویی دروست کرا ✅", "success");
         fetchBackupList();
       } else {
         if (!silent) showToast("هەڵە لە دروستکردنی باکئەپ ❌", "error");

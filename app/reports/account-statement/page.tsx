@@ -11,7 +11,7 @@ interface VoucherLine { id: number; productId: number; qty: number; unitPrice: n
 interface VoucherPaidAmount { id: number; currencyId: number; amount: number; exchangeRate: number; currency: any; }
 interface VoucherExpense { id: number; amount: number; currencyId: number; note: string | null; accountId: number | null; addToAccountDebt?: boolean; }
 interface LedgerEntry { id: number; debit: number; credit: number; currencyId: number; exchangeRate?: number; date?: string; currency: any; accountId?: number | null; }
-interface Account { id: number; name: string; phone?: string; creditLimit?: number; accountTypeId: number; isShareholder: boolean; }
+interface Account { id: number; name: string; phone?: string; creditLimit?: number; accountTypeId: number; isShareholder: boolean; exchangeRateType?: string; customExchangeRate?: number; }
 interface RawVoucher { id: number; isDeleted?: boolean; referenceNo: string | null; type: string; date: string; accountId: number | null; currencyId: number | null; exchangeRate: number; totalAmount: number; totalDiscount: number; netAmount: number; internalNote: string | null; printNote: string | null; hasDelivery: boolean; deliveryFee: number | null; account: Account | null; lines: VoucherLine[]; paidAmounts: VoucherPaidAmount[]; expenses: VoucherExpense[]; ledgerEntries: LedgerEntry[]; }
 
 function AccountStatementContent() {
@@ -103,13 +103,24 @@ function AccountStatementContent() {
     (visibleColumns.note ? 1 : 0) +
     (visibleColumns.balance ? 1 : 0);
 
+  const [singleAccount, setSingleAccount] = useState<any>(null);
+
   useEffect(() => {
     fetchAccounts();
     fetchCurrencies();
     loadVouchers();
-  }, []);
-
-
+    if (accountIdParam) {
+      fetch("/api/accounts")
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            const acc = data.find((a: any) => a.id === Number(accountIdParam));
+            if (acc) setSingleAccount(acc);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [accountIdParam]);
 
   const loadVouchers = async () => {
     try {
@@ -125,7 +136,7 @@ function AccountStatementContent() {
     }
   };
 
-  const account = accounts.find((a: any) => a.id === Number(accountIdParam));
+  const account = singleAccount || accounts.find((a: any) => a.id === Number(accountIdParam));
 
   const getKurdishType = (type: string) => {
     switch (type) {
@@ -175,14 +186,11 @@ function AccountStatementContent() {
     const isRounding = cur ? cur.rounding : false;
     const absVal = Math.abs(amount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: isRounding ? 0 : 2 });
     const symbol = cur?.symbol || cur?.code || "";
-    const isNegative = amount < -0.0001;
+
     return (
-      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "flex-start", direction: "ltr" }}>
-        {showMinus && isNegative && <span style={{ marginRight: "2px" }}>-</span>}
-        <span style={{ fontSize: "0.8em", opacity: 0.7, marginRight: "4px", alignSelf: "flex-start", paddingTop: "2px" }}>
-          {symbol}
-        </span>
-        <span>{absVal}</span>
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: "3px" }} dir="ltr">
+        <span style={{ fontSize: "0.85em", opacity: 0.85 }} className="font-bold flex-shrink-0">{symbol}</span>
+        <span className="whitespace-nowrap">{absVal}</span>
       </span>
     );
   };
@@ -211,7 +219,7 @@ function AccountStatementContent() {
           <span className={isFooter ? "text-slate-800 font-black text-base" : "text-gray-400 font-bold text-sm"}>0</span>
           {showNote && account?.exchangeRateType === "FIXED" && (
             <span className="text-xs font-black text-purple-950 bg-purple-100 border border-purple-300 px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-sm">
-              📌 (نرخی دۆلاری جێگیر: {(account?.customExchangeRate || 132000).toLocaleString("en-US")} د.ع)
+              📌 (نرخی جێگیری 100$: {((account?.customExchangeRate || 132000) > 10000 ? (account?.customExchangeRate || 132000) : (account?.customExchangeRate || 132000) * 100).toLocaleString("en-US")} د.ع)
             </span>
           )}
         </div>
@@ -247,8 +255,8 @@ function AccountStatementContent() {
                 </div>
 
                 {showNote && account?.exchangeRateType === "FIXED" && (
-                  <div className="inline-flex items-center gap-1 text-xs print:text-[8.5px] font-black text-purple-950 bg-purple-100 border border-purple-300 px-2.5 py-1 print:py-0.5 print:px-1.5 rounded-xl print:rounded-md shadow-sm whitespace-nowrap" title={`نرخی جێگیری 100$: ${(account?.customExchangeRate || 132000).toLocaleString("en-US")} دینار`}>
-                    📌 (دۆلاری جێگیر: {(account?.customExchangeRate || 132000).toLocaleString("en-US")} د.ع)
+                  <div className="inline-flex items-center gap-1 text-xs print:text-[8.5px] font-black text-purple-950 bg-purple-100 border border-purple-300 px-2.5 py-1 print:py-0.5 print:px-1.5 rounded-xl print:rounded-md shadow-sm whitespace-nowrap" title={`نرخی جێگیری 100$: ${((account?.customExchangeRate || 132000) > 10000 ? (account?.customExchangeRate || 132000) : (account?.customExchangeRate || 132000) * 100).toLocaleString("en-US")} دینار`}>
+                    📌 (دۆلاری جێگیر: 100$ = {((account?.customExchangeRate || 132000) > 10000 ? (account?.customExchangeRate || 132000) : (account?.customExchangeRate || 132000) * 100).toLocaleString("en-US")} د.ع)
                   </div>
                 )}
               </div>
@@ -256,18 +264,18 @@ function AccountStatementContent() {
           }
 
           return (
-            <div key={curId} className="flex items-center gap-1.5 flex-wrap justify-center text-sm md:text-base print:text-xs">
-              <span className={`font-black ${isNegative ? "text-rose-600 print:text-rose-900" : "text-emerald-600 print:text-emerald-950"}`} dir="ltr">
+            <div key={curId} className="flex items-center gap-1.5 flex-wrap justify-center text-xs md:text-sm">
+              <span className={`font-bold tracking-tight ${isNegative ? "text-rose-600" : "text-emerald-600"}`} dir="ltr">
                 {formatMoney(val, Number(curId), false)}
               </span>
               {showNote && (
-                <span className={`text-xs font-bold ${isNegative ? "text-rose-700" : "text-emerald-700"}`}>
+                <span className={`text-[11px] font-bold ${isNegative ? "text-rose-700" : "text-emerald-700"}`}>
                   {noteText}
                 </span>
               )}
               {showNote && account?.exchangeRateType === "FIXED" && (
-                <span className="text-[11px] font-black text-purple-900 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md shadow-sm">
-                  📌 جێگیر: {(account?.customExchangeRate || 132000).toLocaleString("en-US")} د.ع
+                <span className="text-[10px] font-black text-purple-900 bg-purple-100 border border-purple-300 px-1.5 py-0.5 rounded-md shadow-sm">
+                  📌 جێگیر: 100$ = {((account?.customExchangeRate || 132000) > 10000 ? (account?.customExchangeRate || 132000) : (account?.customExchangeRate || 132000) * 100).toLocaleString("en-US")} د.ع
                 </span>
               )}
             </div>
@@ -642,46 +650,50 @@ function AccountStatementContent() {
         </div>
 
         {/* Info Header Box */}
-        <div className="w-full bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5 overflow-hidden no-print" style={{ direction: "rtl" }}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 items-center">
+        <div className="w-full bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4.5 md:p-5 mb-6 overflow-hidden no-print" style={{ direction: "rtl" }}>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1.35fr_1fr] gap-4 md:gap-5 items-stretch">
             {/* Account Details */}
-            <div className="flex items-center gap-3.5 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#061f5f] to-[#03133f] text-white flex items-center justify-center font-black text-lg shadow-sm flex-shrink-0">
-                👤
+            <div className="flex items-center gap-3.5 p-4 bg-slate-50/90 hover:bg-slate-50 transition-colors rounded-xl border border-slate-200/80 shadow-2xs min-h-[92px]">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#061f5f] to-[#03133f] text-white flex items-center justify-center font-black shadow-md flex-shrink-0">
+                <svg className="w-5.5 h-5.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs md:text-sm text-slate-600 font-black">کەشف حسابی</span>
-                <span className="text-base md:text-lg font-black text-slate-900 truncate">{account?.name || "دیاری نەکراوە"}</span>
-                {account?.phone && <span className="text-xs md:text-sm text-slate-700 font-bold" dir="ltr">{account.phone}</span>}
+              <div className="flex flex-col min-w-0 justify-center">
+                <span className="text-xs text-slate-500 font-bold mb-0.5">کەشف حسابی</span>
+                <span className="text-base md:text-lg font-black text-slate-900 truncate tracking-tight">{account?.name || "دیاری نەکراوە"}</span>
+                {account?.phone && <span className="text-xs text-slate-600 font-bold mt-0.5" dir="ltr">{account.phone}</span>}
               </div>
             </div>
 
-            {/* Date Details */}
-            <div className="flex items-center justify-center gap-2 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200 text-center">
-              <div className="flex flex-col items-center">
-                <span className="text-xs md:text-sm text-slate-600 font-black">بەرواری کەشف حساب</span>
-                <span className="text-sm md:text-base font-black text-slate-900 mt-0.5">
-                  <span dir="ltr">{formatDate(startDate)}</span> بۆ <span dir="ltr">{formatDate(endDate)}</span>
-                </span>
-                <span className="text-xs text-slate-600 font-bold mt-1" dir="ltr">
+            {/* Date Details (Middle Box - Larger & Spacious) */}
+            <div className="flex items-center justify-center p-4 bg-gradient-to-b from-slate-50 to-slate-100/70 rounded-xl border border-slate-200/90 shadow-2xs text-center min-h-[92px]">
+              <div className="flex flex-col items-center justify-center w-full">
+                <span className="text-xs md:text-sm text-slate-600 font-extrabold mb-1.5">بەرواری کەشف حساب</span>
+                <div className="text-sm md:text-base font-black text-slate-900 flex items-center justify-center gap-1.5 flex-wrap">
+                  <span className="bg-white px-2.5 py-1 rounded-md border border-slate-200/90 shadow-2xs font-black text-slate-900" dir="ltr">{formatDate(startDate)}</span>
+                  <span className="text-slate-500 font-bold text-xs">بۆ</span>
+                  <span className="bg-white px-2.5 py-1 rounded-md border border-slate-200/90 shadow-2xs font-black text-slate-900" dir="ltr">{formatDate(endDate)}</span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-semibold mt-1.5" dir="ltr">
                   پرینت: {new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                 </span>
               </div>
             </div>
 
-            {/* Top Balance Box (Clean Light Theme) */}
-            <div className="flex items-center justify-between gap-2.5 p-3.5 bg-slate-50/90 rounded-xl border border-slate-200">
-              <div className="flex items-center gap-2">
-                <span className="text-xs md:text-sm text-slate-700 font-black flex-shrink-0">باڵانس:</span>
-                <div className="text-lg md:text-xl font-black text-slate-900" dir="ltr">
-                  {renderBalances(processed.finalBalances, false, false)}
-                </div>
+            {/* Top Balance Box (Centered, Large Bold Font, No Empty Void) */}
+            <div className="flex flex-col justify-center items-center p-4 bg-gradient-to-b from-slate-50 to-slate-100/70 rounded-xl border border-slate-200/90 shadow-2xs text-center min-h-[96px]">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <span className="text-xs md:text-sm text-slate-600 font-extrabold">باڵانسی هەژمار:</span>
+                {account?.exchangeRateType === "FIXED" && (
+                  <span className="text-[11px] font-black text-purple-950 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
+                    📌 جێگیر: 100$ = {((account.customExchangeRate || 132000) > 10000 ? (account.customExchangeRate || 132000) : (account.customExchangeRate || 132000) * 100).toLocaleString("en-US")} د.ع
+                  </span>
+                )}
               </div>
-              {account?.exchangeRateType === "FIXED" && (
-                <span className="text-xs font-black text-purple-950 bg-purple-100 border border-purple-300 px-2.5 py-1 rounded-md shadow-sm whitespace-nowrap">
-                  📌 جێگیر: {(account.customExchangeRate || 132000).toLocaleString("en-US")} د.ع
-                </span>
-              )}
+              <div className="text-xl md:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center justify-center">
+                {renderBalances(processed.finalBalances, false, false)}
+              </div>
             </div>
           </div>
         </div>
@@ -722,7 +734,7 @@ function AccountStatementContent() {
                 <td className="py-1.5 px-3 border-l border-slate-300 text-center print:whitespace-normal">
                   {account?.exchangeRateType === "FIXED" && (
                     <span className="inline-flex items-center gap-1 text-[8.5px] font-black text-purple-950 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-md shadow-sm">
-                      📌 دۆلاری جێگیر: {(account.customExchangeRate || 132000).toLocaleString("en-US")} د.ع
+                      📌 دۆلاری جێگیر: 100$ = {((account.customExchangeRate || 132000) > 10000 ? (account.customExchangeRate || 132000) : (account.customExchangeRate || 132000) * 100).toLocaleString("en-US")} د.ع
                     </span>
                   )}
                 </td>
@@ -905,24 +917,27 @@ function AccountStatementContent() {
                                   </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-100">
-                                  {v.lines.map((line: any, idx: number) => (
-                                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                      <td className="py-2.5 px-3 text-center text-gray-400 font-bold">{idx + 1}</td>
-                                      <td className="py-2.5 px-3 text-right font-bold text-gray-800">{line.product?.name || "—"}</td>
-                                      <td className="py-2.5 px-3 text-center font-extrabold text-gray-800">
-                                        {line.qty} <span className="text-gray-400 font-normal">{line.note || "دانە"}</span>
-                                      </td>
-                                      <td className="py-2.5 px-3 text-center text-gray-700" dir="ltr">
-                                        {formatMoney(line.unitPrice, v.currencyId || 1)}
-                                      </td>
-                                      <td className="py-2.5 px-3 text-center text-red-400" dir="ltr">
-                                        {line.discountAmount > 0 ? formatMoney(line.discountAmount, v.currencyId || 1) : "—"}
-                                      </td>
-                                      <td className="py-2.5 px-3 text-center font-black text-gray-900" dir="ltr">
-                                        {formatMoney(line.lineTotal, v.currencyId || 1)}
-                                      </td>
-                                    </tr>
-                                  ))}
+                                  {v.lines.map((line: any, idx: number) => {
+                                    const lineCurId = line.currencyId || v.currencyId || 1;
+                                    return (
+                                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                        <td className="py-2.5 px-3 text-center text-gray-400 font-bold">{idx + 1}</td>
+                                        <td className="py-2.5 px-3 text-right font-bold text-gray-800">{line.product?.name || "—"}</td>
+                                        <td className="py-2.5 px-3 text-center font-extrabold text-gray-800">
+                                          {line.qty} <span className="text-gray-400 font-normal">{line.note || "دانە"}</span>
+                                        </td>
+                                        <td className="py-2.5 px-3 text-center text-gray-700" dir="ltr">
+                                          {formatMoney(line.unitPrice, lineCurId)}
+                                        </td>
+                                        <td className="py-2.5 px-3 text-center text-red-400" dir="ltr">
+                                          {line.discountAmount > 0 ? formatMoney(line.discountAmount, lineCurId) : "—"}
+                                        </td>
+                                        <td className="py-2.5 px-3 text-center font-black text-gray-900" dir="ltr">
+                                          {formatMoney(line.lineTotal, v.currencyId || 1)}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                                 {/* Items subtotal footer */}
                                 <tfoot>

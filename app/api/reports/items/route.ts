@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { getCurrentUser } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -37,7 +43,7 @@ export async function GET(request: Request) {
     };
 
     // Build where clause
-    const where: any = { voucher: {} };
+    const where: any = { voucher: { isDeleted: false } };
     
     if (startDate || endDate) {
       where.voucher.date = {};
@@ -56,7 +62,12 @@ export async function GET(request: Request) {
 
     if (accountTypeId && accountTypeId !== "all") {
       const parsed = parseNumberArray(accountTypeId);
-      if (parsed) where.voucher.account = { accountTypeId: parsed };
+      if (parsed) where.voucher.account = { ...where.voucher.account, accountTypeId: parsed };
+    }
+
+    const rateType = searchParams.get("rateType");
+    if (rateType && rateType !== "all") {
+      where.voucher.account = { ...where.voucher.account, exchangeRateType: rateType };
     }
 
     if (voucherType && voucherType !== "all") {
@@ -112,17 +123,15 @@ export async function GET(request: Request) {
       where.voucher.inventoryTransactions = { some: txFilter };
     }
 
-    if (Object.keys(where.voucher).length === 0) {
-      delete where.voucher;
-    }
-
     const lines = await prisma.voucherLine.findMany({
       where,
       select: {
         id: true,
         voucherId: true,
         qty: true,
+        unitPrice: true,
         lineTotal: true,
+        currencyId: true,
         productId: true,
         product: { select: { name: true, code: true, category: true, brand: true } },
         voucher: {
@@ -132,7 +141,7 @@ export async function GET(request: Request) {
             date: true,
             employeeName: true,
             currencyId: true,
-            account: { select: { name: true } },
+            account: { select: { name: true, exchangeRateType: true } },
             inventoryTransactions: {
               select: {
                 productId: true,
@@ -148,6 +157,11 @@ export async function GET(request: Request) {
 
     const items = lines.map(line => {
       const matchTx = line.voucher.inventoryTransactions.find(t => t.productId === line.productId);
+      const unitPrice = line.unitPrice || 0;
+      const lineTotal = line.lineTotal || 0;
+
+      const effectiveCurrencyId = line.currencyId || line.voucher.currencyId || 1;
+
       return {
         id: line.id,
         voucherId: line.voucherId,
@@ -160,9 +174,11 @@ export async function GET(request: Request) {
         label: "-",
         warehouseName: matchTx?.warehouse?.name || "-",
         quantity: line.qty || 0,
-        lineTotal: line.lineTotal || 0,
-        currencyId: line.voucher.currencyId,
+        unitPrice: unitPrice,
+        lineTotal: lineTotal,
+        currencyId: effectiveCurrencyId,
         accountName: line.voucher.account?.name || "نەزانراو",
+        exchangeRateType: line.voucher.account?.exchangeRateType || "DAILY_MARKET",
         date: line.voucher.date,
         employeeName: line.voucher.employeeName || "-",
       };

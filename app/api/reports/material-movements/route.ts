@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { getCurrentUser } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -39,7 +45,7 @@ export async function GET(request: Request) {
     };
 
     // Build where clause
-    const where: any = { voucher: {} };
+    const where: any = { voucher: { isDeleted: false } };
     
     if (startDate || endDate) {
       where.voucher.date = {};
@@ -74,11 +80,6 @@ export async function GET(request: Request) {
       ];
     }
 
-    if (productId && productId !== "all") {
-      const parsed = parseNumberArray(productId);
-      if (parsed) where.productId = parsed;
-    }
-    
     const category = searchParams.get("category");
     const brand = searchParams.get("brand");
 
@@ -92,6 +93,11 @@ export async function GET(request: Request) {
       if (parsed) where.product = { ...where.product, brand: parsed };
     }
 
+    if (productId && productId !== "all") {
+      const parsed = parseNumberArray(productId);
+      if (parsed) where.productId = parsed;
+    }
+    
     if (currencyId && currencyId !== "all") {
       const parsed = parseNumberArray(currencyId);
       if (parsed) where.voucher.currencyId = parsed;
@@ -107,10 +113,6 @@ export async function GET(request: Request) {
         };
       }
     }
-    
-    if (Object.keys(where.voucher).length === 0) {
-      delete where.voucher;
-    }
 
     const lines = await prisma.voucherLine.findMany({
       where,
@@ -122,6 +124,7 @@ export async function GET(request: Request) {
         unitPrice: true,
         discountAmount: true,
         lineTotal: true,
+        currencyId: true,
         product: { select: { name: true, code: true, category: true, brand: true } },
         voucher: {
           select: {
@@ -147,6 +150,48 @@ export async function GET(request: Request) {
       orderBy: { voucher: { date: "desc" } }
     });
 
+    // Query purchase transactions to detect products bought from FIXED rate suppliers
+    const purchaseTxs = await prisma.inventoryTransaction.findMany({
+      where: { qtyChange: { gt: 0 }, voucher: { isDeleted: false } },
+      select: {
+        productId: true,
+        unitCost: true,
+        voucher: {
+          select: {
+            currencyId: true,
+            exchangeRate: true,
+            account: { select: { exchangeRateType: true, customExchangeRate: true } },
+            versions: { select: { version: true, data: true } },
+            lines: { select: { productId: true, currencyId: true } }
+          }
+        }
+      }
+    });
+
+    const productFixedRates: Record<number, { isFixed: boolean, customRate: number, costCurrencyId: number }> = {};
+    purchaseTxs.forEach((pt: any) => {
+      let versionData: any = {};
+      if (pt.voucher?.versions && pt.voucher.versions.length > 0) {
+        const sortedV = [...pt.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
+        const latestV = sortedV[sortedV.length - 1];
+        try { versionData = JSON.parse(latestV.data); } catch(e){}
+      }
+      const sellerAcc = pt.voucher?.account;
+      const rateType = (pt.voucher as any)?.exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType;
+      const customRate = (pt.voucher as any)?.customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate;
+      const pLine = pt.voucher?.lines?.find((l: any) => l.productId === pt.productId);
+      const lineCostCur = pLine?.currencyId || pt.voucher?.currencyId || 1;
+
+      productFixedRates[pt.productId] = {
+        isFixed: rateType === "FIXED" && !!customRate,
+        customRate: customRate ? (customRate > 10000 ? customRate / 100 : customRate) : 1320,
+        costCurrencyId: lineCostCur
+      };
+    });
+
+    const allCurrencies = await prisma.currency.findMany();
+    const currencyMap = new Map<number, any>(allCurrencies.map(c => [c.id, c]));
+
     let items = lines.map(line => {
       const invTrans = line.voucher.inventoryTransactions.find((t: any) => t.productId === line.productId);
       const unitCost = invTrans?.unitCost || 0;
@@ -154,11 +199,53 @@ export async function GET(request: Request) {
       const discount = line.discountAmount || 0;
       const qty = line.qty || 0;
       
+      // Determine price / sale currency strictly from line or voucher
+      const priceCurrencyId = line.currencyId || line.voucher.currencyId || 1;
+      const curObj = currencyMap.get(priceCurrencyId);
+      const isPriceIQD = priceCurrencyId === 2 || priceCurrencyId === 12 || curObj?.code === "IQD" || curObj?.symbol === "دینار";
+      const priceCurrencySymbol = isPriceIQD ? "دینار" : (curObj?.symbol || "$");
+      const priceCurrencyCode = isPriceIQD ? "IQD" : (curObj?.code || "USD");
+
+      // Determine cost currency strictly from purchase record / product
+      const fixedInfo = productFixedRates[line.productId];
+      const costCurrencyId = fixedInfo?.costCurrencyId || (line.voucher.type === 'purchase' ? priceCurrencyId : 1);
+      const costCurObj = currencyMap.get(costCurrencyId);
+      const isCostIQD = costCurrencyId === 2 || costCurrencyId === 12 || costCurObj?.code === "IQD" || costCurObj?.symbol === "دینار";
+      const costCurrencySymbol = isCostIQD ? "دینار" : (costCurObj?.symbol || "$");
+      const costCurrencyCode = isCostIQD ? "IQD" : (costCurObj?.code || "USD");
+
+      // Calculate line total in line's own price currency
+      const lineTotalInPriceCur = (unitPrice * qty) - discount;
+
+      // Exchange rate for conversion
+      const rawRate = line.voucher.exchangeRate || 1500;
+      const rate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1500);
+
+      // Convert cost and price to USD for uniform profit calculation
+      let costInUSD = 0;
+      if (isCostIQD) {
+        costInUSD = (unitCost * qty) / rate;
+      } else {
+        if (fixedInfo && fixedInfo.isFixed && unitCost > 0) {
+          const customRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate / 100 : fixedInfo.customRate;
+          costInUSD = (unitCost * customRate / rate) * qty;
+        } else {
+          costInUSD = unitCost * qty;
+        }
+      }
+
+      let priceInUSD = 0;
+      if (isPriceIQD) {
+        priceInUSD = lineTotalInPriceCur / rate;
+      } else {
+        priceInUSD = lineTotalInPriceCur;
+      }
+
       let profit = 0;
       if (line.voucher.type === 'sales') {
-        profit = (unitPrice - unitCost) * qty - discount;
+        profit = priceInUSD - costInUSD;
       } else if (line.voucher.type === 'sales_return') {
-        profit = -((unitPrice - unitCost) * qty - discount);
+        profit = -(priceInUSD - costInUSD);
       }
 
       return {
@@ -175,26 +262,40 @@ export async function GET(request: Request) {
         warehouseId: invTrans?.warehouseId || null,
         warehouseName: invTrans?.warehouse?.name || "-",
         cost: unitCost,
+        costCurrencyId,
+        costCurrencySymbol,
+        costCurrencyCode,
         price: unitPrice,
+        priceCurrencyId,
+        priceCurrencySymbol,
+        priceCurrencyCode,
         quantity: qty,
         discount: discount,
-        lineTotal: line.lineTotal,
+        lineTotal: lineTotalInPriceCur,
+        lineTotalCurrencyId: priceCurrencyId,
+        lineTotalCurrencySymbol: priceCurrencySymbol,
+        lineTotalCurrencyCode: priceCurrencyCode,
         profit: profit,
+        profitCurrencyId: 1,
+        profitCurrencySymbol: "$",
+        profitCurrencyCode: "USD",
         accountId: line.voucher.accountId,
         accountName: line.voucher.account?.name || "نەزانراو",
         accountTypeId: line.voucher.account?.accountTypeId || null,
-        currencyId: line.voucher.currencyId,
-        currencySymbol: line.voucher.currency?.symbol || "$",
-        currencyCode: line.voucher.currency?.code || "USD",
+        currencyId: priceCurrencyId,
+        currencySymbol: priceCurrencySymbol,
+        currencyCode: priceCurrencyCode,
         exchangeRate: line.voucher.exchangeRate,
         date: line.voucher.date
       };
     });
     
-    if (profitStatus === "profitable") {
-      items = items.filter(i => i.profit > 0);
-    } else if (profitStatus === "loss") {
-      items = items.filter(i => i.profit < 0);
+    if (profitStatus === "profitable" || profitStatus === "قازانجی کردوە") {
+      items = items.filter(i => i.profit > 0.001);
+    } else if (profitStatus === "zero" || profitStatus === "قازانج سفر") {
+      items = items.filter(i => Math.abs(i.profit) <= 0.001);
+    } else if (profitStatus === "loss" || profitStatus === "زەرەری کردوە") {
+      items = items.filter(i => i.profit < -0.001);
     }
 
     return NextResponse.json(items);

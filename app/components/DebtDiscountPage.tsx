@@ -1,6 +1,6 @@
 "use client";
 import { openPrintWindow } from "@/app/utils/printWindow";
-import FormattedNumberInput from "./FormattedNumberInput";
+﻿import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";
 
@@ -59,6 +59,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
   }, [editId]);
 
   const accounts = (useStore((s) => s.accounts) || []) as AccountLike[];
+  const fetchAccounts = useStore((s: any) => s.fetchAccounts);
   const addVoucher = useStore((s) => s.addVoucher);
   const storeCurrencies = useStore((s: any) => s.currencies) || [];
   const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
@@ -76,6 +77,11 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
   const [receiptNumber, setReceiptNumber] = useState("");
   const [createdTime, setCreatedTime] = useState("");
   const [receiptDate, setReceiptDate] = useState("");
+
+  useEffect(() => {
+    fetchAccounts();
+    fetchCurrencies();
+  }, []);
 
   useEffect(() => {
     if (!editId) {
@@ -97,6 +103,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
 
   useEffect(() => {
     if (editId) {
+      fetchAccounts();
       fetch(`/api/vouchers/${editId}`)
         .then((res) => res.json())
         .then((voucher) => {
@@ -353,24 +360,60 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
+    const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
+    const code = getCurrencyCode(currencyId);
+    const symbol = getCurrencySymbol(currencyId);
+    const isIQD = code === "IQD";
+    const absVal = Math.abs(Number(value || 0));
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
+    const formatted = absVal.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: isIQD ? 0 : 2,
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+        </span>
+      </span>
+    );
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
-    const parts = Object.entries(map)
-      .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText, amount]) =>
-        formatCurrencyAmount(amount, Number(currencyIdText))
-      );
-
-    return parts.length ? parts.join(" + ") : "0";
+    const active = Object.entries(map).filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001);
+    if (active.length === 0) {
+      return formatCurrencyAmountJSX(0, defaultCurrency?.id || 1);
+    }
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        {active.map(([currencyIdText, amount], idx) => (
+          <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(amount, Number(currencyIdText))}
+          </span>
+        ))}
+      </span>
+    );
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
-    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -379,21 +422,11 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const symbol = getCurrencySymbol(Number(curIdText));
-          const code = getCurrencyCode(Number(curIdText));
-          const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
-          
-          if (code === "IQD") {
-            return (
-              <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-                {isNegative ? "-" : ""}{formatted} دینار
-              </span>
-            );
-          }
-          
+          const curId = Number(curIdText);
+
           return (
-            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{symbol}{formatted}
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
+              {formatCurrencyAmountJSX(val, curId, isNegative)}
             </span>
           );
         })}
@@ -688,8 +721,11 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
       exchangeRate,
     };
 
-    if (editId) {
-      updateVoucher(Number(editId), payload);
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+
+    if (isEditMode) {
+      updateVoucher(Number(effectiveEditId), payload);
     } else {
       addVoucher(payload);
     }
@@ -877,7 +913,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
               </InfoRow>
 
               <InfoRow label="باڵانس">
-                {formatCurrencyMapWithColors(isLocked ? accountBalanceAfterByCurrency : accountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(selectedAccount))}
               </InfoRow>
             </div>
           )}
@@ -888,7 +924,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
                 title="بڕی داشکاندن"
                 value={
                   toNumber(discountAmount) > 0
-                    ? formatCurrencyAmount(toNumber(discountAmount), discountCurrencyId)
+                    ? formatCurrencyAmountJSX(toNumber(discountAmount), discountCurrencyId)
                     : "0"
                 }
                 color="#16a34a"
@@ -1122,7 +1158,7 @@ export default function DebtDiscountPage({ headerSelector, editId }: Props) {
                 label="بڕی داشکاندن"
                 value={
                   toNumber(discountAmount) > 0
-                    ? formatCurrencyAmount(toNumber(discountAmount), discountCurrencyId)
+                    ? formatCurrencyAmountJSX(toNumber(discountAmount), discountCurrencyId)
                     : "0"
                 }
               />
@@ -1362,7 +1398,7 @@ function StatBox({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={printInfoRow}>
       <b>{label}:</b>
@@ -1377,7 +1413,7 @@ function PrintSummaryLine({
   bold,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
 }) {
   let hideZero = false;
@@ -1390,7 +1426,7 @@ function PrintSummaryLine({
     }
   }
 
-  if (hideZero) {
+  if (hideZero && typeof value === "string") {
     const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
     if (clean === "0" || clean === "" || Number(clean) === 0) {
       return null;
@@ -1425,8 +1461,8 @@ function SettingCheck({
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
 
   body * { visibility: hidden !important; }
 
@@ -1858,8 +1894,9 @@ const printEmployeeBox: CSSProperties = {
 
 const printInfoRow: CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
-  gap: 14,
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: 6,
   lineHeight: 1.8,
 };
 

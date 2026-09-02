@@ -1,6 +1,6 @@
 "use client";
 import { openPrintWindow } from "@/app/utils/printWindow";
-import FormattedNumberInput from "./FormattedNumberInput";
+﻿import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";
 
@@ -96,7 +96,7 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
   const currentUser = useStore((s: any) => s.currentUser || {}) as UserLike;
 
   const employeeNameFromLogin =
-    currentUser.fullName || currentUser.name || "کۆساری مەلا فەرهاد";
+    currentUser.name || (currentUser as any).username || "بەڕێوەبەر";
 
   const employeePhoneFromLogin =
     currentUser.mobileNumber || currentUser.mobile || currentUser.phone || "";
@@ -351,20 +351,53 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
-    if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
-    }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    const absVal = Math.abs(Number(value || 0));
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
+    const code = getCurrencyCode(currencyId);
+    const symbol = getCurrencySymbol(currencyId);
+    const isIQD = code === "IQD";
+    const absVal = Math.abs(Number(value || 0));
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
+    const formatted = absVal.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: isIQD ? 0 : 2,
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+        </span>
+      </span>
+    );
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
-    const parts = Object.entries(map)
-      .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText, amount]) =>
-        formatCurrencyAmount(amount, Number(currencyIdText))
-      );
-
-    return parts.length ? parts.join(" + ") : "0";
+    const active = Object.entries(map).filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001);
+    if (active.length === 0) {
+      return formatCurrencyAmountJSX(0, defaultCurrency?.id || 1);
+    }
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        {active.map(([currencyIdText, amount], idx) => (
+          <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(amount, Number(currencyIdText))}
+          </span>
+        ))}
+      </span>
+    );
   }
 
   function formatDate(dateText: string) {
@@ -611,7 +644,7 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`); if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(dateStr + " " + cleanTime);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -651,8 +684,10 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
       ledgerEntries: []
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res: any) => {
@@ -1246,19 +1281,19 @@ export default function QuotationPage({ headerSelector, editId }: Props) {
                     </td>
 
                     <td style={printTd}>
-                      {formatCurrencyAmount(toNumber(row.price), row.currencyId)}
+                      {formatCurrencyAmountJSX(toNumber(row.price), row.currencyId)}
                     </td>
 
                     {printOptions.showItemDiscount && (
                       <td style={printTd}>
                         {getRowDiscount(row) > 0
-                          ? formatCurrencyAmount(getRowDiscount(row), row.currencyId)
+                          ? formatCurrencyAmountJSX(getRowDiscount(row), row.currencyId)
                           : "-"}
                       </td>
                     )}
 
                     <td style={printTd}>
-                      {formatCurrencyAmount(getRowTotal(row), row.currencyId)}
+                      {formatCurrencyAmountJSX(getRowTotal(row), row.currencyId)}
                     </td>
                   </tr>
                 ))}
@@ -1482,7 +1517,7 @@ function StatBox({
   color,
 }: {
   title: string;
-  value: string;
+  value: React.ReactNode;
   color: string;
 }) {
   return (
@@ -1501,7 +1536,7 @@ function SummaryItem({
   strong,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   strong?: boolean;
 }) {
   return (
@@ -1520,7 +1555,7 @@ function SummaryItem({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={printInfoRow}>
       <b>{label}:</b>
@@ -1535,7 +1570,7 @@ function PrintSummaryLine({
   bold,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
 }) {
   let hideZero = false;
@@ -1548,7 +1583,7 @@ function PrintSummaryLine({
     }
   }
 
-  if (hideZero) {
+  if (hideZero && typeof value === "string") {
     const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
     if (clean === "0" || clean === "" || Number(clean) === 0) {
       return null;
@@ -1583,8 +1618,8 @@ function SettingCheck({
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
 
   body * { visibility: hidden !important; }
 

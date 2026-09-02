@@ -14,6 +14,7 @@ import {
 } from "react";
 
 import { store, useStore } from "../store/store";
+import { getDefaultCashbox } from "../utils/accounting";
 import { currencies as mockCurrencies } from "../data/mockData";
 
 type ToastType = "error" | "success" | "info";
@@ -150,10 +151,14 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
   const storeCurrencies = useStore((s: any) => s.currencies || []);
   const currencies = storeCurrencies.length > 0 ? storeCurrencies : mockCurrencies;
 
+  const fetchProducts = useStore((s: any) => s.fetchProducts);
+  const fetchAccounts = useStore((s: any) => s.fetchAccounts);
+  const fetchCashboxes = useStore((s: any) => s.fetchCashboxes);
+  const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
   const addVoucher = useStore((s: any) => s.addVoucher);
   const updateVoucher = useStore((s: any) => s.updateVoucher);
   const currentUser = useStore((s: any) => s.currentUser || {});
-  const employeeNameFromLogin = currentUser.fullName || currentUser.name || "کۆساری مەلا فەرهاد";
+  const employeeNameFromLogin = currentUser.name || currentUser.username || "بەڕێوەبەر";
 
   const defaultCurrency =
     currencies[0] ||
@@ -203,8 +208,15 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
   }, [accountId, accounts, accountSearch]);
 
   const [cashboxId, setCashboxId] = useState<number | undefined>(
-    cashboxes[0]?.id
+    () => getDefaultCashbox(cashboxes)?.id
   );
+
+  useEffect(() => {
+    if (!editId && !cashboxId && cashboxes.length > 0) {
+      const def = getDefaultCashbox(cashboxes);
+      if (def?.id) setCashboxId(def.id);
+    }
+  }, [cashboxes, editId, cashboxId]);
 
   const [exchangeRate, setExchangeRate] = useState("150000");
 
@@ -415,20 +427,71 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
-    if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
-    }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    const absVal = Math.abs(Number(value || 0));
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
+    const code = getCurrencyCode(currencyId);
+    const symbol = getCurrencySymbol(currencyId);
+    const isIQD = code === "IQD";
+    const absVal = Math.abs(Number(value || 0));
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
+    const formatted = absVal.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: isIQD ? 0 : 2,
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+        </span>
+      </span>
+    );
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
-    const parts = Object.entries(map)
-      .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText, amount]) =>
-        formatCurrencyAmount(amount, Number(currencyIdText))
-      );
+    const active = Object.entries(map).filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001);
+    if (active.length === 0) {
+      return formatCurrencyAmountJSX(0, defaultCurrency?.id || 1);
+    }
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        {active.map(([currencyIdText, amount], idx) => (
+          <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(amount, Number(currencyIdText))}
+          </span>
+        ))}
+      </span>
+    );
+  }
 
-    return parts.length ? parts.join(" + ") : "0";
+  function getAccountBalanceBeforeMap(account?: AccountLike) {
+    const map: Record<string, number> = {};
+    if (!account) return map;
+    if (account.balanceByCurrency) {
+      for (const [currencyIdText, amount] of Object.entries(account.balanceByCurrency)) {
+        const n = Number(amount || 0);
+        if (Math.abs(n) > 0.0001) {
+          map[currencyIdText] = n;
+        }
+      }
+    }
+    if (Object.keys(map).length === 0 && typeof account.balance === "number") {
+      const balanceCurrencyId = account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency.id || 1;
+      map[String(balanceCurrencyId)] = Number(account.balance || 0);
+    }
+    return map;
   }
 
   function formatDate(dateText: string) {
@@ -593,7 +656,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     setAccountSearch("");
     setShowAccountInfo(false);
     setShowAccountList(false);
-    setCashboxId(cashboxes[0]?.id);
+    setCashboxId(getDefaultCashbox(cashboxes)?.id);
     setRows([]);
     setProductSearch("");
     setShowProductList(false);
@@ -658,7 +721,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`); if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(dateStr + " " + cleanTime);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -711,8 +774,10 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
       ledgerEntries: []
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res: any) => {
@@ -733,13 +798,13 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     });
   }
 
-  function handlePrint() {
+  function handlePrint(size: "A4" | "A5" = "A4") {
     if (!editId && !isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
     }
 
-    openPrintWindow("expense-print-area");
+    openPrintWindow("expense-print-area", size);
   }
 
   function togglePrintOption(key: keyof PrintOptions) {
@@ -947,6 +1012,10 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
               <InfoRow label="ناونیشان">
                 {selectedAccount.address || "-"}
               </InfoRow>
+
+              <InfoRow label="باڵانس">
+                {formatCurrencyMap(getAccountBalanceBeforeMap(selectedAccount))}
+              </InfoRow>
             </div>
           )}
 
@@ -1065,8 +1134,12 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
               ڕێکخستن
             </button>
 
-            <button style={printBtn} onClick={handlePrint}>
-              پرێنتکردن
+            <button style={printBtn} onClick={() => handlePrint("A4")}>
+              🖨️ پرێنتی A4
+            </button>
+
+            <button style={{ ...printBtn, backgroundColor: "#7c3aed" }} onClick={() => handlePrint("A5")}>
+              📄 پرێنتی A5
             </button>
           </div>
 
@@ -1343,7 +1416,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
                     <td style={printTdWide}>{row.productName}</td>
                     <td style={printTd}>{row.code || "-"}</td>
                     <td style={printTd}>
-                      {formatCurrencyAmount(
+                      {formatCurrencyAmountJSX(
                         toNumber(row.amount),
                         row.currencyId
                       )}
@@ -1555,7 +1628,7 @@ function StatBox({
   color,
 }: {
   title: string;
-  value: string;
+  value: React.ReactNode;
   color: string;
 }) {
   return (
@@ -1574,7 +1647,7 @@ function SummaryItem({
   strong,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   strong?: boolean;
 }) {
   return (
@@ -1593,7 +1666,7 @@ function SummaryItem({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ ...printInfoRow, justifyContent: "flex-start", gap: "6px" }}>
       <b style={{ marginLeft: "4px" }}>{label}:</b>
@@ -1608,7 +1681,7 @@ function PrintSummaryLine({
   bold,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
 }) {
   let hideZero = false;
@@ -1621,7 +1694,7 @@ function PrintSummaryLine({
     }
   }
 
-  if (hideZero) {
+  if (hideZero && typeof value === "string") {
     const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
     if (clean === "0" || clean === "" || Number(clean) === 0) {
       return null;
@@ -1656,8 +1729,8 @@ function SettingCheck({
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
   body * { visibility: hidden !important; }
   #expense-print-area, #expense-print-area * { visibility: visible !important; }
   #expense-print-area {

@@ -37,21 +37,17 @@ export default function CashboxPage() {
         list.push({
           id: v.id,
           cashboxId: v.cashboxId,
-          type: ["sales", "money_in", "shareholder_deposit"].includes(v.rawType) ? "in" : "out",
-          amount: v.total,
-          currencyId: v.currencyId || 1,
+          type: ["sales", "money_in", "shareholder_deposit", "purchase_return"].includes(v.rawType || v.type) ? "in" : "out",
           note: v.internalNote,
           createdAt: v.date,
         });
       }
-      if (v.fromCashboxId) {
+      if (v.fromCashboxId || v.toCashboxId) {
         list.push({
           id: v.id,
           fromCashboxId: v.fromCashboxId,
           toCashboxId: v.toCashboxId,
           type: "transfer",
-          amount: v.total,
-          currencyId: v.currencyId || 1,
           note: v.internalNote,
           createdAt: v.date,
         });
@@ -67,7 +63,12 @@ export default function CashboxPage() {
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "statement">("list");
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [statementCashbox, setStatementCashbox] = useState<CashboxLike | null>(null);
+  const [statementCashboxId, setStatementCashboxId] = useState<number | null>(null);
+
+  const statementCashbox = useMemo(() => {
+    if (!statementCashboxId) return null;
+    return cashboxesState.find((c: any) => c.id === statementCashboxId) || null;
+  }, [cashboxesState, statementCashboxId]);
 
   const [alertConfig, setAlertConfig] = useState<{isOpen: boolean, type: "error" | "warning" | "success" | "confirm", title: string, message: string, onConfirm?: () => void}>({isOpen: false, type: "warning", title: "", message: ""});
   const showAlert = (type: any, title: string, message: string, onConfirm?: () => void) => setAlertConfig({isOpen: true, type, title, message, onConfirm});
@@ -248,6 +249,7 @@ export default function CashboxPage() {
         name: form.name.trim(),
         type: form.type,
         isActive: form.isActive,
+        balances,
       }).then((res) => {
         if (res) {
           showToast("قاسەی نوێ زیادکرا ✅", "success");
@@ -288,16 +290,13 @@ export default function CashboxPage() {
   }
 
   function openStatement(id: number) {
-    const cashbox = cashboxesState.find((c: any) => c.id === id);
-    if (cashbox) {
-      setStatementCashbox(cashbox);
-      setViewMode("statement");
-    }
+    setStatementCashboxId(id);
+    setViewMode("statement");
   }
 
   function closeStatement() {
     setViewMode("list");
-    setStatementCashbox(null);
+    setStatementCashboxId(null);
   }
 
   function getStatementRows(cashboxId: number) {

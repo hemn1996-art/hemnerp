@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import { useStore } from "../store/store";
+import { getDefaultCashbox } from "../utils/accounting";
 import FormattedNumberInput from "../components/FormattedNumberInput";
 import AlertModal from "../components/AlertModal";
 
@@ -35,6 +36,13 @@ export default function CurrencyExchangePage() {
   const closeAlert = () => setAlertConfig(a => ({...a, isOpen: false}));
   
   const [cashboxId, setCashboxId] = useState("");
+
+  useEffect(() => {
+    if (!cashboxId && cashboxes.length > 0) {
+      const def = getDefaultCashbox(cashboxes);
+      if (def?.id) setCashboxId(def.id.toString());
+    }
+  }, [cashboxes, cashboxId]);
   const [rate, setRate] = useState("150000");
 
   useEffect(() => {
@@ -72,29 +80,47 @@ export default function CurrencyExchangePage() {
   // Handle amount changes
   function handleFromChange(val: string) {
     setFromAmount(val);
-    const num = parseFloat(val) || 0;
-    const r = (parseFloat(rate) || 0) / 100;
-    if (direction === "USD_TO_IQD") {
-      setToAmount((num * r).toString());
-    } else {
-      setToAmount((num / r).toFixed(2));
+    const num = parseFloat(val.replace(/,/g, '')) || 0;
+    const r = (parseFloat(rate.replace(/,/g, '')) || 0) / 100;
+    if (r > 0) {
+      if (direction === "USD_TO_IQD") {
+        setToAmount(Math.round(num * r).toString());
+      } else {
+        setToAmount((num / r).toFixed(2));
+      }
     }
   }
 
   function handleToChange(val: string) {
     setToAmount(val);
-    // User requested to be able to change the second amount manually 
-    // without it affecting the first amount or the rate.
+    const numTo = parseFloat(val.replace(/,/g, '')) || 0;
+    const numFrom = parseFloat(fromAmount.replace(/,/g, '')) || 0;
+    if (numFrom > 0 && numTo > 0) {
+      let calculatedRate = 0;
+      if (direction === "USD_TO_IQD") {
+        // from = USD ($600), to = IQD (950,000)
+        // Rate for $100 = (IQD / USD) * 100
+        calculatedRate = (numTo / numFrom) * 100;
+      } else {
+        // from = IQD, to = USD
+        // Rate for $100 = (IQD / USD) * 100
+        calculatedRate = (numFrom / numTo) * 100;
+      }
+      const formattedRate = Number(calculatedRate.toFixed(2));
+      setRate(formattedRate.toString());
+    }
   }
 
   function handleRateChange(val: string) {
     setRate(val);
-    const r = (parseFloat(val) || 0) / 100;
-    const num = parseFloat(fromAmount) || 0;
-    if (direction === "USD_TO_IQD") {
-      setToAmount((num * r).toString());
-    } else {
-      setToAmount((num / r).toFixed(2));
+    const r = (parseFloat(val.replace(/,/g, '')) || 0) / 100;
+    const num = parseFloat(fromAmount.replace(/,/g, '')) || 0;
+    if (r > 0) {
+      if (direction === "USD_TO_IQD") {
+        setToAmount(Math.round(num * r).toString());
+      } else {
+        setToAmount((num / r).toFixed(2));
+      }
     }
   }
 
@@ -136,8 +162,8 @@ export default function CurrencyExchangePage() {
       exchangeRate: (parseFloat(rate.replace(/,/g, '')) || 0) / 100,
       internalNote: note,
       paidAmounts: [
-        { currencyId: fromCurId, amount: -Math.abs(parseFloat(fromAmount) || 0) }, // Negative = deduct
-        { currencyId: toCurId, amount: Math.abs(parseFloat(toAmount) || 0) },      // Positive = add
+        { currencyId: fromCurId, amount: -Math.abs(numFrom) }, // Negative = deduct
+        { currencyId: toCurId, amount: Math.abs(numTo) },      // Positive = add
       ]
     };
 

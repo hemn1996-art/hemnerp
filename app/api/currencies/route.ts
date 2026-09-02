@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
+import { getCurrentUser } from "../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
     const currencies = await prisma.currency.findMany({
       orderBy: { id: "asc" },
     });
@@ -20,6 +25,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const data = await request.json();
     const currency = await prisma.currency.create({
       data: {
@@ -42,6 +52,11 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const data = await request.json();
     const id = Number(data.id);
     if (!id) {

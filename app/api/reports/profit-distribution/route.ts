@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { getCurrentUser } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const distributions = await prisma.profitDistribution.findMany({
       include: {
         items: true,
@@ -25,6 +31,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { calculatedProfit, distributedProfit, note, items, date } = body;
 

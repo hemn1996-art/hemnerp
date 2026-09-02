@@ -16,6 +16,7 @@ import {
 
 import { store, useStore } from "../store/store";
 import { calculateLedgerEntries } from "../utils/ledgerHelper";
+import { getDefaultCashbox } from "../utils/accounting";
 import { accountTypes, currencies as mockCurrencies } from "../data/mockData";
 
 type Props = {
@@ -102,6 +103,7 @@ type PrintOptions = {
   showInvoiceDate: boolean;
   showCreatedTime: boolean;
   showCashbox: boolean;
+  showExchangeRate: boolean;
   showSupplierInfo: boolean;
   showSupplierName: boolean;
   showSupplierPhone: boolean;
@@ -188,8 +190,6 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [createdTime, setCreatedTime] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
-  const [isArrived, setIsArrived] = useState(true);
-  const [arrivalDate, setArrivalDate] = useState("");
 
   useEffect(() => {
     if (!editId) {
@@ -224,16 +224,6 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               setInvoiceNumber("");
             }
             setInvoiceDate(voucher.date.slice(0, 10));
-            if (voucher.isArrived !== undefined) {
-              setIsArrived(Boolean(voucher.isArrived));
-            } else {
-              setIsArrived(true);
-            }
-            if (voucher.arrivalDate) {
-              setArrivalDate(voucher.arrivalDate.slice(0, 10));
-            } else {
-              setArrivalDate("");
-            }
             const d = new Date(voucher.date);
             setCreatedTime(
               d.toLocaleTimeString("en-US", {
@@ -288,25 +278,23 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             }
 
             const initialPaid: PaidAmounts = {};
-            let totalPaidSum = 0;
+            let hasAnyPaid = false;
             if (voucher.paidAmounts && Array.isArray(voucher.paidAmounts)) {
               voucher.paidAmounts.forEach((pa: any) => {
                 const amt = Number(pa.amount || 0);
                 if (amt > 0) {
+                  hasAnyPaid = true;
                   initialPaid[pa.currencyId] = String(pa.amount);
-                  totalPaidSum += amt;
                 }
               });
             }
             setPaidAmounts(initialPaid);
-
-            const netAmt = Number(voucher.netAmount || 0);
-            if (totalPaidSum === 0 || Object.keys(initialPaid).length === 0) {
-              setPaymentTypeMode("debt");
-            } else if (totalPaidSum >= netAmt - 0.01) {
-              setPaymentTypeMode("cash");
+            if (hasAnyPaid) {
+              const tot = Number(voucher.totalAmount || 0);
+              const paidTot = Object.values(initialPaid).reduce((acc, v) => acc + Number(v || 0), 0);
+              setPaymentTypeMode(paidTot >= tot - 0.01 ? "cash" : "partial");
             } else {
-              setPaymentTypeMode("partial");
+              setPaymentTypeMode("debt");
             }
 
             setInternalNote(voucher.internalNote || "");
@@ -372,8 +360,15 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const [showSupplierInfo, setShowSupplierInfo] = useState(false);
 
   const [cashboxId, setCashboxId] = useState<number | undefined>(
-    cashboxes[0]?.id
+    () => getDefaultCashbox(cashboxes)?.id
   );
+
+  useEffect(() => {
+    if (!editId && !cashboxId && cashboxes.length > 0) {
+      const def = getDefaultCashbox(cashboxes);
+      if (def?.id) setCashboxId(def.id);
+    }
+  }, [cashboxes, editId, cashboxId]);
 
   const [purchaseCurrencyId, setPurchaseCurrencyId] = useState<number | null>(null);
   const [paidCurrencyId, setPaidCurrencyId] = useState<number | null>(null);
@@ -389,7 +384,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   }, [defaultCurrency]);
 
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
-  const [paymentTypeMode, setPaymentTypeMode] = useState<"cash" | "partial" | "debt">("cash");
+  const [paymentTypeMode, setPaymentTypeMode] = useState<"cash" | "partial" | "debt">("debt");
 
   const [exchangeRate, setExchangeRate] = useState("150000");
 
@@ -416,6 +411,13 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const [employeeName, setEmployeeName] = useState("");
   const [employeePhone, setEmployeePhone] = useState("");
 
+  useEffect(() => {
+    if (currentUser) {
+      setEmployeeName(currentUser.name || currentUser.username || "");
+      setEmployeePhone(currentUser.phone || "");
+    }
+  }, [currentUser]);
+
   const [showInvoiceNotes, setShowInvoiceNotes] = useState(false);
   const [invoiceLabel, setInvoiceLabel] = useState("");
   const [internalNote, setInternalNote] = useState("");
@@ -423,6 +425,34 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   const [showSettings, setShowSettings] = useState(false);
   const [showNewInvoiceConfirm, setShowNewInvoiceConfirm] = useState(false);
+
+  const [invoiceTemplates, setInvoiceTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | string>("");
+
+  useEffect(() => {
+    const loadInvoiceTemplates = () => {
+      fetch("/api/invoice-templates")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setInvoiceTemplates(data);
+            const savedId = localStorage.getItem("selected_invoice_template_id");
+            if (savedId) {
+              setSelectedTemplateId(Number(savedId));
+            } else {
+              const main = data.find((t: any) => t.isMain && t.isActive);
+              if (main) setSelectedTemplateId(main.id);
+            }
+          }
+        })
+        .catch((e) => console.error(e));
+    };
+
+    loadInvoiceTemplates();
+    const handleTemplateChange = () => loadInvoiceTemplates();
+    window.addEventListener("invoice-template-changed", handleTemplateChange);
+    return () => window.removeEventListener("invoice-template-changed", handleTemplateChange);
+  }, []);
 
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [originalVoucher, setOriginalVoucher] = useState<any>(null);
@@ -452,6 +482,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     showInvoiceDate: true,
     showCreatedTime: true,
     showCashbox: true,
+    showExchangeRate: true,
     showSupplierInfo: true,
     showSupplierName: true,
     showSupplierPhone: true,
@@ -509,10 +540,11 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
+    const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
@@ -536,29 +568,38 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
-    const parts = Object.entries(map)
-      .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText, amount]) =>
-        formatCurrencyAmount(amount, Number(currencyIdText))
-      );
-    return parts.length ? parts.join(" + ") : "0";
+    const active = Object.entries(map).filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001);
+    if (active.length === 0) {
+      return formatCurrencyAmountJSX(0, defaultCurrency?.id || 1);
+    }
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        {active.map(([currencyIdText, amount], idx) => (
+          <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(amount, Number(currencyIdText))}
+          </span>
+        ))}
+      </span>
+    );
   }
 
-  function formatCurrencyAmountJSX(value: number, currencyId: number) {
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
-    const isRounding = currencies.find((c: any) => c.id === currencyId)?.rounding || false;
+    const isIQD = code === "IQD";
+    // IQD: never show decimals. Others: show up to 2 decimals but drop trailing zeros
     const formatted = Math.abs(value).toLocaleString("en-US", { 
-      minimumFractionDigits: isRounding ? 0 : 2, 
-      maximumFractionDigits: isRounding ? 0 : 2 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: isIQD ? 0 : 2 
     });
 
     const parts = formatted.split('.');
     const whole = parts[0];
-    const decimal = parts[1];
+    const decimal = parts[1]; // undefined when no decimal part (IQD always, USD when .00)
 
-    const displaySymbol = code === "IQD" ? "دینار" : symbol;
-    const isNegative = value < 0;
+    const displaySymbol = isIQD ? "دینار" : symbol;
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : value < 0;
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 2 }} dir="ltr">
@@ -566,7 +607,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
         <span>
           <span>{whole}</span>
-          {decimal !== undefined && (
+          {decimal !== undefined && decimal !== "0" && decimal !== "00" && (
             <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
@@ -607,7 +648,11 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   function formatPrintBalanceMap(map: Record<string, number>, isSupplier = true) {
     const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
-      return <strong style={{ color: "#374151", fontSize: 14 }}>0 $</strong>;
+      return (
+        <strong style={{ color: "#374151", fontSize: 14 }}>
+          {formatCurrencyAmountJSX(0, defaultCurrency?.id || 1)}
+        </strong>
+      );
     }
 
     return (
@@ -622,11 +667,10 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             isRed = val > 0.01;
           }
           const color = isRed ? "#dc2626" : "#16a34a";
-          const formattedStr = formatCurrencyAmount(absVal, curId);
 
           return (
             <strong key={curIdText} style={{ color, fontSize: 14 }}>
-              {formattedStr}
+              {formatCurrencyAmountJSX(absVal, curId, false)}
             </strong>
           );
         })}
@@ -1200,7 +1244,6 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   }
 
   function getPaidCurrencies() {
-    if (paymentTypeMode === "debt") return [];
     return Object.entries(paidAmounts)
       .map(([currencyIdText, amountText]) => ({
         currencyId: Number(currencyIdText),
@@ -1597,6 +1640,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setOpenedDetailRowId(null);
     setExpenses([]);
     setPaidAmounts({});
+    setPaymentTypeMode("debt");
     setPurchaseCurrencyId(defaultCurrency.id);
     setPaidCurrencyId(defaultCurrency.id);
     const iqd = currencies.find((c: any) => c.code === "IQD");
@@ -1616,8 +1660,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setOriginalVoucher(null);
     setExpenseAllocationMode("quantity");
     setExpenseTotalCurrencyId(defaultCurrency.id);
-    setIsArrived(true);
-    setArrivalDate("");
+    setCashboxId(getDefaultCashbox(cashboxes)?.id);
   }
 
   function hasUnsavedData() {
@@ -1663,7 +1706,12 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       ? "convert_to_other_currency"
       : (action === "keep_credit" ? "keep_as_same_currency_balance" : null);
 
-    const paidList = getPaidCurrencies();
+    const paidList = Object.entries(paidAmounts)
+      .map(([currencyIdText, amountText]) => ({
+        currencyId: Number(currencyIdText),
+        amount: toNumber(amountText),
+      }))
+      .filter((x: any) => x.amount > 0);
 
     const result = calculateLedgerEntries({
       type: "purchase",
@@ -1696,7 +1744,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(`${dateStr}T${hours}:${minutes}:00Z`).toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`);
+          if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(`${dateStr} ${cleanTime}`);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -1712,8 +1761,6 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       type: "purchase",
       referenceNo: String(invoiceNumber),
       date: combineDateAndTime(invoiceDate, createdTime),
-      isArrived: isArrived,
-      arrivalDate: isArrived ? (arrivalDate ? combineDateAndTime(arrivalDate, createdTime) : combineDateAndTime(invoiceDate, createdTime)) : null,
       accountId: supplierId || null,
       cashboxId: cashboxId || null,
       currencyId: purchaseCurrencyId,
@@ -1723,7 +1770,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       netAmount: itemsSubtotalInBase,
       internalNote: internalNote,
       printNote: printNote,
-      employeeName: employeeName || "کۆساری مەلا فەرهاد",
+      employeeName: employeeName || currentUser?.name || currentUser?.username || "بەڕێوەبەر",
       lines: rows.map((row: any) => {
         const warehouse = warehouses.find((w: any) => w.name === row.warehouseName);
         return {
@@ -1734,6 +1781,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           discountAmount: toNumber(row.discount),
           lineTotal: getRowTotal(row),
           note: row.note,
+          currencyId: row.currencyId,
           warehouseId: warehouse?.id || warehouses[0]?.id || 1,
           unitCost: getFinalCostPerUnitInRowCurrency(row),
         };
@@ -1754,8 +1802,10 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       extraPaymentHandling: extraHandling
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res) => {
@@ -1915,7 +1965,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         styleTag.innerHTML = `
           @media print {
             @page {
-              size: A4 portrait !important;
+              size: auto !important;
               margin: 6mm !important;
             }
             html, body {
@@ -1928,9 +1978,9 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               width: 100% !important;
               max-width: 100% !important;
               margin: 0 auto !important;
-              padding: 0 !important;
+              padding: 2mm 6mm 6mm 6mm !important;
               box-sizing: border-box !important;
-              position: relative !important;
+              position: fixed !important;
               left: 0 !important;
               top: 0 !important;
             }
@@ -2170,7 +2220,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               </InfoRow>
 
               <InfoRow label="قەرز">
-                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(supplier))}
               </InfoRow>
             </div>
           )}
@@ -2341,7 +2391,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               </div>
             )}
 
-            {showRate && (
+            {(showRate && printOptions.showExchangeRate !== false) && (
               <Field label="ڕەیتی 100 دۆلار بۆ پارەدان">
                 <FormattedNumberInput
                   value={exchangeRate}
@@ -2535,71 +2585,27 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               </span>
             </div>
             
-            <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای فرۆشیار:</span>
-                <input
-                  value={invoiceNumber}
-                  disabled={isLocked}
-                  onChange={(e) => {
-                    if (blockIfLocked()) return;
-                    setInvoiceNumber(e.target.value);
-                  }}
-                  placeholder="ژمارەی پسوڵە بنووسە..."
-                  style={{
-                    ...input,
-                    width: "180px",
-                    padding: "6px 12px",
-                    fontSize: "14px",
-                    borderRadius: "8px",
-                    border: "1px solid #d1d5db",
-                    textAlign: "center",
-                    ...lockedFieldStyle
-                  }}
-                />
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", background: isArrived ? "#f0fdf4" : "#fff7ed", padding: "6px 12px", borderRadius: "8px", border: isArrived ? "1px solid #bbf7d0" : "1px solid #fed7aa" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: isLocked ? "not-allowed" : "pointer", fontWeight: "bold", fontSize: "13px", color: isArrived ? "#15803d" : "#c2410c" }}>
-                  <input
-                    type="checkbox"
-                    checked={isArrived}
-                    disabled={isLocked}
-                    onChange={(e) => {
-                      if (blockIfLocked()) return;
-                      const checked = e.target.checked;
-                      setIsArrived(checked);
-                      if (checked && !arrivalDate) {
-                        setArrivalDate(invoiceDate || new Date().toISOString().slice(0, 10));
-                      }
-                    }}
-                    style={{ width: "16px", height: "16px", accentColor: "#16a34a", cursor: "pointer" }}
-                  />
-                  {isArrived ? "گەیشتۆتە کۆگا" : "نەگەیشتۆتە کۆگا (لە ڕێگادایە)"}
-                </label>
-
-                {isArrived && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                    <span style={{ fontSize: "12px", color: "#64748b" }}>بەرواری گەیشتن:</span>
-                    <input
-                      type="date"
-                      value={arrivalDate || invoiceDate}
-                      disabled={isLocked}
-                      onChange={(e) => {
-                        if (blockIfLocked()) return;
-                        setArrivalDate(e.target.value);
-                      }}
-                      style={{
-                        padding: "3px 8px",
-                        fontSize: "12px",
-                        borderRadius: "6px",
-                        border: "1px solid #cbd5e1",
-                        ...lockedFieldStyle
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای فرۆشیار:</span>
+              <input
+                value={invoiceNumber}
+                disabled={isLocked}
+                onChange={(e) => {
+                  if (blockIfLocked()) return;
+                  setInvoiceNumber(e.target.value);
+                }}
+                placeholder="ژمارەی پسوڵە بنووسە..."
+                style={{
+                  ...input,
+                  width: "180px",
+                  padding: "6px 12px",
+                  fontSize: "14px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  textAlign: "center",
+                  ...lockedFieldStyle
+                }}
+              />
             </div>
           </div>
 
@@ -2835,8 +2841,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                     left: 0,
                                     width: "100vw",
                                     height: "100vh",
-                                    background: "rgba(15, 23, 42, 0.3)",
-                                    backdropFilter: "blur(2px)",
+                                    background: "rgba(0, 0, 0, 0.001)",
                                     zIndex: 9998,
                                   }}
                                   onClick={(e) => {
@@ -2844,7 +2849,16 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                     setOpenedDetailRowId(null);
                                   }}
                                 />
-                                <div style={{ ...detailPanel, marginTop: 0 }} onClick={(e) => e.stopPropagation()}>
+                                <div
+                                  style={{
+                                    ...detailPanel,
+                                    position: "relative",
+                                    zIndex: 9999,
+                                    marginTop: 0,
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                >
                                   <div style={detailTitle}>{row.productName}</div>
 
                                   <div style={detailGrid}>
@@ -2937,8 +2951,6 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                       </select>
                                     </Field>
 
-
-
                                     {(() => {
                                       const prevPurchase = supplierId
                                         ? getPreviousPurchasePrice(row.productId, supplierId)
@@ -2956,20 +2968,22 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                               </div>
                                             ) : (
                                               <button
+                                                type="button"
                                                 style={{
                                                   borderRadius: 8,
                                                   border: 0,
                                                   background: "#2563eb",
                                                   color: "white",
-                                                  padding: "6px 12px",
-                                                  fontWeight: 800,
-                                                  cursor: "pointer",
+                                                  fontSize: 11,
+                                                  fontWeight: 700,
+                                                  padding: "4px 8px",
+                                                  cursor: isLocked ? "not-allowed" : "pointer",
+                                                  opacity: isLocked ? 0.6 : 1,
                                                   fontFamily: appFont,
-                                                  width: "100%",
-                                                  fontSize: 12,
-                                                  minHeight: 30,
                                                 }}
-                                                onClick={() => {
+                                                disabled={isLocked}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
                                                   setShowPrevPrice(true);
                                                 }}
                                               >
@@ -2977,16 +2991,12 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                               </button>
                                             )
                                           ) : (
-                                            <div style={compactReadonlyBox}>
-                                              نییە
-                                            </div>
+                                            <div style={compactReadonlyBox}>نییە</div>
                                           )}
                                         </Field>
                                       );
                                     })()}
-                                  </div>
 
-                                  <div style={{ marginTop: 8 }}>
                                     <Field label="تێبینی">
                                       <textarea
                                         value={row.note}
@@ -3502,7 +3512,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
                   {tableColumns.expense && (
                     <td style={printTd}>
-                      {formatCurrencyAmount(
+                      {formatCurrencyAmountJSX(
                         getAllocatedExpensePerUnitInRowCurrency(row),
                         row.currencyId
                       )}
@@ -3511,7 +3521,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
                   {tableColumns.cost && (
                     <td style={printTd}>
-                      {formatCurrencyAmount(
+                      {formatCurrencyAmountJSX(
                         getFinalCostPerUnitInRowCurrency(row),
                         row.currencyId
                       )}
@@ -3522,7 +3532,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                     rows.some((r) => toNumber(r.discount) > 0) && (
                       <td style={printTd}>
                         {toNumber(row.discount) > 0
-                          ? formatCurrencyAmount(
+                          ? formatCurrencyAmountJSX(
                               toNumber(row.discount),
                               row.currencyId
                             )
@@ -3532,7 +3542,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
                   {tableColumns.total && (
                     <td style={printTd}>
-                      {formatCurrencyAmount(
+                      {formatCurrencyAmountJSX(
                         getRowTotalInOwnCurrency(row),
                         row.currencyId
                       )}
@@ -3558,7 +3568,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی بەهای کاڵاکان</td>
                     </tr>
                     <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyAmount(finalExpenseTotalInSelectedCurrency, expenseTotalCurrencyId || defaultCurrency?.id || 5)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyAmountJSX(finalExpenseTotalInSelectedCurrency, expenseTotalCurrencyId || defaultCurrency?.id || 5)}</td>
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی بڕی خەرجی</td>
                     </tr>
                     <tr>
@@ -3579,7 +3589,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>قەرزی پێشوو</td>
                     </tr>
                     <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{getPaidSummaryText()}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyMap(getPaidAmountsByCurrency())}</td>
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
                     </tr>
                     <tr>
@@ -3735,7 +3745,42 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             </div>
 
             <div style={settingsStack}>
-                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={settingsSection}>
+                <h3 style={settingsTitle}>کڵێشەی پسووڵە</h3>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    setSelectedTemplateId(id);
+                    localStorage.setItem("selected_invoice_template_id", String(id));
+                    window.dispatchEvent(new Event("invoice-template-changed"));
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px",
+                    fontSize: "13px",
+                    fontWeight: "bold",
+                    color: "#374151",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    backgroundColor: "#ffffff",
+                    outline: "none",
+                    cursor: "pointer"
+                  }}
+                >
+                  {invoiceTemplates.length === 0 ? (
+                    <option value="">کڵێشەی سەرەکی</option>
+                  ) : (
+                    invoiceTemplates.map((tmpl: any) => (
+                      <option key={tmpl.id} value={tmpl.id}>
+                        {tmpl.name}{tmpl.isMain ? " (سەرەکی)" : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
@@ -3768,6 +3813,11 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                     label="دۆخی پارەدان"
                     checked={printOptions.showPaymentStatus}
                     onChange={() => togglePrintOption("showPaymentStatus")}
+                  />
+                    <SettingCheck
+                    label="بۆکسی ڕەیتی دۆلار"
+                    checked={printOptions.showExchangeRate !== false}
+                    onChange={() => togglePrintOption("showExchangeRate")}
                   />
                   </div>
                 </div>
@@ -4030,7 +4080,7 @@ function SummaryItem({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ ...printInfoRow, justifyContent: "flex-start", gap: "6px" }}>
       <b style={{ marginLeft: "4px" }}>{label}:</b>
@@ -4095,8 +4145,8 @@ function SettingCheck({
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
 
   body * {
     visibility: hidden !important;
@@ -4868,7 +4918,7 @@ const printInfoRow: CSSProperties = {
 const printTable: CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
-  fontSize: 10,
+  fontSize: 13.5,
   marginTop: 6,
 };
 
@@ -4876,26 +4926,28 @@ const printTh: CSSProperties = {
   border: "1px solid #0f172a",
   background: "#0f172a",
   color: "#ffffff",
-  padding: "7px 5px",
+  padding: "7px 6px",
   textAlign: "center",
   fontWeight: 900,
-  fontSize: 10,
+  fontSize: 13.5,
   letterSpacing: "0.2px",
 };
 
 const printTd: CSSProperties = {
   border: "1px solid #e5e7eb",
-  padding: "6px 5px",
+  padding: "6px 6px",
   textAlign: "center",
   verticalAlign: "middle",
+  fontSize: 13.5,
 };
 
 const printTdWide: CSSProperties = {
   border: "1px solid #e5e7eb",
-  padding: "6px 5px",
+  padding: "6px 6px",
   textAlign: "right",
   verticalAlign: "middle",
   minWidth: 150,
+  fontSize: 13.5,
 };
 
 const printSmallNote: CSSProperties = {

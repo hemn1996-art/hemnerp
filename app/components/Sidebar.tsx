@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useStore } from "../store/store";
+import SellingPricesModal from "./SellingPricesModal";
+import { performBackupFlow } from "../lib/backupClient";
 
 const menuItems = [
   { name: "داشبۆرد", icon: "📊", path: "/dashboard", perm: "dashboard" },
@@ -49,17 +51,19 @@ const menuItems = [
   {
     name: "مەوجودات",
     icon: "💼",
+    perm: "fixed_assets",
     children: [
-      { name: "کاتیگۆری مەوجودات", path: "/fixed-asset-categories" },
-      { name: "مەوجودات", path: "/fixed-assets" },
+      { name: "کاتیگۆری مەوجودات", path: "/fixed-asset-categories", perm: "fixed_assets" },
+      { name: "مەوجودات", path: "/fixed-assets", perm: "fixed_assets" },
     ],
   },
 
   {
     name: "HR",
     icon: "👥",
+    perm: "hr",
     children: [
-      { name: "کارمەندەکان", path: "/employees" },
+      { name: "کارمەندەکان", path: "/employees", perm: "hr" },
     ],
   },
 
@@ -89,6 +93,7 @@ export default function Sidebar({
   const [openMenu, setOpenMenu] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredOpen, setHoveredOpen] = useState(false);
+  const [showPricesModal, setShowPricesModal] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentUser = useStore((s) => s.currentUser);
@@ -133,7 +138,8 @@ export default function Sidebar({
   const handleLogout = async () => {
     try {
       // Automatically create a backup of database changes before logging out
-      await fetch("/api/backup", { method: "POST" });
+      // This will save to the server (with /tmp fallback) and to the user's chosen local directory
+      await performBackupFlow();
     } catch (error) {
       console.error("Auto-backup failed during logout:", error);
     }
@@ -218,12 +224,21 @@ export default function Sidebar({
       <nav className="space-y-1.5">
         {menuItems.map((item: any) => {
           // Permission check: filter menu items
-          if (item.perm && !hasPermission(item.perm, "canView")) return null;
+          if (item.path === "/invoices" || item.perm === "vouchers") {
+            const canAccessInvoices =
+              hasPermission("vouchers", "canCreate") ||
+              hasPermission("vouchers", "canUpdate") ||
+              currentUser?.permissions?.some((p: any) => p.module.startsWith("vouchers_") && (p.canCreate || p.canUpdate));
+            if (!canAccessInvoices) return null;
+          } else if (item.perm && !hasPermission(item.perm, "canView")) {
+            return null;
+          }
 
           if (item.path === "/reports") {
             const reportsPerms = [
               "reports_invoices",
               "reports_debts",
+              "reports_expenses",
               "reports_profit",
               "reports_stock",
               "reports_stock_snapshot",
@@ -318,13 +333,32 @@ export default function Sidebar({
 
       {/* User info */}
       {isExpanded && currentUser && (
-        <div className="pt-2 pb-1 border-t border-white/10 mb-1">
-          <div className="text-center text-xs text-gray-400 mb-1">{currentUser.name}</div>
+        <div className="pt-2 pb-1 border-t border-white/10 mb-1 flex items-center justify-center gap-1.5 text-xs text-slate-300 font-bold">
+          <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          <span>{currentUser.name || currentUser.username}</span>
+        </div>
+      )}
+
+      {/* Selling Prices button */}
+      {hasPermission("selling_prices", "canView") && (
+        <div className="mt-auto pt-3 border-t border-white/10 mb-1">
+          <button
+            onClick={() => setShowPricesModal(true)}
+            className={`w-full py-2.5 rounded-xl border-none cursor-pointer bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 font-extrabold transition-all flex items-center justify-center gap-2 ${
+              isExpanded ? "px-3.5 text-sm" : "px-1 text-lg"
+            }`}
+            title="نرخی فرۆشتن"
+          >
+            <span className="text-lg">🏷️</span>
+            {isExpanded && <span className="whitespace-nowrap">نرخی فرۆشتن</span>}
+          </button>
         </div>
       )}
 
       {/* Contact us button */}
-      <div className="mt-auto pt-3 border-t border-white/10 mb-1">
+      <div className="pt-2 border-t border-white/10 mb-1">
         <button
           onClick={() => handleNavigate("/contact")}
           className={`w-full py-2 rounded-xl border-none cursor-pointer bg-blue-600/10 hover:bg-blue-600/25 text-blue-300 hover:text-white text-base font-bold transition-all flex items-center justify-center gap-2 ${
@@ -340,7 +374,7 @@ export default function Sidebar({
       </div>
 
       {/* Logout button */}
-      <div className="pt-3 border-t border-white/10">
+      <div className="pt-2 border-t border-white/10">
         <button
           onClick={handleLogout}
           className={`w-full py-2 rounded-xl border-none cursor-pointer bg-red-600 hover:bg-red-700 text-white text-base font-bold transition-all flex items-center justify-center gap-2 ${
@@ -354,6 +388,11 @@ export default function Sidebar({
       </div>
     </aside>
 
+    {/* Selling Prices Modal */}
+    <SellingPricesModal
+      isOpen={showPricesModal}
+      onClose={() => setShowPricesModal(false)}
+    />
     </>
   );
 }

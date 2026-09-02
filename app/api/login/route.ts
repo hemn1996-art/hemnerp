@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { verifyPassword, signSessionToken } from "../../lib/auth";
+import { checkRateLimit } from "../../lib/rateLimit";
 
 // Log login attempts for security monitoring
 async function logLoginAttempt(
@@ -35,16 +36,33 @@ export async function POST(request: Request) {
       "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
 
-    if (!username || !password) {
+    // Enforce rate limiting (max 10 attempts per 15 mins per IP)
+    const rateLimit = checkRateLimit(`login_${ip}`, 10, 15 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: "ژمارەی هەوڵەکانی تێپەڕین زۆر بوو! تکایە دوای ١٥ خولەکی تر هەوڵ بدەرەوە." },
+        { status: 429 }
+      );
+    }
+
+    const cleanUsername = String(username || "").trim();
+    const rawPassword = String(password || "");
+
+    if (!cleanUsername || !rawPassword) {
       return NextResponse.json(
         { success: false, error: "یوزەرنەیم و پاسۆرد پێویستن" },
         { status: 400 }
       );
     }
 
-    // Find user in database
-    const user = await prisma.user.findUnique({
-      where: { username },
+    // Find user in database (case-insensitive for username)
+    const user = await prisma.user.findFirst({
+      where: {
+        username: {
+          equals: cleanUsername,
+          mode: "insensitive",
+        },
+      },
       select: {
         id: true,
         username: true,

@@ -68,15 +68,13 @@ export default function MultiSelectDropdown({
       <div 
         onClick={() => {
           setIsOpen(!isOpen);
-          if (!isOpen) inputRef.current?.focus();
+          if (!isOpen) setTimeout(() => inputRef.current?.focus(), 50);
         }}
-        className={`mui-outline cursor-pointer select-none flex items-center justify-between gap-3 transition-all min-h-[52px] ${
-          isOpen ? "border-[#0b1f50] ring-2 ring-[#0b1f50]/10" : ""
+        className={`w-full border rounded-xl p-3 bg-white min-h-[48px] outline-none text-right font-bold text-sm text-gray-600 shadow-sm flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+          isOpen ? "border-[#0b1f50] ring-2 ring-[#0b1f50]/20" : "border-gray-300 hover:border-gray-400"
         }`}
       >
-        <label className="select-none pointer-events-none">{label}</label>
-
-        <div className="flex-1 flex flex-wrap items-center justify-start gap-1 py-1 px-1 overflow-hidden">
+        <div className="flex-1 flex flex-wrap items-center justify-start gap-1.5 overflow-hidden">
           {selectedValues.map(val => {
             const opt = options.find(o => o.value === val);
             if (!opt) return null;
@@ -84,7 +82,7 @@ export default function MultiSelectDropdown({
               <span
                 key={val}
                 onClick={e => e.stopPropagation()}
-                className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-[#0b1f50] font-bold text-[11px] pr-2.5 pl-1.5 py-0.5 rounded-full transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 bg-slate-100 border border-slate-300 text-[#0b1f50] font-black text-xs px-2.5 py-1 rounded-lg transition-colors shrink-0"
               >
                 <span>{opt.label}</span>
                 <button
@@ -93,7 +91,7 @@ export default function MultiSelectDropdown({
                     e.stopPropagation();
                     toggleOption(val);
                   }}
-                  className="bg-slate-300 hover:bg-red-500 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center text-[9px] font-black transition-colors cursor-pointer border-none p-0 shrink-0"
+                  className="bg-slate-300 hover:bg-rose-600 text-slate-700 hover:text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black transition-colors cursor-pointer border-none p-0 shrink-0"
                 >
                   ✕
                 </button>
@@ -102,8 +100,8 @@ export default function MultiSelectDropdown({
           })}
 
           {selectedValues.length === 0 && !isOpen && (
-            <span className="text-slate-400 font-bold text-sm text-right px-1">
-              هەموو
+            <span className="text-gray-400 font-bold text-sm text-right">
+              {label ? label : "هەموو"}
             </span>
           )}
 
@@ -113,26 +111,26 @@ export default function MultiSelectDropdown({
               type="text"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder={selectedValues.length === 0 ? "گەڕان..." : ""}
-              className="flex-1 min-w-[80px] border-none outline-none text-xs font-bold text-slate-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
+              placeholder={selectedValues.length === 0 ? label || "گەڕان..." : "گەڕان..."}
+              className="flex-1 min-w-[100px] border-none outline-none text-xs font-bold text-gray-800 bg-transparent py-0.5 focus:ring-0 focus:outline-none"
               dir="rtl"
               onClick={e => e.stopPropagation()}
             />
           )}
         </div>
 
-        <div className="flex items-center gap-2 text-slate-500 shrink-0 pl-1 border-r border-slate-200 pr-2">
-          {(selectedValues.length > 0 || searchTerm) && (
+        <div className="flex items-center gap-2 text-gray-400 shrink-0 pl-1 border-r border-gray-200 pr-2">
+          {selectedValues.length > 0 && (
             <button
               type="button"
               onClick={handleClearAll}
-              className="text-slate-400 hover:text-slate-700 bg-transparent border-none cursor-pointer text-sm font-bold flex items-center justify-center w-5 h-5"
+              className="text-gray-400 hover:text-rose-600 bg-transparent border-none cursor-pointer text-xs font-bold flex items-center justify-center w-5 h-5"
               title="پاککردنەوەی هەموو"
             >
               ✕
             </button>
           )}
-          <span className="text-[10px] select-none text-slate-400">
+          <span className="text-xs text-gray-400 select-none">
             {isOpen ? "▲" : "▼"}
           </span>
         </div>

@@ -56,9 +56,7 @@ export async function GET(request: Request) {
         deliveryAddress: true,
         deliveryFee: true,
         extraPaymentHandling: true,
-        isArrived: true,
-        arrivalDate: true,
-        account: { select: { id: true, name: true, accountTypeId: true, city: { select: { name: true } }, district: { select: { name: true } } } },
+        account: { select: { id: true, name: true, accountTypeId: true, exchangeRateType: true, customExchangeRate: true, city: { select: { name: true } }, district: { select: { name: true } } } },
         cashbox: { select: { id: true, name: true } },
         fromCashbox: { select: { id: true, name: true } },
         toCashbox: { select: { id: true, name: true } },
@@ -95,6 +93,7 @@ export async function GET(request: Request) {
             qtyChange: true,
             unitCost: true,
             warehouseId: true,
+            currencyId: true,
           },
         },
         ledgerEntries: {
@@ -118,10 +117,15 @@ export async function GET(request: Request) {
     });
 
     // Normalize totalAmount and netAmount for vouchers with mixed IQD/USD lines
+    // Only correct vouchers where: header currency is USD (id=1) but all lines are IQD,
+    // meaning the stored totalAmount is an incorrect USD number (e.g. 571.43)
+    // when it should have been IQD (e.g. 880,000).
+    // If the voucher header currency is ALREADY IQD (currencyId=2), the stored totalAmount IS correct.
     const normalizedVouchers = vouchers.map((v: any) => {
-      if (v.lines && Array.isArray(v.lines) && v.lines.length > 0) {
-        const hasIqdLine = v.lines.some((l: any) => l.currencyId === 2 || Number(l.unitPrice) > 1000);
-        if (hasIqdLine) {
+      const headerIsUSD = v.currencyId === 1 || v.currencyId === 11;
+      if (headerIsUSD && v.lines && Array.isArray(v.lines) && v.lines.length > 0) {
+        const allLinesIQD = v.lines.length > 0 && v.lines.every((l: any) => l.currencyId === 2 || Number(l.currencyId) === 2);
+        if (allLinesIQD) {
           let customRate = 1520;
           if (v.exchangeRate && v.exchangeRate > 1) {
             customRate = v.exchangeRate;
@@ -138,14 +142,11 @@ export async function GET(request: Request) {
           for (const line of v.lines) {
             const qty = Number(line.qty || 0);
             const unitPrice = Number(line.unitPrice || 0);
-            const isIQD = line.currencyId === 2 || unitPrice > 1000;
-            if (isIQD) {
-              realTotalUsd += (qty * unitPrice) / (customRate || 1520);
-            } else {
-              realTotalUsd += qty * unitPrice;
-            }
+            realTotalUsd += (qty * unitPrice) / (customRate || 1520);
           }
 
+          // Only override if the stored totalAmount looks like a wrong USD number
+          // (i.e. the header says USD but all lines are IQD – legacy data issue)
           if (v.totalAmount > 2000 && realTotalUsd < 2000) {
             return {
               ...v,
@@ -155,7 +156,10 @@ export async function GET(request: Request) {
           }
         }
       }
-      return v;
+      return {
+        ...v,
+        employeeName: v.employeeName || (v.versions && v.versions[0]?.employeeName) || "کۆسار",
+      };
     });
 
     return NextResponse.json(normalizedVouchers);
@@ -222,10 +226,11 @@ export async function POST(request: Request) {
           return cur?.code === "IQD" ? `${formattedAmount} ${curName}` : `${curName} ${formattedAmount}`;
         });
 
-        const displayRate = data.exchangeRate > 100 ? data.exchangeRate : data.exchangeRate * 100;
-        const formattedRate = Number(displayRate).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        const rawExRate = Number(data.exchangeRate) || 1500;
+        const displayRate100 = rawExRate >= 10000 ? rawExRate : rawExRate * 100;
+        const formattedRate = Number(displayRate100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-        const rate = displayRate / 100;
+        const ratePerUSD = displayRate100 / 100;
         let totalEquivalent = 0;
         nonZeroPayments.forEach((p: any) => {
           const fromId = Number(p.currencyId);
@@ -236,9 +241,9 @@ export async function POST(request: Request) {
             const fromCur = dbCurrencies.find(c => Number(c.id) === fromId);
             const toCur = dbCurrencies.find(c => Number(c.id) === targetCurId);
             if (fromCur?.code === "IQD" && toCur?.code === "USD") {
-              totalEquivalent += amt / rate;
+              totalEquivalent += amt / ratePerUSD;
             } else if (fromCur?.code === "USD" && toCur?.code === "IQD") {
-              totalEquivalent += amt * rate;
+              totalEquivalent += amt * ratePerUSD;
             } else {
               totalEquivalent += amt;
             }
@@ -261,6 +266,10 @@ export async function POST(request: Request) {
       data.internalNote = autoNote;
     }
 
+    const creatorName = (data.employeeName && data.employeeName.trim() !== "")
+      ? data.employeeName.trim()
+      : (currentUser.name || currentUser.username || "کۆسار");
+
     const voucher = await prisma.$transaction(async (tx) => {
       const createdVoucher = await tx.voucher.create({
         data: {
@@ -279,7 +288,7 @@ export async function POST(request: Request) {
           internalNote: data.internalNote,
           printNote: data.printNote,
           isSaved: data.isSaved ?? true,
-          employeeName: data.employeeName,
+          employeeName: creatorName,
           hasDelivery: data.hasDelivery ?? false,
           driverName: data.driverName,
           driverPhone: data.driverPhone,
@@ -287,8 +296,6 @@ export async function POST(request: Request) {
           deliveryAddress: data.deliveryAddress,
           deliveryFee: data.deliveryFee ? Number(data.deliveryFee) : null,
           extraPaymentHandling: data.extraPaymentHandling || null,
-          isArrived: data.isArrived !== undefined ? Boolean(data.isArrived) : true,
-          arrivalDate: data.arrivalDate ? new Date(data.arrivalDate) : (data.isArrived === false ? null : (data.date ? new Date(data.date) : new Date())),
         },
       });
 
@@ -308,24 +315,38 @@ export async function POST(request: Request) {
             },
           });
 
-          if (["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
-            const shouldCreateInventory = createdVoucher.type !== "purchase" || createdVoucher.isArrived !== false;
-            if (shouldCreateInventory) {
-              let qtyChange = Number(line.qty);
-              if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
-                qtyChange = -qtyChange;
-              }
-              if (line.warehouseId) {
-                await tx.inventoryTransaction.create({
-                  data: {
-                    voucherId: createdVoucher.id,
-                    productId: Number(line.productId),
-                    warehouseId: Number(line.warehouseId),
-                    qtyChange,
-                    unitCost: Number(line.unitCost || line.unitPrice || 0),
-                    date: createdVoucher.arrivalDate || createdVoucher.date,
-                  },
-                });
+          // Check if product is a service or expense (they do not enter/affect inventory)
+          const product = await tx.product.findUnique({
+            where: { id: Number(line.productId) },
+            select: { id: true, name: true, isExpense: true, isService: true, category: true },
+          });
+          const isServiceOrExpense = Boolean(
+            product?.isExpense ||
+            product?.isService ||
+            (product?.category && (product.category.includes("خزمەتگوزاری") || product.category.includes("گەیاندن"))) ||
+            (product?.name && (product.name.includes("گەیاندن") || product.name.includes("خزمەتگوزاری")))
+          );
+
+          if (!isServiceOrExpense && ["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
+            let qtyChange = Number(line.qty);
+            if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
+              qtyChange = -qtyChange;
+            }
+            if (line.warehouseId) {
+              await tx.inventoryTransaction.create({
+                data: {
+                  voucherId: createdVoucher.id,
+                  productId: Number(line.productId),
+                  warehouseId: Number(line.warehouseId),
+                  qtyChange,
+                  unitCost: Number(line.unitCost || line.unitPrice || 0),
+                  // IMPORTANT: line.currencyId is the authoritative source for the item's currency.
+                  // Fall back to the voucher's currencyId if line doesn't have one.
+                  // Never fall back to hardcoded 1 (USD) because that causes IQD items to get tagged as USD.
+                  currencyId: Number(line.currencyId ?? data.currencyId),
+                  date: createdVoucher.date,
+                },
+              });
 
               if (qtyChange < 0) {
                 const currentInv = await tx.inventoryTransaction.aggregate({
@@ -339,17 +360,12 @@ export async function POST(request: Request) {
                 });
                 const currentStock = currentInv._sum.qtyChange || 0;
                 if (currentStock < -0.0001) {
-                  const product = await tx.product.findUnique({
-                    where: { id: Number(line.productId) },
-                    select: { name: true },
-                  });
                   throw new Error(`ناتوانیت کەرەستەی "${product?.name || line.productId}" بفرۆشیت یان کەم بکەیتەوە، چونکە بڕی پێویست لە کۆگادا نییە. بڕی بەردەست لە کۆگادا: ${currentStock - qtyChange} دانە.`);
                 }
               }
             }
           }
         }
-      }
       }
 
       if (data.expenses && Array.isArray(data.expenses)) {
@@ -453,7 +469,15 @@ export async function POST(request: Request) {
             balanceBeforeByCurrency[String(agg.currencyId)] = (agg._sum.debit || 0) - (agg._sum.credit || 0);
           }
 
+          const accInfo = await tx.account.findUnique({
+            where: { id: createdVoucher.accountId },
+            select: { exchangeRateType: true, customExchangeRate: true }
+          });
+
           let effectiveVoucherRate = createdVoucher.exchangeRate;
+          if (accInfo?.exchangeRateType === "FIXED" && accInfo?.customExchangeRate) {
+            effectiveVoucherRate = accInfo.customExchangeRate / 100;
+          }
 
           const dbCurrencies = await tx.currency.findMany();
 
@@ -466,7 +490,9 @@ export async function POST(request: Request) {
               ...(data.paidAmounts ? data.paidAmounts.map((pa: any) => {
                 const curId = Number(pa.currencyId);
                 let pRate = Number(pa.exchangeRate || 1);
-
+                if (accInfo?.exchangeRateType === "FIXED" && accInfo?.customExchangeRate && (curId === 2 || curId === 12)) {
+                  pRate = accInfo.customExchangeRate / 100;
+                }
                 return {
                   currencyId: curId,
                   amount: Number(pa.amount),
@@ -504,7 +530,7 @@ export async function POST(request: Request) {
         data: {
           voucherId: createdVoucher.id,
           version: 1,
-          employeeName: createdVoucher.employeeName || data.employeeName || "کۆساری مەلا فەرهاد",
+          employeeName: creatorName,
           data: JSON.stringify(data),
         }
       });

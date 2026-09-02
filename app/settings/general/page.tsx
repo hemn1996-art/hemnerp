@@ -38,7 +38,7 @@ export default function GeneralSettingsPage() {
     aboutLang: "ku",
     address: "سلێمانی کۆگانی ژووری بازرگانی 456",
     addressLang: "ku",
-    emails: ["info@dostan.com"],
+    emails: ["info@londoncenter.com"],
     phones: ["07501734006", "07701403038"],
     primaryCurrency: "$",
     notificationLanguage: "کوردی",
@@ -87,7 +87,7 @@ export default function GeneralSettingsPage() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.companyName === "سەنتەری کارەبای لەندەن") {
+        if (parsed.companyName === "کۆگای دۆستان") {
           parsed.companyName = "کۆگای دۆستان";
           localStorage.setItem("general_settings", JSON.stringify(parsed));
         }

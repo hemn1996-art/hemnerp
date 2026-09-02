@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { getCurrentUser } from "../../../lib/auth";
+import { getCalculatedWarehouseValueInUsd } from "../../../../lib/stockValue";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -92,14 +99,33 @@ export async function GET(request: Request) {
       prisma.currency.findMany({ where: { isActive: true } }),
       prisma.ledgerEntry.groupBy({
         by: ["accountId", "currencyId"],
+        where: { voucher: { isDeleted: false } },
         _sum: { debit: true, credit: true }
       }),
       prisma.cashboxBalance.findMany({
         include: { cashbox: true }
       }),
       prisma.inventoryTransaction.findMany({
-        where: endDate ? { date: { lte: dateFilter.lte } } : undefined,
-        select: { productId: true, qtyChange: true, unitCost: true, warehouseId: true, product: { select: { isMultiBatch: true } } }
+        where: {
+          ...(endDate ? { date: { lte: dateFilter.lte } } : {}),
+          voucher: { isDeleted: false },
+        },
+        select: {
+          productId: true,
+          qtyChange: true,
+          unitCost: true,
+          warehouseId: true,
+          currencyId: true,
+          product: { select: { isMultiBatch: true } },
+          voucher: {
+            select: {
+              currencyId: true,
+              exchangeRate: true,
+              account: { select: { exchangeRateType: true, customExchangeRate: true } },
+              versions: { select: { version: true, data: true } }
+            }
+          }
+        }
       }),
       prisma.product.findMany(),
       prisma.account.findMany()
@@ -107,6 +133,11 @@ export async function GET(request: Request) {
 
     const usdCurrency = currencies.find(c => c.code === "USD");
     const usdId = usdCurrency ? usdCurrency.id : 1;
+
+    const iqdCur = currencies.find(c => c.code === "IQD" || c.id === 2);
+    const iqdId = iqdCur?.id || 2;
+    const rawRate = iqdCur?.rate || 1520;
+    const marketRatePerDollar = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
 
     const displayCurrencyId = Number(searchParams.get("currencyId") || usdId);
     const targetCurrency = currencies.find(c => c.id === displayCurrencyId);
@@ -147,30 +178,127 @@ export async function GET(request: Request) {
     let totalGifts = 0;
     let totalLosses = 0;
 
-    // Calculate the cost for every product
-    const productPurchaseStats: Record<number, { totalValue: number, totalQty: number, latestCost: number, isMultiBatch: boolean }> = {};
+    // Build fixed-rate map from purchase transactions
+    const productFixedRates: Record<number, number> = {};
+    inventoryTrans.forEach((t: any) => {
+      if (t.qtyChange > 0 && t.unitCost > 0) {
+        const sellerAcc = (t.voucher as any)?.account;
+        let rateType = sellerAcc?.exchangeRateType;
+        let customRate = sellerAcc?.customExchangeRate;
+
+        // Also check version data for overrides
+        const versions = (t.voucher as any)?.versions;
+        if (versions && versions.length > 0) {
+          const sorted = [...versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
+          try {
+            const vData = JSON.parse(sorted[sorted.length - 1].data);
+            if (vData.exchangeRateType) rateType = vData.exchangeRateType;
+            if (vData.customExchangeRate) customRate = vData.customExchangeRate;
+          } catch(e) {}
+        }
+
+        if (rateType === "FIXED" && customRate) {
+          productFixedRates[t.productId] = customRate > 10000 ? customRate / 100 : customRate;
+        }
+      }
+    });
+
+    const productPurchaseStats: Record<number, { runningCostUSD: number, runningOnHandQty: number, latestCost: number, isMultiBatch: boolean }> = {};
+    // Fixed-rate products: cost tracked in IQD
+    const fixedPurchaseStats: Record<number, { runningCostIQD: number, runningOnHandQty: number, latestCost: number, isMultiBatch: boolean }> = {};
+
     inventoryTrans.forEach((t: any) => {
       const matchesWarehouse = !warehouseIds || warehouseIds.includes(t.warehouseId);
       const matchesProduct = matchesProductFilters(t.productId);
-      
-      if (matchesWarehouse && matchesProduct && t.qtyChange > 0 && t.unitCost > 0) {
-        if (!productPurchaseStats[t.productId]) {
-          productPurchaseStats[t.productId] = { totalValue: 0, totalQty: 0, latestCost: 0, isMultiBatch: t.product?.isMultiBatch || false };
+      if (!matchesWarehouse || !matchesProduct) return;
+
+      const pId = t.productId;
+      const isMultiBatch = t.product?.isMultiBatch || false;
+      const isCostIQD = t.unitCost > 500;
+      const fixedRate = productFixedRates[pId];
+
+      const vRate = (t.voucher as any)?.exchangeRate && (t.voucher as any).exchangeRate > 100
+        ? ((t.voucher as any).exchangeRate > 10000 ? (t.voucher as any).exchangeRate / 100 : (t.voucher as any).exchangeRate)
+        : marketRatePerDollar;
+
+      if (t.qtyChange > 0 && t.unitCost > 0) {
+        const qtyIn = t.qtyChange;
+
+        // Fixed-rate product (cost in USD but with fixed IQD rate)
+        if (fixedRate && !isCostIQD) {
+          if (!fixedPurchaseStats[pId]) {
+            fixedPurchaseStats[pId] = { runningCostIQD: 0, runningOnHandQty: 0, latestCost: 0, isMultiBatch };
+          }
+          const costIQD = t.unitCost * fixedRate;
+          fixedPurchaseStats[pId].latestCost = costIQD;
+
+          if (isMultiBatch) {
+            fixedPurchaseStats[pId].runningCostIQD = costIQD;
+            fixedPurchaseStats[pId].runningOnHandQty += qtyIn;
+          } else {
+            const currentOnHand = fixedPurchaseStats[pId].runningOnHandQty || 0;
+            if (currentOnHand <= 0) {
+              fixedPurchaseStats[pId].runningCostIQD = costIQD;
+              fixedPurchaseStats[pId].runningOnHandQty = qtyIn;
+            } else {
+              const totalVal = (currentOnHand * fixedPurchaseStats[pId].runningCostIQD) + (qtyIn * costIQD);
+              const newOnHand = currentOnHand + qtyIn;
+              fixedPurchaseStats[pId].runningOnHandQty = newOnHand;
+              fixedPurchaseStats[pId].runningCostIQD = totalVal / newOnHand;
+            }
+          }
+        } else {
+          // Regular product
+          if (!productPurchaseStats[pId]) {
+            productPurchaseStats[pId] = { runningCostUSD: 0, runningOnHandQty: 0, latestCost: 0, isMultiBatch };
+          }
+          const effectiveUnitCostUsd = isCostIQD ? (t.unitCost / vRate) : t.unitCost;
+          productPurchaseStats[pId].latestCost = effectiveUnitCostUsd;
+
+          if (isMultiBatch) {
+            productPurchaseStats[pId].runningCostUSD = effectiveUnitCostUsd;
+            productPurchaseStats[pId].runningOnHandQty += qtyIn;
+          } else {
+            const currentOnHand = productPurchaseStats[pId].runningOnHandQty || 0;
+            if (currentOnHand <= 0) {
+              productPurchaseStats[pId].runningCostUSD = effectiveUnitCostUsd;
+              productPurchaseStats[pId].runningOnHandQty = qtyIn;
+            } else {
+              const totalVal = (currentOnHand * productPurchaseStats[pId].runningCostUSD) + (qtyIn * effectiveUnitCostUsd);
+              const newOnHand = currentOnHand + qtyIn;
+              productPurchaseStats[pId].runningOnHandQty = newOnHand;
+              productPurchaseStats[pId].runningCostUSD = totalVal / newOnHand;
+            }
+          }
         }
-        productPurchaseStats[t.productId].totalValue += (t.qtyChange * t.unitCost);
-        productPurchaseStats[t.productId].totalQty += t.qtyChange;
-        productPurchaseStats[t.productId].latestCost = t.unitCost;
+      } else if (t.qtyChange < 0) {
+        if (fixedPurchaseStats[pId]) {
+          fixedPurchaseStats[pId].runningOnHandQty += t.qtyChange;
+        }
+        if (productPurchaseStats[pId]) {
+          productPurchaseStats[pId].runningOnHandQty += t.qtyChange;
+        }
       }
     });
 
     const productCosts: Record<number, number> = {};
     for (const [pId, stats] of Object.entries(productPurchaseStats)) {
-      if (stats.isMultiBatch) {
-        productCosts[Number(pId)] = stats.latestCost;
-      } else {
-        productCosts[Number(pId)] = stats.totalQty > 0 ? (stats.totalValue / stats.totalQty) : 0;
-      }
+      productCosts[Number(pId)] = stats.isMultiBatch ? stats.latestCost : stats.runningCostUSD;
     }
+
+    // Fixed-rate products: cost stored in IQD
+    const fixedCostIQD: Record<number, number> = {};
+    for (const [pId, stats] of Object.entries(fixedPurchaseStats)) {
+      fixedCostIQD[Number(pId)] = stats.isMultiBatch ? stats.latestCost : stats.runningCostIQD;
+    }
+
+    dbProducts.forEach((p: any) => {
+      if (productCosts[p.id] === undefined) {
+        const rawCost = p.costPrice || 0;
+        const isCostIQD = rawCost > 500;
+        productCosts[p.id] = isCostIQD ? (rawCost / marketRatePerDollar) : rawCost;
+      }
+    });
 
     vouchers.forEach((v: any) => {
       // Apply voucher-level filters
@@ -179,6 +307,27 @@ export async function GET(request: Request) {
       if (accountTypeIds && (!v.account || !accountTypeIds.includes(v.account.accountTypeId))) return;
 
       const amount = convertVoucherToTarget(v.netAmount, v.currencyId || usdId, v.exchangeRate);
+
+      const getItemCostUsdForVoucher = (productId: number, rawCost?: number, rawCurId?: number) => {
+        // Check if product has fixed-rate IQD cost
+        const fixedIQD = fixedCostIQD[productId];
+        if (fixedIQD !== undefined && fixedIQD > 0) {
+          // Convert IQD cost to USD at market rate
+          return fixedIQD / marketRatePerDollar;
+        }
+
+        let cost = productCosts[productId];
+        if (cost === undefined || cost === null || cost === 0) {
+          if (rawCost && rawCost > 0) {
+            const isIQD = rawCost > 500;
+            const vRate = (v.exchangeRate && v.exchangeRate > 100)
+              ? (v.exchangeRate > 10000 ? v.exchangeRate / 100 : v.exchangeRate)
+              : marketRatePerDollar;
+            cost = isIQD ? (rawCost / vRate) : rawCost;
+          }
+        }
+        return cost || 0;
+      };
 
       if (v.type === "sales") {
         let voucherSalesAmount = 0;
@@ -205,7 +354,8 @@ export async function GET(request: Request) {
             v.inventoryTransactions.forEach((tx: any) => {
               if (matchesProductFilters(tx.productId)) {
                 if (!hasWarehouseFilter || warehouseIds!.includes(tx.warehouseId)) {
-                  cogs += Math.abs(tx.qtyChange) * tx.unitCost;
+                  const costUsd = getItemCostUsdForVoucher(tx.productId, tx.unitCost, tx.currencyId);
+                  cogs += Math.abs(tx.qtyChange) * costUsd;
                 }
               }
             });
@@ -216,8 +366,8 @@ export async function GET(request: Request) {
                   const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && warehouseIds!.includes(tx.warehouseId));
                   if (!hasTxInWarehouse) return;
                 }
-                const cost = productCosts[line.productId] || 0;
-                cogs += line.qty * cost;
+                const costUsd = getItemCostUsdForVoucher(line.productId);
+                cogs += line.qty * costUsd;
               }
             });
           }
@@ -228,12 +378,13 @@ export async function GET(request: Request) {
           totalSales += amount;
           if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
             v.inventoryTransactions.forEach((tx: any) => {
-              cogs += Math.abs(tx.qtyChange) * tx.unitCost;
+              const costUsd = getItemCostUsdForVoucher(tx.productId, tx.unitCost, tx.currencyId);
+              cogs += Math.abs(tx.qtyChange) * costUsd;
             });
           } else if (v.lines) {
             v.lines.forEach((line: any) => {
-              const cost = productCosts[line.productId] || 0;
-              cogs += line.qty * cost;
+              const costUsd = getItemCostUsdForVoucher(line.productId);
+              cogs += line.qty * costUsd;
             });
           }
           totalCOGS += convertToTarget(cogs, usdId);
@@ -263,7 +414,8 @@ export async function GET(request: Request) {
             v.inventoryTransactions.forEach((tx: any) => {
               if (matchesProductFilters(tx.productId)) {
                 if (!hasWarehouseFilter || warehouseIds!.includes(tx.warehouseId)) {
-                  cogs += Math.abs(tx.qtyChange) * tx.unitCost;
+                  const costUsd = getItemCostUsdForVoucher(tx.productId, tx.unitCost, tx.currencyId);
+                  cogs += Math.abs(tx.qtyChange) * costUsd;
                 }
               }
             });
@@ -274,8 +426,8 @@ export async function GET(request: Request) {
                   const hasTxInWarehouse = v.inventoryTransactions?.some((tx: any) => tx.productId === line.productId && warehouseIds!.includes(tx.warehouseId));
                   if (!hasTxInWarehouse) return;
                 }
-                const cost = productCosts[line.productId] || 0;
-                cogs += line.qty * cost;
+                const costUsd = getItemCostUsdForVoucher(line.productId);
+                cogs += line.qty * costUsd;
               }
             });
           }
@@ -286,12 +438,13 @@ export async function GET(request: Request) {
           totalSales -= amount;
           if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
             v.inventoryTransactions.forEach((tx: any) => {
-              cogs += Math.abs(tx.qtyChange) * tx.unitCost;
+              const costUsd = getItemCostUsdForVoucher(tx.productId, tx.unitCost, tx.currencyId);
+              cogs += Math.abs(tx.qtyChange) * costUsd;
             });
           } else if (v.lines) {
             v.lines.forEach((line: any) => {
-              const cost = productCosts[line.productId] || 0;
-              cogs += line.qty * cost;
+              const costUsd = getItemCostUsdForVoucher(line.productId);
+              cogs += line.qty * costUsd;
             });
           }
           totalCOGS -= convertToTarget(cogs, usdId);
@@ -355,38 +508,9 @@ export async function GET(request: Request) {
               }
             });
           }
-          totalLosses += convertToTarget(losses, usdId);
+          totalLosses += convertVoucherToTarget(losses, v.currencyId || usdId, v.exchangeRate);
         } else {
           totalLosses += amount;
-        }
-      } else if (v.type === "warehouse_stock" || v.type === "جەردی کۆگا") {
-        let adjustmentValue = 0;
-        const hasProductFilter = productIds !== null || categories !== null || brands !== null;
-        const hasWarehouseFilter = warehouseIds !== null;
-
-        if (hasProductFilter || hasWarehouseFilter) {
-          if (v.inventoryTransactions) {
-            v.inventoryTransactions.forEach((tx: any) => {
-              if (matchesProductFilters(tx.productId)) {
-                if (!hasWarehouseFilter || warehouseIds!.includes(tx.warehouseId)) {
-                  adjustmentValue -= tx.qtyChange * tx.unitCost;
-                }
-              }
-            });
-          }
-          totalLosses += convertToTarget(adjustmentValue, usdId);
-        } else {
-          if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
-            v.inventoryTransactions.forEach((tx: any) => {
-              adjustmentValue -= tx.qtyChange * tx.unitCost;
-            });
-          } else if (v.lines) {
-            v.lines.forEach((line: any) => {
-              const cost = productCosts[line.productId] || 0;
-              adjustmentValue -= line.qty * cost;
-            });
-          }
-          totalLosses += convertToTarget(adjustmentValue, usdId);
         }
       }
     });
@@ -438,15 +562,7 @@ export async function GET(request: Request) {
       }
     });
 
-    const productStock: Record<number, number> = {};
-    inventoryTrans.forEach(t => {
-      const matchesWarehouse = !warehouseIds || warehouseIds.includes(t.warehouseId);
-      const matchesProduct = matchesProductFilters(t.productId);
-      if (matchesWarehouse && matchesProduct) {
-        productStock[t.productId] = (productStock[t.productId] || 0) + t.qtyChange * t.unitCost;
-      }
-    });
-    const totalWarehouseValueInUsd = Object.values(productStock).reduce((s, v) => s + v, 0);
+    const totalWarehouseValueInUsd = await getCalculatedWarehouseValueInUsd(endDate ? dateFilter.lte : undefined);
     const totalWarehouseValue = totalWarehouseValueInUsd * targetRate;
 
     return NextResponse.json({

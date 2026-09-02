@@ -148,8 +148,8 @@ function ItemsList({
               <th style={th}>جۆر</th>
               <th style={th}>کاتیگۆری</th>
               <th style={th}>براند</th>
-              <th style={th}>نرخی �رۆشتن</th>
-              <th style={th}>�رە وەجبە</th>
+              <th style={th}>نرخی �رۆشتن</th>
+              <th style={th}>�رە وەجبە</th>
               <th style={th}>ئاگاداری کۆگا</th>
               <th style={th}>بەسەرچوون</th>
               <th style={th}>حاڵەت</th>
@@ -222,7 +222,7 @@ function ItemsList({
                         onClick={() => handleDelete(item)}
                         title="سڕینەوە"
                       >
-                        🗑�
+                        🗑�
                       </button>
                     )}
                   </td>
@@ -467,7 +467,7 @@ function AddItemForm({
 
   return (
     <div>
-      <div style={notice}>ئەو �یلدانەی کە بە * نیشانە کراون داواکراون.</div>
+      <div style={notice}>ئەو �یلدانەی کە بە * نیشانە کراون داواکراون.</div>
 
       <div style={titleBox}>
         <h2 style={{ margin: 0 }}>
@@ -476,7 +476,7 @@ function AddItemForm({
         <p style={{ margin: "6px 0 0", color: "#6b7280" }}>
           {productToEdit
             ? "دەستکاریکردنی زانیاری و ڕێکخستنەکانی کەرەستە"
-            : "زانیاری کەرەستە، نرخی �رۆشتن، پێچانەوە و ڕێکخستنەکان"}
+            : "زانیاری کەرەستە، نرخی �رۆشتن، پێچانەوە و ڕێکخستنەکان"}
         </p>
       </div>
 
@@ -594,7 +594,7 @@ function AddItemForm({
                 checked={isMultiBatch}
                 onChange={(e) => setIsMultiBatch(e.target.checked)}
               />
-              ئەم کەرەستە �رە وەجبەیە؟
+              ئەم کەرەستە �رە وەجبەیە؟
             </label>
           )}
 
@@ -605,7 +605,7 @@ function AddItemForm({
         </div>
       </Section>
 
-      <Section title="نرخی �رۆشتن" icon="$">
+      <Section title="نرخی �رۆشتن" icon="$">
         {salePrices.map((row, index) => (
           <div
             key={index}
@@ -785,7 +785,7 @@ function AddItemForm({
         </Section>
       )}
 
-      <Section title="حاڵەت" icon="�">
+      <Section title="حاڵەت" icon="�">
         <select
           value={isActive ? "چالاک" : "ناچالاک"}
           onChange={(e) => setIsActive(e.target.value === "چالاک")}

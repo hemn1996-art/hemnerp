@@ -15,6 +15,7 @@ import {
 
 import { store, useStore } from "../store/store";
 import { calculateLedgerEntries } from "../utils/ledgerHelper";
+import { getDefaultCashbox } from "../utils/accounting";
 import { currencies as mockCurrencies } from "../data/mockData";
 
 type ToastType = "error" | "success" | "info";
@@ -80,6 +81,7 @@ type PrintOptions = {
   showInvoiceDate: boolean;
   showCreatedTime: boolean;
   showCashbox: boolean;
+  showExchangeRate: boolean;
   showSupplierInfo: boolean;
   showSupplierName: boolean;
   showSupplierPhone: boolean;
@@ -260,8 +262,15 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   const [showSupplierInfo, setShowSupplierInfo] = useState(false);
 
   const [cashboxId, setCashboxId] = useState<number | undefined>(
-    cashboxes[0]?.id
+    () => getDefaultCashbox(cashboxes)?.id
   );
+
+  useEffect(() => {
+    if (!editId && !cashboxId && cashboxes.length > 0) {
+      const def = getDefaultCashbox(cashboxes);
+      if (def?.id) setCashboxId(def.id);
+    }
+  }, [cashboxes, editId, cashboxId]);
 
   const [returnCurrencyId] = useState<number>(defaultCurrency.id);
 
@@ -312,6 +321,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     showInvoiceDate: true,
     showCreatedTime: true,
     showCashbox: true,
+    showExchangeRate: true,
     showSupplierInfo: true,
     showSupplierName: true,
     showSupplierPhone: true,
@@ -565,37 +575,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   }
 
   function getCurrencyKey(currencyId: number) {
-    const rawId = Number(currencyId || returnCurrencyId || defaultCurrency?.id || 11);
-    const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
-
-    const getGroupCode = (c: any) => {
-      if (!c) return "";
-      const code = (c.code || "").toUpperCase().trim();
-      const symbol = (c.symbol || "").trim();
-      if (code.includes("USD") || symbol === "$") return "USD";
-      if (code.includes("IQD") || symbol === "دینار" || symbol === "د.ع") return "IQD";
-      return code || symbol;
-    };
-
-    const targetGroup = getGroupCode(found);
-    if (targetGroup) {
-      const mainCur = (currencies || []).find((c: any) => getGroupCode(c) === targetGroup && (c.isActive !== false));
-      if (mainCur) return String(mainCur.id);
-    }
-
-    const mainCur = (currencies || []).find((c: any) => found && c.code === found.code && (c.isActive !== false));
-    return String(mainCur ? mainCur.id : rawId);
-  }
-
-  function normalizeCurrencyMap(map: Record<string, number>): Record<string, number> {
-    if (!map) return {};
-    const normalized: Record<string, number> = {};
-    for (const [curIdText, val] of Object.entries(map)) {
-      if (typeof val !== "number" || isNaN(val)) continue;
-      const canonicalKey = getCurrencyKey(Number(curIdText));
-      normalized[canonicalKey] = (normalized[canonicalKey] || 0) + val;
-    }
-    return normalized;
+    return String(currencyId);
   }
 
     function getNormalizedCurrencyId(id?: number): number {
@@ -647,26 +627,43 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
+    const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
 
-  function formatCurrencyMap(map: Record<string, number>) {
-    const normalized = normalizeCurrencyMap(map);
-    const parts = Object.entries(normalized)
-      .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText, amount]) =>
-        formatCurrencyAmount(amount, Number(currencyIdText))
-      );
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
+    const code = getCurrencyCode(currencyId);
+    const symbol = getCurrencySymbol(currencyId);
+    const isIQD = code === "IQD";
+    const absVal = Math.abs(Number(value || 0));
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
+    const formatted = absVal.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: isIQD ? 0 : 2,
+    });
 
-    return parts.length ? parts.join(" + ") : "0";
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+        </span>
+      </span>
+    );
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
-    const normalized = normalizeCurrencyMap(map);
-    const activeEntries = Object.entries(normalized).filter(([_, val]) => Math.abs(val) > 0.01);
+    const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -675,25 +672,32 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const symbol = getCurrencySymbol(Number(curIdText));
-          const code = getCurrencyCode(Number(curIdText));
-          const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
-          
-          if (code === "IQD") {
-            return (
-              <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-                {isNegative ? "-" : ""}{formatted} دینار
-              </span>
-            );
-          }
-          
+          const curId = Number(curIdText);
+
           return (
-            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{symbol}{formatted}
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
+              {formatCurrencyAmountJSX(val, curId, isNegative)}
             </span>
           );
         })}
       </div>
+    );
+  }
+
+  function formatCurrencyMap(map: Record<string, number>) {
+    const active = Object.entries(map).filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001);
+    if (active.length === 0) {
+      return formatCurrencyAmountJSX(0, defaultCurrency?.id || 1);
+    }
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        {active.map(([currencyIdText, amount], idx) => (
+          <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(amount, Number(currencyIdText))}
+          </span>
+        ))}
+      </span>
     );
   }
 
@@ -773,8 +777,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   }
 
   function getAccountBalancePrintText() {
-    const text = formatCurrencyMap(accountBalanceBeforeByCurrency);
-    return text && text !== "0" ? text : "0";
+    return formatCurrencyMap(accountBalanceBeforeByCurrency);
   }
 
   function subtractMoneyMap(
@@ -1238,7 +1241,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`); if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(dateStr + " " + cleanTime);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -1287,8 +1290,10 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
       extraPaymentHandling: extraHandling
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res) => {
@@ -1547,7 +1552,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
               </InfoRow>
 
               <InfoRow label="باڵانس">
-                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(supplier))}
               </InfoRow>
             </div>
           )}
@@ -1641,7 +1646,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
               </div>
             )}
 
-            {showRate && (
+            {(showRate && printOptions.showExchangeRate !== false) && (
               <Field label="ڕەیتی 100 دۆلار بۆ پارەی دراو">
                 <FormattedNumberInput
                   value={exchangeRate}
@@ -1847,8 +1852,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                                     left: 0,
                                     width: "100vw",
                                     height: "100vh",
-                                    background: "rgba(15, 23, 42, 0.3)",
-                                    backdropFilter: "blur(2px)",
+                                    background: "rgba(0, 0, 0, 0.001)",
                                     zIndex: 9998,
                                   }}
                                   onClick={(e) => {
@@ -1965,9 +1969,9 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                                   >
                                     تەواو
                                   </button>
-                                </div>
-                              </div>
-                            </>
+                                 </div>
+                               </div>
+                             </>
                           )}
                           </td>
                         )}
@@ -2175,21 +2179,21 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
 
                   {tableColumns.returnPrice && (
                     <td style={printTd}>
-                      {formatCurrencyAmount(toNumber(row.returnPrice), row.currencyId)}
+                      {formatCurrencyAmountJSX(toNumber(row.returnPrice), row.currencyId)}
                     </td>
                   )}
 
                   {tableColumns.discount && rows.some((r) => toNumber(r.discount) > 0) && (
                     <td style={printTd}>
                       {toNumber(row.discount) > 0
-                        ? formatCurrencyAmount(toNumber(row.discount), row.currencyId)
+                        ? formatCurrencyAmountJSX(toNumber(row.discount), row.currencyId)
                         : ""}
                     </td>
                   )}
 
                   {tableColumns.total && (
                     <td style={printTd}>
-                      {formatCurrencyAmount(getRowTotalInOwnCurrency(row), row.currencyId)}
+                      {formatCurrencyAmountJSX(getRowTotalInOwnCurrency(row), row.currencyId)}
                     </td>
                   )}
                 </tr>
@@ -2325,6 +2329,11 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                     label="قاسە"
                     checked={printOptions.showCashbox}
                     onChange={() => togglePrintOption("showCashbox")}
+                  />
+                    <SettingCheck
+                    label="بۆکسی ڕەیتی دۆلار"
+                    checked={printOptions.showExchangeRate !== false}
+                    onChange={() => togglePrintOption("showExchangeRate")}
                   />
                   </div>
                 </div>
@@ -2540,7 +2549,7 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function StatBox({ title, value, color }: { title: string; value: string; color: string }) {
+function StatBox({ title, value, color }: { title: string; value: React.ReactNode; color: string }) {
   return (
     <div style={statBox}>
       <div style={{ color: "#374151", fontWeight: 700 }}>{title}</div>
@@ -2551,7 +2560,7 @@ function StatBox({ title, value, color }: { title: string; value: string; color:
   );
 }
 
-function SummaryItem({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function SummaryItem({ label, value, strong }: { label: string; value: React.ReactNode; strong?: boolean }) {
   return (
     <div style={summaryItem}>
       <div style={{ color: "#6b7280", marginBottom: 6 }}>{label}</div>
@@ -2568,7 +2577,7 @@ function SummaryItem({ label, value, strong }: { label: string; value: string; s
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={printInfoRow}>
       <b>{label}:</b>
@@ -2583,7 +2592,7 @@ function PrintSummaryLine({
   bold,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
 }) {
   let hideZero = false;
@@ -2596,7 +2605,7 @@ function PrintSummaryLine({
     }
   }
 
-  if (hideZero) {
+  if (hideZero && typeof value === "string") {
     const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
     if (clean === "0" || clean === "" || Number(clean) === 0) {
       return null;
@@ -2623,8 +2632,8 @@ function SettingCheck({ label, checked, onChange }: { label: string; checked: bo
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
   body * { visibility: hidden !important; }
   #purchase-return-print-area, #purchase-return-print-area * { visibility: visible !important; }
   #purchase-return-print-area {
@@ -2718,7 +2727,7 @@ const printInfoBox: CSSProperties = {
   flexDirection: "column",
   gap: 4,
 };
-const printInfoRow: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 14, lineHeight: 1.8 };
+const printInfoRow: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 6, lineHeight: 1.8 };
 const printTable: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 10, marginTop: 6 };
 const printTh: CSSProperties = { border: "1px solid #0f172a", background: "#0f172a", color: "#ffffff", padding: "7px 5px", textAlign: "center", fontWeight: 900, fontSize: 10, letterSpacing: "0.2px" };
 const printTd: CSSProperties = { border: "1px solid #e5e7eb", padding: "6px 5px", textAlign: "center", verticalAlign: "middle" };

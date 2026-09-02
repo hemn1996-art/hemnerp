@@ -36,8 +36,8 @@ export function openPrintWindow(
       font-weight: 400;
     }
     @page {
-      size: ${isA5 ? "A5 landscape" : "A4 portrait"};
-      margin: 0;
+      size: ${isA5 ? "A5" : "A4"};
+      margin: ${isA5 ? "3mm" : "5mm"};
     }
     *, *::before, *::after { box-sizing: border-box; }
     html, body {
@@ -51,33 +51,32 @@ export function openPrintWindow(
       print-color-adjust: exact !important;
     }
     #__print_root {
-      padding: ${isA5 ? "2mm 3mm" : "3mm 6mm"};
+      padding: ${isA5 ? "2mm 4mm" : "4mm 8mm"};
       width: 100%;
     }
     table {
       width: 100% !important;
-      table-layout: fixed !important;
+      table-layout: auto !important;
       border-collapse: collapse !important;
       box-sizing: border-box !important;
     }
     th {
-      padding: ${isA5 ? "2px 2px" : "4px 3px"} !important;
-      font-size: ${isA5 ? "8px" : "11px"} !important;
-      line-height: 1.3;
+      padding: ${isA5 ? "6px 6px" : "7px 8px"} !important;
+      font-size: ${isA5 ? "14px" : "15px"} !important;
+      font-weight: 800 !important;
+      line-height: 1.4;
       word-break: break-word;
       overflow-wrap: break-word;
-      overflow: hidden;
       white-space: normal;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
     td {
-      padding: ${isA5 ? "1.5px 2px" : "4px 3px"} !important;
-      font-size: ${isA5 ? "7.5px" : "10px"} !important;
-      line-height: 1.3;
+      padding: ${isA5 ? "5px 6px" : "6px 8px"} !important;
+      font-size: ${isA5 ? "14px" : "14.5px"} !important;
+      line-height: 1.4;
       word-break: break-word;
       overflow-wrap: break-word;
-      overflow: hidden;
       white-space: normal;
     }
     tr { page-break-inside: avoid; break-inside: avoid; }

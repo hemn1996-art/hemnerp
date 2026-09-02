@@ -77,9 +77,21 @@ export default function ReportsDashboard() {
       icon: (
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857" />
           <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 11a3 3 0 10-6 0M17 11a3 3 0 10-6 0" />
+        </svg>
+      )
+    },
+    {
+      id: "expenses",
+      title: "ڕاپۆرتی خەرجی",
+      description: "لیست و پۆلێنکردنی پسووڵەکانی خەرجی و کەرەستە خەرجییەکان",
+      path: "/reports/expenses",
+      perm: "reports_expenses",
+      colorClass: { bg: "bg-rose-500/10", text: "text-rose-600" },
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       )
     },
@@ -156,7 +168,7 @@ export default function ReportsDashboard() {
     {
       id: "finance",
       title: "دارایی",
-      reportIds: ["balance-sheet", "profit", "debts"]
+      reportIds: ["balance-sheet", "profit", "debts", "expenses"]
     },
     {
       id: "warehouse",

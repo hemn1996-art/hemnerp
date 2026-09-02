@@ -15,6 +15,7 @@ export default function ItemsPage() {
   const [mode, setMode] = useState<"list" | "add" | "edit">("list");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isCopy, setIsCopy] = useState(false);
 
   return (
     <div style={{ direction: "rtl", minWidth: 0 }}>
@@ -22,11 +23,18 @@ export default function ItemsPage() {
         <ItemsList
           onAdd={() => {
             setSelectedProduct(null);
+            setIsCopy(false);
             setMode("add");
           }}
           onEdit={(product: any) => {
             setSelectedProduct(product);
+            setIsCopy(false);
             setMode("edit");
+          }}
+          onCopy={(product: any) => {
+            setSelectedProduct(product);
+            setIsCopy(true);
+            setMode("add");
           }}
           successMsg={successMessage}
           clearSuccessMsg={() => setSuccessMessage(null)}
@@ -34,6 +42,7 @@ export default function ItemsPage() {
       ) : (
         <AddItemForm
           productToEdit={selectedProduct}
+          isCopy={isCopy}
           onBack={() => setMode("list")}
           onSuccess={(msg) => {
             setSuccessMessage(msg);
@@ -48,11 +57,13 @@ export default function ItemsPage() {
 function ItemsList({
   onAdd,
   onEdit,
+  onCopy,
   successMsg,
   clearSuccessMsg,
 }: {
   onAdd: () => void;
   onEdit: (product: Product) => void;
+  onCopy: (product: Product) => void;
   successMsg: string | null;
   clearSuccessMsg: () => void;
 }) {
@@ -89,7 +100,14 @@ function ItemsList({
     if (s) {
       setSearch(decodeURIComponent(s));
     }
-  }, [searchParams]);
+    const editId = searchParams?.get("edit") || searchParams?.get("id");
+    if (editId && products.length > 0) {
+      const target = products.find((p: any) => p.id === Number(editId) || String(p.id) === String(editId));
+      if (target) {
+        onEdit(target);
+      }
+    }
+  }, [searchParams, products, onEdit]);
 
   useEffect(() => {
     if (successMsg) {
@@ -232,6 +250,9 @@ function ItemsList({
                   </td>
 
                   <td style={td}>
+                    <button style={{ ...smallBtn, color: "#16a34a", borderColor: "#bbf7d0" }} onClick={() => onCopy(item)}>
+                      کۆپی
+                    </button>
                     <button style={smallBtn} onClick={() => onEdit(item)}>
                       دەستکاری
                     </button>
@@ -258,10 +279,12 @@ function ItemsList({
 
 function AddItemForm({
   productToEdit,
+  isCopy = false,
   onBack,
   onSuccess,
 }: {
   productToEdit?: Product | null;
+  isCopy?: boolean;
   onBack: () => void;
   onSuccess: (message: string) => void;
 }) {
@@ -300,36 +323,29 @@ function AddItemForm({
       : "inventory"
   );
 
-  const [salePrices, setSalePrices] = useState(() => {
-    if (productToEdit?.salePrices) {
-      if (Array.isArray(productToEdit.salePrices) && productToEdit.salePrices.length > 0) {
-        return productToEdit.salePrices.map((p: any) => ({
-          currencyId: String(p.currencyId || "1"),
-          priceType: p.priceType || "جوملە",
-          amount: String(p.amount || ""),
-        }));
-      }
-      if (typeof productToEdit.salePrices === "object") {
-        return Object.entries(productToEdit.salePrices).map(([cur, amt]) => ({
-          currencyId: cur === "IQD" ? "2" : "1",
-          priceType: "جوملە",
-          amount: String(amt || ""),
-        }));
-      }
-    }
-    return [
-      {
-        currencyId: "1",
-        priceType: "جوملە",
-        amount: "",
-      },
-    ];
-  });
+  const priceTypesStore = (useStore((s: any) => s.priceTypes) || []) as any[];
+  const defaultPriceTypeName = priceTypesStore[0]?.name || "نرخی تاک";
+
+  const [salePrices, setSalePrices] = useState(
+    productToEdit && productToEdit.salePrices && productToEdit.salePrices.length > 0
+      ? productToEdit.salePrices.map((p) => ({
+          currencyId: String(p.currencyId),
+          priceType: p.priceType || defaultPriceTypeName,
+          amount: String(p.amount),
+        }))
+      : [
+          {
+            currencyId: "1",
+            priceType: defaultPriceTypeName,
+            amount: "",
+          },
+        ]
+  );
 
   const [packages, setPackages] = useState([
     {
-      name: productToEdit?.packaging || "",
-      quantity: productToEdit ? "1" : "",
+      name: productToEdit?.packaging || "دانە",
+      quantity: "1",
     },
   ]);
 
@@ -388,7 +404,8 @@ function AddItemForm({
           if (productToEdit?.packaging) {
             setPackages([{ name: productToEdit.packaging, quantity: "1" }]);
           } else {
-            setPackages([{ name: "", quantity: "" }]);
+            const hasDana = active.some((p: any) => p.name === "دانە");
+            setPackages([{ name: hasDana ? "دانە" : (active[0]?.name || "دانە"), quantity: "1" }]);
           }
         }
       } catch (err) { console.error(err); }
@@ -548,8 +565,8 @@ function AddItemForm({
       const isService = itemKind === "service";
       const isInventory = itemKind === "inventory";
 
-      // For non-expense items, category, brand, and packaging are mandatory.
-      if (!isExpense) {
+      // For standard inventory items (non-expense and non-service), category, brand, and packaging are mandatory.
+      if (!isExpense && !isService) {
         if (!category) {
           showAlert("warning", "ئاگاداری", "تکایە کاتێگۆری دیاری بکە");
           setIsSaving(false);
@@ -585,11 +602,11 @@ function AddItemForm({
         }));
 
       const productData = {
-        id: productToEdit?.id,
+        id: (productToEdit && !isCopy) ? productToEdit.id : undefined,
         name: name.trim(),
         code: code.trim() || null,
-        category: isExpense ? null : category,
-        brand: isExpense ? null : brand,
+        category: category?.trim() || null,
+        brand: brand?.trim() || null,
         packaging: isExpense ? null : (packages[0]?.name || null),
         isMultiBatch: isInventory ? isMultiBatch : false,
         isExpense,
@@ -601,13 +618,13 @@ function AddItemForm({
         expiryAlertDays: Number(expiryAlertDays) || 0,
       };
 
-      const res = productToEdit
+      const res = (productToEdit && !isCopy)
         ? await store.updateProduct(productData)
         : await store.addProduct(productData);
 
       if (res && res.success) {
         onSuccess(
-          productToEdit
+          (productToEdit && !isCopy)
             ? "کەرەستە بە سەرکەوتوویی دەستکاری کرا ✅"
             : "کەرەستە بە سەرکەوتوویی خەزن کرا ✅"
         );
@@ -629,10 +646,12 @@ function AddItemForm({
 
       <div style={titleBox}>
         <h2 style={{ margin: 0 }}>
-          {productToEdit ? "دەستکاریکردنی کەرەستە" : "دروستکردنی کەرەستە"}
+          {isCopy ? "زیادکردنی کەرەستە (کۆپی)" : productToEdit ? "دەستکاریکردنی کەرەستە" : "دروستکردنی کەرەستە"}
         </h2>
         <p style={{ margin: "6px 0 0", color: "#6b7280" }}>
-          {productToEdit
+          {isCopy
+            ? "زیادکردنی کەرەستەی نوێ بە کۆپیکردنی زانیارییەکانی کەرەستەی پێشوو"
+            : productToEdit
             ? "دەستکاریکردنی زانیاری و ڕێکخستنەکانی کەرەستە"
             : "زانیاری کەرەستە، نرخی فرۆشتن، پێچانەوە و ڕێکخستنەکان"}
         </p>
@@ -684,7 +703,7 @@ function AddItemForm({
             />
           </Field>
 
-          <Field label={itemKind === "expense" ? "براند" : "* براند"}>
+          <Field label={(itemKind === "expense" || itemKind === "service") ? "براند" : "* براند"}>
             <SingleSelectDropdown
               options={brands.map((b: any) => ({ value: b.name, label: b.name }))}
               value={brand}
@@ -695,7 +714,7 @@ function AddItemForm({
         </div>
 
         <div style={grid3}>
-          <Field label={itemKind === "expense" ? "کاتێگۆری" : "* کاتێگۆری"}>
+          <Field label={(itemKind === "expense" || itemKind === "service") ? "کاتێگۆری" : "* کاتێگۆری"}>
             <SingleSelectDropdown
               options={categories.map((c: any) => ({ value: c.name, label: c.name }))}
               value={category}
@@ -809,11 +828,13 @@ function AddItemForm({
                   lang="en"
                   dir="ltr"
                   value={row.amount}
-                  onChange={(e) =>
-                    updateSalePrice(index, "amount", e.target.value)
-                  }
+                  onChange={(e) => {
+                    let clean = e.target.value.replace(/[^0-9.]/g, "");
+                    clean = clean.replace(/^0+(?=\d)/, "");
+                    updateSalePrice(index, "amount", clean);
+                  }}
                   style={numericInput}
-                  placeholder="170"
+                  placeholder="0"
                 />
               </Field>
 
@@ -846,13 +867,16 @@ function AddItemForm({
                 marginBottom: 12,
               }}
             >
-              <Field label="* پێچانەوە">
+              <Field label={itemKind === "service" ? "پێچانەوە" : "* پێچانەوە"}>
                 <select
                   value={row.name}
                   onChange={(e) => updatePackage(index, "name", e.target.value)}
                   style={input}
                 >
                   <option value="">پێچانەوە دیاری بکە...</option>
+                  {!packagings.some((p) => p.name === "دانە") && (
+                    <option value="دانە">دانە</option>
+                  )}
                   {packagings.map((pkg) => (
                     <option key={pkg.id} value={pkg.name}>
                       {pkg.name}
@@ -861,7 +885,7 @@ function AddItemForm({
                 </select>
               </Field>
 
-              <Field label="* ژمارەی ناو پێچانەوە">
+              <Field label={itemKind === "service" ? "ژمارەی ناو پێچانەوە" : "* ژمارەی ناو پێچانەوە"}>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -977,30 +1001,18 @@ function getItemType(item: Product) {
   return "کۆگایی";
 }
 
-function formatSalePrices(item: Product | any) {
-  if (!item) return "-";
-  if (!item.salePrices) {
+function formatSalePrices(item: Product) {
+  if (!item.salePrices || item.salePrices.length === 0) {
     return item.salePrice ? `${item.salePrice} $` : "-";
   }
 
-  if (Array.isArray(item.salePrices)) {
-    if (item.salePrices.length === 0) return item.salePrice ? `${item.salePrice} $` : "-";
-    return item.salePrices
-      .map((price: any) => {
-        const currency = mockCurrencies.find((x: any) => x.id === price.currencyId);
-        const symbol = currency ? currency.symbol : "$";
-        return `${price.amount} ${symbol}`;
-      })
-      .join(" | ");
-  }
-
-  if (typeof item.salePrices === "object") {
-    const entries = Object.entries(item.salePrices);
-    if (entries.length === 0) return item.salePrice ? `${item.salePrice} $` : "-";
-    return entries.map(([cur, amt]) => `${amt} ${cur === 'USD' ? '$' : cur}`).join(" | ");
-  }
-
-  return item.salePrice ? `${item.salePrice} $` : "-";
+  return item.salePrices
+    .map((price) => {
+      const currency = mockCurrencies.find((x: any) => x.id === price.currencyId);
+      const symbol = currency ? currency.symbol : "";
+      return `${price.amount} ${symbol}`;
+    })
+    .join(" | ");
 }
 
 function Section({ title, icon, children }: any) {

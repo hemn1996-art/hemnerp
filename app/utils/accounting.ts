@@ -78,3 +78,35 @@ export function decreaseStock(
 
   product.stock -= qty;
 }
+
+export function getDefaultCashbox(cashboxes: any[] | undefined | null): any | undefined {
+  if (!Array.isArray(cashboxes) || cashboxes.length === 0) return undefined;
+  
+  // 1. First priority: exactly "دەغیلەی دوکان" (active)
+  const exactActive = cashboxes.find(
+    (c: any) => c && c.name && c.name.trim() === "دەغیلەی دوکان" && c.isActive !== false
+  );
+  if (exactActive) return exactActive;
+
+  // 2. Second priority: contains "دەغیلەی دوکان" or "دەغیلە" (active)
+  const containsActive = cashboxes.find(
+    (c: any) => c && c.name && (c.name.includes("دەغیلەی دوکان") || c.name.includes("دەغیلە")) && c.isActive !== false
+  );
+  if (containsActive) return containsActive;
+
+  // 3. Fallback: exact "دەغیلەی دوکان" even if isActive not explicitly set
+  const exact = cashboxes.find((c: any) => c && c.name && c.name.trim() === "دەغیلەی دوکان");
+  if (exact) return exact;
+
+  // 4. Fallback: first active cashbox
+  const firstActive = cashboxes.find((c: any) => c && c.isActive !== false);
+  if (firstActive) return firstActive;
+
+  // 5. Fallback: first cashbox in array
+  return cashboxes[0];
+}
+
+export function getDefaultCashboxId(cashboxes: any[] | undefined | null): number | undefined {
+  const box = getDefaultCashbox(cashboxes);
+  return box ? box.id : undefined;
+}

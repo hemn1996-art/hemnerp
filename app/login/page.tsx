@@ -16,6 +16,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined" && window.location.search.includes("revoked=true")) {
+      setError("ئەم ئەکاونتە لە سیستەمەکە سڕدراوەتەوە یان ناچالاک کراوە.");
+    }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -75,8 +78,8 @@ export default function LoginPage() {
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
         @keyframes logo-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
-          50% { box-shadow: 0 0 0 20px rgba(99, 102, 241, 0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+          50% { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
         }
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
@@ -194,7 +197,7 @@ export default function LoginPage() {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
-        background: "#050a18",
+        background: "#022c22",
         fontFamily: '"Speda", "Segoe UI", Tahoma, Arial, sans-serif',
         direction: "rtl",
         padding: 20,
@@ -207,8 +210,8 @@ export default function LoginPage() {
           position: "absolute",
           inset: 0,
           backgroundImage: `
-            linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px)
+            linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px)
           `,
           backgroundSize: "60px 60px",
           zIndex: 0,
@@ -220,7 +223,7 @@ export default function LoginPage() {
           width: 500,
           height: 500,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%)",
           top: "-10%",
           right: "-5%",
           animation: "float-orb-1 20s ease-in-out infinite",
@@ -232,7 +235,7 @@ export default function LoginPage() {
           width: 400,
           height: 400,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(52, 211, 153, 0.12) 0%, transparent 70%)",
           bottom: "-8%",
           left: "-3%",
           animation: "float-orb-2 25s ease-in-out infinite",
@@ -244,7 +247,7 @@ export default function LoginPage() {
           width: 300,
           height: 300,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(168, 85, 247, 0.1) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(4, 120, 87, 0.1) 0%, transparent 70%)",
           top: "40%",
           left: "50%",
           animation: "float-orb-3 18s ease-in-out infinite",
@@ -259,7 +262,7 @@ export default function LoginPage() {
             width: Math.random() * 3 + 1,
             height: Math.random() * 3 + 1,
             borderRadius: "50%",
-            background: `rgba(${100 + Math.random() * 100}, ${100 + Math.random() * 100}, 241, ${0.2 + Math.random() * 0.3})`,
+            background: `rgba(${52 + Math.random() * 50}, 211, ${153 + Math.random() * 50}, ${0.2 + Math.random() * 0.3})`,
             left: `${Math.random() * 100}%`,
             bottom: `${Math.random() * 30}%`,
             animation: `particle-float ${6 + Math.random() * 10}s ease-out infinite`,
@@ -283,12 +286,12 @@ export default function LoginPage() {
             alignItems: "center",
           }}>
             {/* Bar Chart */}
-            <svg width="180" height="130" viewBox="0 0 180 130" fill="none" style={{ filter: "drop-shadow(0 0 20px rgba(99, 102, 241, 0.15))" }}>
+            <svg width="180" height="130" viewBox="0 0 180 130" fill="none" style={{ filter: "drop-shadow(0 0 20px rgba(16, 185, 129, 0.15))" }}>
               {/* Chart grid lines */}
-              <line x1="25" y1="110" x2="170" y2="110" stroke="rgba(99, 102, 241, 0.1)" strokeWidth="1" />
-              <line x1="25" y1="85" x2="170" y2="85" stroke="rgba(99, 102, 241, 0.05)" strokeWidth="0.5" strokeDasharray="4 4" />
-              <line x1="25" y1="60" x2="170" y2="60" stroke="rgba(99, 102, 241, 0.05)" strokeWidth="0.5" strokeDasharray="4 4" />
-              <line x1="25" y1="35" x2="170" y2="35" stroke="rgba(99, 102, 241, 0.05)" strokeWidth="0.5" strokeDasharray="4 4" />
+              <line x1="25" y1="110" x2="170" y2="110" stroke="rgba(16, 185, 129, 0.1)" strokeWidth="1" />
+              <line x1="25" y1="85" x2="170" y2="85" stroke="rgba(16, 185, 129, 0.05)" strokeWidth="0.5" strokeDasharray="4 4" />
+              <line x1="25" y1="60" x2="170" y2="60" stroke="rgba(16, 185, 129, 0.05)" strokeWidth="0.5" strokeDasharray="4 4" />
+              <line x1="25" y1="35" x2="170" y2="35" stroke="rgba(16, 185, 129, 0.05)" strokeWidth="0.5" strokeDasharray="4 4" />
               {/* Animated bars */}
               {[0,1,2,3,4,5].map(i => (
                 <rect
@@ -308,16 +311,16 @@ export default function LoginPage() {
               ))}
               <defs>
                 <linearGradient id="barGrad0" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#818cf8" stopOpacity="0.5" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.15" />
+                  <stop offset="0%" stopColor="#34d399" stopOpacity="0.5" />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.15" />
                 </linearGradient>
                 <linearGradient id="barGrad1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#c084fc" stopOpacity="0.45" />
-                  <stop offset="100%" stopColor="#a855f7" stopOpacity="0.12" />
+                  <stop offset="0%" stopColor="#a7f3d0" stopOpacity="0.45" />
+                  <stop offset="100%" stopColor="#059669" stopOpacity="0.12" />
                 </linearGradient>
                 <linearGradient id="barGrad2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.1" />
+                  <stop offset="0%" stopColor="#6ee7b7" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#047857" stopOpacity="0.1" />
                 </linearGradient>
               </defs>
               {/* Y-axis labels */}
@@ -327,19 +330,19 @@ export default function LoginPage() {
             </svg>
 
             {/* Donut/Ring Chart */}
-            <svg width="90" height="90" viewBox="0 0 100 100" fill="none" style={{ filter: "drop-shadow(0 0 15px rgba(168, 85, 247, 0.1))" }}>
-              <circle cx="50" cy="50" r="38" stroke="rgba(99, 102, 241, 0.08)" strokeWidth="8" fill="none" />
+            <svg width="90" height="90" viewBox="0 0 100 100" fill="none" style={{ filter: "drop-shadow(0 0 15px rgba(16, 185, 129, 0.1))" }}>
+              <circle cx="50" cy="50" r="38" stroke="rgba(16, 185, 129, 0.08)" strokeWidth="8" fill="none" />
               <circle cx="50" cy="50" r="38" stroke="url(#donutGrad)" strokeWidth="8" fill="none"
                 strokeDasharray="160 251" strokeLinecap="round"
                 style={{ animation: "donut-spin 12s linear infinite", transformOrigin: "center" }} />
-              <circle cx="50" cy="50" r="38" stroke="rgba(168, 85, 247, 0.2)" strokeWidth="8" fill="none"
+              <circle cx="50" cy="50" r="38" stroke="rgba(52, 211, 153, 0.2)" strokeWidth="8" fill="none"
                 strokeDasharray="60 251" strokeDashoffset="-170" strokeLinecap="round" />
-              <text x="50" y="48" textAnchor="middle" fill="rgba(129, 140, 248, 0.4)" fontSize="12" fontWeight="bold">67%</text>
+              <text x="50" y="48" textAnchor="middle" fill="rgba(52, 211, 153, 0.4)" fontSize="12" fontWeight="bold">67%</text>
               <text x="50" y="60" textAnchor="middle" fill="rgba(148, 163, 184, 0.25)" fontSize="7">قازانج</text>
               <defs>
                 <linearGradient id="donutGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#818cf8" />
-                  <stop offset="100%" stopColor="#c084fc" />
+                  <stop offset="0%" stopColor="#34d399" />
+                  <stop offset="100%" stopColor="#059669" />
                 </linearGradient>
               </defs>
             </svg>
@@ -361,39 +364,39 @@ export default function LoginPage() {
             alignItems: "center",
           }}>
             {/* Line Chart with moving dot */}
-            <svg width="180" height="110" viewBox="0 0 180 110" fill="none" style={{ filter: "drop-shadow(0 0 20px rgba(56, 189, 248, 0.1))" }}>
+            <svg width="180" height="110" viewBox="0 0 180 110" fill="none" style={{ filter: "drop-shadow(0 0 20px rgba(52, 211, 153, 0.1))" }}>
               {/* Grid */}
-              <line x1="10" y1="95" x2="170" y2="95" stroke="rgba(99, 102, 241, 0.08)" strokeWidth="0.5" />
-              <line x1="10" y1="70" x2="170" y2="70" stroke="rgba(99, 102, 241, 0.04)" strokeWidth="0.5" strokeDasharray="3 3" />
-              <line x1="10" y1="45" x2="170" y2="45" stroke="rgba(99, 102, 241, 0.04)" strokeWidth="0.5" strokeDasharray="3 3" />
-              <line x1="10" y1="20" x2="170" y2="20" stroke="rgba(99, 102, 241, 0.04)" strokeWidth="0.5" strokeDasharray="3 3" />
+              <line x1="10" y1="95" x2="170" y2="95" stroke="rgba(16, 185, 129, 0.08)" strokeWidth="0.5" />
+              <line x1="10" y1="70" x2="170" y2="70" stroke="rgba(16, 185, 129, 0.04)" strokeWidth="0.5" strokeDasharray="3 3" />
+              <line x1="10" y1="45" x2="170" y2="45" stroke="rgba(16, 185, 129, 0.04)" strokeWidth="0.5" strokeDasharray="3 3" />
+              <line x1="10" y1="20" x2="170" y2="20" stroke="rgba(16, 185, 129, 0.04)" strokeWidth="0.5" strokeDasharray="3 3" />
               {/* Area fill */}
               <path d="M10 70 Q40 40, 55 55 T100 30 T140 40 T170 18 V95 H10 Z" fill="url(#areaGrad)" />
               {/* Line */}
               <path d="M10 70 Q40 40, 55 55 T100 30 T140 40 T170 18" stroke="url(#lineGrad)" strokeWidth="2" fill="none" strokeLinecap="round"
                 strokeDasharray="300" style={{ animation: "line-chart-draw 4s ease-out forwards" }} />
               {/* Moving dot */}
-              <circle r="4" fill="#818cf8" style={{ animation: "chart-dot-move 6s ease-in-out infinite" }}>
+              <circle r="4" fill="#34d399" style={{ animation: "chart-dot-move 6s ease-in-out infinite" }}>
                 <animate attributeName="cx" values="10;40;70;100;130;160;10" dur="6s" repeatCount="indefinite" />
                 <animate attributeName="cy" values="70;45;55;30;40;18;70" dur="6s" repeatCount="indefinite" />
               </circle>
-              <circle r="8" fill="rgba(129, 140, 248, 0.2)" style={{ animation: "chart-dot-move 6s ease-in-out infinite" }}>
+              <circle r="8" fill="rgba(52, 211, 153, 0.2)" style={{ animation: "chart-dot-move 6s ease-in-out infinite" }}>
                 <animate attributeName="cx" values="10;40;70;100;130;160;10" dur="6s" repeatCount="indefinite" />
                 <animate attributeName="cy" values="70;45;55;30;40;18;70" dur="6s" repeatCount="indefinite" />
               </circle>
               {/* Data point dots */}
               {[[10,70],[40,45],[70,55],[100,30],[140,40],[170,18]].map(([cx,cy], i) => (
-                <circle key={`dp-${i}`} cx={cx} cy={cy} r="2.5" fill="rgba(129, 140, 248, 0.3)" stroke="rgba(129, 140, 248, 0.15)" strokeWidth="1" />
+                <circle key={`dp-${i}`} cx={cx} cy={cy} r="2.5" fill="rgba(52, 211, 153, 0.3)" stroke="rgba(52, 211, 153, 0.15)" strokeWidth="1" />
               ))}
               <defs>
                 <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#38bdf8" />
-                  <stop offset="50%" stopColor="#818cf8" />
-                  <stop offset="100%" stopColor="#c084fc" />
+                  <stop offset="0%" stopColor="#34d399" />
+                  <stop offset="50%" stopColor="#10b981" />
+                  <stop offset="100%" stopColor="#059669" />
                 </linearGradient>
                 <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(129, 140, 248, 0.12)" />
-                  <stop offset="100%" stopColor="rgba(129, 140, 248, 0)" />
+                  <stop offset="0%" stopColor="rgba(16, 185, 129, 0.12)" />
+                  <stop offset="100%" stopColor="rgba(16, 185, 129, 0)" />
                 </linearGradient>
               </defs>
             </svg>
@@ -406,7 +409,7 @@ export default function LoginPage() {
               ].map((kpi, i) => (
                 <div key={`kpi-${i}`} style={{
                   background: "rgba(15, 23, 42, 0.5)",
-                  border: "1px solid rgba(99, 102, 241, 0.08)",
+                  border: "1px solid rgba(16, 185, 129, 0.08)",
                   borderRadius: 12,
                   padding: "10px 14px",
                   textAlign: "center",
@@ -426,7 +429,7 @@ export default function LoginPage() {
         {mounted && (
           <>
             {/* Dollar sign */}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(129, 140, 248, 0.15)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(16, 185, 129, 0.15)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               style={{ position: "absolute", top: "12%", left: "18%", animation: "float-icon 7s ease-in-out infinite", zIndex: 1 }}>
               <line x1="12" y1="1" x2="12" y2="23" />
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -438,7 +441,7 @@ export default function LoginPage() {
               <polyline points="17 6 23 6 23 12" />
             </svg>
             {/* Calculator */}
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(192, 132, 252, 0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(52, 211, 153, 0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               style={{ position: "absolute", bottom: "22%", right: "30%", animation: "float-icon 9s ease-in-out infinite", animationDelay: "2s", zIndex: 1 }}>
               <rect x="4" y="2" width="16" height="20" rx="2" />
               <line x1="8" y1="6" x2="16" y2="6" />
@@ -450,20 +453,20 @@ export default function LoginPage() {
               <line x1="12" y1="15" x2="12" y2="15.01" />
             </svg>
             {/* Wallet */}
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(56, 189, 248, 0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(16, 185, 129, 0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               style={{ position: "absolute", bottom: "30%", left: "20%", animation: "float-icon-alt 6s ease-in-out infinite", animationDelay: "0.5s", zIndex: 1 }}>
               <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
               <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
               <path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z" />
             </svg>
             {/* Pie chart icon */}
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(99, 102, 241, 0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(16, 185, 129, 0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               style={{ position: "absolute", top: "70%", right: "15%", animation: "float-icon 10s ease-in-out infinite", animationDelay: "3s", zIndex: 1 }}>
               <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
               <path d="M22 12A10 10 0 0 0 12 2v10z" />
             </svg>
             {/* Receipt */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(251, 146, 60, 0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(16, 185, 129, 0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
               style={{ position: "absolute", top: "15%", right: "40%", animation: "float-icon-alt 8s ease-in-out infinite", animationDelay: "4s", zIndex: 1 }}>
               <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z" />
               <path d="M8 10h8" />
@@ -487,7 +490,7 @@ export default function LoginPage() {
             position: "absolute",
             inset: -1,
             borderRadius: 28,
-            background: "linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(14, 165, 233, 0.1), rgba(168, 85, 247, 0.2))",
+            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(52, 211, 153, 0.1), rgba(4, 120, 87, 0.2))",
             animation: "border-glow 4s ease-in-out infinite",
             zIndex: -1,
           }} />
@@ -501,7 +504,7 @@ export default function LoginPage() {
             border: "1px solid rgba(255, 255, 255, 0.06)",
             boxShadow: `
               0 25px 50px -12px rgba(0, 0, 0, 0.5),
-              0 0 80px -20px rgba(99, 102, 241, 0.15),
+              0 0 80px -20px rgba(16, 185, 129, 0.15),
               inset 0 1px 0 rgba(255, 255, 255, 0.05)
             `,
             textAlign: "center",
@@ -535,8 +538,8 @@ export default function LoginPage() {
                   width: 80,
                   height: 80,
                   borderRadius: "50%",
-                  background: "linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(168, 85, 247, 0.15) 100%)",
-                  border: "1px solid rgba(99, 102, 241, 0.3)",
+                  background: "linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(4, 120, 87, 0.15) 100%)",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -550,16 +553,29 @@ export default function LoginPage() {
                     background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)",
                     animation: "shimmer 3s ease-in-out infinite",
                   }} />
-                  {/* Shield SVG icon */}
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="url(#logo-gradient)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ position: "relative", zIndex: 2 }}>
+                  {/* Home Appliances SVG icon (Washing machine, Refrigerator, Stove) */}
+                  <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="url(#logo-gradient)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ position: "relative", zIndex: 2 }}>
                     <defs>
                       <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#818cf8" />
-                        <stop offset="100%" stopColor="#c084fc" />
+                        <stop offset="0%" stopColor="#34d399" />
+                        <stop offset="100%" stopColor="#059669" />
                       </linearGradient>
                     </defs>
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    <path d="M9 12l2 2 4-4" />
+                    {/* Refrigerator Frame */}
+                    <rect x="3" y="2" width="8" height="20" rx="1.5" />
+                    <line x1="3" y1="10" x2="11" y2="10" />
+                    <line x1="9" y1="6" x2="9" y2="8" />
+                    <line x1="9" y1="13" x2="9" y2="16" />
+                    
+                    {/* Washing Machine Frame */}
+                    <rect x="13" y="11" width="8" height="11" rx="1.5" />
+                    <circle cx="17" cy="16.5" r="2.5" />
+                    <line x1="15" y1="13" x2="19" y2="13" />
+                    
+                    {/* Stove/Hob elements inside machine area/top */}
+                    <circle cx="15" cy="5" r="1.5" />
+                    <circle cx="19" cy="5" r="1.5" />
+                    <line x1="13" y1="8" x2="21" y2="8" />
                   </svg>
                 </div>
               </div>
@@ -570,13 +586,14 @@ export default function LoginPage() {
                 fontSize: 30,
                 fontWeight: 900,
                 letterSpacing: "2px",
-                background: "linear-gradient(135deg, #818cf8, #c084fc, #38bdf8, #818cf8)",
+                background: "linear-gradient(135deg, #34d399, #10b981, #059669, #34d399)",
                 backgroundSize: "300% 300%",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
                 animation: "text-gradient-shift 6s ease infinite",
                 lineHeight: 1.2,
+                textAlign: "center",
               }}>
                 کۆگای دۆستان
               </h1>
@@ -589,6 +606,7 @@ export default function LoginPage() {
                 color: "rgba(148, 163, 184, 0.7)",
                 letterSpacing: "3px",
                 textTransform: "uppercase",
+                textAlign: "center",
               }}>
                 Enterprise Resource Planning
               </p>
@@ -598,7 +616,7 @@ export default function LoginPage() {
                 width: 60,
                 height: 2,
                 borderRadius: 2,
-                background: "linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.5), transparent)",
+                background: "linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.5), transparent)",
                 margin: "20px auto 0",
               }} />
             </div>
@@ -703,16 +721,17 @@ export default function LoginPage() {
                     style={{
                       width: "100%",
                       background: "rgba(15, 23, 42, 0.6)",
-                      border: `1.5px solid ${focusedField === "username" ? "rgba(99, 102, 241, 0.5)" : "rgba(255, 255, 255, 0.06)"}`,
+                      border: `1.5px solid ${focusedField === "username" ? "rgba(16, 185, 129, 0.5)" : "rgba(255, 255, 255, 0.06)"}`,
                       borderRadius: 14,
                       padding: "14px 18px",
                       color: "#e2e8f0",
                       fontSize: 15,
                       outline: "none",
+                      textAlign: "center",
                       fontFamily: '"Speda", "Segoe UI", Tahoma, Arial, sans-serif',
                       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       boxShadow: focusedField === "username"
-                        ? "0 0 0 3px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(0, 0, 0, 0.2)"
+                        ? "0 0 0 3px rgba(16, 185, 129, 0.1), 0 4px 12px rgba(0, 0, 0, 0.2)"
                         : "0 2px 6px rgba(0, 0, 0, 0.1)",
                     }}
                   />
@@ -724,7 +743,7 @@ export default function LoginPage() {
                     width: focusedField === "username" ? "80%" : "0%",
                     height: 2,
                     borderRadius: 2,
-                    background: "linear-gradient(90deg, #818cf8, #c084fc)",
+                    background: "linear-gradient(90deg, #34d399, #059669)",
                     transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                   }} />
                 </div>
@@ -760,17 +779,18 @@ export default function LoginPage() {
                     style={{
                       width: "100%",
                       background: "rgba(15, 23, 42, 0.6)",
-                      border: `1.5px solid ${focusedField === "password" ? "rgba(99, 102, 241, 0.5)" : "rgba(255, 255, 255, 0.06)"}`,
+                      border: `1.5px solid ${focusedField === "password" ? "rgba(16, 185, 129, 0.5)" : "rgba(255, 255, 255, 0.06)"}`,
                       borderRadius: 14,
                       padding: "14px 18px",
                       paddingLeft: 48,
                       color: "#e2e8f0",
                       fontSize: 15,
                       outline: "none",
+                      textAlign: "center",
                       fontFamily: '"Speda", "Segoe UI", Tahoma, Arial, sans-serif',
                       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       boxShadow: focusedField === "password"
-                        ? "0 0 0 3px rgba(99, 102, 241, 0.1), 0 4px 12px rgba(0, 0, 0, 0.2)"
+                        ? "0 0 0 3px rgba(16, 185, 129, 0.1), 0 4px 12px rgba(0, 0, 0, 0.2)"
                         : "0 2px 6px rgba(0, 0, 0, 0.1)",
                     }}
                   />
@@ -785,7 +805,7 @@ export default function LoginPage() {
                       transform: "translateY(-50%)",
                       background: "none",
                       border: "none",
-                      color: showPassword ? "#818cf8" : "#475569",
+                      color: showPassword ? "#34d399" : "#475569",
                       cursor: "pointer",
                       padding: 4,
                       display: "flex",
@@ -816,10 +836,33 @@ export default function LoginPage() {
                     width: focusedField === "password" ? "80%" : "0%",
                     height: 2,
                     borderRadius: 2,
-                    background: "linear-gradient(90deg, #818cf8, #c084fc)",
+                    background: "linear-gradient(90deg, #34d399, #059669)",
                     transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                   }} />
                 </div>
+              </div>
+
+              {/* Warning Notice Box */}
+              <div style={{
+                background: "rgba(245, 158, 11, 0.06)",
+                border: "1px solid rgba(245, 158, 11, 0.15)",
+                borderRadius: 14,
+                padding: "12px 14px",
+                color: "#fbbf24",
+                fontSize: 11,
+                lineHeight: "1.6",
+                textAlign: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <span>تێبینی: بە هەوڵدان بۆ چوونەژوورەوە، زانیارییەکان و لۆکەیشنەکەت دەنێردرێت بۆ خاوەنی بەرنامەکە.</span>
               </div>
 
               {/* Submit Button */}
@@ -831,7 +874,7 @@ export default function LoginPage() {
                   overflow: "hidden",
                   background: loginSuccess
                     ? "linear-gradient(135deg, #059669 0%, #10b981 100%)"
-                    : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%)",
+                    : "linear-gradient(135deg, #059669 0%, #10b981 50%, #059669 100%)",
                   backgroundSize: "200% 200%",
                   border: "none",
                   borderRadius: 14,
@@ -843,7 +886,7 @@ export default function LoginPage() {
                   marginTop: 4,
                   boxShadow: loginSuccess
                     ? "0 8px 24px rgba(16, 185, 129, 0.3)"
-                    : "0 8px 24px rgba(99, 102, 241, 0.25), 0 2px 8px rgba(0, 0, 0, 0.2)",
+                    : "0 8px 24px rgba(16, 185, 129, 0.25), 0 2px 8px rgba(0, 0, 0, 0.2)",
                   fontFamily: '"Speda", "Segoe UI", Tahoma, Arial, sans-serif',
                   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                   opacity: isLoading ? 0.85 : 1,

@@ -63,6 +63,7 @@ export default function ItemsReportPage() {
   const [filterCreatedBys, setFilterCreatedBys] = useState<string[]>([]);
   const [isGift, setIsGift] = useState("all");
   const [groupReverse, setGroupReverse] = useState("all");
+  const [filterRateType, setFilterRateType] = useState("all"); // "all", "FIXED", "DAILY_MARKET"
 
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [brandsList, setBrandsList] = useState<any[]>([]);
@@ -160,7 +161,7 @@ export default function ItemsReportPage() {
   const employeeOptions = React.useMemo(() => {
     if (!invoices) return [];
     const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار کۆگای دۆستان", "هێمن حەمە فەرهاد"];
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [invoices]);
 
@@ -222,6 +223,9 @@ export default function ItemsReportPage() {
           };
         });
         setItems(mapped);
+      } else if (res.status === 401 || res.status === 403) {
+        router.push("/login");
+        return;
       }
     } catch (e) {
       console.error(e);
@@ -509,9 +513,18 @@ export default function ItemsReportPage() {
 
 
           {/* Columns */}
-          <button onClick={() => setShowColumnsModal(true)}
-            className="flex items-center gap-1 bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs hover:bg-slate-200 transition">
-            🗂 ئۆڵۆمەکان
+          <button
+            onClick={() => setShowColumnsModal(true)}
+            className="flex items-center justify-center gap-1.5 text-white font-black px-3 py-1.5 rounded text-xs transition-transform hover:scale-105 cursor-pointer shadow-sm border-none"
+            style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 6px rgba(2, 132, 199, 0.3)" }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="12" y1="3" x2="12" y2="21" />
+              <path d="M3 9h18" />
+              <path d="M3 15h18" />
+            </svg>
+            <span>کۆڵۆمەکان</span>
           </button>
         </div>
       </div>
@@ -613,7 +626,17 @@ export default function ItemsReportPage() {
                   {visibleColumns.label && <td className="p-2.5 border-r border-slate-200 text-center text-slate-400">{item.label}</td>}
                   {visibleColumns.brand && <td className="p-2.5 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
                   {visibleColumns.category && <td className="p-2.5 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
-                  {visibleColumns.productName && <td className="p-2.5 border-r border-slate-200 text-center text-slate-700 font-medium allow-wrap">{item.productName}</td>}
+                  {visibleColumns.productName && (
+                    <td className="p-2.5 border-r border-slate-200 text-center allow-wrap">
+                      <button
+                        onClick={() => router.push(`/materials?edit=${item.productId}`)}
+                        className="text-slate-800 font-bold hover:text-blue-600 hover:underline bg-transparent border-none p-0 cursor-pointer text-center inline-block text-[11px]"
+                        title="دەستکاری کردنی کەرەستە"
+                      >
+                        {item.productName}
+                      </button>
+                    </td>
+                  )}
                   {visibleColumns.voucherReference && (
                     <td className="p-2.5 border-r border-slate-200 text-center">
                       <span 
@@ -697,8 +720,16 @@ export default function ItemsReportPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowColumnsModal(false)}>
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="bg-[#0b1f50] p-3 flex items-center justify-between text-white">
-              <h2 className="font-bold text-sm">کۆڵۆمە دیاریکراوەکان</h2>
-              <button onClick={() => setShowColumnsModal(false)} className="text-slate-300 hover:text-white">✕</button>
+              <div className="flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#38bdf8" }}>
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <line x1="12" y1="3" x2="12" y2="21" />
+                  <path d="M3 9h18" />
+                  <path d="M3 15h18" />
+                </svg>
+                <h2 className="font-bold text-sm m-0">کۆڵۆمە دیاریکراوەکان</h2>
+              </div>
+              <button onClick={() => setShowColumnsModal(false)} className="text-slate-300 hover:text-white bg-transparent border-none text-lg cursor-pointer">✕</button>
             </div>
             <div className="p-2 flex flex-col max-h-[60vh] overflow-y-auto">
               {Object.entries({

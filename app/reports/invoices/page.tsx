@@ -7,6 +7,7 @@ import { useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
+import { normalizeKurdishSearchText } from "../../utils/digits";
 
 // TypeScript Interfaces for DB Vouchers & Relations
 interface Product {
@@ -26,6 +27,7 @@ interface VoucherLine {
   discountAmount: number;
   lineTotal: number;
   note: string | null;
+  currencyId?: number | null;
   product: Product;
 }
 
@@ -70,6 +72,7 @@ interface Account {
   city?: { name: string } | null;
   district?: { name: string } | null;
   phone?: string | null;
+  fullAddress?: string | null;
 }
 
 interface Cashbox {
@@ -97,10 +100,14 @@ interface RawVoucher {
   printNote: string | null;
   hasDelivery: boolean;
   deliveryFee: number | null;
+  deliveryCity?: string | null;
+  deliveryAddress?: string | null;
   driverName?: string | null;
   driverPhone?: string | null;
   account: Account | null;
   cashbox: Cashbox | null;
+  fromCashbox?: Cashbox | null;
+  toCashbox?: Cashbox | null;
   currency: {
     id: number;
     code: string;
@@ -118,6 +125,8 @@ interface RawVoucher {
     productId: number;
     qtyChange: number;
     unitCost: number;
+    currencyId?: number | null;
+    warehouseId?: number | null;
   }>;
 }
 
@@ -127,9 +136,95 @@ interface Option {
 }
 
 
+const voucherTypePermMap: Record<string, string> = {
+  sales: "vouchers_sales",
+  purchase: "vouchers_purchase",
+  money_out: "vouchers_money_out",
+  money_in: "vouchers_money_in",
+  expense: "vouchers_expense",
+  quotation: "vouchers_sales",
+  sales_return: "vouchers_sales_return",
+  purchase_return: "vouchers_purchase_return",
+  my_debt: "vouchers_my_debt",
+  people_debt: "vouchers_people_debt",
+  my_debt_discount: "vouchers_debt_discount_mine",
+  people_debt_discount: "vouchers_debt_discount_people",
+  deposit: "vouchers_cash_deposit",
+  withdrawal: "vouchers_cash_withdrawal",
+  product_transfer: "vouchers_product_transfer",
+  material_issue: "vouchers_material_issue",
+  warehouse_damage: "vouchers_warehouse_damage",
+  warehouse_stock: "vouchers_warehouse_stock",
+  "جەردی کۆگا": "vouchers_warehouse_stock",
+  "سەرفی مەواد": "vouchers_material_issue",
+  "سەرفی مواد": "vouchers_material_issue",
+  "زیانی کۆگا": "vouchers_warehouse_damage",
+  "خەسارەی کۆگا": "vouchers_warehouse_damage",
+  "گواستنەوەی کەرەستە": "vouchers_product_transfer",
+  "گواستنەوەی کاڵا": "vouchers_product_transfer",
+};
+
 function InvoiceReportContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const currentUser = useStore((s: any) => s.currentUser);
+  const hasPermission = useStore((s: any) => s.hasPermission);
+
+  const canViewProfit = Boolean(
+    currentUser && (
+      currentUser.role === "admin" ||
+      hasPermission("reports_profit", "canView") ||
+      hasPermission("profit", "canView")
+    )
+  );
+
+  const canViewVoucher = (type: string) => {
+    if (!currentUser || currentUser.role === "admin" || hasPermission("vouchers", "canView")) return true;
+    const permKey = voucherTypePermMap[type];
+    return permKey ? hasPermission(permKey, "canView") : false;
+  };
+
+  const canUpdateVoucher = (type: string) => {
+    if (!currentUser || currentUser.role === "admin" || hasPermission("vouchers", "canUpdate")) return true;
+    const permKey = voucherTypePermMap[type];
+    return permKey ? hasPermission(permKey, "canUpdate") : false;
+  };
+
+  const canDeleteVoucher = (type: string) => {
+    if (!currentUser || currentUser.role === "admin" || hasPermission("vouchers", "canDelete")) return true;
+    const permKey = voucherTypePermMap[type];
+    return permKey ? hasPermission(permKey, "canDelete") : false;
+  };
+
+  const allowedInvoiceTypeOptions = useMemo(() => {
+    const allOptions = [
+      { value: "sales", label: "فرۆشتن" },
+      { value: "purchase", label: "کڕین" },
+      { value: "money_in", label: "پارەی هاتوو" },
+      { value: "money_out", label: "پارەی ڕۆشتوو" },
+      { value: "people_debt", label: "قەرزم لای خەڵکە" },
+      { value: "my_debt", label: "من قەرزارم" },
+      { value: "people_debt_discount", label: "داشکاندنم کردوە" },
+      { value: "my_debt_discount", label: "داشکاندنم بۆ کراوە" },
+      { value: "expense", label: "خەرجی" },
+      { value: "quotation", label: "نرخاندن" },
+      { value: "sales_return", label: "گەڕانەوەی فرۆشتن" },
+      { value: "purchase_return", label: "گەڕانەوەی کڕین" },
+      { value: "shareholder_deposit", label: "دانانی پارە" },
+      { value: "shareholder_withdrawal", label: "کشانەوەی پارە" },
+      { value: "material_issue", label: "سەرفی مەواد" },
+      { value: "warehouse_damage", label: "زیانی کۆگا" },
+      { value: "warehouse_stock", label: "جەردی کۆگا" },
+      { value: "product_transfer", label: "گواستنەوەی کەرەستە" }
+    ];
+
+    if (!currentUser || currentUser.role === "admin" || hasPermission("vouchers", "canView")) {
+      return allOptions;
+    }
+
+    return allOptions.filter((opt) => canViewVoucher(opt.value));
+  }, [currentUser, hasPermission]);
 
   // Store items
   const {
@@ -350,6 +445,7 @@ function InvoiceReportContent() {
     actions: true,
   };
   const [visibleColumns, setVisibleColumns] = useState(defaultCols);
+  const isProfitColumnVisible = Boolean(canViewProfit && visibleColumns.profit);
   const colsLoadedRef = useRef(false);
 
   // Load saved columns from localStorage on mount
@@ -527,30 +623,39 @@ function InvoiceReportContent() {
     return currencies.find((c: any) => c.code === "USD") || currencies[0] || { id: 1, code: "USD", symbol: "$" };
   };
 
+  const normalizeRate = (rate: number | null | undefined) => {
+    if (!rate || rate <= 0) return 1520;
+    if (rate > 10000) return rate / 100;
+    if (rate < 10) return rate * 100;
+    return rate;
+  };
+
   // Helper: Currency conversion utility
   const convertAmount = (amount: number, fromCurrencyId: number | null, targetCode = "USD", rate = 1500) => {
-    if (!fromCurrencyId) return amount;
+    if (!fromCurrencyId || !amount) return amount || 0;
     const currency = currencies.find((c: any) => Number(c.id) === Number(fromCurrencyId));
     if (!currency || currency.code.toUpperCase() === targetCode.toUpperCase()) return amount;
 
-    if (currency.code === "IQD" && targetCode === "USD") return amount / rate;
-    if (currency.code === "USD" && targetCode === "IQD") return amount * rate;
+    const normRate = normalizeRate(rate);
+    if (currency.code === "IQD" && targetCode === "USD") return amount / normRate;
+    if (currency.code === "USD" && targetCode === "IQD") return amount * normRate;
     return amount;
   };
 
   // Robust currency converter between any two currency IDs
   const convertBetweenCurrencies = (amount: number, fromCurrencyId: number | null, toCurrencyId: number | null, rate = 1500) => {
-    if (!fromCurrencyId || !toCurrencyId || Number(fromCurrencyId) === Number(toCurrencyId)) return amount;
+    if (!fromCurrencyId || !toCurrencyId || Number(fromCurrencyId) === Number(toCurrencyId) || !amount) return amount || 0;
     const fromCurrency = currencies.find((c: any) => Number(c.id) === Number(fromCurrencyId));
     const toCurrency = currencies.find((c: any) => Number(c.id) === Number(toCurrencyId));
     if (!fromCurrency || !toCurrency || fromCurrency.code.toUpperCase() === toCurrency.code.toUpperCase()) return amount;
 
+    const normRate = normalizeRate(rate);
     let usdAmount = amount;
     if (fromCurrency.code === "IQD") {
-      usdAmount = amount / rate;
+      usdAmount = amount / normRate;
     }
     if (toCurrency.code === "IQD") {
-      return usdAmount * rate;
+      return usdAmount * normRate;
     }
     return usdAmount;
   };
@@ -558,42 +663,98 @@ function InvoiceReportContent() {
   // Format currency dynamically based on original and filter settings
   const formatCurrencyValue = (amount: number, currencyId: number) => {
     const currencyObj = currencies.find((c: any) => c.id === currencyId);
+    const isIQD = currencyObj?.code === "IQD" || Number(currencyId) === 2 || Number(currencyId) === 12;
+    if (isIQD) {
+      return `دینار ${Math.round(amount).toLocaleString("en-US")}`;
+    }
     const formattedNumber = amount.toLocaleString("en-US", { 
-      minimumFractionDigits: 0, 
+      minimumFractionDigits: amount % 1 === 0 ? 0 : 2, 
       maximumFractionDigits: 2 
     });
-    
-    if (filterCurrencyId !== "all") {
-      if (currencyObj?.code === "USD") {
-        return `$ ${formattedNumber}`;
-      } else if (currencyObj?.code === "IQD") {
-        return `${formattedNumber} د.ع`;
-      }
-      return `${formattedNumber} ${currencyObj?.symbol || ""}`;
-    } else {
-      if (currencyObj?.code === "IQD") {
-        return `${formattedNumber} دینار`;
-      } else if (currencyObj?.code === "USD") {
-        return `${formattedNumber} دۆلار`;
-      }
-      return `${formattedNumber} ${currencyObj?.name || ""}`;
-    }
+    return `$ ${formattedNumber}`;
   };
 
   // Format values in base currency
   const formatBaseCurrency = (val: number) => {
     const baseCurrency = getBaseCurrency();
-    const formattedNumber = val.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-    if (baseCurrency.code === "USD") {
-      return `$ ${formattedNumber}`;
-    } else if (baseCurrency.code === "IQD") {
-      return `${formattedNumber} دینار`;
+    const isIQD = baseCurrency.code === "IQD" || Number(baseCurrency.id) === 2 || Number(baseCurrency.id) === 12;
+    if (isIQD) {
+      return `دینار ${Math.round(val).toLocaleString("en-US")}`;
     }
-    return `${formattedNumber} ${baseCurrency.symbol}`;
+    const formattedNumber = val.toLocaleString("en-US", { minimumFractionDigits: val % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
+    return `$ ${formattedNumber}`;
+  };
+
+  const getVoucherMultiCurrencyBreakdownJSX = (v: any) => {
+    if (!v || !v.lines || !Array.isArray(v.lines) || v.lines.length === 0) return null;
+    const totalsByCurrency: Record<string, number> = {};
+    for (const line of v.lines) {
+      const isIQD = line.currencyId === 2 || Number(line.currencyId) === 2;
+      const curKey = isIQD ? "2" : "1";
+      const lineTot = Number(line.lineTotal || (Number(line.qty) * Number(line.unitPrice)));
+      totalsByCurrency[curKey] = (totalsByCurrency[curKey] || 0) + lineTot;
+    }
+    const keys = Object.keys(totalsByCurrency).filter(k => totalsByCurrency[k] > 0);
+    if (keys.length > 1) {
+      const usdAmt = totalsByCurrency["1"] || 0;
+      const iqdAmt = totalsByCurrency["2"] || 0;
+      return (
+        <div className="flex flex-col items-center gap-0.5">
+          {usdAmt > 0 && (
+            <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
+              <span className="text-[0.78em] opacity-85 font-bold">$</span>
+              <span>{usdAmt.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+            </span>
+          )}
+          {iqdAmt > 0 && (
+            <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
+              <span className="text-[0.78em] opacity-85 font-bold">دینار</span>
+              <span>{Math.round(iqdAmt).toLocaleString("en-US")}</span>
+            </span>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const getVoucherPaidAmountsJSX = (v: any, fallbackDisplayId: number, fallbackPaidVal: number) => {
+    if (!v || !v.paidAmounts || !Array.isArray(v.paidAmounts) || v.paidAmounts.length === 0) {
+      return fallbackPaidVal > 0 ? formatCurrencyValueJSX(fallbackPaidVal, fallbackDisplayId) : "-";
+    }
+
+    const activePaid = v.paidAmounts.filter((p: any) => Number(p.amount) > 0);
+    if (activePaid.length === 0) return "-";
+
+    if (activePaid.length === 1) {
+      return formatCurrencyValueJSX(Number(activePaid[0].amount), activePaid[0].currencyId);
+    }
+
+    return (
+      <div className="flex flex-col items-center gap-0.5">
+        {activePaid.map((pa: any, idx: number) => (
+          <span key={idx} className="font-extrabold text-xs text-emerald-600">
+            {formatCurrencyValueJSX(Number(pa.amount), pa.currencyId)}
+          </span>
+        ))}
+      </div>
+    );
   };
 
   const formatCurrencyValueJSX = (amount: number, currencyId: number) => {
     const currencyObj = currencies.find((c: any) => c.id === currencyId);
+    const isIQD = currencyObj?.code === "IQD" || Number(currencyId) === 2 || Number(currencyId) === 12;
+
+    if (isIQD) {
+      const rounded = Math.round(amount).toLocaleString("en-US");
+      return (
+        <span className="inline-flex items-baseline gap-1" dir="ltr">
+          <span style={{ fontSize: '0.85em', opacity: 0.85 }}>دینار</span>
+          <span>{rounded}</span>
+        </span>
+      );
+    }
+
     const isInteger = amount % 1 === 0;
     const formattedNumber = amount.toLocaleString("en-US", { 
       minimumFractionDigits: isInteger ? 0 : 2, 
@@ -613,28 +774,9 @@ function InvoiceReportContent() {
       </span>
     );
 
-    let prefix = "";
-    if (filterCurrencyId !== "all") {
-      if (currencyObj?.code === "USD") {
-        prefix = "$ ";
-      } else if (currencyObj?.code === "IQD") {
-        prefix = "دینار ";
-      } else {
-        prefix = `${currencyObj?.symbol || ""} `;
-      }
-    } else {
-      if (currencyObj?.code === "IQD") {
-        prefix = "دینار ";
-      } else if (currencyObj?.code === "USD") {
-        prefix = "$ ";
-      } else {
-        prefix = `${currencyObj?.name || ""} `;
-      }
-    }
-
     return (
-      <span className="inline-flex items-baseline" style={{ display: 'inline-flex', alignItems: 'baseline', gap: '2px' }}>
-        <span style={{ fontSize: '0.85em', opacity: 0.8 }}>{prefix}</span>
+      <span className="inline-flex items-baseline gap-1" dir="ltr">
+        <span style={{ fontSize: '0.85em', opacity: 0.85 }}>$</span>
         {renderedNumber}
       </span>
     );
@@ -642,6 +784,17 @@ function InvoiceReportContent() {
 
   const formatBaseCurrencyJSX = (val: number) => {
     const baseCurrency = getBaseCurrency();
+    const isIQD = baseCurrency.code === "IQD" || Number(baseCurrency.id) === 2 || Number(baseCurrency.id) === 12;
+
+    if (isIQD) {
+      return (
+        <span className="inline-flex items-baseline gap-1" dir="ltr">
+          <span style={{ fontSize: '0.85em', opacity: 0.85 }}>دینار</span>
+          <span>{Math.round(val).toLocaleString("en-US")}</span>
+        </span>
+      );
+    }
+
     const isInteger = val % 1 === 0;
     const formattedNumber = val.toLocaleString("en-US", { 
       minimumFractionDigits: isInteger ? 0 : 2, 
@@ -661,19 +814,24 @@ function InvoiceReportContent() {
       </span>
     );
 
-    let prefix = "";
+    let prefix = "$ ";
+    let suffix = "";
     if (baseCurrency.code === "USD") {
       prefix = "$ ";
+      suffix = "";
     } else if (baseCurrency.code === "IQD") {
-      prefix = "دینار ";
+      prefix = "";
+      suffix = " دینار";
     } else {
       prefix = `${baseCurrency.symbol} `;
+      suffix = "";
     }
 
     return (
       <span className="inline-flex items-baseline" style={{ display: 'inline-flex', alignItems: 'baseline', gap: '2px' }}>
-        <span style={{ fontSize: '0.85em', opacity: 0.8 }}>{prefix}</span>
+        {prefix && <span style={{ fontSize: '0.85em', opacity: 0.8 }}>{prefix}</span>}
         {renderedNumber}
+        {suffix && <span style={{ fontSize: '0.85em', opacity: 0.8 }}>{suffix}</span>}
       </span>
     );
   };
@@ -742,55 +900,276 @@ function InvoiceReportContent() {
     }, 0);
   };
 
+  // Map of product purchase custom exchange rates
+  // Map of product purchase custom exchange rates
+  const productFixedRateMap = useMemo(() => {
+    const map: Record<number, number> = {};
+    if (!vouchers) return map;
+    vouchers.forEach((v: any) => {
+      let versionData: any = {};
+      if (v.versions && v.versions.length > 0) {
+        const sortedV = [...v.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
+        const latestV = sortedV[sortedV.length - 1];
+        try { versionData = JSON.parse(latestV.data); } catch (e) {}
+      }
+
+      const acc = v.account || (accounts || []).find((a: any) => a.id === v.accountId);
+      const rateType = v.exchangeRateType || versionData.exchangeRateType || acc?.exchangeRateType;
+      const customRate = v.customExchangeRate || versionData.customExchangeRate || acc?.customExchangeRate;
+
+      // Only check incoming stock vouchers: purchase, warehouse_stock, or incoming inventory movements
+      const isIncoming = v.type === "purchase" || v.type === "warehouse_stock" || (v.inventoryTransactions || []).some((t: any) => t.qtyChange > 0);
+
+      if (isIncoming && rateType === "FIXED" && customRate) {
+        const rateVal = Number(customRate) > 10000 ? Number(customRate) / 100 : Number(customRate);
+        if (v.lines) {
+          v.lines.forEach((l: any) => {
+            if (l.productId) map[l.productId] = rateVal;
+          });
+        }
+        if (v.inventoryTransactions) {
+          v.inventoryTransactions.forEach((t: any) => {
+            if (t.productId && t.qtyChange > 0) map[t.productId] = rateVal;
+          });
+        }
+      }
+    });
+    return map;
+  }, [vouchers, accounts]);
+
+  // Pre-calculate product unit costs from incoming purchase/warehouse transactions
+  // For fixed-rate products: cost stored in IQD (unitCost$ × fixedRate)
+  // For regular products: cost stored in USD
+  const { productCostsMap, fixedRateCostIQDMap } = useMemo(() => {
+    const stats: Record<number, { runningCostUSD: number; runningOnHandQty: number; latestCostUSD: number; isMultiBatch: boolean }> = {};
+    const fixedStats: Record<number, { runningCostIQD: number; runningOnHandQty: number; latestCostIQD: number; isMultiBatch: boolean }> = {};
+    const usdCur = currencies?.find((c: any) => c.code === "USD");
+    const usdId = usdCur ? usdCur.id : 1;
+    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
+    const iqdId = iqdCur?.id || 2;
+    const rawRate = iqdCur?.rate || 1520;
+    const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
+
+    (vouchers || []).forEach((v: any) => {
+      const vRate = normalizeRate(v.exchangeRate) || marketRate;
+
+      (v.inventoryTransactions || []).forEach((t: any) => {
+        const pId = t.productId;
+        const prod = (products || []).find((p: any) => p.id === pId);
+        const isMultiBatch = prod?.isMultiBatch || false;
+        const fixedRate = productFixedRateMap[pId];
+        const txCurId = t.currencyId ?? v.currencyId ?? usdId;
+        const isCostIQD = t.unitCost > 500;
+
+        if (t.qtyChange > 0 && t.unitCost > 0) {
+          const qtyIn = t.qtyChange;
+
+          // Fixed-rate product (cost in USD but with fixed IQD rate)
+          if (fixedRate && !isCostIQD) {
+            if (!fixedStats[pId]) {
+              fixedStats[pId] = { runningCostIQD: 0, runningOnHandQty: 0, latestCostIQD: 0, isMultiBatch };
+            }
+            const costIQD = t.unitCost * fixedRate;
+            fixedStats[pId].latestCostIQD = costIQD;
+
+            if (isMultiBatch) {
+              fixedStats[pId].runningCostIQD = costIQD;
+              fixedStats[pId].runningOnHandQty += qtyIn;
+            } else {
+              const currentOnHand = fixedStats[pId].runningOnHandQty || 0;
+              if (currentOnHand <= 0) {
+                fixedStats[pId].runningCostIQD = costIQD;
+                fixedStats[pId].runningOnHandQty = qtyIn;
+              } else {
+                const totalVal = (currentOnHand * fixedStats[pId].runningCostIQD) + (qtyIn * costIQD);
+                const newOnHand = currentOnHand + qtyIn;
+                fixedStats[pId].runningOnHandQty = newOnHand;
+                fixedStats[pId].runningCostIQD = totalVal / newOnHand;
+              }
+            }
+          } else {
+            // Regular product (USD or IQD)
+            if (!stats[pId]) {
+              stats[pId] = { runningCostUSD: 0, runningOnHandQty: 0, latestCostUSD: 0, isMultiBatch };
+            }
+            const effectiveCostUSD = isCostIQD ? (t.unitCost / vRate) : t.unitCost;
+            stats[pId].latestCostUSD = effectiveCostUSD;
+
+            if (isMultiBatch) {
+              stats[pId].runningCostUSD = effectiveCostUSD;
+              stats[pId].runningOnHandQty += qtyIn;
+            } else {
+              const currentOnHand = stats[pId].runningOnHandQty || 0;
+              if (currentOnHand <= 0) {
+                stats[pId].runningCostUSD = effectiveCostUSD;
+                stats[pId].runningOnHandQty = qtyIn;
+              } else {
+                const totalVal = (currentOnHand * stats[pId].runningCostUSD) + (qtyIn * effectiveCostUSD);
+                const newOnHand = currentOnHand + qtyIn;
+                stats[pId].runningOnHandQty = newOnHand;
+                stats[pId].runningCostUSD = totalVal / newOnHand;
+              }
+            }
+          }
+        } else if (t.qtyChange < 0) {
+          if (fixedStats[pId]) {
+            fixedStats[pId].runningOnHandQty += t.qtyChange;
+          }
+          if (stats[pId]) {
+            stats[pId].runningOnHandQty += t.qtyChange;
+          }
+        }
+      });
+    });
+
+    // Regular products: cost in USD
+    const costs: Record<number, number> = {};
+    for (const [pId, s] of Object.entries(stats)) {
+      costs[Number(pId)] = s.isMultiBatch ? s.latestCostUSD : s.runningCostUSD;
+    }
+
+    // Fixed-rate products: cost in IQD
+    const fixedIQD: Record<number, number> = {};
+    for (const [pId, s] of Object.entries(fixedStats)) {
+      fixedIQD[Number(pId)] = s.isMultiBatch ? s.latestCostIQD : s.runningCostIQD;
+    }
+
+    return { productCostsMap: costs, fixedRateCostIQDMap: fixedIQD };
+  }, [vouchers, currencies, products, productFixedRateMap]);
+
+  // Helper: Get item cost in USD for a specific voucher
+  // For fixed-rate products, converts IQD cost to USD at the sale voucher's daily rate
+  const getItemCostUsdForVoucher = (voucher: RawVoucher, productId: number, rawCost?: number, _rawCurId?: number) => {
+    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
+    const rawRate = iqdCur?.rate || 1520;
+    const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
+    const saleRate = normalizeRate(voucher.exchangeRate) || marketRate;
+
+    // Check if product has fixed exchange rate from purchase/stock voucher
+    const fixedRate = productFixedRateMap[productId];
+    if (fixedRate && fixedRate > 0) {
+      if (rawCost && rawCost > 0) {
+        const isCostIQD = rawCost > 500;
+        const costIQD = isCostIQD ? rawCost : (rawCost * fixedRate);
+        return costIQD / saleRate;
+      }
+      const fixedCostIQD = fixedRateCostIQDMap[productId];
+      if (fixedCostIQD !== undefined && fixedCostIQD > 0) {
+        return fixedCostIQD / saleRate;
+      }
+    }
+
+    // Regular product: cost already in USD or check transaction cost
+    if (rawCost && rawCost > 0) {
+      const isCostIQD = rawCost > 500;
+      return isCostIQD ? (rawCost / saleRate) : rawCost;
+    }
+
+    let cost = productCostsMap[productId];
+    return cost || 0;
+  };
+
   // Helper: Calculate cost of goods sold (COGS) in USD
   const getVoucherCostUSD = (voucher: RawVoucher) => {
     if (voucher.type !== "sales" && voucher.type !== "sales_return") return 0;
 
-    // Use transaction unitCost if available
+    let cogs = 0;
     if (voucher.inventoryTransactions && voucher.inventoryTransactions.length > 0) {
-      return voucher.inventoryTransactions.reduce((sum, tx) => {
-        return sum + Math.abs(tx.qtyChange) * (tx.unitCost || 0);
-      }, 0);
+      voucher.inventoryTransactions.forEach((tx: any) => {
+        const costUsd = getItemCostUsdForVoucher(voucher, tx.productId, tx.unitCost, tx.currencyId);
+        cogs += Math.abs(tx.qtyChange) * costUsd;
+      });
+    } else if (voucher.lines) {
+      voucher.lines.forEach((line: any) => {
+        const costUsd = getItemCostUsdForVoucher(voucher, line.productId);
+        cogs += line.qty * costUsd;
+      });
     }
-
-    // Fallback: lookup costPrice from products loaded in store
-    return voucher.lines.reduce((sum, line) => {
-      const storeProduct = (products || []).find((p: any) => p.id === line.productId);
-      const cost = storeProduct?.costPrice || 0;
-      return sum + line.qty * cost;
-    }, 0);
+    return cogs;
   };
 
-  // Helper: Calculate net profit in base currency
+  // Helper: Calculate net profit in base currency (used for KPI totals box)
   const getVoucherProfitBase = (voucher: RawVoucher) => {
     if (voucher.type !== "sales" && voucher.type !== "sales_return") return 0;
     
     const baseCurrency = getBaseCurrency();
-    const netUSD = convertAmount(voucher.netAmount, voucher.currencyId, "USD", voucher.exchangeRate);
-    const netBase = convertAmount(netUSD, currencies.find((c: any) => c.code === "USD")?.id || 1, baseCurrency.code, voucher.exchangeRate);
-    
+    const usdCur = currencies?.find((c: any) => c.code === "USD");
+    const usdId = usdCur ? usdCur.id : 1;
+    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
+    const iqdId = iqdCur?.id || 2;
+    const rawRate = iqdCur?.rate || 1520;
+    const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
+
+    const vCurId = voucher.currencyId || usdId;
+    const isVoucherIQD = vCurId === iqdId || vCurId === 2 || vCurId === 12;
+    const vRate = normalizeRate(voucher.exchangeRate) || marketRate;
+
+    const netUSD = isVoucherIQD ? (Number(voucher.netAmount || 0) / vRate) : Number(voucher.netAmount || 0);
     const costUSD = getVoucherCostUSD(voucher);
-    const costBase = convertAmount(costUSD, currencies.find((c: any) => c.code === "USD")?.id || 1, baseCurrency.code, voucher.exchangeRate);
-    
-    if (voucher.type === "sales_return") {
-      return -Math.max(netBase - costBase, 0);
+    const profitUSD = voucher.type === "sales_return" ? -(netUSD - costUSD) : (netUSD - costUSD);
+
+    if (baseCurrency.code === "IQD" || baseCurrency.id === 2 || baseCurrency.id === 12) {
+      return profitUSD * marketRate;
     }
-    
-    return Math.max(netBase - costBase, 0);
+    return profitUSD;
+  };
+
+  // Helper: Calculate profit in the correct display currency per-row
+  const getVoucherProfitInVoucherCurrency = (voucher: RawVoucher): { amount: number; currencyId: number } => {
+    const fallback = { amount: 0, currencyId: voucher.currencyId || 1 };
+    if (voucher.type !== "sales" && voucher.type !== "sales_return") return fallback;
+
+    const usdCur = currencies?.find((c: any) => c.code === "USD");
+    const usdId = usdCur ? usdCur.id : 1;
+    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
+    const iqdId = iqdCur?.id || 2;
+    const rawRate = iqdCur?.rate || 1520;
+    const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
+
+    const vCurId = voucher.currencyId || usdId;
+    const saleIsIQD = vCurId === iqdId || vCurId === 2 || vCurId === 12;
+    const vRate = normalizeRate(voucher.exchangeRate) || marketRate;
+
+    // Check if voucher has mixed currencies
+    const hasMixedCurrencies = (() => {
+      if (voucher.lines && Array.isArray(voucher.lines) && voucher.lines.length > 0) {
+        const lineCurrencies = new Set(
+          voucher.lines.map((l: any) => Number(l.currencyId || voucher.currencyId || usdId))
+        );
+        if (lineCurrencies.size > 1) return true;
+      }
+      return false;
+    })();
+
+    const netUSD = saleIsIQD ? (Number(voucher.netAmount || 0) / vRate) : Number(voucher.netAmount || 0);
+    const costUSD = getVoucherCostUSD(voucher);
+    const profitUSD = voucher.type === "sales_return" ? -(netUSD - costUSD) : (netUSD - costUSD);
+
+    if (hasMixedCurrencies) {
+      return { amount: profitUSD, currencyId: usdId };
+    }
+
+    if (saleIsIQD) {
+      return { amount: profitUSD * vRate, currencyId: iqdId };
+    } else {
+      return { amount: profitUSD, currencyId: usdId };
+    }
   };
 
   // Helper: Calculate payment status
   const getPaymentStatus = (voucher: RawVoucher) => {
     const netUSD = convertAmount(voucher.netAmount, voucher.currencyId, "USD", voucher.exchangeRate);
     const paidUSD = getVoucherPaidUSD(voucher);
+    const remainingUSD = Math.max(netUSD - paidUSD, 0);
 
     if (paidUSD <= 0.01) {
-      return { label: "قەرز", color: "bg-red-100 text-red-700 border-red-200" };
+      return { label: "قەرز", color: "bg-rose-50 text-rose-700 border-rose-200 font-bold" };
     }
-    if (paidUSD >= netUSD - 0.01) {
-      return { label: "نەقد", color: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+    // If remaining is less than $1 USD (or equivalent < 1000 IQD), treat as fully paid (نەقد)
+    if (remainingUSD < 1.0) {
+      return { label: "نەقد", color: "bg-emerald-50 text-emerald-700 border-emerald-200 font-bold" };
     }
-    return { label: "بەشەکی", color: "bg-amber-100 text-amber-700 border-amber-200" };
+    return { label: "بەشێکی دراو", color: "bg-amber-50 text-amber-800 border-amber-300/80 font-bold" };
   };
 
   // Helper: Get display currency ID for a voucher
@@ -945,14 +1324,138 @@ function InvoiceReportContent() {
   // Dynamic Employee List
   const employeeOptions = useMemo(() => {
     const fromVouchers = vouchers.map((v) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار کۆگای دۆستان", "هێمن حەمە فەرهاد"];
-    return Array.from(new Set([...defaults, ...fromVouchers]));
-  }, [vouchers]);
+    const curName = currentUser?.name || currentUser?.username;
+    const list = curName ? [curName, ...fromVouchers] : fromVouchers;
+    return Array.from(new Set(list));
+  }, [vouchers, currentUser]);
 
   // Dynamic City & District Lists from accounts
   const cityOptions = useMemo(() => {
     return Array.from(new Set(accounts.map((a: any) => a.city).filter(Boolean))) as string[];
   }, [accounts]);
+
+  // Helper: Comprehensive general search matching across all voucher fields including items/products
+  const matchVoucherSearch = (v: RawVoucher, search: string) => {
+    if (!search) return true;
+    const rawSearch = search.toLowerCase();
+    const tempCust = getTemporaryCustomer(v);
+
+    // 1. Voucher ID & Reference & Notes
+    if (
+      normalizeKurdishSearchText(v.id.toString()).includes(search) ||
+      normalizeKurdishSearchText(v.referenceNo || "").includes(search) ||
+      normalizeKurdishSearchText(v.internalNote || "").includes(search) ||
+      normalizeKurdishSearchText(v.printNote || "").includes(search)
+    ) return true;
+
+    // 2. Account & Customer info
+    if (
+      normalizeKurdishSearchText(v.account?.name || "").includes(search) ||
+      normalizeKurdishSearchText(tempCust?.name || "").includes(search) ||
+      normalizeKurdishSearchText(v.account?.phone || "").includes(search) ||
+      normalizeKurdishSearchText(tempCust?.phone || "").includes(search) ||
+      normalizeKurdishSearchText(v.account?.fullAddress || "").includes(search) ||
+      normalizeKurdishSearchText(tempCust?.address || "").includes(search) ||
+      normalizeKurdishSearchText(v.account?.city?.name || "").includes(search) ||
+      normalizeKurdishSearchText(v.account?.district?.name || "").includes(search)
+    ) return true;
+
+    // 3. Cashbox & Currency
+    if (
+      normalizeKurdishSearchText(v.cashbox?.name || "").includes(search) ||
+      normalizeKurdishSearchText(v.fromCashbox?.name || "").includes(search) ||
+      normalizeKurdishSearchText(v.toCashbox?.name || "").includes(search) ||
+      normalizeKurdishSearchText(v.currency?.name || "").includes(search) ||
+      normalizeKurdishSearchText(v.currency?.code || "").includes(search) ||
+      normalizeKurdishSearchText(v.currency?.symbol || "").includes(search)
+    ) return true;
+
+    // 4. Employee & Delivery info
+    if (
+      normalizeKurdishSearchText(v.employeeName || "").includes(search) ||
+      normalizeKurdishSearchText(v.driverName || "").includes(search) ||
+      normalizeKurdishSearchText(v.driverPhone || "").includes(search) ||
+      normalizeKurdishSearchText(v.deliveryCity || "").includes(search) ||
+      normalizeKurdishSearchText(v.deliveryAddress || "").includes(search)
+    ) return true;
+
+    // 5. Products / Items in voucher lines (name, code, barcode, line note)
+    if (v.lines && v.lines.length > 0) {
+      const hasMatchingLine = v.lines.some((l: any) => {
+        const prod = l.product || (products || []).find((p: any) => p.id === l.productId);
+        const prodName = prod?.name || l.productName || l.name || "";
+        const prodCode = prod?.code || l.code || "";
+        const prodBarcode = prod?.barcode || "";
+        const lineNote = l.note || "";
+        return (
+          normalizeKurdishSearchText(prodName).includes(search) ||
+          prodName.toLowerCase().includes(rawSearch) ||
+          normalizeKurdishSearchText(prodCode).includes(search) ||
+          prodCode.toLowerCase().includes(rawSearch) ||
+          normalizeKurdishSearchText(prodBarcode).includes(search) ||
+          normalizeKurdishSearchText(lineNote).includes(search) ||
+          lineNote.toLowerCase().includes(rawSearch)
+        );
+      });
+      if (hasMatchingLine) return true;
+    }
+
+    // 6. Products in inventory transactions (backup)
+    if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
+      const hasMatchingInv = v.inventoryTransactions.some((tx: any) => {
+        const prod = tx.product || (products || []).find((p: any) => p.id === tx.productId);
+        const prodName = prod?.name || "";
+        const prodCode = prod?.code || "";
+        const prodBarcode = prod?.barcode || "";
+        return (
+          normalizeKurdishSearchText(prodName).includes(search) ||
+          prodName.toLowerCase().includes(rawSearch) ||
+          normalizeKurdishSearchText(prodCode).includes(search) ||
+          prodCode.toLowerCase().includes(rawSearch) ||
+          normalizeKurdishSearchText(prodBarcode).includes(search)
+        );
+      });
+      if (hasMatchingInv) return true;
+    }
+
+    // 7. Products in version snapshots (data.rows)
+    if (v.versions && v.versions.length > 0) {
+      for (const ver of v.versions) {
+        if (ver.data) {
+          try {
+            const parsed = typeof ver.data === "string" ? JSON.parse(ver.data) : ver.data;
+            const rows = parsed.rows || parsed.lines || [];
+            if (Array.isArray(rows) && rows.length > 0) {
+              const matchRow = rows.some((r: any) => {
+                const rName = r.productName || r.name || "";
+                const rCode = r.code || r.productCode || "";
+                const rNote = r.note || "";
+                return (
+                  normalizeKurdishSearchText(rName).includes(search) ||
+                  rName.toLowerCase().includes(rawSearch) ||
+                  normalizeKurdishSearchText(rCode).includes(search) ||
+                  rCode.toLowerCase().includes(rawSearch) ||
+                  normalizeKurdishSearchText(rNote).includes(search)
+                );
+              });
+              if (matchRow) return true;
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    // 8. Expenses notes
+    if (v.expenses && v.expenses.length > 0) {
+      const hasMatchingExp = v.expenses.some((e) =>
+        normalizeKurdishSearchText(e.note || "").includes(search) ||
+        (e.note || "").toLowerCase().includes(rawSearch)
+      );
+      if (hasMatchingExp) return true;
+    }
+
+    return false;
+  };
 
   // Helper to check if there are returns matching active filters (ignoring invoice type)
   const hasReturnsMatchingFilters = (returnType: "sales_return" | "purchase_return") => {
@@ -987,21 +1490,10 @@ function InvoiceReportContent() {
         }
       }
 
-      // General Search
-      const search = (searchTerm || generalSearch).trim().toLowerCase();
+      // General Search (searches everything including item/product names)
+      const search = normalizeKurdishSearchText(searchTerm || generalSearch).trim();
       if (search) {
-        const tempCust = getTemporaryCustomer(v);
-        const match =
-          v.id.toString().includes(search) ||
-          (v.referenceNo && v.referenceNo.toLowerCase().includes(search)) ||
-          (v.account && v.account.name.toLowerCase().includes(search)) ||
-          (tempCust && tempCust.name && tempCust.name.toLowerCase().includes(search)) ||
-          (v.account && v.account.phone && v.account.phone.toLowerCase().includes(search)) ||
-          (tempCust && tempCust.phone && tempCust.phone.toLowerCase().includes(search)) ||
-          (v.driverPhone && v.driverPhone.toLowerCase().includes(search)) ||
-          (v.internalNote && v.internalNote.toLowerCase().includes(search)) ||
-          (v.printNote && v.printNote.toLowerCase().includes(search));
-        if (!match) return false;
+        if (!matchVoucherSearch(v, search)) return false;
       }
 
       // Payment Status
@@ -1055,7 +1547,7 @@ function InvoiceReportContent() {
 
       // Employee
       if (filterEmployees.length > 0) {
-        const empName = v.employeeName || "کۆساری مەلا فەرهاد";
+        const empName = v.employeeName || "-";
         if (!filterEmployees.includes(empName)) return false;
       }
 
@@ -1116,6 +1608,11 @@ function InvoiceReportContent() {
     // Exclude cashbox transfers and exchanges from invoices report
     list = list.filter(v => v.type !== "cashbox_transfer" && v.type !== "cashbox_exchange");
 
+    // Strictly filter out voucher types the user does NOT have permission to view!
+    if (currentUser && currentUser.role !== "admin" && !hasPermission("vouchers", "canView")) {
+      list = list.filter((v: any) => canViewVoucher(v.type));
+    }
+
     // Invoice Status Filter (active, modified, deleted)
     if (filterStatus === "active") {
       list = list.filter((v) => !v.isDeleted);
@@ -1146,28 +1643,32 @@ function InvoiceReportContent() {
       );
     }
 
-    // Search term / General Search
-    const search = (searchTerm || generalSearch).trim().toLowerCase();
+    // Search term / General Search (searches all voucher data including product/item names)
+    const search = normalizeKurdishSearchText(searchTerm || generalSearch).trim();
     if (search) {
-      list = list.filter((v) => {
-        const tempCust = getTemporaryCustomer(v);
-        return (
-          v.id.toString().includes(search) ||
-          (v.referenceNo && v.referenceNo.toLowerCase().includes(search)) ||
-          (v.account && v.account.name.toLowerCase().includes(search)) ||
-          (tempCust && tempCust.name && tempCust.name.toLowerCase().includes(search)) ||
-          (v.account && v.account.phone && v.account.phone.toLowerCase().includes(search)) ||
-          (tempCust && tempCust.phone && tempCust.phone.toLowerCase().includes(search)) ||
-          (v.driverPhone && v.driverPhone.toLowerCase().includes(search)) ||
-          (v.internalNote && v.internalNote.toLowerCase().includes(search)) ||
-          (v.printNote && v.printNote.toLowerCase().includes(search))
-        );
-      });
+      list = list.filter((v) => matchVoucherSearch(v, search));
     }
 
     // Invoice Type Filter (multi-select)
     if (filterInvoiceTypes.length > 0) {
-      list = list.filter((v) => (v.rawType ? filterInvoiceTypes.includes(v.rawType) : false) || filterInvoiceTypes.includes(v.type));
+      list = list.filter((v) => {
+        const t = v.type;
+        const rt = v.rawType || v.type;
+        return filterInvoiceTypes.some(ft => 
+          ft === t || 
+          ft === rt ||
+          (ft === "people_debt" && (t === "قەرزم لای خەڵکە" || rt === "قەرزم لای خەڵکە" || t === "people_debt" || rt === "people_debt")) ||
+          (ft === "my_debt" && (t === "من قەرزارم" || t === "قەرزی خەڵکم لایە" || rt === "من قەرزارم" || rt === "قەرزی خەڵکم لایە" || t === "my_debt" || rt === "my_debt")) ||
+          (ft === "my_debt_discount" && (t === "داشکاندنم بۆ کراوە" || rt === "داشکاندنم بۆ کراوە" || t === "my_debt_discount" || rt === "my_debt_discount")) ||
+          (ft === "people_debt_discount" && (t === "داشکاندنم کردوە" || rt === "داشکاندنم کردوە" || t === "people_debt_discount" || rt === "people_debt_discount" || t === "debt_discount" || rt === "debt_discount" || t === "debt discount" || rt === "debt discount")) ||
+          (ft === "shareholder_deposit" && (t === "دانانی پارە" || rt === "دانانی پارە" || t === "deposit" || rt === "deposit")) ||
+          (ft === "shareholder_withdrawal" && (t === "کشانەوەی پارە" || rt === "کشانەوەی پارە" || t === "withdrawal" || rt === "withdrawal")) ||
+          (ft === "warehouse_stock" && (t === "جەردی کۆگا" || rt === "جەردی کۆگا")) ||
+          (ft === "material_issue" && (t === "سەرفی مەواد" || t === "سەرفی مواد" || rt === "سەرفی مەواد" || rt === "سەرفی مواد")) ||
+          (ft === "warehouse_damage" && (t === "زیانی کۆگا" || t === "خەسارەی کۆگا" || rt === "زیانی کۆگا" || rt === "خەسارەی کۆگا")) ||
+          (ft === "product_transfer" && (t === "گواستنەوەی کەرەستە" || t === "گواستنەوەی کاڵا" || rt === "گواستنەوەی کەرەستە" || rt === "گواستنەوەی کاڵا"))
+        );
+      });
     }
 
     // Payment Status Filter
@@ -1198,7 +1699,9 @@ function InvoiceReportContent() {
     // Specific Warehouse Filter (multi-select)
     if (filterWarehouseIds.length > 0) {
       list = list.filter((v: any) =>
-        v.inventoryTransactions && v.inventoryTransactions.some((it: any) => filterWarehouseIds.includes(it.warehouseId))
+        (v.inventoryTransactions && v.inventoryTransactions.some((it: any) => filterWarehouseIds.includes(it.warehouseId))) ||
+        (v.lines && v.lines.some((l: any) => l.warehouseId && filterWarehouseIds.includes(Number(l.warehouseId)))) ||
+        (v.warehouseId && filterWarehouseIds.includes(Number(v.warehouseId)))
       );
     }
 
@@ -1227,7 +1730,7 @@ function InvoiceReportContent() {
     // Employee Filter (multi-select)
     if (filterEmployees.length > 0) {
       list = list.filter((v) => {
-        const empName = v.employeeName || "کۆساری مەلا فەرهاد";
+        const empName = v.employeeName || "-";
         return filterEmployees.includes(empName);
       });
     }
@@ -1248,8 +1751,12 @@ function InvoiceReportContent() {
         aVal = getVoucherPaidUSD(a);
         bVal = getVoucherPaidUSD(b);
       } else if (sortField === "remaining") {
-        aVal = convertAmount(a.netAmount, a.currencyId, "USD", a.exchangeRate) - getVoucherPaidUSD(a);
-        bVal = convertAmount(b.netAmount, b.currencyId, "USD", b.exchangeRate) - getVoucherPaidUSD(b);
+        const aValUSD = convertAmount(a.netAmount, a.currencyId, "USD", a.exchangeRate);
+        const bValUSD = convertAmount(b.netAmount, b.currencyId, "USD", b.exchangeRate);
+        aVal = Math.max(aValUSD - getVoucherPaidUSD(a), 0);
+        if (aVal < 1.0) aVal = 0;
+        bVal = Math.max(bValUSD - getVoucherPaidUSD(b), 0);
+        if (bVal < 1.0) bVal = 0;
       } else if (sortField === "expenses") {
         aVal = getVoucherExpensesUSD(a);
         bVal = getVoucherExpensesUSD(b);
@@ -1314,7 +1821,8 @@ function InvoiceReportContent() {
       const val = convertAmount(v.netAmount, v.currencyId, "USD", v.exchangeRate);
       const disc = convertAmount(v.totalDiscount, v.currencyId, "USD", v.exchangeRate);
       const paid = getVoucherPaidUSD(v);
-      const rem = Math.max(val - paid, 0);
+      let rem = Math.max(val - paid, 0);
+      if (rem < 1.0) rem = 0;
       const exp = getVoucherExpensesUSD(v);
       const prof = getVoucherProfitBase(v);
 
@@ -1333,7 +1841,15 @@ function InvoiceReportContent() {
         return sum + convertBetweenCurrencies(pa.amount, pa.currencyId, curId, pa.exchangeRate || v.exchangeRate || 1500);
       }, 0);
       paidByCurrency[curId] = (paidByCurrency[curId] || 0) + paidInVoucherCurrency;
-      remainingByCurrency[curId] = (remainingByCurrency[curId] || 0) + Math.max(v.netAmount - paidInVoucherCurrency, 0);
+      
+      let remInVoucherCur = Math.max(v.netAmount - paidInVoucherCurrency, 0);
+      const isIqdCur = curId === 2 || curId === 12 || currencies.find((c: any) => c.id === curId)?.code === "IQD";
+      if (isIqdCur && remInVoucherCur < 1000) {
+        remInVoucherCur = 0;
+      } else if (!isIqdCur && remInVoucherCur < 1.0) {
+        remInVoucherCur = 0;
+      }
+      remainingByCurrency[curId] = (remainingByCurrency[curId] || 0) + remInVoucherCur;
       
       // Expenses: use same approach
       const expInVoucherCurrency = v.expenses.reduce((sum, e) => {
@@ -1409,11 +1925,13 @@ function InvoiceReportContent() {
     };
     const columnKey = sortFieldToColumnMap[field];
     if (columnKey && !visibleColumns[columnKey]) {
+      if (columnKey === "profit" && !canViewProfit) return;
       setVisibleColumns((prev: any) => ({ ...prev, [columnKey]: true }));
     }
   };
 
   const toggleColumn = (key: keyof typeof visibleColumns) => {
+    if (key === "profit" && !canViewProfit) return;
     setVisibleColumns((prev: any) => ({
       ...prev,
       [key]: !prev[key],
@@ -1791,9 +2309,16 @@ function InvoiceReportContent() {
 
             <button
               onClick={() => setShowColumnsModal(true)}
-              className="bg-slate-200 text-slate-800 hover:bg-slate-300 font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-sm border border-slate-300"
+              className="text-white font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-md border-none hover:scale-105"
+              style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 8px rgba(2, 132, 199, 0.35)" }}
             >
-              🗂️ کۆڵۆمەکان
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+                <path d="M3 9h18" />
+                <path d="M3 15h18" />
+              </svg>
+              <span>کۆڵۆمەکان</span>
             </button>
 
             <button
@@ -1825,7 +2350,7 @@ function InvoiceReportContent() {
         <div className="w-full transition-all duration-500 ease-in-out overflow-hidden max-h-24 opacity-100 mt-4">
           <input
             type="text"
-            placeholder="🔍 گەڕانی گشتی لە پسوڵە، بەکارهێنەر، قاسە، تێبینیەکان..."
+            placeholder="🔍 گەڕانی گشتی (ژمارەی پسوڵە، کڕیار، ناوی کەرەستە، قاسە، کارمەند، تێبینی، شۆفێر...)"
             value={searchTerm || generalSearch}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -1901,12 +2426,14 @@ function InvoiceReportContent() {
             </div>
 
             {/* Card: Profits */}
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
-              <span className="text-slate-600 text-xs font-bold">قازانج (فرۆشتن)</span>
-              <span className="text-amber-900 text-xl font-black mt-2">
-                {visibleColumns.profit ? formatKPIMultiCurrency(totals.profitByCurrency) : "ناچالاکە"}
-              </span>
-            </div>
+            {canViewProfit && (
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
+                <span className="text-slate-600 text-xs font-bold">قازانج (فرۆشتن)</span>
+                <span className="text-amber-900 text-xl font-black mt-2">
+                  {isProfitColumnVisible ? formatKPIMultiCurrency(totals.profitByCurrency) : "ناچالاکە"}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -2002,7 +2529,7 @@ function InvoiceReportContent() {
                       خەرجی {sortField === "expenses" && (sortDirection === "asc" ? "▲" : "▼")}
                     </th>
                   )}
-                  {visibleColumns.profit && (
+                  {isProfitColumnVisible && (
                     <th onClick={() => handleSort("profit")} className="px-4 py-3.5 text-center text-xs font-bold cursor-pointer select-none">
                       قازانج {sortField === "profit" && (sortDirection === "asc" ? "▲" : "▼")}
                     </th>
@@ -2053,6 +2580,15 @@ function InvoiceReportContent() {
                     const payStatus = getPaymentStatus(voucher);
                     const isExpanded = expandedRowId === voucher.id;
 
+                    const sortedVers = voucher.versions && voucher.versions.length > 0 ? [...voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0)) : [];
+                    const latestVer = sortedVers.length > 0 ? sortedVers[sortedVers.length - 1] : null;
+                    let versionData: any = {};
+                    if (latestVer && latestVer.data) {
+                      try { versionData = JSON.parse(latestVer.data); } catch(e){}
+                    }
+                    const isFixedRateVoucher = (voucher as any).exchangeRateType === "FIXED" || versionData.exchangeRateType === "FIXED";
+                    const customExRate = (voucher as any).customExchangeRate || versionData.customExchangeRate || 132000;
+
                     const displayCurrencyId = getDisplayCurrencyId(voucher);
                     const displayCurrencyObj = currencies.find((c: any) => c.id === displayCurrencyId);
 
@@ -2079,7 +2615,28 @@ function InvoiceReportContent() {
                       return sum + expInDisplay;
                     }, 0);
 
-                    const remainingVal = Math.max(valVal - paidVal, 0);
+                    let remainingVal = Math.max(valVal - paidVal, 0);
+                    const curObj = currencies.find((c: any) => c.id === displayCurrencyId);
+                    const isIQD = curObj?.code === "IQD" || displayCurrencyId === 2 || displayCurrencyId === 12;
+                    if (isIQD && remainingVal < 1000) {
+                      remainingVal = 0;
+                      if (paidVal > 0 && Math.abs(valVal - paidVal) < 1000) {
+                        valVal = paidVal;
+                      }
+                    } else if (!isIQD && remainingVal < 1.0) {
+                      remainingVal = 0;
+                      if (paidVal > 0 && Math.abs(valVal - paidVal) < 1.0) {
+                        valVal = paidVal;
+                      }
+                    }
+
+                    if (payStatus.label === "نەقد" && paidVal > 0) {
+                      remainingVal = 0;
+                      if (Math.abs(valVal - paidVal) < (isIQD ? 1000 : 1.0)) {
+                        valVal = paidVal;
+                      }
+                    }
+
                     const profitVal = getVoucherProfitBase(voucher);
 
                     const isDebtVoucherType = [
@@ -2127,7 +2684,7 @@ function InvoiceReportContent() {
                           {visibleColumns.paymentStatus && (
                             <td className="px-4 py-3.5 text-center">
                               <span
-                                className={`px-2.5 py-1 rounded-full text-xs font-extrabold border ${payStatus.color}`}
+                                className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border whitespace-nowrap shadow-2xs ${payStatus.color}`}
                               >
                                 {payStatus.label}
                               </span>
@@ -2156,7 +2713,29 @@ function InvoiceReportContent() {
                           )}
                           {visibleColumns.total && (
                             <td className="px-4 py-3.5 text-center font-black">
-                              {formatCurrencyValueJSX(valVal, displayCurrencyId)}
+                              {(() => {
+                                const breakdownJSX = getVoucherMultiCurrencyBreakdownJSX(voucher);
+                                if (breakdownJSX) {
+                                  return (
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      {breakdownJSX}
+                                      <span className="text-[11px] text-gray-500 font-bold mt-0.5" title="نرخی گواستنەوە بۆ دۆلاری ڕۆژ">
+                                        ≈ {formatCurrencyValueJSX(valVal, displayCurrencyId)}
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                                return isFixedRateVoucher ? (
+                                  <span
+                                    title={`📌 دۆلاری جێگیر: 100$ = ${Number(Number(customExRate) > 10000 ? customExRate : Number(customExRate) * 100).toLocaleString("en-US")} دینار`}
+                                    style={{ color: "#7c3aed" }}
+                                  >
+                                    {formatCurrencyValueJSX(valVal, displayCurrencyId)}
+                                  </span>
+                                ) : (
+                                  formatCurrencyValueJSX(valVal, displayCurrencyId)
+                                );
+                              })()}
                             </td>
                           )}
                           {visibleColumns.discount && (
@@ -2168,7 +2747,7 @@ function InvoiceReportContent() {
                           )}
                           {visibleColumns.paid && (
                             <td className="px-4 py-3.5 text-center text-emerald-600">
-                              {paidVal > 0 ? formatCurrencyValueJSX(paidVal, displayCurrencyId) : "-"}
+                              {getVoucherPaidAmountsJSX(voucher, displayCurrencyId, paidVal)}
                             </td>
                           )}
                           {visibleColumns.remaining && (
@@ -2195,9 +2774,12 @@ function InvoiceReportContent() {
                               {expensesVal > 0 ? formatCurrencyValueJSX(expensesVal, displayCurrencyId) : "-"}
                             </td>
                           )}
-                          {visibleColumns.profit && (
+                          {isProfitColumnVisible && (
                             <td className={`px-4 py-3.5 text-center font-bold ${(voucher.type === "sales" || voucher.type === "sales_return") && profitVal < 0 ? "text-rose-600" : "text-amber-700"}`}>
-                              {(voucher.type === "sales" || voucher.type === "sales_return") ? formatBaseCurrencyJSX(profitVal) : "-"}
+                              {(voucher.type === "sales" || voucher.type === "sales_return") ? (() => {
+                                const { amount: pAmt, currencyId: pCurId } = getVoucherProfitInVoucherCurrency(voucher);
+                                return formatCurrencyValueJSX(pAmt, pCurId);
+                              })() : "-"}
                             </td>
                           )}
                           {visibleColumns.cashbox && (
@@ -2221,7 +2803,7 @@ function InvoiceReportContent() {
                                     {voucher.versions?.length || 1}
                                   </span>
                                   <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-xl text-[10px] font-extrabold shadow-sm">
-                                    {voucher.employeeName || "کۆساری مەلا فەرهاد"}
+                                    {voucher.employeeName || (voucher.versions && voucher.versions[0]?.employeeName) || "کۆسار"}
                                   </span>
                                 </div>
                                 <span className="text-slate-500 font-bold">
@@ -2253,16 +2835,18 @@ function InvoiceReportContent() {
                                   
                                   {activeDropdownId === voucher.id && (
                                     <div className="absolute left-0 mt-1 w-36 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-50 text-right">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setActiveDropdownId(null);
-                                          window.location.href = `/invoices?editId=${voucher.id}&type=${voucher.type}`;
-                                        }}
-                                        className="w-full text-right px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                      >
-                                        <span>✏️</span> نوێکردنەوە
-                                      </button>
+                                      {canUpdateVoucher(voucher.type) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveDropdownId(null);
+                                            window.location.href = `/invoices?editId=${voucher.id}&type=${voucher.type}`;
+                                          }}
+                                          className="w-full text-right px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                                        >
+                                          <span>✏️</span> نوێکردنەوە
+                                        </button>
+                                      )}
                                       {(voucher.versions?.length || 0) > 1 && (
                                         <button
                                           onClick={(e) => {
@@ -2330,17 +2914,34 @@ function InvoiceReportContent() {
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                          {voucher.lines.map((line, idx) => (
-                                            <tr key={line.id} className="hover:bg-slate-50/80 transition-colors">
-                                              <td className="py-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
-                                              <td className="py-2.5 text-right font-bold text-slate-800">{line.product?.name || "نەناسراو"}</td>
-                                              <td className="py-2.5 text-center text-slate-500 font-mono text-[11px]">{line.product?.code || "-"}</td>
-                                              <td className="py-2.5 text-center font-extrabold text-slate-800">{line.qty}</td>
-                                              <td className="py-2.5 text-center">{formatCurrencyValue(line.unitPrice, voucher.currencyId || 1)}</td>
-                                              <td className="py-2.5 text-center text-rose-500">{line.discountAmount > 0 ? formatCurrencyValue(line.discountAmount, voucher.currencyId || 1) : "-"}</td>
-                                              <td className="py-2.5 text-center font-black text-slate-900">{formatCurrencyValue(line.lineTotal, voucher.currencyId || 1)}</td>
-                                            </tr>
-                                          ))}
+                                          {voucher.lines.map((line, idx) => {
+                                            const lineCurId = line.currencyId || voucher.currencyId || 1;
+                                            const fixedRate = productFixedRateMap[line.productId];
+                                            const isFixedProduct = fixedRate !== undefined && fixedRate > 0;
+                                            return (
+                                              <tr key={line.id} className={`hover:bg-slate-50/80 transition-colors ${isFixedProduct ? "bg-purple-50/30" : ""}`}>
+                                                <td className="py-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
+                                                <td className="py-2.5 text-right font-bold">
+                                                  {isFixedProduct ? (
+                                                    <span
+                                                      title={`📌 نرخی دۆلاری جێگیر: 100$ = ${Number(Number(fixedRate) > 10000 ? fixedRate : Number(fixedRate) * 100).toLocaleString("en-US")} دینار`}
+                                                      style={{ color: "#7c3aed", cursor: "help" }}
+                                                      className="border-b border-dashed border-purple-300"
+                                                    >
+                                                      {line.product?.name || "نەناسراو"}
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-slate-800">{line.product?.name || "\u0646\u06d5\u0646\u0627\u0633\u0631\u0627\u0648"}</span>
+                                                  )}
+                                                </td>
+                                                <td className="py-2.5 text-center text-slate-500 font-mono text-[11px]">{line.product?.code || "-"}</td>
+                                                <td className="py-2.5 text-center font-extrabold text-slate-800">{line.qty}</td>
+                                                <td className="py-2.5 text-center">{formatCurrencyValue(line.unitPrice, lineCurId)}</td>
+                                                <td className="py-2.5 text-center text-rose-500">{line.discountAmount > 0 ? formatCurrencyValue(line.discountAmount, lineCurId) : "-"}</td>
+                                                <td className="py-2.5 text-center font-black text-slate-900">{formatCurrencyValue(line.lineTotal, voucher.currencyId || 1)}</td>
+                                              </tr>
+                                            );
+                                          })}
                                         </tbody>
                                       </table>
                                     </div>
@@ -2410,7 +3011,7 @@ function InvoiceReportContent() {
                                         {voucher.exchangeRate > 1 && (
                                           <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                                             <span className="text-[10px] text-slate-400 font-bold block mb-1">ڕێژەی گۆڕینەوە</span>
-                                            <span className="text-xs font-black text-slate-800">{voucher.exchangeRate.toLocaleString()}</span>
+                                            <span className="text-xs font-black text-slate-800">{voucher.exchangeRate.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                                           </div>
                                         )}
                                       </div>
@@ -2597,24 +3198,7 @@ function InvoiceReportContent() {
                   {/* Invoice Type */}
                   <MultiSelectDropdown
                     label="جۆری پسوڵە" pluralLabel="جۆر"
-                    options={[
-                      { value: "sales", label: "فرۆشتن" },
-                      { value: "purchase", label: "کڕین" },
-                      { value: "money_in", label: "پارەی هاتوو" },
-                      { value: "money_out", label: "پارەی ڕۆشتوو" },
-                      { value: "expense", label: "خەرجی" },
-                      { value: "quotation", label: "نرخاندن" },
-                      { value: "sales_return", label: "گەڕانەوەی فرۆشتن" },
-                      { value: "purchase_return", label: "گەڕانەوەی کڕین" },
-                      { value: "shareholder_deposit", label: "دانانی پارە" },
-                      { value: "shareholder_withdrawal", label: "کشانەوەی پارە" },
-                      { value: "my_debt_discount", label: "داشکاندنم بۆ کراوە" },
-                      { value: "people_debt_discount", label: "داشکاندنم کردوە" },
-                      { value: "material_issue", label: "سەرفی مەواد" },
-                      { value: "warehouse_damage", label: "زیانی کۆگا" },
-                      { value: "warehouse_stock", label: "جەردی کۆگا" },
-                      { value: "product_transfer", label: "گواستنەوەی کەرەستە" }
-                    ]}
+                    options={allowedInvoiceTypeOptions}
                     selectedValues={filterInvoiceTypes}
                     onChange={setFilterInvoiceTypes}
                   />
@@ -2629,7 +3213,7 @@ function InvoiceReportContent() {
                     >
                       <option value="all">ھەموو</option>
                       <option value="قەرز">قەرز</option>
-                      <option value="بەشەکی">بەشەکی</option>
+                      <option value="بەشێکی دراو">بەشێکی دراو</option>
                       <option value="نەقد">نەقد</option>
                     </select>
                   </div>
@@ -2838,7 +3422,13 @@ function InvoiceReportContent() {
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-[#0f172a] text-white">
               <h2 className="text-lg font-black m-0 flex items-center gap-2">
-                <span>🗂️ کۆڵۆمە دیاریکراوەکان</span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#38bdf8" }}>
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <line x1="12" y1="3" x2="12" y2="21" />
+                  <path d="M3 9h18" />
+                  <path d="M3 15h18" />
+                </svg>
+                <span>کۆڵۆمە دیاریکراوەکان</span>
               </h2>
               <button
                 onClick={() => setShowColumnsModal(false)}
@@ -2950,15 +3540,17 @@ function InvoiceReportContent() {
                 خەرجی
               </label>
 
-              <label className="flex items-center gap-2.5 cursor-pointer py-1">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.profit}
-                  onChange={() => toggleColumn("profit")}
-                  className="w-4 h-4 accent-blue-600 rounded"
-                />
-                قازانج
-              </label>
+              {canViewProfit && (
+                <label className="flex items-center gap-2.5 cursor-pointer py-1">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.profit}
+                    onChange={() => toggleColumn("profit")}
+                    className="w-4 h-4 accent-blue-600 rounded"
+                  />
+                  قازانج
+                </label>
+              )}
 
               <label className="flex items-center gap-2.5 cursor-pointer py-1">
                 <input

@@ -17,6 +17,17 @@ export async function GET(request: Request) {
     const productId = searchParams.get("productId");
     const sellerName = searchParams.get("sellerName");
 
+    // Helper to parse comma-separated number values into Prisma-compatible filters
+    const parseNumberArray = (val: string | null) => {
+      if (!val || val === "all" || val === "") return undefined;
+      if (val.includes(",")) {
+        const list = val.split(",").map(id => parseInt(id)).filter(id => !isNaN(id));
+        return list.length > 0 ? { in: list } : undefined;
+      }
+      const parsed = parseInt(val);
+      return isNaN(parsed) ? undefined : parsed;
+    };
+
     // Build database filters
     const where: any = {};
 
@@ -29,12 +40,18 @@ export async function GET(request: Request) {
     }
 
     if (warehouseId && warehouseId !== "all" && warehouseId !== "") {
-      where.warehouseId = parseInt(warehouseId);
+      const parsed = parseNumberArray(warehouseId);
+      if (parsed) where.warehouseId = parsed;
     }
 
     if (productId && productId !== "all" && productId !== "") {
-      where.productId = parseInt(productId);
+      const parsed = parseNumberArray(productId);
+      if (parsed) where.productId = parsed;
     }
+
+    // Exclude expense items (only commercial inventory belongs in stock reports)
+    where.product = { ...(where.product || {}), isExpense: false };
+    where.voucher = { isDeleted: false };
 
     const category = searchParams.get("category");
     const brand = searchParams.get("brand");
@@ -49,13 +66,14 @@ export async function GET(request: Request) {
           warehouseId: true,
           qtyChange: true,
           unitCost: true,
+          currencyId: true,
           product: { select: { name: true, code: true, category: true, brand: true, isMultiBatch: true, salePrices: true } },
           warehouse: { select: { name: true } },
           voucher: {
             select: {
               type: true,
               date: true,
-              account: { select: { id: true, name: true } },
+              account: { select: { id: true, name: true, exchangeRateType: true, customExchangeRate: true } },
               versions: { select: { version: true, data: true } },
               lines: {
                 select: {
@@ -114,8 +132,13 @@ export async function GET(request: Request) {
       let rawPrice = (line && line.unitPrice > 0) ? line.unitPrice : (t.unitCost || 0);
       let voucherCurId = (line as any)?.currencyId || (t.voucher as any)?.currencyId || 1;
       
-      const isIQD = voucherCurId === iqdCur?.id || rawPrice > 1000;
-      let originalPriceUsd = isIQD ? (rawPrice / marketRatePerDollar) : rawPrice;
+      // Determine currency from the stored currencyId (backfilled from voucher)
+      const txCurId = (t as any).currencyId ?? voucherCurId;
+      const isIQD = txCurId === iqdCur?.id;
+      const vRate = (t.voucher as any)?.exchangeRate && (t.voucher as any).exchangeRate > 100
+        ? ((t.voucher as any).exchangeRate > 10000 ? (t.voucher as any).exchangeRate / 100 : (t.voucher as any).exchangeRate)
+        : marketRatePerDollar;
+      let originalPriceUsd = isIQD ? (rawPrice / vRate) : rawPrice;
 
       let versionData: any = {};
       if (t.voucher?.versions && t.voucher.versions.length > 0) {
@@ -125,8 +148,8 @@ export async function GET(request: Request) {
       }
 
       const sellerAcc = t.voucher?.account;
-      let rateTypeForProduct = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || (sellerAcc as any)?.exchangeRateType || "DAILY_MARKET";
-      let customRateForProduct = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || (sellerAcc as any)?.customExchangeRate || 132000;
+      let rateTypeForProduct = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType || "DAILY_MARKET";
+      let customRateForProduct = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate || 132000;
 
       if (rateTypeForProduct === "FIXED") {
         stockMap[key].exchangeRateType = "FIXED";
@@ -136,14 +159,43 @@ export async function GET(request: Request) {
       if (t.qtyChange > 0 && rawPrice > 0) {
         let effectiveUnitCostUsd = originalPriceUsd;
 
-        if (rateTypeForProduct === "FIXED") {
+        // Only convert IQD items using fixed rate. USD items already ARE in USD — no conversion needed.
+        if (isIQD && rateTypeForProduct === "FIXED") {
           const fixedRatePerDollar = customRateForProduct / 100;
-          effectiveUnitCostUsd = (originalPriceUsd * fixedRatePerDollar) / marketRatePerDollar;
+          effectiveUnitCostUsd = rawPrice / fixedRatePerDollar;
+        } else if (!isIQD && rateTypeForProduct === "FIXED") {
+          // USD item with FIXED rate account → price stays in USD as entered, no adjustment
+          effectiveUnitCostUsd = originalPriceUsd;
         }
 
         const unitExpense = 0;
+        const qtyIn = t.qtyChange;
+        const unitCostUsdIn = effectiveUnitCostUsd + unitExpense;
+        const unitRawCostIn = isIQD ? rawPrice : originalPriceUsd;
+
+        if (stockMap[key].isMultiBatch) {
+          stockMap[key].runningCostUsd = unitCostUsdIn;
+          stockMap[key].runningRawCost = unitRawCostIn;
+          stockMap[key].runningOnHandQty = (stockMap[key].runningOnHandQty || 0) + qtyIn;
+        } else {
+          // Perpetual Moving Average Cost: averages incoming batch with currently available on-hand stock
+          const currentOnHand = stockMap[key].runningOnHandQty || 0;
+          if (currentOnHand <= 0) {
+            stockMap[key].runningCostUsd = unitCostUsdIn;
+            stockMap[key].runningRawCost = unitRawCostIn;
+            stockMap[key].runningOnHandQty = qtyIn;
+          } else {
+            const totalValUsd = (currentOnHand * (stockMap[key].runningCostUsd || 0)) + (qtyIn * unitCostUsdIn);
+            const totalValRaw = (currentOnHand * (stockMap[key].runningRawCost || 0)) + (qtyIn * unitRawCostIn);
+            const newOnHand = currentOnHand + qtyIn;
+            stockMap[key].runningOnHandQty = newOnHand;
+            stockMap[key].runningCostUsd = totalValUsd / newOnHand;
+            stockMap[key].runningRawCost = totalValRaw / newOnHand;
+          }
+        }
 
         stockMap[key].totalPurchaseValue += (t.qtyChange * effectiveUnitCostUsd);
+        stockMap[key].totalPurchaseValueRaw = (stockMap[key].totalPurchaseValueRaw || 0) + (t.qtyChange * (isIQD ? rawPrice : originalPriceUsd));
         stockMap[key].totalPurchaseQty += t.qtyChange;
         stockMap[key].totalExpenseValue += (t.qtyChange * unitExpense);
         
@@ -152,23 +204,17 @@ export async function GET(request: Request) {
         stockMap[key].isIQD = isIQD;
         stockMap[key].currencyCode = isIQD ? "IQD" : "USD";
         stockMap[key].currencySymbol = isIQD ? "دینار" : "$";
-        stockMap[key].rawPurchasePrice = isIQD ? rawPrice : originalPriceUsd;
-        stockMap[key].rawCost = isIQD ? rawPrice : effectiveUnitCostUsd;
+        stockMap[key].latestRawPrice = isIQD ? rawPrice : originalPriceUsd;
+        stockMap[key].latestCostUsd = effectiveUnitCostUsd + unitExpense;
 
-        if (stockMap[key].isMultiBatch) {
-          stockMap[key].purchasePrice = isIQD ? rawPrice : originalPriceUsd;
-          stockMap[key].cost = isIQD ? rawPrice : effectiveUnitCostUsd;
-          stockMap[key].expense = unitExpense;
-        } else {
-          const avgCostUsd = stockMap[key].totalPurchaseQty > 0 ? (stockMap[key].totalPurchaseValue / stockMap[key].totalPurchaseQty) : effectiveUnitCostUsd;
-          const avgExpense = 0;
-          
-          stockMap[key].purchasePrice = isIQD ? rawPrice : originalPriceUsd;
-          stockMap[key].cost = isIQD ? (avgCostUsd * marketRatePerDollar) : avgCostUsd;
-          stockMap[key].costUsd = avgCostUsd;
-          stockMap[key].purchasePriceUsd = originalPriceUsd;
-          stockMap[key].expense = avgExpense;
-        }
+        stockMap[key].rawPurchasePrice = stockMap[key].runningRawCost;
+        stockMap[key].rawCost = stockMap[key].runningRawCost;
+        stockMap[key].purchasePrice = isIQD ? stockMap[key].runningRawCost : stockMap[key].runningCostUsd;
+        stockMap[key].cost = isIQD ? stockMap[key].runningRawCost : stockMap[key].runningCostUsd;
+        stockMap[key].costUsd = stockMap[key].runningCostUsd;
+        stockMap[key].purchasePriceUsd = stockMap[key].runningCostUsd;
+        stockMap[key].expense = unitExpense;
+
         if (t.voucher?.account?.name) {
           stockMap[key].sellerName = t.voucher.account.name;
           stockMap[key].sellerId = t.voucher.account.id;
@@ -176,6 +222,9 @@ export async function GET(request: Request) {
         if (t.voucher?.date) {
           stockMap[key].purchaseDate = t.voucher.date;
         }
+      } else if (t.qtyChange < 0) {
+        // Outflow (sale / transfer out) reduces on-hand quantity without changing unit cost
+        stockMap[key].runningOnHandQty = (stockMap[key].runningOnHandQty || 0) + t.qtyChange;
       }
     });
 
@@ -188,6 +237,10 @@ export async function GET(request: Request) {
         if (txWithCost) {
           item.purchasePrice = txWithCost.unitCost;
           item.cost = txWithCost.unitCost;
+          item.costUsd = item.isIQD ? (txWithCost.unitCost / marketRatePerDollar) : txWithCost.unitCost;
+          item.purchasePriceUsd = item.costUsd;
+          item.rawCost = txWithCost.unitCost;
+          item.rawPurchasePrice = txWithCost.unitCost;
         }
       }
 
@@ -200,7 +253,7 @@ export async function GET(request: Request) {
           const latestV = sortedV[sortedV.length - 1];
           try { vData = JSON.parse(latestV.data); } catch(e){}
         }
-        return (t.voucher as any)?.exchangeRateType === "FIXED" || vData.exchangeRateType === "FIXED" || (t.voucher?.account as any)?.exchangeRateType === "FIXED";
+        return (t.voucher as any)?.exchangeRateType === "FIXED" || vData.exchangeRateType === "FIXED" || t.voucher?.account?.exchangeRateType === "FIXED";
       });
 
       if (txFixed) {
@@ -211,7 +264,7 @@ export async function GET(request: Request) {
           try { vData = JSON.parse(latestV.data); } catch(e){}
         }
         item.exchangeRateType = "FIXED";
-        item.customExchangeRate = (txFixed.voucher as any)?.customExchangeRate || vData.customExchangeRate || (txFixed.voucher?.account as any)?.customExchangeRate || 132000;
+        item.customExchangeRate = (txFixed.voucher as any)?.customExchangeRate || vData.customExchangeRate || txFixed.voucher?.account?.customExchangeRate || 132000;
       }
     });
 
@@ -342,7 +395,8 @@ export async function PUT(request: Request) {
       where: {
         productId,
         warehouseId,
-        qtyChange: { gt: 0 }
+        qtyChange: { gt: 0 },
+        voucher: { isDeleted: false }
       },
       select: { id: true }
     });
@@ -361,7 +415,8 @@ export async function PUT(request: Request) {
       const latestTx = await prisma.inventoryTransaction.findFirst({
         where: {
           productId,
-          warehouseId
+          warehouseId,
+          voucher: { isDeleted: false }
         },
         orderBy: {
           id: "desc"

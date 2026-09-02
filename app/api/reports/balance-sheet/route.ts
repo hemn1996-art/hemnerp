@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import { getCurrentUser } from "../../../lib/auth";
+import { getCalculatedWarehouseValueInUsd } from "../../../../lib/stockValue";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const asOfDate = searchParams.get("asOfDate") || new Date().toISOString().split("T")[0];
     const currencyId = searchParams.get("currencyId");
@@ -33,11 +40,15 @@ export async function GET(request: Request) {
       }),
       // 2. Inventory transactions
       prisma.inventoryTransaction.findMany({
-        where: { date: { lte: dateFilter } },
+        where: {
+          date: { lte: dateFilter },
+          voucher: { isDeleted: false },
+        },
         select: {
           productId: true,
           qtyChange: true,
           unitCost: true,
+          currencyId: true,
           date: true,
           voucher: { select: { type: true } },
         },
@@ -47,6 +58,7 @@ export async function GET(request: Request) {
         by: ["accountId", "currencyId"],
         where: {
           date: { lte: dateFilter },
+          voucher: { isDeleted: false },
         },
         _sum: { debit: true, credit: true },
       }),
@@ -54,6 +66,7 @@ export async function GET(request: Request) {
       prisma.voucher.findMany({
         where: {
           date: { lte: dateFilter },
+          isDeleted: false,
           type: {
             in: [
               "sales",
@@ -76,7 +89,7 @@ export async function GET(request: Request) {
           currencyId: true,
           exchangeRate: true,
           inventoryTransactions: {
-            select: { qtyChange: true, unitCost: true },
+            select: { qtyChange: true, unitCost: true, currencyId: true },
           },
           lines: {
             select: { productId: true, qty: true },
@@ -191,70 +204,30 @@ export async function GET(request: Request) {
     }, 0);
 
     // 2. Warehouse Value
-    const productStats: Record<number, {
-      totalPurchaseValue: number;
-      totalPurchaseQty: number;
-      currentQty: number;
-      fallbackCost: number;
-    }> = {};
-
-    // Sort transactions by date ascending to match Stock Report fallback logic
-    const sortedTrans = [...inventoryTrans].sort((a, b) => {
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateA - dateB;
-    });
-
-    sortedTrans.forEach(t => {
-      const pId = t.productId;
-      if (!productStats[pId]) {
-        productStats[pId] = {
-          totalPurchaseValue: 0,
-          totalPurchaseQty: 0,
-          currentQty: 0,
-          fallbackCost: 0
-        };
-      }
-      
-      const stats = productStats[pId];
-      stats.currentQty += t.qtyChange;
-
-      if (t.qtyChange > 0 && t.voucher?.type === "purchase") {
-        stats.totalPurchaseValue += (t.qtyChange * t.unitCost);
-        stats.totalPurchaseQty += t.qtyChange;
-      }
-
-      if (t.unitCost > 0 && stats.fallbackCost === 0) {
-        stats.fallbackCost = t.unitCost;
-      }
-    });
-
-    let totalWarehouseValueInUsd = 0;
-    Object.values(productStats).forEach(stats => {
-      let cost = 0;
-      if (stats.totalPurchaseQty > 0) {
-        cost = stats.totalPurchaseValue / stats.totalPurchaseQty;
-      } else {
-        cost = stats.fallbackCost;
-      }
-      
-      const val = stats.currentQty * cost;
-      if (val > 0) {
-        totalWarehouseValueInUsd += val;
-      }
-    });
+    const totalWarehouseValueInUsd = await getCalculatedWarehouseValueInUsd(dateFilter);
     const warehouseValue = totalWarehouseValueInUsd * targetRate;
 
     // 3. Accounts receivable / payable
     let totalShareholderDeposits = 0;
     let totalShareholderWithdrawals = 0;
-    const shareholderAccounts = await prisma.account.findMany({
-      where: { isShareholder: true },
-      select: { id: true, name: true, phone: true, sharePercentage: true, isActive: true }
+    const allAccounts = await prisma.account.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        sharePercentage: true,
+        isActive: true,
+        isShareholder: true,
+        exchangeRateType: true,
+        customExchangeRate: true,
+      }
     });
+    const shareholderAccounts = allAccounts.filter(a => a.isShareholder);
     const shareholderIds = new Set(shareholderAccounts.map(a => a.id));
+    const nonShareholderMap = new Map(allAccounts.filter(a => !a.isShareholder).map(a => [a.id, a]));
 
-    const accountNetBalances: Record<number, number> = {};
+    const nonShCurBalances: Record<number, Record<number, number>> = {};
     const shareholderBalances: Record<number, number> = {};
     const shareholderBalancesUSD: Record<number, number> = {};
 
@@ -274,28 +247,44 @@ export async function GET(request: Request) {
         totalShareholderDeposits += creditConverted;
         totalShareholderWithdrawals += debitConverted;
       } else {
-        accountNetBalances[agg.accountId] = (accountNetBalances[agg.accountId] || 0) + netConverted;
+        if (!nonShCurBalances[agg.accountId]) nonShCurBalances[agg.accountId] = {};
+        nonShCurBalances[agg.accountId][agg.currencyId] = netRaw;
       }
     });
+
+    const iqdId = dbIQD ? dbIQD.id : 2;
+    const marketRatePerDollar = customIQDRate || (fallbackRate > 10000 ? fallbackRate / 100 : fallbackRate);
 
     let accountsReceivable = 0;
     let accountsPayable = 0;
-    Object.values(accountNetBalances).forEach(balance => {
-      if (balance > 0.01) {
-        accountsReceivable += balance;
-      } else if (balance < -0.01) {
-        accountsPayable += Math.abs(balance);
-      }
-    });
 
-    if (accountsPayable < 1) accountsPayable = 0;
-    if (accountsReceivable < 1) accountsReceivable = 0;
+    for (const [accIdStr, curBals] of Object.entries(nonShCurBalances)) {
+      const accId = Number(accIdStr);
+      const acc = nonShareholderMap.get(accId);
+      if (!acc) continue;
 
-    Object.values(shareholderBalances).forEach(balance => {
-      if (balance > 0.01) {
-        totalShareholderWithdrawals += balance;
+      const usdBal = curBals[usdId] || 0;
+      const iqdBal = curBals[iqdId] || 0;
+
+      let effectiveUsd = 0;
+      if (acc.exchangeRateType === "FIXED") {
+        const customRatePerDollar = acc.customExchangeRate
+          ? (acc.customExchangeRate > 10000 ? acc.customExchangeRate / 100 : acc.customExchangeRate)
+          : 1320;
+        effectiveUsd = (usdBal * customRatePerDollar) / marketRatePerDollar + (iqdBal / marketRatePerDollar);
+      } else {
+        effectiveUsd = usdBal + (iqdBal / marketRatePerDollar);
       }
-    });
+
+      const convertedEffective = effectiveUsd * targetRate;
+
+      if (convertedEffective > 0.01) {
+        accountsReceivable += convertedEffective;
+      } else if (convertedEffective < -0.01) {
+        accountsPayable += Math.abs(convertedEffective);
+      }
+    }
+
 
     const activeAssetsSum = await prisma.fixedAsset.aggregate({
       where: { isActive: true },
@@ -306,10 +295,12 @@ export async function GET(request: Request) {
     const totalAssets = totalCash + warehouseValue + accountsReceivable + fixedAssetsValue;
 
     // 4. Net Profit calculation (matching final profit in profit report)
-    const productCosts: Record<number, number> = {};
+    const productCosts: Record<number, { costUsd: number }> = {};
     inventoryTrans.forEach((t) => {
       if (t.qtyChange > 0 && t.unitCost > 0) {
-        productCosts[t.productId] = t.unitCost;
+        // Convert unitCost to USD using the stored currencyId
+        const costUsd = convertToTarget(t.unitCost, t.currencyId || usdId) / targetRate;
+        productCosts[t.productId] = { costUsd };
       }
     });
 
@@ -330,29 +321,35 @@ export async function GET(request: Request) {
         let cogs = 0;
         if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
           v.inventoryTransactions.forEach((tx: any) => {
-            cogs += Math.abs(tx.qtyChange) * tx.unitCost;
+            const pc = productCosts[tx.productId];
+            const costUsd = pc ? pc.costUsd : convertToTarget(tx.unitCost, tx.currencyId || usdId) / targetRate;
+            cogs += Math.abs(tx.qtyChange) * costUsd;
           });
         } else if (v.lines) {
           v.lines.forEach((line: any) => {
-            const cost = productCosts[line.productId] || 0;
-            cogs += line.qty * cost;
+            const pc = productCosts[line.productId];
+            const costUsd = pc ? pc.costUsd : 0;
+            cogs += line.qty * costUsd;
           });
         }
-        totalCOGS += convertToTarget(cogs, usdId);
+        totalCOGS += cogs * targetRate;
       } else if (v.type === "sales_return") {
         totalSales -= amount;
         let cogs = 0;
         if (v.inventoryTransactions && v.inventoryTransactions.length > 0) {
           v.inventoryTransactions.forEach((tx: any) => {
-            cogs += Math.abs(tx.qtyChange) * tx.unitCost;
+            const pc = productCosts[tx.productId];
+            const costUsd = pc ? pc.costUsd : convertToTarget(tx.unitCost, tx.currencyId || usdId) / targetRate;
+            cogs += Math.abs(tx.qtyChange) * costUsd;
           });
         } else if (v.lines) {
           v.lines.forEach((line: any) => {
-            const cost = productCosts[line.productId] || 0;
-            cogs += line.qty * cost;
+            const pc = productCosts[line.productId];
+            const costUsd = pc ? pc.costUsd : 0;
+            cogs += line.qty * costUsd;
           });
         }
-        totalCOGS -= convertToTarget(cogs, usdId);
+        totalCOGS -= cogs * targetRate;
       } else if (v.type === "my_debt_discount" || v.type === "داشکاندنم بۆ کراوە") {
         totalMyDebtDiscount += amount;
       } else if (v.type === "people_debt_discount" || v.type === "داشکاندنم کردوە") {
@@ -367,14 +364,6 @@ export async function GET(request: Request) {
         totalDistributedProfit += amount;
       }
     });
-
-    const salesProfit = totalSales - totalCOGS;
-    const currentLiabilities = accountsPayable;
-    const capital = totalShareholderDeposits - totalShareholderWithdrawals;
-    const annualProfit = totalCash + warehouseValue + accountsReceivable + fixedAssetsValue - accountsPayable - capital;
-    const withdrawals = 0;
-    const startingCapital = 0;
-    const totalLiabilitiesEquity = currentLiabilities + capital + annualProfit + withdrawals;
 
     const shareholderIdsList = shareholderAccounts.map(a => a.id);
     const [ledgerCounts, voucherCounts] = await Promise.all([
@@ -411,6 +400,15 @@ export async function GET(request: Request) {
         canDelete
       };
     });
+
+    const salesProfit = totalSales - totalCOGS;
+    const currentLiabilities = accountsPayable;
+    // Single Source of Truth: Capital is strictly the sum of all individual shareholder balances
+    const capital = shareholders.reduce((sum, sh) => sum + sh.balance, 0);
+    const annualProfit = totalCash + warehouseValue + accountsReceivable + fixedAssetsValue - accountsPayable - capital;
+    const withdrawals = 0;
+    const startingCapital = 0;
+    const totalLiabilitiesEquity = currentLiabilities + capital + annualProfit + withdrawals;
 
     return NextResponse.json({
       asOfDate,

@@ -5,6 +5,8 @@ import { Pool } from "pg";
 const globalForPrisma = global as unknown as {
   prisma: PrismaClient;
   pgPool: Pool;
+  directPrisma?: PrismaClient;
+  directPool?: Pool;
 };
 
 const getPrismaClient = () => {
@@ -25,3 +27,19 @@ const getPrismaClient = () => {
 // هەمیشە cache بکە — هەم development هەم production
 export const prisma = globalForPrisma.prisma ?? getPrismaClient();
 globalForPrisma.prisma = prisma;
+
+const getDirectPrismaClient = () => {
+  if (!globalForPrisma.directPool) {
+    globalForPrisma.directPool = new Pool({
+      connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL,
+      max: 2,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 8000,
+    });
+  }
+  const adapter = new PrismaPg(globalForPrisma.directPool);
+  return new PrismaClient({ adapter });
+};
+
+export const directPrisma = globalForPrisma.directPrisma ?? getDirectPrismaClient();
+globalForPrisma.directPrisma = directPrisma;

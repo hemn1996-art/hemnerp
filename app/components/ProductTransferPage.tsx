@@ -1,6 +1,6 @@
 "use client";
 import { openPrintWindow } from "@/app/utils/printWindow";
-import DateInput from "./DateInput";
+﻿import DateInput from "./DateInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 
 import {
@@ -642,7 +642,8 @@ export default function ProductTransferPage({ headerSelector, editId }: Props) {
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`);
+          if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(dateStr + " " + cleanTime);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -690,8 +691,10 @@ export default function ProductTransferPage({ headerSelector, editId }: Props) {
       ledgerEntries: [],
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res: any) => {
@@ -1391,7 +1394,7 @@ function StatBox({
   color,
 }: {
   title: string;
-  value: string;
+  value: React.ReactNode;
   color: string;
 }) {
   return (
@@ -1404,7 +1407,7 @@ function StatBox({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={printInfoRow}>
       <b>{label}:</b>
@@ -1419,7 +1422,7 @@ function PrintSummaryLine({
   bold,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
 }) {
   let hideZero = false;
@@ -1432,7 +1435,7 @@ function PrintSummaryLine({
     }
   }
 
-  if (hideZero) {
+  if (hideZero && typeof value === "string") {
     const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
     if (clean === "0" || clean === "" || Number(clean) === 0) {
       return null;
@@ -1467,8 +1470,8 @@ function SettingCheck({
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
 
   body * { visibility: hidden !important; }
 

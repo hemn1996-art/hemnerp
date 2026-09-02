@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
+import { getCurrentUser } from "../../lib/auth";
+import { convertDigits } from "../../utils/digits";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search");
+    const searchRaw = searchParams.get("search");
+    const search = searchRaw ? convertDigits(searchRaw) : null;
 
     const whereClause = search
       ? {
@@ -39,6 +47,8 @@ export async function GET(request: Request) {
           discountPercent: true,
           guarantorName: true,
           notes: true,
+          exchangeRateType: true,
+          customExchangeRate: true,
           accountType: { select: { id: true, name: true, showsInSales: true, showsInPurch: true } },
           country: { select: { name: true } },
           city: { select: { name: true } },
@@ -49,6 +59,9 @@ export async function GET(request: Request) {
       // Aggregate ledger entries by account+currency in the database
       prisma.ledgerEntry.groupBy({
         by: ["accountId", "currencyId"],
+        where: {
+          voucher: { isDeleted: false },
+        },
         _sum: {
           debit: true,
           credit: true,
@@ -59,10 +72,16 @@ export async function GET(request: Request) {
       }),
       prisma.ledgerEntry.groupBy({
         by: ["accountId"],
+        where: {
+          voucher: { isDeleted: false },
+        },
         _count: { id: true }
       }),
       prisma.voucher.groupBy({
         by: ["accountId"],
+        where: {
+          isDeleted: false,
+        },
         _count: { id: true }
       })
     ]);
@@ -133,6 +152,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const data = await request.json();
 
     if (!data.name?.trim()) {
@@ -189,6 +213,8 @@ export async function POST(request: Request) {
         isShareholder: data.isShareholder || false,
         sharePercentage: data.isShareholder ? (data.sharePercentage || 0) : 0,
         isActive: data.isActive ?? true,
+        exchangeRateType: data.exchangeRateType || "DAILY_MARKET",
+        customExchangeRate: data.customExchangeRate ? Number(data.customExchangeRate) : 132000,
       },
     });
 
@@ -204,6 +230,11 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const data = await request.json();
 
     if (!data.id) {
@@ -242,6 +273,8 @@ export async function PUT(request: Request) {
       discountPercent: data.discountPercent ?? 0,
       guarantorName: data.guarantorName || null,
       notes: data.notes || null,
+      exchangeRateType: data.exchangeRateType || "DAILY_MARKET",
+      customExchangeRate: data.customExchangeRate ? Number(data.customExchangeRate) : 132000,
     };
 
     if (data.accountTypeId) {
@@ -265,6 +298,11 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

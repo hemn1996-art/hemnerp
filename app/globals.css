@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Aref+Ruqaa:wght@700&family=Noto+Naskh+Arabic:wght@500;700&family=Scheherazade+New:wght@600;700&family=Cairo:wght@700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Naskh+Arabic:wght@500;700&family=Scheherazade+New:wght@600;700&family=Cairo:wght@700;800&display=swap');
 @import "tailwindcss";
 
 @font-face {
@@ -19,8 +19,9 @@
 
 .dua-font,
 .arabic-dua,
-.tashkeel-font {
-  font-family: 'Amiri', 'Noto Naskh Arabic', 'Scheherazade New', 'Traditional Arabic', 'Arabic Typesetting', serif !important;
+.tashkeel-font,
+.arabic-dhikr-font {
+  font-family: 'Amiri', 'Scheherazade New', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arabic Typesetting', serif !important;
   font-feature-settings: "kern" 1, "liga" 1, "calt" 1 !important;
   text-rendering: optimizeLegibility !important;
 }
@@ -81,6 +82,28 @@ select,
 textarea,
 option {
   font-family: "Speda", "Segoe UI", Tahoma, Arial, sans-serif !important;
+}
+
+/* ───────────────────────────────────────────────────────────
+   GLOBAL DIGITS & NUMBERS TYPOGRAPHY FIX
+   Speda font has narrow glyph kerning for bold numbers.
+   This forces [dir="ltr"] numbers, amounts, currencies & dates
+   to use clean, spacious system sans-serif font kerning.
+─────────────────────────────────────────────────────────── */
+[dir="ltr"] {
+  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", Arial, sans-serif !important;
+  letter-spacing: 0.035em !important;
+}
+
+[dir="ltr"] *,
+span[dir="ltr"],
+td[dir="ltr"],
+div[dir="ltr"] {
+  letter-spacing: 0.035em !important;
+}
+
+input, select, textarea {
+  text-align: center !important;
 }
 
 /* Responsive Grid Custom Properties */
@@ -246,13 +269,11 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
    Ensures print view fits A4/A5 without clipping or sidebars.
    Resets zoom, width, overflow and margins on print.
 ─────────────────────────────────────────────────────────── */
-@media print {
-  /* Reset browser margin and page margins */
-  @page {
-    size: auto;
-    margin: 0;
-  }
+@page {
+  margin: 0mm;
+}
 
+@media print {
   /* Reset layout zoom and dimensions */
   html {
     zoom: 1 !important;
@@ -271,11 +292,6 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
     padding: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-  }
-
-  /* ── Critical: kill the 1280px min-width that forces wider-than-A4 layout ── */
-  body, #root, #__next, .app, .main-layout, .dashboard-page {
-    min-width: 0 !important;
   }
 
   table, tr, th, td, div {
@@ -332,14 +348,14 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   #cash-withdrawal-print-area,
   #quotation-print-area,
   [id$="-print-area"] {
-    position: fixed !important;
+    position: absolute !important;
     left: 0 !important;
     top: 0 !important;
     right: 0 !important;
     width: 100% !important;
     min-width: 100% !important;
     max-width: 100% !important;
-    padding: 2mm 6mm 6mm 6mm !important; /* Top: 2mm, Left/Right: 6mm, Bottom: 6mm */
+    padding: 0mm 6mm 6mm 6mm !important; /* Top: 0mm, Left/Right: 6mm, Bottom: 6mm */
     margin: 0 !important;
     box-sizing: border-box !important;
     border: none !important;
@@ -401,11 +417,16 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   }
   
   th, td {
-    padding: 4px 6px !important;
-    font-size: 11px !important;
-    line-height: 1.3 !important;
+    padding: 5px 7px !important;
+    font-size: 13.5px !important;
+    line-height: 1.4 !important;
     white-space: normal !important;
     word-break: break-word !important;
+  }
+
+  th {
+    font-size: 14px !important;
+    font-weight: 800 !important;
   }
 
   th:not(.allow-wrap),
@@ -445,14 +466,26 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   .grid-cols-3 > div span,
   .grid-cols-4 > div span,
   .grid > div span {
-    font-size: 11px !important;
+    font-size: 13px !important;
+  }
+
+  /* Increase voucher header info text & totals text on print */
+  [id$="-print-area"] div,
+  #print-area div,
+  #invoice-print-area div,
+  #purchase-print-area div,
+  #expense-print-area div,
+  #sales-return-print-area div,
+  #purchase-return-print-area div,
+  #quotation-print-area div {
+    font-size: 13px;
   }
 
   /* Specific A5 paper size optimization */
   body.print-paper-a5 #invoice-print-area,
   body.print-paper-a5 #purchase-print-area,
   body.print-paper-a5 [id$="-print-area"] {
-    zoom: 0.67 !important;
+    zoom: 0.78 !important;
     width: 100% !important;
     max-width: 100% !important;
   }
@@ -460,16 +493,62 @@ div[style*="position: fixed"][style*="left: 50%"][style*="background:#1e293b"] {
   body.print-paper-a5 .print-header-spacer {
     height: 80px !important;
   }
+
+  /* Ensure top header image starts flush at the very top of print page */
+  #print-area,
+  #print-report-area,
+  [id$="-print-area"],
+  #print-area > div,
+  #print-report-area > div,
+  [id$="-print-area"] > div {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    top: 0 !important;
+  }
+
+  img[alt="Header"],
+  div[style*="headerImageContainer"] {
+    margin-top: -15px !important;
+    padding-top: 0 !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  /* Center text vertically and horizontally in bottom summary boxes */
+  [style*="minHeight: 40"],
+  [style*="min-height: 40"],
+  [style*="printSummaryBox"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
 }
 
 /* Dhikr & Duaa Calligraphic Font Override */
 .arabic-dhikr-font,
-.arabic-dhikr-font * {
-  font-family: 'Amiri Quran', 'Scheherazade New', 'Aref Ruqaa', 'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arabic Typesetting', serif !important;
+.arabic-dhikr-font *,
+html body .arabic-dhikr-font,
+html body .arabic-dhikr-font *,
+html body .dua-font,
+html body .arabic-dua {
+  font-family: 'Amiri', 'Scheherazade New', 'Noto Naskh Arabic', 'Traditional Arabic', 'Arabic Typesetting', serif !important;
   font-weight: 700 !important;
-  font-size: 1.4em !important;
   letter-spacing: 0px !important;
-  line-height: 1.5 !important;
-  font-feature-settings: "kern" 1, "liga" 1, "calt" 1 !important;
-  text-rendering: optimizeLegibility !important;
-}
+  line-height: 1.6 !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PRINT — @page MUST be at top-level, NOT inside @media.
+   Nesting @page inside @media print is invalid CSS and
+   browsers silently ignore it.
+   ═══════════════════════════════════════════════════════ */
+@page {
+  margin: 0mm;
+}
+
+@media print {
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

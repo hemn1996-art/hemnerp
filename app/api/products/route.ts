@@ -33,13 +33,36 @@ export async function GET(request: Request) {
           },
         },
         inventoryTransactions: {
+          where: { voucher: { isDeleted: false } },
           select: {
             id: true,
             qtyChange: true,
             unitCost: true,
+            currencyId: true,
             date: true,
             warehouseId: true,
+            voucher: {
+              select: {
+                type: true,
+                exchangeRate: true,
+                account: {
+                  select: {
+                    id: true,
+                    name: true,
+                    exchangeRateType: true,
+                    customExchangeRate: true,
+                  },
+                },
+                versions: {
+                  select: {
+                    version: true,
+                    data: true,
+                  },
+                },
+              },
+            },
           },
+          orderBy: { date: "asc" },
         },
       },
       orderBy: { id: "desc" },
@@ -57,18 +80,53 @@ export async function GET(request: Request) {
         warehouseStocks[wId] = (warehouseStocks[wId] || 0) + t.qtyChange;
       });
 
-      const purchaseTx = p.inventoryTransactions
-        .filter((t) => t.qtyChange > 0 && t.unitCost > 0)
-        .sort((a, b) => b.id - a.id);
-      
-      let costPrice = 0;
-      if (p.isMultiBatch) {
-        costPrice = purchaseTx.length > 0 ? purchaseTx[0].unitCost : 0;
-      } else {
-        const totalValue = purchaseTx.reduce((sum, t) => sum + (t.qtyChange * t.unitCost), 0);
-        const totalQty = purchaseTx.reduce((sum, t) => sum + t.qtyChange, 0);
-        costPrice = totalQty > 0 ? (totalValue / totalQty) : 0;
-      }
+      let runningOnHand = 0;
+      let runningCost = 0;
+      let exchangeRateType = "DAILY_MARKET";
+      let customExchangeRate = 132000;
+      let lastCostCurrencyId = 1;
+
+      // Sort transactions chronologically
+      const sortedTxs = [...p.inventoryTransactions].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id
+      );
+
+      sortedTxs.forEach((t) => {
+        let versionData: any = {};
+        if (t.voucher?.versions && t.voucher.versions.length > 0) {
+          const sortedV = [...t.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
+          const latestV = sortedV[sortedV.length - 1];
+          try { versionData = JSON.parse(latestV.data); } catch (e) {}
+        }
+
+        const acc = t.voucher?.account;
+        const rateType = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || acc?.exchangeRateType;
+        const customRate = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || acc?.customExchangeRate;
+
+        if (rateType === "FIXED" && customRate) {
+          exchangeRateType = "FIXED";
+          customExchangeRate = customRate;
+        }
+
+        if (t.qtyChange > 0 && t.unitCost > 0) {
+          lastCostCurrencyId = t.currencyId || (t.unitCost > 1000 ? 2 : 1);
+          if (p.isMultiBatch) {
+            runningCost = t.unitCost;
+            runningOnHand += t.qtyChange;
+          } else {
+            if (runningOnHand <= 0) {
+              runningCost = t.unitCost;
+              runningOnHand = t.qtyChange;
+            } else {
+              const totalVal = (runningOnHand * runningCost) + (t.qtyChange * t.unitCost);
+              runningOnHand += t.qtyChange;
+              runningCost = totalVal / runningOnHand;
+            }
+          }
+        } else if (t.qtyChange < 0) {
+          runningOnHand += t.qtyChange;
+        }
+      });
 
       const hasTransactions = (p._count?.inventoryTransactions || 0) > 0 || (p._count?.voucherLines || 0) > 0;
       return {
@@ -84,7 +142,10 @@ export async function GET(request: Request) {
         isActive: p.isActive,
         createdAt: p.createdAt,
         stock: stock,
-        costPrice: costPrice,
+        costPrice: runningCost,
+        costCurrencyId: lastCostCurrencyId,
+        exchangeRateType,
+        customExchangeRate,
         isDeletable: !hasTransactions,
         salePrices: p.salePrices ? JSON.parse(p.salePrices) : [],
         warehouseStocks,

@@ -55,10 +55,19 @@ const PERMISSION_GROUPS = [
     modules: [
       { key: "materials", label: "کەرەستە" },
       { key: "materials_cost", label: "کۆستی کەرەستە (مایەی کڕین)" },
+      { key: "materials_stock", label: "دانەی بەردەست لە کەرەستە (مەوجودات/Stock)" },
+      { key: "selling_prices", label: "نرخی فرۆشتن (دوگمەی سایدمێنۆ)" },
       { key: "categories", label: "کاتیگۆری" },
       { key: "brands", label: "براند" },
       { key: "packaging", label: "پێچانەوە" },
       { key: "price_types", label: "جۆری نرخ" },
+    ],
+  },
+  {
+    name: "مەوجودات",
+    icon: "💼",
+    modules: [
+      { key: "fixed_assets", label: "مەوجودات (داراییە جێگیرەکان)" },
     ],
   },
   {
@@ -67,6 +76,7 @@ const PERMISSION_GROUPS = [
     modules: [
       { key: "reports_invoices", label: "ڕاپۆرتی پسووڵە" },
       { key: "reports_debts", label: "ڕاپۆرتی قەرز" },
+      { key: "reports_expenses", label: "ڕاپۆرتی خەرجی" },
       { key: "reports_profit", label: "ڕاپۆرتی قازانجی گشتی" },
       { key: "reports_stock", label: "ڕاپۆرتی کۆگا" },
       { key: "reports_stock_snapshot", label: "ڕاپۆرتی ئاستی کۆگا" },
@@ -161,16 +171,27 @@ export default function PermissionsPage({ params }: { params: Promise<{ id: stri
     );
   };
 
+  const isSingleViewOnly = (key: string) => {
+    return (
+      key.startsWith("reports_") ||
+      key === "materials_cost" ||
+      key === "materials_stock" ||
+      key === "selling_prices" ||
+      key === "dashboard" ||
+      key === "fixed_assets"
+    );
+  };
+
   const toggleAllInGroup = (modules: { key: string }[], enable: boolean) => {
     setPermissions((prev) => {
       const newPerms = { ...prev };
       modules.forEach((m) => {
-        const isReport = m.key.startsWith("reports_");
+        const isSingle = isSingleViewOnly(m.key);
         newPerms[m.key] = {
           canView: enable,
-          canCreate: isReport ? false : enable,
-          canUpdate: isReport ? false : enable,
-          canDelete: isReport ? false : enable,
+          canCreate: isSingle ? false : enable,
+          canUpdate: isSingle ? false : enable,
+          canDelete: isSingle ? false : enable,
         };
       });
       return newPerms;
@@ -181,6 +202,7 @@ export default function PermissionsPage({ params }: { params: Promise<{ id: stri
   const getPermCount = (module: string) => {
     const p = permissions[module];
     if (!p) return 0;
+    if (isSingleViewOnly(module)) return p.canView ? 1 : 0;
     return [p.canView, p.canCreate, p.canUpdate, p.canDelete].filter(Boolean).length;
   };
 
@@ -191,13 +213,13 @@ export default function PermissionsPage({ params }: { params: Promise<{ id: stri
       const permArray = Object.entries(permissions)
         .filter(([, v]) => v.canView || v.canCreate || v.canUpdate || v.canDelete)
         .map(([moduleKey, v]) => {
-          const isReport = moduleKey.startsWith("reports_");
+          const isSingle = isSingleViewOnly(moduleKey);
           return {
             module: moduleKey,
             canView: v.canView,
-            canCreate: isReport ? false : v.canCreate,
-            canUpdate: isReport ? false : v.canUpdate,
-            canDelete: isReport ? false : v.canDelete,
+            canCreate: isSingle ? false : v.canCreate,
+            canUpdate: isSingle ? false : v.canUpdate,
+            canDelete: isSingle ? false : v.canDelete,
           };
         });
 
@@ -270,7 +292,7 @@ export default function PermissionsPage({ params }: { params: Promise<{ id: stri
         {PERMISSION_GROUPS.map((group) => {
           const isOpen = openGroups.includes(group.name);
           const totalPerms = group.modules.reduce((sum, m) => sum + getPermCount(m.key), 0);
-          const maxPerms = group.modules.reduce((sum, m) => sum + (m.key.startsWith("reports_") ? 1 : 4), 0);
+          const maxPerms = group.modules.reduce((sum, m) => sum + (isSingleViewOnly(m.key) ? 1 : 4), 0);
 
           return (
             <div key={group.name} style={{
@@ -345,18 +367,18 @@ export default function PermissionsPage({ params }: { params: Promise<{ id: stri
                       <span style={{ fontSize: 14, fontWeight: 600, color: "#334155", display: "flex", alignItems: "center", gap: 8 }}>
                         {module.label}
                         <span style={{
-                          background: getPermCount(module.key) === (module.key.startsWith("reports_") ? 1 : 4) ? "#dcfce7" : getPermCount(module.key) > 0 ? "#e0f2fe" : "#f1f5f9",
-                          color: getPermCount(module.key) === (module.key.startsWith("reports_") ? 1 : 4) ? "#16a34a" : getPermCount(module.key) > 0 ? "#0284c7" : "#94a3b8",
+                          background: getPermCount(module.key) === (isSingleViewOnly(module.key) ? 1 : 4) ? "#dcfce7" : getPermCount(module.key) > 0 ? "#e0f2fe" : "#f1f5f9",
+                          color: getPermCount(module.key) === (isSingleViewOnly(module.key) ? 1 : 4) ? "#16a34a" : getPermCount(module.key) > 0 ? "#0284c7" : "#94a3b8",
                           padding: "1px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700,
                         }}>
-                          {getPermCount(module.key)}/{module.key.startsWith("reports_") ? 1 : 4}
+                          {getPermCount(module.key)}/{isSingleViewOnly(module.key) ? 1 : 4}
                         </span>
                       </span>
                       {(["canView", "canCreate", "canUpdate", "canDelete"] as const).map((action) => {
-                        const isReport = module.key.startsWith("reports_");
+                        const isSingle = isSingleViewOnly(module.key);
                         const isReadOnlyAction = action !== "canView";
 
-                        if (isReport && isReadOnlyAction) {
+                        if (isSingle && isReadOnlyAction) {
                           return (
                             <div key={action} style={{ textAlign: "center", color: "#cbd5e1", fontSize: 16 }}>
                               -

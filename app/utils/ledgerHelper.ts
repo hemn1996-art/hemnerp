@@ -73,8 +73,8 @@ export function calculateLedgerEntries({
   currencies,
 }: CalculateLedgerEntriesParams) {
   // Normalize types
-  const incomingTypes = ["sales", "money_in", "purchase_return", "people_debt_discount", "debt_discount", "daشکاندن لە قەرزم لای خەڵکە", "people_debt_discount"];
-  const outgoingTypes = ["purchase", "money_out", "sales_return", "my_debt_discount", "daشکاندن لە من قەرزارم", "my_debt_discount"];
+  const incomingTypes = ["sales", "money_in", "purchase_return", "people_debt_discount", "debt_discount", "داشکاندنم کردوە"];
+  const outgoingTypes = ["purchase", "money_out", "sales_return", "my_debt_discount", "داشکاندنم بۆ کراوە"];
   const openingDebtTypes = ["people_debt", "my_debt", "قەرزم لای خەڵکە", "من قەرزارم"];
 
   const isIncoming = incomingTypes.includes(type);

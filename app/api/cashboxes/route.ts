@@ -81,11 +81,16 @@ export async function POST(request: Request) {
 
       for (const currency of activeCurrencies) {
         // Initialize balance for this cashbox and currency
+        const initialBal = (data.balances || []).find(
+          (b: any) => Number(b.currencyId) === Number(currency.id)
+        );
+        const initialAmount = Number(initialBal?.amount || 0);
+
         await tx.cashboxBalance.create({
           data: {
             cashboxId: cashbox.id,
             currencyId: currency.id,
-            amount: 0,
+            amount: initialAmount,
           },
         });
       }

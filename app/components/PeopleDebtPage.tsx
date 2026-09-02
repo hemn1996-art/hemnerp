@@ -1,6 +1,6 @@
 "use client";
 import { openPrintWindow } from "@/app/utils/printWindow";
-import FormattedNumberInput from "./FormattedNumberInput";
+﻿import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 import DateInput from "./DateInput";
 
@@ -68,7 +68,8 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
     }
   }, [editId]);
 
-  const accounts = (store.accounts || []) as AccountLike[];
+  const accounts = (useStore((s) => s.accounts) || []) as AccountLike[];
+  const fetchAccounts = useStore((s: any) => s.fetchAccounts);
   const addVoucher = useStore((s) => s.addVoucher);
   const storeCurrencies = useStore((s: any) => s.currencies) || [];
   const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
@@ -99,6 +100,11 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
   const [receiptDate, setReceiptDate] = useState("");
 
   useEffect(() => {
+    fetchAccounts();
+    fetchCurrencies();
+  }, []);
+
+  useEffect(() => {
     if (!editId) {
       setReceiptNumber("");
       setCreatedTime(
@@ -111,12 +117,16 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
     }
   }, [editId]);
 
+  const [originalVoucher, setOriginalVoucher] = useState<any>(null);
+
   useEffect(() => {
     if (editId) {
+      fetchAccounts();
       fetch(`/api/vouchers/${editId}`)
         .then((res) => res.json())
         .then((voucher) => {
           if (voucher) {
+            setOriginalVoucher(voucher);
             setReceiptNumber(String(voucher.id));
             setReceiptDate(voucher.date.slice(0, 10));
             const d = new Date(voucher.date);
@@ -202,6 +212,34 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
   const [showSettings, setShowSettings] = useState(false);
   const [showNewReceiptConfirm, setShowNewReceiptConfirm] = useState(false);
 
+  const [invoiceTemplates, setInvoiceTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | string>("");
+
+  useEffect(() => {
+    const loadInvoiceTemplates = () => {
+      fetch("/api/invoice-templates")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setInvoiceTemplates(data);
+            const savedId = localStorage.getItem("selected_invoice_template_id");
+            if (savedId) {
+              setSelectedTemplateId(Number(savedId));
+            } else {
+              const main = data.find((t: any) => t.isMain && t.isActive);
+              if (main) setSelectedTemplateId(main.id);
+            }
+          }
+        })
+        .catch((e) => console.error(e));
+    };
+
+    loadInvoiceTemplates();
+    const handleTemplateChange = () => loadInvoiceTemplates();
+    window.addEventListener("invoice-template-changed", handleTemplateChange);
+    return () => window.removeEventListener("invoice-template-changed", handleTemplateChange);
+  }, []);
+
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [isLocked, setIsLocked] = useState(false);
 
@@ -245,25 +283,44 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
 
   const hasIqdDebt = getCurrencyCode(debtCurrencyId) === "IQD";
 
-  const liveAccountBalanceBeforeByCurrency =
-    getAccountBalanceBeforeMap(selectedAccount);
-
   const accountBalanceChangeByCurrency = getAccountBalanceChangeByCurrency();
 
-  const liveAccountBalanceAfterByCurrency = addMoneyMap(
-    liveAccountBalanceBeforeByCurrency,
-    accountBalanceChangeByCurrency
-  );
+  const accountBalanceBeforeByCurrency = useMemo(() => {
+    const currentBalMap = getAccountBalanceBeforeMap(selectedAccount);
+    if (!editId || !originalVoucher || !selectedAccount) {
+      return isLocked && lockedBalanceBefore ? lockedBalanceBefore : currentBalMap;
+    }
 
-  const accountBalanceBeforeByCurrency =
-    isLocked && lockedBalanceBefore
-      ? lockedBalanceBefore
-      : liveAccountBalanceBeforeByCurrency;
+    if (Number(accountId) !== originalVoucher.accountId) {
+      return currentBalMap;
+    }
 
-  const accountBalanceAfterByCurrency =
-    isLocked && lockedBalanceAfter
-      ? lockedBalanceAfter
-      : liveAccountBalanceAfterByCurrency;
+    if (originalVoucher.historicalBalanceBefore) {
+      return originalVoucher.historicalBalanceBefore;
+    }
+
+    const computedBefore = { ...currentBalMap };
+    if (originalVoucher.ledgerEntries && originalVoucher.ledgerEntries.length > 0) {
+      originalVoucher.ledgerEntries.forEach((le: any) => {
+        if (le.accountId === Number(accountId)) {
+          const curIdText = String(le.currencyId);
+          const change = le.debit - le.credit;
+          computedBefore[curIdText] = (computedBefore[curIdText] || 0) - change;
+        }
+      });
+    } else if (originalVoucher.currencyId && (originalVoucher.netAmount || originalVoucher.totalAmount)) {
+      const curIdText = String(originalVoucher.currencyId);
+      const amt = Number(originalVoucher.netAmount || originalVoucher.totalAmount || 0);
+      computedBefore[curIdText] = (computedBefore[curIdText] || 0) - amt;
+    }
+
+    return computedBefore;
+  }, [selectedAccount, editId, originalVoucher, accountId, isLocked, lockedBalanceBefore]);
+
+  const accountBalanceAfterByCurrency = useMemo(() => {
+    if (isLocked && lockedBalanceAfter) return lockedBalanceAfter;
+    return addMoneyMap(accountBalanceBeforeByCurrency, accountBalanceChangeByCurrency);
+  }, [accountBalanceBeforeByCurrency, accountBalanceChangeByCurrency, isLocked, lockedBalanceAfter]);
 
   const debtInDefaultCurrency = convertCurrency(
     toNumber(debtAmount),
@@ -410,10 +467,36 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
-    if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
-    }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    const absVal = Math.abs(Number(value || 0));
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
+    const code = getCurrencyCode(currencyId);
+    const symbol = getCurrencySymbol(currencyId);
+    const isIQD = code === "IQD";
+    const absVal = Math.abs(Number(value || 0));
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
+    const formatted = absVal.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: isIQD ? 0 : 2,
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+        </span>
+      </span>
+    );
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
@@ -426,6 +509,33 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
     return parts.length ? parts.join(" + ") : "0";
   }
 
+  function formatCurrencyMapForPrint(map: Record<string, number>) {
+    const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(Number(val || 0)) > 0.01);
+    if (activeEntries.length === 0) {
+      return <span style={{ color: "#6b7280", fontWeight: 900, display: "inline-block", width: "100%", textAlign: "center" }}>0</span>;
+    }
+
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", width: "100%", textAlign: "center", gap: 6 }}>
+        {activeEntries.map(([curIdText, val], idx) => {
+          const numVal = Number(val || 0);
+          const isNegative = numVal < -0.01;
+          const color = isNegative ? "#dc2626" : "#16a34a";
+          const curId = Number(curIdText);
+
+          return (
+            <span key={curIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+              <span style={{ color, fontWeight: 900 }}>
+                {formatCurrencyAmountJSX(numVal, curId, isNegative)}
+              </span>
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
+
   function formatCurrencyMapWithColors(map: Record<string, number>) {
     const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
@@ -436,21 +546,11 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const symbol = getCurrencySymbol(Number(curIdText));
-          const code = getCurrencyCode(Number(curIdText));
-          const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
-          
-          if (code === "IQD") {
-            return (
-              <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-                {isNegative ? "-" : ""}{formatted} دینار
-              </span>
-            );
-          }
-          
+          const curId = Number(curIdText);
+
           return (
-            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{symbol}{formatted}
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
+              {formatCurrencyAmountJSX(val, curId, isNegative)}
             </span>
           );
         })}
@@ -583,18 +683,12 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
   }
 
   function getAccountBalanceChangeByCurrency() {
-    const balanceCurrencyId = getNormalizedCurrencyId(getSingleAccountBalanceCurrencyId(selectedAccount));
-
-    const normalized = normalizeMoneyMapToSingleCurrency(
-      getDebtByCurrency(),
-      balanceCurrencyId
-    );
-
+    const rawMap = getDebtByCurrency();
     const result: Record<string, number> = {};
 
-    for (const [currencyIdText, amount] of Object.entries(normalized)) {
+    for (const [currencyIdText, amount] of Object.entries(rawMap)) {
       const normId = getNormalizedCurrencyId(Number(currencyIdText));
-      result[String(normId)] = (result[String(normId)] || 0) - Number(amount || 0);
+      result[String(normId)] = (result[String(normId)] || 0) + Number(amount || 0);
     }
 
     return result;
@@ -744,12 +838,14 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
       accountBalanceAfterByCurrency: balanceAfterAtSave,
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res) => {
-      if (res) {
+      if (res && (res.id || !res.error)) {
         applyAccountBalanceIncrease();
         setLockedBalanceBefore(balanceBeforeAtSave);
         setLockedBalanceAfter(balanceAfterAtSave);
@@ -757,7 +853,8 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
         setIsLocked(true);
         showToast("پسوڵەی قەرزم لای خەڵکە خەزن کرا ✅", "success");
       } else {
-        showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
+        const msg = res?.error || "هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.";
+        showToast(msg, "error");
       }
     }).catch((err) => {
       console.error("Save error:", err);
@@ -765,10 +862,51 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
     });
   }
 
-  function handlePrint() {
+  function handlePrint(size: "A4" | "A5" = "A4") {
     if (!isLocked && !isSaved) {
       showToast("پێش پرێنتکردن دەبێت پسوڵەکە خەزن بکەیت.");
       return;
+    }
+
+    if (typeof document !== "undefined") {
+      let styleTag = document.getElementById("dynamic-print-paper-style");
+      if (!styleTag) {
+        styleTag = document.createElement("style");
+        styleTag.id = "dynamic-print-paper-style";
+        document.head.appendChild(styleTag);
+      }
+
+      if (size === "A5") {
+        styleTag.innerHTML = `
+          @media print {
+            @page {
+              size: A5 landscape !important;
+              margin: 3mm !important;
+            }
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+          }
+        `;
+      } else {
+        styleTag.innerHTML = `
+          @media print {
+            @page {
+              size: auto !important;
+              margin: 4mm !important;
+            }
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+          }
+        `;
+      }
     }
 
     openPrintWindow("people-debt-print-area");
@@ -940,7 +1078,7 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
               </InfoRow>
 
               <InfoRow label="باڵانس">
-                {formatCurrencyMapWithColors(isLocked ? accountBalanceAfterByCurrency : accountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(selectedAccount))}
               </InfoRow>
             </div>
           )}
@@ -962,16 +1100,13 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
 
             <div style={twoCol}>
               <Field label="بڕی قەرز">
-                <input
+                <FormattedNumberInput
                   value={debtAmount}
                   disabled={isLocked}
-                  onChange={(e) => {
+                  onChange={(val) => {
                     if (blockIfLocked()) return;
-                    setDebtAmount(onlyDecimal(e.target.value));
+                    setDebtAmount(val);
                   }}
-                  inputMode="decimal"
-                  lang="en"
-                  dir="ltr"
                   placeholder="0"
                   style={{ ...input, ...lockedFieldStyle }}
                 />
@@ -1074,12 +1209,68 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
               {isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
 
+            <div style={{ display: "flex", gap: 8, width: "100%" }}>
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 5px rgba(37, 99, 235, 0.25)"
+                }}
+                onClick={() => handlePrint("A4")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                A4
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "10px 4px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "#16a34a",
+                  color: "#ffffff",
+                  fontFamily: '"Segoe UI", Arial, sans-serif',
+                  fontWeight: 800,
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  boxShadow: "0 2px 5px rgba(22, 163, 74, 0.25)"
+                }}
+                onClick={() => handlePrint("A5")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                A5
+              </button>
+            </div>
+
             <button style={outlineBlueBtn} onClick={() => setShowSettings(true)}>
               ڕێکخستن
-            </button>
-
-            <button style={printBtn} onClick={handlePrint}>
-              پرێنتکردن
             </button>
           </div>
 
@@ -1176,32 +1367,38 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
 
           
 
-          <div style={printBottomGrid}>
-            <div style={printSummaryBox}>
-              <PrintSummaryLine
-                label="باڵانسی پێشوو"
-                value={formatCurrencyMap(accountBalanceBeforeByCurrency)}
-                bold
-              />
-
-              <PrintSummaryLine
-                label="بڕی قەرز"
-                value={
-                  toNumber(debtAmount) > 0
-                    ? formatCurrencyAmount(toNumber(debtAmount), debtCurrencyId)
-                    : "0"
-                }
-              />
-
-              <PrintSummaryLine
-                label="کۆی گشتی ماوە"
-                value={formatCurrencyMap(editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency)}
-                bold
-              />
-            </div>
-
-            
-          </div>
+          {/* Balance Section — 3 stacked rows, full width */}
+          <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #94a3b8", marginTop: 12, fontSize: 15 }}>
+            <tbody>
+              {/* Row 1: Previous Balance */}
+              <tr>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
+                  باڵانسی پێش پسوڵە
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
+                  {formatCurrencyMapForPrint(accountBalanceBeforeByCurrency)}
+                </td>
+              </tr>
+              {/* Row 2: Voucher Amount */}
+              <tr>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
+                  بڕی پسووڵە
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
+                  {toNumber(debtAmount) > 0 ? formatCurrencyAmountJSX(toNumber(debtAmount), debtCurrencyId) : "0"}
+                </td>
+              </tr>
+              {/* Row 3: Current Balance */}
+              <tr style={{ background: "#f8fafc" }}>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
+                  باڵانسی ئێستا
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
+                  {formatCurrencyMapForPrint(accountBalanceAfterByCurrency)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
           {printNote && printNote.trim() !== "" && (
             <div style={{
@@ -1268,7 +1465,42 @@ export default function PeopleDebtPage({ headerSelector, editId }: Props) {
             </div>
 
             <div style={settingsStack}>
-                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={settingsSection}>
+                <h3 style={settingsTitle}>کڵێشەی پسووڵە</h3>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    setSelectedTemplateId(id);
+                    localStorage.setItem("selected_invoice_template_id", String(id));
+                    window.dispatchEvent(new Event("invoice-template-changed"));
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px",
+                    fontSize: "13px",
+                    fontWeight: "bold",
+                    color: "#374151",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
+                    backgroundColor: "#ffffff",
+                    outline: "none",
+                    cursor: "pointer"
+                  }}
+                >
+                  {invoiceTemplates.length === 0 ? (
+                    <option value="">کڵێشەی سەرەکی</option>
+                  ) : (
+                    invoiceTemplates.map((tmpl: any) => (
+                      <option key={tmpl.id} value={tmpl.id}>
+                        {tmpl.name}{tmpl.isMain ? " (سەرەکی)" : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
@@ -1410,7 +1642,7 @@ function StatBox({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={printInfoRow}>
       <b>{label}:</b>
@@ -1473,8 +1705,8 @@ function SettingCheck({
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
 
   body * { visibility: hidden !important; }
 
@@ -1906,8 +2138,9 @@ const printEmployeeBox: CSSProperties = {
 
 const printInfoRow: CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
-  gap: 14,
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: 6,
   lineHeight: 1.8,
 };
 

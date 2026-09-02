@@ -13,7 +13,7 @@ import {
 } from "react";
 
 import { useStore } from "../store/store";
-import { saveInvoice } from "../utils/invoiceLogic";
+import { getDefaultCashbox } from "../utils/accounting";
 import { currencies as mockCurrencies } from "../data/mockData";
 
 type ToastType = "error" | "success" | "info";
@@ -110,6 +110,35 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
   const [createdTime, setCreatedTime] = useState("");
   const [receiptDate, setReceiptDate] = useState("");
 
+  const [accountSearch, setAccountSearch] = useState("");
+  const [accountId, setAccountId] = useState<number | undefined>();
+  const [showAccountList, setShowAccountList] = useState(false);
+  const [showAccountInfo, setShowAccountInfo] = useState(false);
+
+  const [cashboxId, setCashboxId] = useState<number | undefined>(
+    () => getDefaultCashbox(cashboxes)?.id
+  );
+
+  useEffect(() => {
+    if (!editId && !cashboxId && cashboxes.length > 0) {
+      const def = getDefaultCashbox(cashboxes);
+      if (def?.id) setCashboxId(def.id);
+    }
+  }, [cashboxes, editId, cashboxId]);
+
+  const [amount, setAmount] = useState("");
+  const [currencyId, setCurrencyId] = useState<number>(defaultCurrency.id);
+  const [exchangeRate, setExchangeRate] = useState<string>("154000");
+
+  useEffect(() => {
+    if (!editId && currencies && currencies.length > 0) {
+      const iqd = currencies.find((c: any) => c.code === "IQD");
+      if (iqd && iqd.rate) {
+        setExchangeRate(String(iqd.rate * 100));
+      }
+    }
+  }, [currencies, editId]);
+
   useEffect(() => {
     if (!editId) {
       setReceiptNumber("");
@@ -144,10 +173,21 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
               if (acc) setAccountSearch(acc.name);
             }
             if (voucher.cashboxId) setCashboxId(voucher.cashboxId);
-            
-            const amt = voucher.totalAmount ?? voucher.amount;
-            if (amt) setAmount(String(amt));
-            if (voucher.currencyId) setCurrencyId(voucher.currencyId);
+
+            const isIQDVoucher = voucher.paidAmounts && voucher.paidAmounts.length > 0 && (voucher.paidAmounts[0].currencyId === 2 || voucher.paidAmounts[0].currencyId === 12);
+            if (isIQDVoucher) {
+              setAmount(String(voucher.paidAmounts[0].amount));
+              setCurrencyId(voucher.paidAmounts[0].currencyId);
+            } else {
+              const amt = voucher.totalAmount ?? voucher.amount;
+              if (amt) setAmount(String(amt));
+              if (voucher.currencyId) setCurrencyId(voucher.currencyId);
+            }
+
+            if (voucher.exchangeRate) {
+              const rawEx = Number(voucher.exchangeRate);
+              setExchangeRate(String(rawEx >= 1000 ? rawEx : rawEx * 100));
+            }
 
             setReceiptNote(voucher.internalNote || "");
             setPrintNote(voucher.printNote || "");
@@ -156,21 +196,22 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
             setIsLocked(false);
           }
         })
-        .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
+        .catch((err) => console.error("Error loading voucher:", err))
+        .finally(() => setIsEditLoading(false));
     }
-  }, [editId]);
+  }, [editId, accounts]);
 
-  const [accountSearch, setAccountSearch] = useState("");
-  const [accountId, setAccountId] = useState<number | undefined>();
-  const [showAccountList, setShowAccountList] = useState(false);
-  const [showAccountInfo, setShowAccountInfo] = useState(false);
+  const usdCurrencyId = currencies.find((c: any) => c.code === "USD")?.id || defaultCurrency.id || 1;
+  const iqdCurrencyId = currencies.find((c: any) => c.code === "IQD")?.id || 2;
+  const isIQD = currencyId === iqdCurrencyId || currencies.find((c: any) => c.id === currencyId)?.code === "IQD";
 
-  const [cashboxId, setCashboxId] = useState<number | undefined>(
-    cashboxes[0]?.id
-  );
-
-  const [amount, setAmount] = useState("");
-  const [currencyId, setCurrencyId] = useState<number>(defaultCurrency.id);
+  const currentUsdEquivalent = useMemo(() => {
+    const rawAmt = Number(amount) || 0;
+    if (rawAmt <= 0) return 0;
+    if (!isIQD) return rawAmt;
+    const rate = (Number(exchangeRate) || 154000) / 100;
+    return Number((rawAmt / rate).toFixed(2));
+  }, [amount, isIQD, exchangeRate]);
 
   const [receiptNote, setReceiptNote] = useState("");
   const [printNote, setPrintNote] = useState("");
@@ -201,17 +242,6 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
     showEmployeeInfo: false,
   });
 
-  useEffect(() => {
-    setReceiptNumber("");
-    setCreatedTime(
-      new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    );
-    setReceiptDate(new Date().toISOString().slice(0, 10));
-  }, []);
-
   const selectedAccount = accounts.find((account: any) => account.id === accountId);
   const selectedCashbox = cashboxes.find((cashbox: any) => cashbox.id === cashboxId);
 
@@ -232,6 +262,41 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
       );
     });
   }, [accounts, accountSearch]);
+
+  function getShareholderBalanceByCurrency(account?: AccountLike) {
+    const result: Record<string, number> = {};
+    if (!account) return result;
+
+    if (account.shareholderBalanceByCurrency) {
+      for (const [currencyIdText, value] of Object.entries(
+        account.shareholderBalanceByCurrency
+      )) {
+        const n = Number(value || 0);
+        if (Math.abs(n) > 0.0001) {
+          result[currencyIdText] = n;
+        }
+      }
+    }
+
+    if (
+      Object.keys(result).length === 0 &&
+      typeof account.shareholderBalance === "number"
+    ) {
+      result[String(usdCurrencyId)] = Number(
+        account.shareholderBalance || 0
+      );
+    }
+
+    return result;
+  }
+
+  function getShareholderBalanceAfter(baseMap: Record<string, number>) {
+    const result: Record<string, number> = { ...baseMap };
+    // باڵانسی پشک هەمیشە بە دۆلار زیاد دەبێت
+    const usdKey = String(usdCurrencyId);
+    result[usdKey] = Number(result[usdKey] || 0) + currentUsdEquivalent;
+    return result;
+  }
 
   const liveShareholderBalanceByCurrency =
     getShareholderBalanceByCurrency(selectedAccount);
@@ -256,6 +321,7 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
       cashboxId,
       amount,
       currencyId,
+      exchangeRate,
       receiptDate,
       createdTime,
       receiptNote,
@@ -268,14 +334,13 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
     cashboxId,
     amount,
     currencyId,
+    exchangeRate,
     receiptDate,
     createdTime,
     receiptNote,
     printNote,
     printOptions,
   ]);
-
-  
 
   useEffect(() => {
     if (editId && !isEditLoading && !savedSnapshot) {
@@ -318,18 +383,6 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
     return false;
   }
 
-  function onlyDecimal(value: string) {
-    const cleaned = value.replace(/[^\d.]/g, "");
-    const firstDot = cleaned.indexOf(".");
-
-    if (firstDot === -1) return cleaned;
-
-    return (
-      cleaned.slice(0, firstDot + 1) +
-      cleaned.slice(firstDot + 1).replace(/\./g, "")
-    );
-  }
-
   function toNumber(value: string | number | undefined) {
     const n = Number(value || 0);
     return Number.isFinite(n) ? n : 0;
@@ -344,63 +397,64 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
   }
 
   function formatCurrencyAmount(value: number, id: number) {
-    if (getCurrencyCode(id) === "IQD") {
-      return `${Number(value || 0).toLocaleString("en-US")} دینار`;
+    const code = getCurrencyCode(id);
+    const symbol = getCurrencySymbol(id);
+    const absVal = Math.abs(Number(value || 0));
+    if (code === "IQD") {
+      return `${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} دینار`;
     }
-    return `${Number(value || 0).toLocaleString("en-US")} ${getCurrencySymbol(id)}`;
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyIdVal: number, isNegativeParam?: boolean) {
+    const code = getCurrencyCode(currencyIdVal);
+    const symbol = getCurrencySymbol(currencyIdVal);
+    const isIQDVal = code === "IQD";
+    const absVal = Math.abs(Number(value || 0));
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
+    const formatted = absVal.toLocaleString("en-US", {
+      minimumFractionDigits: isIQDVal ? 0 : 2,
+      maximumFractionDigits: isIQDVal ? 0 : 2,
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const displaySymbol = isIQDVal ? "دینار" : symbol;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+        </span>
+      </span>
+    );
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
-    const parts = Object.entries(map)
-      .filter(([, value]) => Math.abs(Number(value || 0)) > 0.0001)
-      .map(([currencyIdText, value]) =>
-        formatCurrencyAmount(Number(value || 0), Number(currencyIdText))
-      );
-
-    return parts.length ? parts.join(" + ") : "0";
+    const active = Object.entries(map).filter(([, val]) => Math.abs(Number(val || 0)) > 0.0001);
+    if (active.length === 0) {
+      return formatCurrencyAmountJSX(0, usdCurrencyId);
+    }
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        {active.map(([currencyIdText, val], idx) => (
+          <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(val, Number(currencyIdText))}
+          </span>
+        ))}
+      </span>
+    );
   }
 
   function formatDate(dateText: string) {
     if (!dateText) return "-";
     const [year, month, day] = dateText.split("-");
     return `${day}/${month}/${year}`;
-  }
-
-  function getShareholderBalanceByCurrency(account?: AccountLike) {
-    const result: Record<string, number> = {};
-
-    if (!account) return result;
-
-    if (account.shareholderBalanceByCurrency) {
-      for (const [currencyIdText, value] of Object.entries(
-        account.shareholderBalanceByCurrency
-      )) {
-        const n = Number(value || 0);
-
-        if (Math.abs(n) > 0.0001) {
-          result[currencyIdText] = n;
-        }
-      }
-    }
-
-    if (
-      Object.keys(result).length === 0 &&
-      typeof account.shareholderBalance === "number"
-    ) {
-      result[String(defaultCurrency.id)] = Number(
-        account.shareholderBalance || 0
-      );
-    }
-
-    return result;
-  }
-
-  function getShareholderBalanceAfter(baseMap: Record<string, number>) {
-    const result: Record<string, number> = { ...baseMap };
-
-    result[String(currencyId)] = Number(result[String(currencyId)] || 0) + toNumber(amount);
-
-    return result;
   }
 
   function validateBeforeSave() {
@@ -463,14 +517,15 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
     const account = accounts.find((item: any) => item.id === accountId);
     if (!account) return;
 
-    const depositAmount = toNumber(amount);
+    const depositAmount = currentUsdEquivalent;
+    const usdKey = String(usdCurrencyId);
 
     if (!account.shareholderBalanceByCurrency) {
       account.shareholderBalanceByCurrency = {};
     }
 
-    account.shareholderBalanceByCurrency[String(currencyId)] =
-      Number(account.shareholderBalanceByCurrency[String(currencyId)] || 0) +
+    account.shareholderBalanceByCurrency[usdKey] =
+      Number(account.shareholderBalanceByCurrency[usdKey] || 0) +
       depositAmount;
 
     if (typeof account.shareholderBalance === "number") {
@@ -498,7 +553,7 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
     setShowAccountList(false);
     setShowAccountInfo(false);
 
-    setCashboxId(cashboxes[0]?.id);
+    setCashboxId(getDefaultCashbox(cashboxes)?.id);
     setAmount("");
     setCurrencyId(defaultCurrency.id);
 
@@ -542,15 +597,8 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
     const shareholderBalanceBeforeAtSave =
       getShareholderBalanceByCurrency(selectedAccount);
 
-    const shareholderBalanceChangeAtSave = {
-      [String(currencyId)]: toNumber(amount),
-    };
-
-    const shareholderBalanceAfterAtSave = {
-      ...shareholderBalanceBeforeAtSave,
-      [String(currencyId)]:
-        Number(shareholderBalanceBeforeAtSave[String(currencyId)] || 0) + toNumber(amount),
-    };
+    const shareholderBalanceAfterAtSave =
+      getShareholderBalanceAfter(shareholderBalanceBeforeAtSave);
 
     const combineDateAndTime = (dateStr: string, timeStr: string) => {
       try {
@@ -569,7 +617,8 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(`${dateStr}T${hours}:${minutes}:00Z`).toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`);
+          if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(`${dateStr} ${cleanTime}`);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -581,31 +630,39 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
       return new Date().toISOString();
     };
 
+    const rateVal = (toNumber(exchangeRate) / 100) || 1540;
+    const autoNote = isIQD
+      ? `(${toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری ${toNumber(exchangeRate).toLocaleString('en-US')} دیناری)`
+      : "";
+    const finalPrintNote = autoNote ? (printNote ? `${autoNote}\n${printNote}` : autoNote) : printNote;
+
     const payload = {
       type: "shareholder_deposit",
       referenceNo: receiptNumber,
       date: combineDateAndTime(receiptDate, createdTime),
       accountId: accountId ? Number(accountId) : null,
       cashboxId: cashboxId ? Number(cashboxId) : null,
-      currencyId: Number(currencyId),
-      exchangeRate: 1,
-      totalAmount: toNumber(amount),
+      currencyId: usdCurrencyId, // هەمیشە بە دۆلار بۆ باڵانسی خاوەن پشک
+      exchangeRate: rateVal,
+      totalAmount: currentUsdEquivalent,
       netAmount: 0,
       internalNote: receiptNote,
-      printNote,
+      printNote: finalPrintNote,
       paidAmounts: [
         {
           currencyId: Number(currencyId),
           amount: toNumber(amount),
-          exchangeRate: 1
+          exchangeRate: rateVal
         }
       ],
       employeeName: employeeNameFromLogin,
     };
 
     setIsSaving(true);
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise
@@ -614,6 +671,8 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
           if (!editId) {
             applyCashboxIncrease();
             applyShareholderBalanceIncrease();
+            setLockedShareholderBalanceBefore(shareholderBalanceBeforeAtSave);
+            setLockedShareholderBalanceAfter(shareholderBalanceAfterAtSave);
             setIsLocked(true);
           }
           setSavedSnapshot(currentSnapshot);
@@ -660,105 +719,103 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
           position: "fixed",
           top: 0,
           left: 0,
-          width: "100vw",
-          height: "100vh",
-          backgroundColor: "rgba(255, 255, 255, 0.7)",
-          backdropFilter: "blur(2px)",
-          zIndex: 9999,
+          right: 0,
+          bottom: 0,
+          background: "rgba(255,255,255,0.7)",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          pointerEvents: "all"
+          zIndex: 9999,
+          backdropFilter: "blur(2px)",
         }}>
-          <div style={{
-            width: "50px",
-            height: "50px",
-            border: "5px solid #e5e7eb",
-            borderTop: "5px solid #3b82f6",
-            borderRadius: "50%",
-            animation: "spin 1s linear infinite",
-            marginBottom: "12px"
-          }} />
-          <style>{`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}</style>
-          <span style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937" }}>
-            باردەکرێت...
-          </span>
+          <div style={{ fontSize: 16, fontWeight: "bold", color: "#1e3a8a" }}>
+            لە بارکردندایە...
+          </div>
         </div>
       )}
-      <style>{printCss}</style>
 
       {toastMessage && (
         <div
           style={{
-            ...toastBar,
-            ...(toastType === "success"
-              ? toastSuccess
-              : toastType === "info"
-              ? toastInfo
-              : toastError),
+            ...toast,
+            background:
+              toastType === "success"
+                ? "#16a34a"
+                : toastType === "info"
+                ? "#2563eb"
+                : "#dc2626",
           }}
         >
-          <button style={toastCloseBtn} onClick={() => setToastMessage("")}>
-            ×
-          </button>
-
-          <span>{toastMessage}</span>
+          {toastMessage}
         </div>
       )}
 
-      <div style={pageGrid} className="no-print">
-        <aside style={leftPanel}>
-          <div style={{ position: "relative", marginBottom: 14 }}>
-            <label style={labelStyle}>هەژماری خاوەن پشک</label>
+      <div style={topBar}>
+        <div style={topBarActions}>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            style={{
+              ...saveBtn,
+              opacity: isSaving ? 0.7 : 1,
+              cursor: isSaving ? "not-allowed" : "pointer",
+            }}
+          >
+            {isSaving ? "خەزن دەکرێت..." : editId ? "نوێکردنەوە" : "خەزنکردن"}
+          </button>
 
-            <div style={accountInputWrap}>
+          <button type="button" onClick={handlePrint} style={printBtn}>
+            پرێنت
+          </button>
+
+          <button
+            type="button"
+            onClick={handleNewReceipt}
+            style={newReceiptBtn}
+          >
+            پسوڵەی نوێ
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            style={settingsBtn}
+          >
+            ڕێکخستن
+          </button>
+        </div>
+
+        <div>{headerSelector}</div>
+      </div>
+
+      <div style={workspaceGrid}>
+        <aside style={rightSidebar}>
+          <div style={accountSearchBox}>
+            <Field label="گەڕان بەدوای خاوەن پشک">
               <input
+                type="text"
                 value={accountSearch}
                 disabled={isLocked}
-                onFocus={() => {
-                  if (!isLocked) setShowAccountList(true);
-                }}
+                placeholder="ناو ، ژمارە مۆبایل ، شار بنووسە..."
                 onChange={(event) => {
                   if (blockIfLocked()) return;
                   setAccountSearch(event.target.value);
-                  setAccountId(undefined);
                   setShowAccountList(true);
-                  setShowAccountInfo(false);
                 }}
-                placeholder="تەنها هەژماری خاوەن پشک..."
-                style={{
-                  ...input,
-                  ...lockedFieldStyle,
-                  paddingLeft: accountId && !isLocked ? 44 : 14,
+                onFocus={() => {
+                  if (isLocked) return;
+                  setShowAccountList(true);
                 }}
+                style={{ ...input, ...lockedFieldStyle }}
               />
-
-              {accountId && !isLocked && (
-                <button
-                  type="button"
-                  style={accountClearBtn}
-                  onClick={() => {
-                    setAccountId(undefined);
-                    setAccountSearch("");
-                    setShowAccountInfo(false);
-                    setShowAccountList(false);
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
+            </Field>
 
             {showAccountList && !isLocked && shareholderAccounts.length > 0 && (
-              <div style={dropdownLarge}>
+              <div style={accountDropdown}>
                 {shareholderAccounts.map((account: any) => (
                   <button
+                    type="button"
                     key={account.id}
                     style={dropdownItem}
                     onMouseDown={() => {
@@ -821,6 +878,14 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
               />
             </div>
 
+            {isIQD && toNumber(amount) > 0 && (
+              <div style={{ marginTop: 8, padding: "8px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, textAlign: "center" }}>
+                <span style={{ fontSize: 13, fontWeight: "bold", color: "#166534" }}>
+                  بڕی دۆلاری هاوتا: ${currentUsdEquivalent.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+
             <Field label="قاسە">
               <select
                 value={cashboxId || ""}
@@ -863,7 +928,7 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
                     if (blockIfLocked()) return;
                     setCurrencyId(Number(event.target.value));
                   }}
-                  style={{ ...input, ...lockedFieldStyle , minWidth: "130px" }}
+                  style={{ ...input, ...lockedFieldStyle, minWidth: "130px" }}
                 >
                   {currencies.map((currency: any) => (
                     <option key={currency.id} value={currency.id}>
@@ -873,6 +938,21 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
                 </select>
               </Field>
             </div>
+
+            {isIQD && (
+              <Field label="ڕەیتی ١٠٠ دۆلار (بۆ گۆڕین بۆ باڵانسی دۆلار)">
+                <FormattedNumberInput
+                  value={exchangeRate}
+                  disabled={isLocked}
+                  onChange={(val) => {
+                    if (blockIfLocked()) return;
+                    setExchangeRate(val);
+                  }}
+                  placeholder="154,000"
+                  style={{ ...input, ...lockedFieldStyle, borderColor: "#3b82f6" }}
+                />
+              </Field>
+            )}
 
             <Field label="بەروار">
               <DateInput
@@ -913,12 +993,13 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
                         if (blockIfLocked()) return;
                         setReceiptNote(event.target.value);
                       }}
-                      rows={3}
+                      rows={2}
+                      placeholder="تێبینی ناوخۆیی بنووسە..."
                       style={{ ...textarea, ...lockedFieldStyle }}
                     />
                   </Field>
 
-                  <Field label="تێبینی چاپ">
+                  <Field label="تێبینی سەر پسوڵە">
                     <textarea
                       value={printNote}
                       disabled={isLocked}
@@ -926,7 +1007,8 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
                         if (blockIfLocked()) return;
                         setPrintNote(event.target.value);
                       }}
-                      rows={3}
+                      rows={2}
+                      placeholder={isIQD ? `خۆکارانە دەنوسرێت: (${toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری ${toNumber(exchangeRate).toLocaleString('en-US')} دیناری)` : "تێبینی سەر پسوڵە بنووسە..."}
                       style={{ ...textarea, ...lockedFieldStyle }}
                     />
                   </Field>
@@ -934,54 +1016,56 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
               )}
             </div>
           </div>
-
-          <div style={sideActions}>
-            <button style={outlineBlueBtn} onClick={handleNewReceipt}>
-              پسوڵەی نوێ
-            </button>
-
-            <button
-              style={{
-                ...primaryBtn,
-                opacity: (isLocked || (!!editId && isSaved) || isSaving) ? 0.55 : 1,
-                cursor: (isLocked || (!!editId && isSaved) || isSaving) ? "not-allowed" : "pointer",
-              }}
-              onClick={handleSave}
-              disabled={isLocked || (!!editId && isSaved) || isSaving}
-            >
-              {isSaving ? "چاوەڕوانبە..." : isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
-            </button>
-
-            <button style={outlineBlueBtn} onClick={() => setShowSettings(true)}>
-              ڕێکخستن
-            </button>
-
-            <button style={printBtn} onClick={handlePrint}>
-              پرێنتکردن
-            </button>
-          </div>
-
-          {!isSaved && hasUnsavedData() && !isLocked && (
-            <div style={unsavedNotice}>ئەم پسوڵەیە هێشتا خەزن نەکراوە.</div>
-          )}
-
-          {isLocked && (
-            <div style={lockedNotice}>
-              پسوڵەکە قوفڵ کراوە؛ تەنها پرێنت، ڕێکخستن و پسوڵەی نوێ کار دەکات.
-            </div>
-          )}
         </aside>
 
         <main style={mainContent}>
-          <div style={headerCard}>
-            {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>پسوڵەی دانانی پارە</h2>}
-
-            
-          </div>
-
           <div style={emptyMainCard}>
-            <h2 style={{ marginTop: 0 }}>پسوڵەی هاوپێچکراو</h2>
-            <button style={viewBtn}>بینین</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#1e3a8a" }}>
+                پسوڵەی دانانی پارە (Deposit)
+              </div>
+              <button
+                type="button"
+                onClick={handlePrint}
+                style={viewBtn}
+              >
+                پێشبینینی پرێنت
+              </button>
+            </div>
+
+            <div style={{ marginTop: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+              <div style={{ background: "white", padding: 14, borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: 12, color: "#64748b", fontWeight: "bold" }}>خاوەن پشک</div>
+                <div style={{ fontSize: 16, fontWeight: "bold", color: "#0f172a", marginTop: 4 }}>
+                  {selectedAccount?.name || "دیاری نەکراوە"}
+                </div>
+              </div>
+
+              <div style={{ background: "white", padding: 14, borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: 12, color: "#64748b", fontWeight: "bold" }}>قاسە</div>
+                <div style={{ fontSize: 16, fontWeight: "bold", color: "#0f172a", marginTop: 4 }}>
+                  {selectedCashbox?.name || "دیاری نەکراوە"}
+                </div>
+              </div>
+
+              <div style={{ background: "white", padding: 14, borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: 12, color: "#64748b", fontWeight: "bold" }}>بڕی پارە</div>
+                <div style={{ fontSize: 18, fontWeight: "900", color: "#16a34a", marginTop: 4 }}>
+                  {toNumber(amount) > 0 ? formatCurrencyAmount(toNumber(amount), currencyId) : "0"}
+                </div>
+                {isIQD && toNumber(amount) > 0 && (
+                  <div style={{ fontSize: 13, color: "#2563eb", fontWeight: "bold", marginTop: 2 }}>
+                    ≈ ${currentUsdEquivalent.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {isIQD && toNumber(amount) > 0 && (
+              <div style={{ marginTop: 16, background: "#eff6ff", padding: "10px 14px", borderRadius: 8, border: "1px solid #bfdbfe", color: "#1e40af", fontSize: 13, fontWeight: "bold" }}>
+                تێبینی خۆکارانەی پسووڵە: ({toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری {toNumber(exchangeRate).toLocaleString('en-US')} دیناری)
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -991,104 +1075,104 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
           <PrintWatermark />
           <PrintHeader />
 
-                    {(printOptions.showReceiptInfo || printOptions.showShareholderInfo) && (
+          {printOptions.showReceiptInfo && (
             <div style={printInfoGrid}>
-              {/* Right Column: Invoice Info Box */}
-              {printOptions.showReceiptInfo ? (
-                <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                  <PrintInfoLine
-                  label="جۆری پسوڵە"
-                  value="پسوڵەی دانانی پارە"
-                />
-                  <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber} />
-                  <PrintInfoLine
-                    label="بەروار"
-                    value={formatDate(receiptDate)}
-                  />
-                  <PrintInfoLine label="کاتژمێر" value={createdTime} />
-                  <PrintInfoLine
-                    label="قاسە"
-                    value={selectedCashbox?.name || "-"}
-                  />
+              <div style={printInfoBox}>
+                {printOptions.showReceiptNumber && (
+                  <div style={printInfoRow}>
+                    <strong>ژمارەی پسوڵە:</strong>
+                    <span>{receiptNumber || "-"}</span>
+                  </div>
+                )}
+
+                {printOptions.showReceiptDate && (
+                  <div style={printInfoRow}>
+                    <strong>بەروار:</strong>
+                    <span>{formatDate(receiptDate)}</span>
+                  </div>
+                )}
+
+                {printOptions.showCreatedTime && (
+                  <div style={printInfoRow}>
+                    <strong>کاتژمێر:</strong>
+                    <span>{createdTime || "-"}</span>
+                  </div>
+                )}
+
+                {printOptions.showCashbox && (
+                  <div style={printInfoRow}>
+                    <strong>قاسە:</strong>
+                    <span>{selectedCashbox?.name || "-"}</span>
+                  </div>
+                )}
+              </div>
+
+              {printOptions.showShareholderInfo && (
+                <div style={printInfoBox}>
+                  {printOptions.showShareholderName && (
+                    <div style={printInfoRow}>
+                      <strong>خاوەن پشک:</strong>
+                      <span>{selectedAccount?.name || "-"}</span>
+                    </div>
+                  )}
+
+                  {printOptions.showShareholderPhone && (
+                    <div style={printInfoRow}>
+                      <strong>ژمارە:</strong>
+                      <span>{selectedAccount?.phone || "-"}</span>
+                    </div>
+                  )}
+
+                  {printOptions.showShareholderAddress && (
+                    <div style={printInfoRow}>
+                      <strong>ناونیشان:</strong>
+                      <span>{selectedAccount?.address || "-"}</span>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div />
               )}
+            </div>
+          )}
 
-              {/* Left Column: Stack of Account Info & Employee Info */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-                {printOptions.showShareholderInfo && (
-                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                    <PrintInfoLine
-                    label="خاوەن پشک"
-                    value={selectedAccount?.name || "-"}
-                  />
-                    <PrintInfoLine
-                    label="ژمارە"
-                    value={selectedAccount?.phone || "-"}
-                  />
-                    <PrintInfoLine
-                    label="ناونیشان"
-                    value={
-                      [selectedAccount?.city, selectedAccount?.address]
-                        .filter(Boolean)
-                        .join(" - ") || "-"
-                    }
-                  />
-                  </div>
-                )}
-
-                {/* Employee Info Box */}
-                {printOptions.showEmployeeInfo && (employeeNameFromLogin?.trim() !== "" || employeePhoneFromLogin?.trim() !== "") && (
-                  <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                                        {employeeNameFromLogin?.trim() !== "" && (
-                      <PrintInfoLine
-                        label="کارمەند"
-                        value={employeeNameFromLogin}
-                      />
-                    )}
-                    {employeePhoneFromLogin?.trim() !== "" && (
-                      <PrintInfoLine
-                        label="مۆبایل"
-                        value={employeePhoneFromLogin}
-                      />
-                    )}
-                  </div>
-                )}
+          {printOptions.showEmployeeInfo && (
+            <div style={printEmployeeBox}>
+              <div style={printInfoRow}>
+                <strong>کارمەند:</strong>
+                <span>{employeeNameFromLogin || "-"}</span>
+              </div>
+              <div style={printInfoRow}>
+                <strong>مۆبایل:</strong>
+                <span>{employeePhoneFromLogin || "-"}</span>
               </div>
             </div>
           )}
 
-          
-
           <div style={printBottomGrid}>
-  <div style={printSummaryBox}>
-    <PrintSummaryLine
-      label="پارەی دانراو"
-      value={
-        toNumber(amount) > 0
-          ? formatCurrencyAmount(toNumber(amount), currencyId)
-          : "0"
-      }
-      bold
-    />
+            <div style={printSummaryBox}>
+              <PrintSummaryLine
+                label="پارەی دانراو"
+                value={
+                  toNumber(amount) > 0
+                    ? formatCurrencyAmountJSX(toNumber(amount), currencyId)
+                    : "0"
+                }
+                bold
+              />
 
-    <PrintSummaryLine
-      label="باڵانسی پشک پێشوو"
-      value={formatCurrencyMap(shareholderBalanceByCurrency)}
-    />
+              <PrintSummaryLine
+                label="باڵانسی پشک پێشوو"
+                value={formatCurrencyMap(shareholderBalanceByCurrency)}
+              />
 
-    <PrintSummaryLine
-      label="باڵانسی پشک ئێستا"
-      value={formatCurrencyMap(shareholderBalanceAfterByCurrency)}
-      bold
-    />
-  </div>
-
-            
+              <PrintSummaryLine
+                label="باڵانسی پشک ئێستا"
+                value={formatCurrencyMap(shareholderBalanceAfterByCurrency)}
+                bold
+              />
+            </div>
           </div>
 
-          {printNote && printNote.trim() !== "" && (
+          {((printNote && printNote.trim() !== "") || (isIQD && toNumber(amount) > 0)) && (
             <div style={{
               marginTop: 12,
               border: "1px solid #cbd5e1",
@@ -1100,7 +1184,12 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
               boxSizing: "border-box"
             }}>
               <b>تێبینی:</b>
-              <div style={{ marginTop: 4, whiteSpace: "pre-line" }}>{printNote}</div>
+              <div style={{ marginTop: 4, whiteSpace: "pre-line" }}>
+                {isIQD && toNumber(amount) > 0 && !printNote.includes("بە ڕەیتی 100 دۆلاری") && (
+                  `(${toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری ${toNumber(exchangeRate).toLocaleString('en-US')} دیناری)\n`
+                )}
+                {printNote}
+              </div>
             </div>
           )}
         </div>
@@ -1153,92 +1242,71 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
             </div>
 
             <div style={settingsStack}>
-                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
                     <SettingCheck
-                    label="زانیاری پسوڵە دەرکەوێت"
-                    checked={printOptions.showReceiptInfo}
-                    onChange={() => togglePrintOption("showReceiptInfo")}
-                  />
+                      label="زانیاری پسوڵە دەرکەوێت"
+                      checked={printOptions.showReceiptInfo}
+                      onChange={() => togglePrintOption("showReceiptInfo")}
+                    />
                     <SettingCheck
-                    label="ژمارەی پسوڵە"
-                    checked={printOptions.showReceiptNumber}
-                    onChange={() => togglePrintOption("showReceiptNumber")}
-                  />
+                      label="ژمارەی پسوڵە"
+                      checked={printOptions.showReceiptNumber}
+                      onChange={() => togglePrintOption("showReceiptNumber")}
+                    />
                     <SettingCheck
-                    label="بەروار"
-                    checked={printOptions.showReceiptDate}
-                    onChange={() => togglePrintOption("showReceiptDate")}
-                  />
+                      label="بەروار"
+                      checked={printOptions.showReceiptDate}
+                      onChange={() => togglePrintOption("showReceiptDate")}
+                    />
                     <SettingCheck
-                    label="کاتژمێر"
-                    checked={printOptions.showCreatedTime}
-                    onChange={() => togglePrintOption("showCreatedTime")}
-                  />
+                      label="کاتژمێر"
+                      checked={printOptions.showCreatedTime}
+                      onChange={() => togglePrintOption("showCreatedTime")}
+                    />
                     <SettingCheck
-                    label="قاسە"
-                    checked={printOptions.showCashbox}
-                    onChange={() => togglePrintOption("showCashbox")}
-                  />
+                      label="قاسە"
+                      checked={printOptions.showCashbox}
+                      onChange={() => togglePrintOption("showCashbox")}
+                    />
                   </div>
                 </div>
                 <div>
                   <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری خاوەن پشک</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
                     <SettingCheck
-                    label="زانیاری خاوەن پشک"
-                    checked={printOptions.showShareholderInfo}
-                    onChange={() => togglePrintOption("showShareholderInfo")}
-                  />
+                      label="زانیاری خاوەن پشک"
+                      checked={printOptions.showShareholderInfo}
+                      onChange={() => togglePrintOption("showShareholderInfo")}
+                    />
                     <SettingCheck
-                    label="ناوی خاوەن پشک"
-                    checked={printOptions.showShareholderName}
-                    onChange={() => togglePrintOption("showShareholderName")}
-                  />
+                      label="ناوی خاوەن پشک"
+                      checked={printOptions.showShareholderName}
+                      onChange={() => togglePrintOption("showShareholderName")}
+                    />
                     <SettingCheck
-                    label="ژمارەی خاوەن پشک"
-                    checked={printOptions.showShareholderPhone}
-                    onChange={() => togglePrintOption("showShareholderPhone")}
-                  />
+                      label="ژمارەی خاوەن پشک"
+                      checked={printOptions.showShareholderPhone}
+                      onChange={() => togglePrintOption("showShareholderPhone")}
+                    />
                     <SettingCheck
-                    label="ناونیشانی خاوەن پشک"
-                    checked={printOptions.showShareholderAddress}
-                    onChange={() => togglePrintOption("showShareholderAddress")}
-                  />
-                  </div>
-                </div>
-              </div>
-
-              <div style={settingsSection}>
-                <h3 style={settingsTitle}>کارمەند / ئامادەکار</h3>
-
-                <SettingCheck
-                  label="زانیاری کارمەند لە چاپ دەرکەوێت"
-                  checked={printOptions.showEmployeeInfo}
-                  onChange={() => togglePrintOption("showEmployeeInfo")}
-                />
-
-                <div style={employeePreviewBox}>
-                  <div>
-                    <b>ناوی کارمەند:</b>{" "}
-                    {employeeNameFromLogin.trim() ||
-                      "لە ئەکاونتی کارمەنددا نییە"}
-                  </div>
-
-                  <div>
-                    <b>مۆبایل:</b>{" "}
-                    {employeePhoneFromLogin.trim() ||
-                      "لە ئەکاونتی کارمەنددا نییە"}
+                      label="ناونیشانی خاوەن پشک"
+                      checked={printOptions.showShareholderAddress}
+                      onChange={() => togglePrintOption("showShareholderAddress")}
+                    />
                   </div>
                 </div>
               </div>
             </div>
 
             <div style={modalFooter}>
-              <button style={primaryBtn} onClick={() => setShowSettings(false)}>
-                تەواو
+              <button
+                style={primaryBtn}
+                onClick={() => setShowSettings(false)}
+              >
+                داخستن
               </button>
             </div>
           </div>
@@ -1248,16 +1316,28 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
-    <label style={{ display: "block", marginBottom: 14 }}>
+    <label style={{ display: "block" }}>
       <div style={labelStyle}>{label}</div>
       {children}
     </label>
   );
 }
 
-function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+function InfoRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <div style={infoRow}>
       <div style={infoKey}>{label}</div>
@@ -1272,24 +1352,15 @@ function StatBox({
   color,
 }: {
   title: string;
-  value: string;
-  color: string;
+  value: ReactNode;
+  color?: string;
 }) {
   return (
     <div style={statBox}>
       <div style={{ color: "#374151", fontWeight: 700 }}>{title}</div>
-      <div style={{ color, fontWeight: 900, fontSize: 18, marginTop: 6 }}>
+      <div style={{ color, fontWeight: 900, fontSize: 20, marginTop: 6 }}>
         {value}
       </div>
-    </div>
-  );
-}
-
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={printInfoRow}>
-      <b>{label}:</b>
-      <span>{value}</span>
     </div>
   );
 }
@@ -1300,30 +1371,13 @@ function PrintSummaryLine({
   bold,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   bold?: boolean;
 }) {
-  let hideZero = false;
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem("general_settings");
-    if (saved) {
-      try {
-        hideZero = !!JSON.parse(saved).hideZeroBalance;
-      } catch (e) {}
-    }
-  }
-
-  if (hideZero) {
-    const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
-    if (clean === "0" || clean === "" || Number(clean) === 0) {
-      return null;
-    }
-  }
-
   return (
-    <div style={{ ...printSummaryLine, justifyContent: "flex-start", gap: "8px" }}>
-      <span style={{ display: "inline-block", width: "135px", fontWeight: bold ? 900 : 700, textAlign: "right" }}>{label}</span>
-      <span style={{ fontWeight: bold ? 900 : 500 }}>{value}</span>
+    <div style={printSummaryLine}>
+      <span style={{ fontWeight: bold ? "bold" : "normal" }}>{label}:</span>
+      <span style={{ fontWeight: bold ? "bold" : "normal" }}>{value}</span>
     </div>
   );
 }
@@ -1340,222 +1394,195 @@ function SettingCheck({
   return (
     <label style={settingCheck}>
       <input type="checkbox" checked={checked} onChange={onChange} />
-      {label}
+      <span>{label}</span>
     </label>
   );
 }
 
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
-const printCss = `
-@media print {
-  @page { size: auto; margin: 0 !important; }
-
-  body * { visibility: hidden !important; }
-
-  #cash-deposit-print-area,
-  #cash-deposit-print-area * {
-    visibility: visible !important;
-  }
-
-  #cash-deposit-print-area {
-    display: block !important;
-    position: relative !important;
-    width: 100% !important;
-    min-height: auto !important;
-    background: white !important;
-    z-index: 999999 !important;
-  }
-
-  button,
-  input,
-  select,
-  textarea {
-    display: none !important;
-  }
-}
-`;
-
-const page: CSSProperties = { direction: "rtl", fontFamily: appFont };
-
-const toastBar: CSSProperties = {
-  position: "fixed",
-  top: 10,
-  left: "50%",
-  transform: "translateX(-50%)",
-  zIndex: 99999,
-  minWidth: 360,
-  maxWidth: "80vw",
-  padding: "12px 18px",
-  borderRadius: 8,
-  color: "white",
-  fontWeight: 900,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 12,
-  boxShadow: "0 10px 30px rgba(15,23,42,0.25)",
-  textAlign: "center",
-};
-
-const toastError: CSSProperties = { background: "#ef4444" };
-const toastSuccess: CSSProperties = { background: "#16a34a" };
-const toastInfo: CSSProperties = { background: "#2563eb" };
-
-const toastCloseBtn: CSSProperties = {
-  border: 0,
-  background: "transparent",
-  color: "white",
-  fontSize: 26,
-  lineHeight: 1,
-  cursor: "pointer",
-  fontWeight: 900,
-};
-
-const pageGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "var(--page-grid-cols-no-items, 1000px 1fr)",
-  gap: 18,
-  alignItems: "stretch",
-};
-
-const leftPanel: CSSProperties = {
-  background: "white",
-  border: "1px solid #e5e7eb",
-  borderRadius: 18,
+const page: CSSProperties = {
+  direction: "rtl",
+  fontFamily: appFont,
   padding: 16,
-  position: "var(--left-panel-position, sticky)" as any,
-  top: 16,
+  maxWidth: 1600,
+  margin: "0 auto",
+  background: "#f8fafc",
+  minHeight: "100vh",
+};
+
+const topBar: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 16,
+  gap: 12,
+  flexWrap: "wrap",
+};
+
+const topBarActions: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+const baseBtn: CSSProperties = {
+  fontFamily: appFont,
+  fontSize: 14,
+  fontWeight: 700,
+  padding: "10px 16px",
+  borderRadius: 10,
+  border: "none",
+  cursor: "pointer",
+  transition: "all 0.2s",
+};
+
+const saveBtn: CSSProperties = {
+  ...baseBtn,
+  background: "#16a34a",
+  color: "white",
+};
+
+const printBtn: CSSProperties = {
+  ...baseBtn,
+  background: "#0284c7",
+  color: "white",
+};
+
+const newReceiptBtn: CSSProperties = {
+  ...baseBtn,
+  background: "#4f46e5",
+  color: "white",
+};
+
+const settingsBtn: CSSProperties = {
+  ...baseBtn,
+  background: "#475569",
+  color: "white",
+};
+
+const primaryBtn: CSSProperties = {
+  ...baseBtn,
+  background: "#2563eb",
+  color: "white",
+};
+
+const outlineBlueBtn: CSSProperties = {
+  ...baseBtn,
+  background: "white",
+  color: "#2563eb",
+  border: "1px solid #2563eb",
+};
+
+const dangerBtn: CSSProperties = {
+  ...baseBtn,
+  background: "#dc2626",
+  color: "white",
+};
+
+const workspaceGrid: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "360px 1fr",
+  gap: 16,
+  alignItems: "start",
+};
+
+const rightSidebar: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
 };
 
 const mainContent: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 16,
-  minWidth: 0,
 };
 
-const input: CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  borderRadius: 12,
-  border: "1px solid #d1d5db",
-  fontSize: 15,
-  outline: "none",
-  background: "white",
-  boxSizing: "border-box",
-  fontFamily: appFont,
-};
-
-const textarea: CSSProperties = {
-  width: "100%",
-  padding: "12px 14px",
-  borderRadius: 12,
-  border: "1px solid #d1d5db",
-  fontSize: 15,
-  outline: "none",
-  resize: "vertical",
-  boxSizing: "border-box",
-  fontFamily: appFont,
-};
-
-const labelStyle: CSSProperties = {
-  marginBottom: 6,
-  fontWeight: 700,
-  color: "#374151",
-};
-
-const accountInputWrap: CSSProperties = {
+const accountSearchBox: CSSProperties = {
   position: "relative",
-  width: "100%",
 };
 
-const accountClearBtn: CSSProperties = {
-  position: "absolute",
-  left: 8,
-  top: "50%",
-  transform: "translateY(-50%)",
-  width: 28,
-  height: 28,
-  borderRadius: "50%",
-  border: "1px solid #fecaca",
-  background: "#fee2e2",
-  color: "#dc2626",
-  fontSize: 20,
-  fontWeight: 900,
-  lineHeight: "24px",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontFamily: appFont,
-  zIndex: 5,
-};
-
-const dropdownLarge: CSSProperties = {
+const accountDropdown: CSSProperties = {
   position: "absolute",
   top: "100%",
-  left: 0,
   right: 0,
-  marginTop: 6,
+  left: 0,
   background: "white",
-  border: "1px solid #d1d5db",
-  borderRadius: 12,
-  boxShadow: "0 14px 35px rgba(15,23,42,0.12)",
-  zIndex: 80,
-  maxHeight: "70vh",
+  border: "1px solid #cbd5e1",
+  borderRadius: 10,
+  maxHeight: 220,
   overflowY: "auto",
+  zIndex: 50,
+  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+  marginTop: 4,
 };
 
 const dropdownItem: CSSProperties = {
-  display: "block",
   width: "100%",
+  padding: "10px 12px",
   textAlign: "right",
-  border: 0,
-  background: "white",
-  padding: 12,
-  cursor: "pointer",
+  background: "none",
+  border: "none",
   borderBottom: "1px solid #f1f5f9",
+  cursor: "pointer",
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
   fontFamily: appFont,
 };
 
 const smallMuted: CSSProperties = {
-  display: "block",
+  fontSize: 11,
+  color: "#64748b",
+};
+
+const noteToggleBtn: CSSProperties = {
+  background: "none",
+  border: "1px dashed #cbd5e1",
+  borderRadius: 8,
+  padding: "8px 12px",
   fontSize: 12,
-  color: "#6b7280",
-  marginTop: 4,
+  fontWeight: 700,
+  color: "#475569",
+  cursor: "pointer",
+  width: "100%",
+  fontFamily: appFont,
 };
 
 const accountCard: CSSProperties = {
-  background: "#fafafa",
-  border: "1px solid #e5e7eb",
-  borderRadius: 14,
-  padding: 12,
-  marginTop: 12,
-  marginBottom: 14,
+  background: "white",
+  border: "1px solid #e2e8f0",
+  borderRadius: 12,
+  padding: 14,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
 };
 
 const infoRow: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "110px 1fr",
-  gap: 8,
-  padding: "7px 0",
-  borderBottom: "1px solid #e5e7eb",
+  display: "flex",
+  justifyContent: "space-between",
+  fontSize: 13,
+  borderBottom: "1px solid #f8fafc",
+  paddingBottom: 4,
 };
 
 const infoKey: CSSProperties = {
-  fontWeight: 700,
-  color: "#374151",
+  color: "#64748b",
+  fontWeight: 600,
 };
 
 const infoVal: CSSProperties = {
-  color: "#111827",
+  fontWeight: 700,
+  color: "#1e293b",
 };
 
 const totalsCard: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  borderRadius: 14,
-  padding: 12,
+  background: "white",
+  border: "1px solid #e2e8f0",
+  borderRadius: 12,
+  padding: 14,
   display: "flex",
   flexDirection: "column",
   gap: 12,
@@ -1564,138 +1591,75 @@ const totalsCard: CSSProperties = {
 const totalGridSingle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr",
-  gap: 14,
 };
 
 const statBox: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  borderRadius: 12,
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: 10,
   padding: 12,
-  background: "#fbfbfb",
+  textAlign: "center",
 };
 
 const twoCol: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 12,
+  gridTemplateColumns: "1fr 1fr",
+  gap: 8,
+};
+
+const labelStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: "#334155",
+  marginBottom: 4,
+};
+
+const input: CSSProperties = {
+  width: "100%",
+  padding: "9px 12px",
+  borderRadius: 8,
+  border: "1px solid #cbd5e1",
+  fontSize: 14,
+  fontFamily: appFont,
+  boxSizing: "border-box",
+  background: "white",
+};
+
+const textarea: CSSProperties = {
+  width: "100%",
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "1px solid #cbd5e1",
+  fontSize: 13,
+  fontFamily: appFont,
+  boxSizing: "border-box",
+  resize: "vertical",
 };
 
 const noteToggleBox: CSSProperties = {
-  borderTop: "1px solid #e5e7eb",
-  paddingTop: 10,
-};
-
-const noteToggleBtn: CSSProperties = {
-  width: "100%",
-  border: "1px solid #d1d5db",
-  background: "#f8fafc",
-  color: "#374151",
-  borderRadius: 12,
-  padding: "12px",
-  fontWeight: 800,
-  cursor: "pointer",
-  textAlign: "center",
-  fontFamily: appFont,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
 };
 
 const notesInsidePayment: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr",
-  gap: 12,
-  marginTop: 12,
-};
-
-const sideActions: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 14,
-  marginTop: 14,
-};
-
-const outlineBlueBtn: CSSProperties = {
-  borderRadius: 12,
-  border: "1px solid #2563eb",
-  background: "white",
-  color: "#2563eb",
-  padding: "12px",
-  fontWeight: 800,
-  cursor: "pointer",
-  fontFamily: appFont,
-};
-
-const primaryBtn: CSSProperties = {
-  borderRadius: 12,
-  border: 0,
-  background: "#2563eb",
-  color: "white",
-  padding: "12px",
-  fontWeight: 800,
-  cursor: "pointer",
-  fontFamily: appFont,
-};
-
-const printBtn: CSSProperties = {
-  borderRadius: 12,
-  border: 0,
-  background: "#22c55e",
-  color: "white",
-  padding: "12px",
-  fontWeight: 800,
-  cursor: "pointer",
-  fontFamily: appFont,
-};
-
-const dangerBtn: CSSProperties = {
-  borderRadius: 12,
-  border: 0,
-  background: "#dc2626",
-  color: "white",
-  padding: "12px",
-  fontWeight: 900,
-  cursor: "pointer",
-  fontFamily: appFont,
-};
-
-const unsavedNotice: CSSProperties = {
-  marginTop: 12,
-  padding: 12,
-  borderRadius: 12,
-  background: "#fef3c7",
-  color: "#92400e",
-  border: "1px solid #fde68a",
-  fontWeight: 800,
-  textAlign: "center",
-};
-
-const lockedNotice: CSSProperties = {
-  marginTop: 12,
-  padding: 12,
-  borderRadius: 12,
-  background: "#e0f2fe",
-  color: "#075985",
-  border: "1px solid #bae6fd",
-  fontWeight: 900,
-  textAlign: "center",
-};
-
-const headerCard: CSSProperties = {
-  background: "white",
-  border: "1px solid #e5e7eb",
-  borderRadius: 16,
-  padding: 14,
   display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
+  flexDirection: "column",
+  gap: 8,
+  marginTop: 4,
 };
 
-const currentBadge: CSSProperties = {
-  background: "#eff6ff",
-  color: "#1d4ed8",
-  border: "1px solid #bfdbfe",
-  borderRadius: 999,
-  padding: "7px 14px",
-  fontWeight: 800,
+const toast: CSSProperties = {
+  position: "fixed",
+  bottom: 24,
+  left: 24,
+  color: "white",
+  padding: "12px 20px",
+  borderRadius: 10,
+  fontWeight: 700,
+  fontSize: 14,
+  zIndex: 9999,
+  boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
 };
 
 const printArea: CSSProperties = {
@@ -1712,12 +1676,6 @@ const printPage: CSSProperties = {
   fontFamily: appFont,
   color: "#111827",
   position: "relative",
-};
-
-const printHeaderBlankSpace: CSSProperties = {
-  height: "60mm",
-  borderBottom: "1px solid #e5e7eb",
-  marginBottom: 8,
 };
 
 const printInfoGrid: CSSProperties = {
@@ -1771,20 +1729,11 @@ const printSummaryBox: CSSProperties = {
 
 const printSummaryLine: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "90px 1fr",
+  gridTemplateColumns: "110px 1fr",
   gap: 8,
   alignItems: "center",
   borderBottom: "1px solid #f1f5f9",
   padding: "4px 0",
-};
-
-const printNoteBox: CSSProperties = {
-  marginTop: 8,
-  border: "1px solid #e5e7eb",
-  padding: 8,
-  fontSize: 10,
-  lineHeight: 1.8,
-  background: "#f8fafc",
 };
 
 const modalOverlay: CSSProperties = {
@@ -1861,16 +1810,6 @@ const settingsSection: CSSProperties = {
   background: "#fafafa",
 };
 
-const settingsTitle: CSSProperties = {
-  margin: "0 0 10px",
-};
-
-const settingGrid2: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 8,
-};
-
 const settingCheck: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -1878,15 +1817,6 @@ const settingCheck: CSSProperties = {
   padding: "8px 0",
   borderBottom: "1px solid #f1f5f9",
   fontWeight: 700,
-};
-
-const employeePreviewBox: CSSProperties = {
-  border: "1px solid #e5e7eb",
-  borderRadius: 12,
-  background: "#ffffff",
-  padding: 12,
-  lineHeight: 2,
-  color: "#374151",
 };
 
 const emptyMainCard: CSSProperties = { minHeight: 160, background: "#f3f4f6", borderRadius: 14, padding: 30, textAlign: "right" };

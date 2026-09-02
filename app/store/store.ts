@@ -69,7 +69,7 @@ interface StoreState {
   addAccountType: (accountTypeData: any) => Promise<any>;
   updateAccountType: (accountTypeData: any) => Promise<any>;
   deleteAccountType: (id: number) => Promise<boolean>;
-  addCashbox: (cashboxData: { name: string; type: string; isActive?: boolean }) => Promise<any>;
+  addCashbox: (cashboxData: { name: string; type: string; isActive?: boolean; balances?: any[] }) => Promise<any>;
   updateCashbox: (cashboxData: { id: number; name: string; type: string; isActive?: boolean }) => Promise<any>;
   deleteCashbox: (id: number) => Promise<boolean>;
   addWarehouse: (warehouseData: { name: string; color?: string; isMain?: boolean; isActive?: boolean }) => Promise<any>;
@@ -134,7 +134,11 @@ export const useStore = create<StoreState>((set, get) => ({
         // Clear session cookies client-side on auth failure
         document.cookie = "auth_token=; path=/; max-age=0; SameSite=Lax";
         document.cookie = "user_session=; path=/; max-age=0; SameSite=Lax";
+        if (typeof sessionStorage !== "undefined") sessionStorage.clear();
         set({ currentUser: null, userLoaded: true });
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+          window.location.href = "/login?revoked=true";
+        }
       } else {
         // Server error (500) or DB timeout — don't logout!
         // If we don't have a user yet, try reading from the cookie as fallback
@@ -601,6 +605,7 @@ export const useStore = create<StoreState>((set, get) => ({
           get().fetchInvoices(),
           get().fetchCashboxes(),
           get().fetchAccounts(),
+          get().fetchProducts(),
         ]).catch((err) => console.error("Failed to refresh data after addVoucher:", err));
         
         return createdVoucher;
@@ -630,6 +635,7 @@ export const useStore = create<StoreState>((set, get) => ({
           get().fetchInvoices(),
           get().fetchCashboxes(),
           get().fetchAccounts(),
+          get().fetchProducts(),
         ]).catch((err) => console.error("Failed to refresh data after updateVoucher:", err));
         
         return updatedVoucher;

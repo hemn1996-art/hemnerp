@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { calculateLedgerEntries } from "../../../utils/ledgerHelper";
+import { getCurrentUser } from "../../../lib/auth";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
     const { id } = await params;
     const voucherId = Number(id);
     console.log("API: Fetching voucher ID:", id, "-> parsed to:", voucherId);
@@ -62,6 +67,7 @@ export async function GET(
           by: ["currencyId"],
           where: {
             accountId: voucher.accountId,
+            voucher: { isDeleted: false },
             OR: [
               { date: { lt: voucher.date } },
               {
@@ -77,6 +83,7 @@ export async function GET(
           by: ["currencyId"],
           where: {
             accountId: voucher.accountId,
+            voucher: { isDeleted: false },
             OR: [
               { date: { lt: voucher.date } },
               {
@@ -129,6 +136,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { id } = await params;
     const voucherId = Number(id);
     const data = await request.json();
@@ -178,10 +190,11 @@ export async function PUT(
           return cur?.code === "IQD" ? `${formattedAmount} ${curName}` : `${curName} ${formattedAmount}`;
         });
 
-        const displayRate = data.exchangeRate > 100 ? data.exchangeRate : data.exchangeRate * 100;
-        const formattedRate = Number(displayRate).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        const rawExRate = Number(data.exchangeRate) || 1500;
+        const displayRate100 = rawExRate >= 10000 ? rawExRate : rawExRate * 100;
+        const formattedRate = Number(displayRate100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-        const rate = displayRate / 100;
+        const ratePerUSD = displayRate100 / 100;
         let totalEquivalent = 0;
         nonZeroPayments.forEach((p: any) => {
           const fromId = Number(p.currencyId);
@@ -192,9 +205,9 @@ export async function PUT(
             const fromCur = dbCurrencies.find(c => Number(c.id) === fromId);
             const toCur = dbCurrencies.find(c => Number(c.id) === targetCurId);
             if (fromCur?.code === "IQD" && toCur?.code === "USD") {
-              totalEquivalent += amt / rate;
+              totalEquivalent += amt / ratePerUSD;
             } else if (fromCur?.code === "USD" && toCur?.code === "IQD") {
-              totalEquivalent += amt * rate;
+              totalEquivalent += amt * ratePerUSD;
             } else {
               totalEquivalent += amt;
             }
@@ -296,8 +309,6 @@ export async function PUT(
           deliveryAddress: data.deliveryAddress,
           deliveryFee: data.deliveryFee ? Number(data.deliveryFee) : null,
           extraPaymentHandling: data.extraPaymentHandling || null,
-          isArrived: data.isArrived !== undefined ? Boolean(data.isArrived) : true,
-          arrivalDate: data.arrivalDate ? new Date(data.arrivalDate) : (data.isArrived === false ? null : (data.date ? new Date(data.date) : new Date())),
         },
       });
 
@@ -318,24 +329,38 @@ export async function PUT(
             },
           });
 
-          if (["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
-            const shouldCreateInventory = updated.type !== "purchase" || updated.isArrived !== false;
-            if (shouldCreateInventory) {
-              let qtyChange = Number(line.qty);
-              if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
-                qtyChange = -qtyChange;
-              }
-              if (line.warehouseId) {
-                await tx.inventoryTransaction.create({
-                  data: {
-                    voucherId: updated.id,
-                    productId: Number(line.productId),
-                    warehouseId: Number(line.warehouseId),
-                    qtyChange,
-                    unitCost: Number(line.unitCost || line.unitPrice || 0),
-                    date: updated.arrivalDate || updated.date,
-                  },
-                });
+          // Check if product is a service or expense (they do not enter/affect inventory)
+          const product = await tx.product.findUnique({
+            where: { id: Number(line.productId) },
+            select: { id: true, name: true, isExpense: true, isService: true, category: true },
+          });
+          const isServiceOrExpense = Boolean(
+            product?.isExpense ||
+            product?.isService ||
+            (product?.category && (product.category.includes("خزمەتگوزاری") || product.category.includes("گەیاندن"))) ||
+            (product?.name && (product.name.includes("گەیاندن") || product.name.includes("خزمەتگوزاری")))
+          );
+
+          if (!isServiceOrExpense && ["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
+            let qtyChange = Number(line.qty);
+            if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
+              qtyChange = -qtyChange;
+            }
+            if (line.warehouseId) {
+              await tx.inventoryTransaction.create({
+                data: {
+                  voucherId: updated.id,
+                  productId: Number(line.productId),
+                  warehouseId: Number(line.warehouseId),
+                  qtyChange,
+                  unitCost: Number(line.unitCost || line.unitPrice || 0),
+                  // IMPORTANT: line.currencyId is the authoritative source for the item's currency.
+                  // Fall back to the voucher's currencyId if line doesn't have one.
+                  // Never fall back to hardcoded 1 (USD) because that causes IQD items to get tagged as USD.
+                  currencyId: Number(line.currencyId ?? data.currencyId),
+                  date: updated.date,
+                },
+              });
 
               if (qtyChange < 0) {
                 const currentInv = await tx.inventoryTransaction.aggregate({
@@ -349,17 +374,12 @@ export async function PUT(
                 });
                 const currentStock = currentInv._sum.qtyChange || 0;
                 if (currentStock < -0.0001) {
-                  const product = await tx.product.findUnique({
-                    where: { id: Number(line.productId) },
-                    select: { name: true },
-                  });
                   throw new Error(`ناتوانیت کەرەستەی "${product?.name || line.productId}" بفرۆشیت یان کەم بکەیتەوە، چونکە بڕی پێویست لە کۆگادا نییە. بڕی بەردەست لە کۆگادا: ${currentStock - qtyChange} دانە.`);
                 }
               }
             }
           }
         }
-      }
       }
 
       // 6. Add new Voucher Expenses if provided
@@ -560,7 +580,7 @@ export async function PUT(
           data: {
             voucherId,
             version: 1,
-            employeeName: existingVoucher.employeeName || "کۆساری مەلا فەرهاد",
+            employeeName: existingVoucher.employeeName || "بەڕێوەبەر",
             data: JSON.stringify(originalData),
             updatedAt: existingVoucher.createdAt,
           }
@@ -573,7 +593,7 @@ export async function PUT(
         data: {
           voucherId,
           version: nextVersionNum,
-          employeeName: updated.employeeName || data.employeeName || "کۆساری مەلا فەرهاد",
+          employeeName: updated.employeeName || data.employeeName || "بەڕێوەبەر",
           data: JSON.stringify(data),
         },
       });
@@ -599,6 +619,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { id } = await params;
     const voucherId = Number(id);
 

@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../lib/prisma";
@@ -25,8 +24,16 @@ export async function verifyPassword(plain: string, hashed: string): Promise<boo
   return bcrypt.compare(plain, hashed);
 }
 
+export interface SessionUser {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+}
 
-const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "hemnerp-secure-session-key-2026";
+import crypto from "crypto";
+
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "orient-iraq-client-2-secure-session-key-2026";
 
 /**
  * Sign session payload with HMAC-SHA256
@@ -73,15 +80,8 @@ export function verifySessionToken(token: string): { id: number; username: strin
   }
 }
 
-export interface SessionUser {
-  id: number;
-  username: string;
-  name: string;
-  role: string;
-}
-
 /**
- * Get the current authenticated user from cookies
+ * Get the current authenticated user from cookies, verifying against DB
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
@@ -226,6 +226,7 @@ export const PERMISSION_MODULES = [
   // ڕاپۆرتەکان
   { key: "reports_invoices", label: "ڕاپۆرتی پسووڵە", group: "ڕاپۆرتەکان", icon: "📈" },
   { key: "reports_debts", label: "ڕاپۆرتی قەرز", group: "ڕاپۆرتەکان", icon: "📈" },
+  { key: "reports_expenses", label: "ڕاپۆرتی خەرجی", group: "ڕاپۆرتەکان", icon: "📈" },
   { key: "reports_profit", label: "ڕاپۆرتی قازانجی گشتی", group: "ڕاپۆرتەکان", icon: "📈" },
   { key: "reports_stock", label: "ڕاپۆرتی کۆگا", group: "ڕاپۆرتەکان", icon: "📈" },
   { key: "reports_stock_snapshot", label: "ڕاپۆرتی ئاستی کۆگا", group: "ڕاپۆرتەکان", icon: "📈" },

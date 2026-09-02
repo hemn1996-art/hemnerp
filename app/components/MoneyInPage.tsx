@@ -14,6 +14,7 @@ import {
 
 import { store, useStore } from "../store/store";
 import { calculateLedgerEntries } from "../utils/ledgerHelper";
+import { getDefaultCashbox } from "../utils/accounting";
 import { currencies as mockCurrencies } from "../data/mockData";
 import { useRouter } from "next/navigation";
 
@@ -214,8 +215,15 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   const [showAccountInfo, setShowAccountInfo] = useState(true);
 
   const [cashboxId, setCashboxId] = useState<number | undefined>(
-    cashboxes[0]?.id
+    () => getDefaultCashbox(cashboxes)?.id
   );
+
+  useEffect(() => {
+    if (!editId && !cashboxId && cashboxes.length > 0) {
+      const def = getDefaultCashbox(cashboxes);
+      if (def?.id) setCashboxId(def.id);
+    }
+  }, [cashboxes, editId, cashboxId]);
 
   const [paidCurrencyId, setPaidCurrencyId] = useState<number>(
     defaultCurrency.id
@@ -235,12 +243,24 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [isLocked, setIsLocked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [lockedBalanceBefore, setLockedBalanceBefore] =
+    useState<Record<string, number> | null>(null);
+  const [lockedBalanceAfter, setLockedBalanceAfter] =
+    useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     if (accountId && accounts.length > 0) {
       const acc = accounts.find((a: any) => a.id === accountId);
       if (acc) {
         setAccountSearch(acc.name);
+        if (acc.exchangeRateType === "FIXED" && acc.customExchangeRate) {
+          setExchangeRate(String(acc.customExchangeRate));
+        } else if (!editId) {
+          const iqd = currencies.find((c: any) => c.code === "IQD");
+          if (iqd && iqd.rate) {
+            setExchangeRate(String(iqd.rate * 100));
+          }
+        }
         const balanceMap = getAccountBalanceBeforeMap(acc);
         const activeCurKeys = Object.keys(balanceMap).filter(key => Math.abs(balanceMap[key]) > 0.01);
         if (activeCurKeys.length === 1) {
@@ -248,7 +268,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
         }
       }
     }
-  }, [accountId, accounts]);
+  }, [accountId, accounts, editId]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -324,7 +344,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     }
 
     return computedBefore;
-  }, [selectedAccount, editId, originalVoucher, accountId]);
+  }, [selectedAccount, editId, originalVoucher, accountId, isLocked, lockedBalanceBefore]);
 
   const screenAccountBalanceBeforeByCurrency = useMemo(() => {
     const currentBalMap = getAccountBalanceBeforeMap(selectedAccount);
@@ -455,6 +475,9 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   const accountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
     const before = accountBalanceBeforeByCurrency;
+    if (isSaved && !editId) {
+      return before;
+    }
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const rate = toNumber(exchangeRate) / 100;
 
@@ -476,11 +499,14 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isLocked, lockedBalanceAfter]);
 
   const screenAccountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
     const before = screenAccountBalanceBeforeByCurrency;
+    if (isSaved && !editId) {
+      return before;
+    }
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const rate = toNumber(exchangeRate) / 100;
 
@@ -502,7 +528,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isSaved, editId]);
 
   useEffect(() => {
     const checkFn = () => {
@@ -591,10 +617,39 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
+    const absValue = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
+      return `دینار ${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    return `${symbol} ${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
+    const code = getCurrencyCode(currencyId);
+    const symbol = getCurrencySymbol(currencyId);
+    const isIQD = code === "IQD";
+    const absVal = Math.abs(Number(value || 0));
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
+    const formatted = absVal.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: isIQD ? 0 : 2,
+    });
+
+    const parts = formatted.split('.');
+    const whole = parts[0];
+    const decimal = parts[1];
+    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
+        {isNegative && <span>-</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
+        <span>
+          <span>{whole}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+        </span>
+      </span>
+    );
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
@@ -604,11 +659,11 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
         formatCurrencyAmount(amount, Number(currencyIdText))
       );
 
-    return parts.length ? parts.join(" + ") : "0";
+    return parts.length ? parts.join(" ، ") : "0";
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
-    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -617,15 +672,41 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
         {activeEntries.map(([curIdText, val]) => {
           const isNegative = val < -0.01;
           const color = isNegative ? "#dc2626" : "#16a34a";
-          const symbol = getCurrencySymbol(Number(curIdText));
-          const formatted = Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+          const curId = Number(curIdText);
           return (
-            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {isNegative ? "-" : ""}{symbol}{formatted}
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
+              {formatCurrencyAmountJSX(val, curId, isNegative)}
             </span>
           );
         })}
       </div>
+    );
+  }
+
+  function formatCurrencyMapForPrint(map: Record<string, number>) {
+    const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(Number(val || 0)) > 0.01);
+    if (activeEntries.length === 0) {
+      return <span style={{ color: "#6b7280", fontWeight: 900, display: "inline-block", width: "100%", textAlign: "center" }}>0</span>;
+    }
+
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", width: "100%", textAlign: "center", gap: 6 }}>
+        {activeEntries.map(([curIdText, val], idx) => {
+          const numVal = Number(val || 0);
+          const isNegative = numVal < -0.01;
+          const color = isNegative ? "#dc2626" : "#16a34a";
+          const curId = Number(curIdText);
+
+          return (
+            <span key={curIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+              <span style={{ color, fontWeight: 900 }}>
+                {formatCurrencyAmountJSX(numVal, curId, isNegative)}
+              </span>
+            </span>
+          );
+        })}
+      </span>
     );
   }
 
@@ -760,7 +841,23 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
     return list
       .map((item: any) => formatCurrencyAmount(item.amount, item.currencyId))
-      .join(" + ");
+      .join(" ، ");
+  }
+
+  function getPaidSummaryJSX() {
+    const list = getPaidCurrencies();
+    if (list.length === 0) return <span style={{ fontWeight: 900 }}>0</span>;
+
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        {list.map((item: any, idx: number) => (
+          <span key={item.currencyId} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(item.amount, item.currencyId)}
+          </span>
+        ))}
+      </span>
+    );
   }
 
   function getAccountBalanceReductionByCurrency(activeTargetCurrencyId?: number) {
@@ -876,6 +973,9 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   }
 
   function resetReceipt() {
+    setLockedBalanceBefore(null);
+    setLockedBalanceAfter(null);
+    setOriginalVoucher(null);
     if (editId) {
       router.push("/invoices?type=money_in");
       return;
@@ -988,7 +1088,8 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(`${dateStr}T${hours}:${minutes}:00Z`).toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`);
+          if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(`${dateStr} ${cleanTime}`);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -1024,8 +1125,10 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     };
 
     setIsSaving(true);
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise
@@ -1338,7 +1441,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
           <div style={totalsCard}>
             <div style={totalGrid}>
-              <StatBox title="پارەی دراو" value={getPaidSummaryText()} color="#16a34a" />
+              <StatBox title="پارەی دراو" value={getPaidSummaryJSX()} color="#16a34a" />
               {(() => {
                 const paidEntries = Object.entries(paidAmounts).filter(([_, amt]) => toNumber(amt) > 0);
                 if (paidEntries.length === 0) return null;
@@ -1671,7 +1774,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
               {printOptions.showReceiptInfo ? (
                 <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
                   <PrintInfoLine label="جۆری پسوڵە" value="پارەی هاتوو" />
-                  <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber} />
+                  <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber || (originalVoucher?.id ? String(originalVoucher.id) : (editId || "-"))} />
                   <PrintInfoLine label="بەروار" value={formatDate(receiptDate)} />
                   <PrintInfoLine label="کاتژمێر" value={createdTime} />
                   <PrintInfoLine label="قاسە" value={selectedCashbox?.name || "-"} />
@@ -1708,61 +1811,62 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             </div>
           )}
 
-          <table style={{ width: "100%", borderCollapse: "collapse", border: "none", marginTop: 8 }}>
+          {/* Balance Section — 3 stacked rows, full width */}
+          <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #94a3b8", marginTop: 12, fontSize: 15 }}>
             <tbody>
+              {/* Row 1: Previous Balance */}
               <tr>
-                {/* Right Box: Payment Details (First column, renders on the right in RTL) */}
-                <td style={{ width: "50%", paddingRight: 6, verticalAlign: "top", border: "none" }}>
-                  <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
-                    <tbody>
-                      <tr>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>
-                          {getPaidSummaryText()}
-                        </td>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
-                      </tr>
-                      {toNumber(discountAmount) > 0 && (
-                        <tr>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
-                            {`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.symbol || "$") : "$"}`}
-                          </td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>داشکاندن</td>
-                        </tr>
-                      )}
-                      {showRate && (
-                        <tr>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
-                            {`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}
-                          </td>
-                          <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ڕەیتی 100 دۆلار</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
+                  باڵانسی پێش پسوڵە
                 </td>
-
-                {/* Left Box: Account Balances (Second column, renders on the left in RTL) */}
-                <td style={{ width: "50%", paddingLeft: 6, verticalAlign: "top", border: "none" }}>
-                  <table style={{ borderCollapse: "collapse", border: "1px solid #cbd5e1", fontSize: 12, width: "100%" }}>
-                    <tbody>
-                      <tr>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
-                          {formatCurrencyMap(accountBalanceBeforeByCurrency)}
-                        </td>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>قەرزی پێشوو</td>
-                      </tr>
-                      <tr>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: "bold", fontFamily: "monospace" }}>
-                          {formatCurrencyMap(accountBalanceAfterByCurrency)}
-                        </td>
-                        <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", color: "#374151", whiteSpace: "nowrap" }}>کۆی گشتی قەرز</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
+                  {formatCurrencyMapForPrint(accountBalanceBeforeByCurrency)}
+                </td>
+              </tr>
+              {/* Row 2: Paid Amount */}
+              <tr>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
+                  بڕی پارەی دراو
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
+                  {getPaidSummaryJSX()}
+                </td>
+              </tr>
+              {/* Row 3: Current Balance */}
+              <tr style={{ background: "#f8fafc" }}>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
+                  باڵانسی ئێستا
+                </td>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
+                  {formatCurrencyMapForPrint(accountBalanceAfterByCurrency)}
                 </td>
               </tr>
             </tbody>
           </table>
+
+          {/* Additional info: discount & rate */}
+          {(toNumber(discountAmount) > 0 || showRate) && (
+            <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #cbd5e1", marginTop: 6, fontSize: 12 }}>
+              <tbody>
+                {toNumber(discountAmount) > 0 && (
+                  <tr>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap", width: "40%" }}>داشکاندن</td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
+                      <span dir="ltr">{`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.symbol || "$") : "$"}`}</span>
+                    </td>
+                  </tr>
+                )}
+                {showRate && (
+                  <tr>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
+                      {`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}
+                    </td>
+                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ڕەیتی 100 دۆلار</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
 
           {printNote && printNote.trim() !== "" && (
             <div style={{
@@ -2027,7 +2131,7 @@ function StatBox({ title, value, color }: { title: string; value: ReactNode; col
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ ...printInfoRow, justifyContent: "flex-start", gap: "6px" }}>
       <b style={{ marginLeft: "4px" }}>{label}:</b>
@@ -2082,8 +2186,8 @@ function SettingCheck({ label, checked, onChange }: { label: string; checked: bo
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
   body * { visibility: hidden !important; }
   #money-in-print-area, #money-in-print-area * { visibility: visible !important; }
   #money-in-print-area {

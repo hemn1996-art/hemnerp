@@ -22,38 +22,40 @@ export default function PrintHeader() {
   });
   const [activeTemplate, setActiveTemplate] = useState<any>(null);
 
-  const loadActiveTemplate = () => {
+  const loadTemplate = () => {
+    const savedSettings = localStorage.getItem("general_settings");
+    if (savedSettings) {
+      try {
+        setSettings((prev) => ({ ...prev, ...JSON.parse(savedSettings) }));
+      } catch (e) {}
+    }
+
     fetch("/api/invoice-templates")
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           const savedId = localStorage.getItem("selected_invoice_template_id");
-          let found = null;
-          if (savedId) {
-            found = data.find((t: any) => String(t.id) === savedId);
+          let selected = data.find((t: any) => String(t.id) === savedId);
+          if (!selected) {
+            selected = data.find((t: any) => t.isMain && t.isActive) || data[0];
           }
-          if (!found) {
-            found = data.find((t: any) => t.isMain && t.isActive) || data[0];
-          }
-          setActiveTemplate(found);
+          if (selected) setActiveTemplate(selected);
         }
       })
       .catch((err) => console.error("Error loading template in PrintHeader:", err));
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem("general_settings");
-    if (saved) {
-      try {
-        setSettings((prev) => ({ ...prev, ...JSON.parse(saved) }));
-      } catch (e) {}
-    }
+    loadTemplate();
 
-    loadActiveTemplate();
+    const handleUpdate = () => loadTemplate();
+    window.addEventListener("invoice-template-changed", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
 
-    const handleTemplateChange = () => loadActiveTemplate();
-    window.addEventListener("invoice-template-changed", handleTemplateChange);
-    return () => window.removeEventListener("invoice-template-changed", handleTemplateChange);
+    return () => {
+      window.removeEventListener("invoice-template-changed", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, []);
 
   if (activeTemplate?.headerImage) {
@@ -153,6 +155,8 @@ const logoStyle: CSSProperties = {
 const headerImageContainer: CSSProperties = {
   width: "100%",
   height: "auto",
+  marginTop: "4px",
+  paddingTop: "4px",
   marginBottom: "8px",
   overflow: "hidden",
   display: "block",
@@ -162,6 +166,9 @@ const headerImageStyle: CSSProperties = {
   width: "100%",
   height: "auto",
   display: "block",
+  marginTop: "0px",
+  paddingTop: "0px",
+  verticalAlign: "top",
 };
 
 const companyNameStyle: CSSProperties = {

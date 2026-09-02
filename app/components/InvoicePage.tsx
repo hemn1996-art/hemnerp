@@ -18,6 +18,8 @@ import {
 
 import { store, useStore } from "../store/store";
 import { calculateLedgerEntries } from "../utils/ledgerHelper";
+import { normalizeKurdishSearchText } from "../utils/digits";
+import { getDefaultCashbox } from "../utils/accounting";
 import { accountTypes, currencies as mockCurrencies } from "../data/mockData";
 
 type Props = {
@@ -53,7 +55,12 @@ type InvoiceRow = {
   availableQty: number;
   previousPrice?: number;
   costPrice?: number;
+  costCurrencyId?: number;
+  exchangeRateType?: "DAILY_MARKET" | "FIXED" | string;
+  customExchangeRate?: number;
   showCost: boolean;
+  isExpense?: boolean;
+  isService?: boolean;
 };
 
 type ProductLike = {
@@ -65,7 +72,12 @@ type ProductLike = {
   brand?: string;
   salePrice?: number;
   costPrice?: number;
+  costCurrencyId?: number;
+  exchangeRateType?: "DAILY_MARKET" | "FIXED" | string;
+  customExchangeRate?: number;
   stock?: number;
+  isExpense?: boolean;
+  isService?: boolean;
   warehouseStocks?: Record<number, number>;
   salePrices?: {
     currencyId: number;
@@ -111,6 +123,7 @@ type PrintOptions = {
   showInvoiceDate: boolean;
   showCreatedTime: boolean;
   showCashbox: boolean;
+  showExchangeRate: boolean;
   showAccountInfo: boolean;
   showAccountName: boolean;
   showAccountPhone: boolean;
@@ -125,10 +138,76 @@ type PrintOptions = {
   showEmployeePhone: boolean;
 };
 
+const defaultTableColumns: TableColumns = {
+  product: true,
+  code: true,
+  qty: true,
+  price: true,
+  discount: true,
+  total: true,
+  action: true,
+};
+
+const defaultPrintOptions: PrintOptions = {
+  showInvoiceInfo: true,
+  showInvoiceType: true,
+  showInvoiceNumber: true,
+  showInvoiceDate: true,
+  showCreatedTime: true,
+  showCashbox: true,
+  showExchangeRate: true,
+
+  showAccountInfo: true,
+  showAccountName: true,
+  showAccountPhone: true,
+  showAccountAddress: true,
+
+  showCode: true,
+  showDiscount: true,
+  showNotes: true,
+  showDelivery: true,
+  showPriceType: true,
+
+  showPrintBalance: false,
+  showEmployeeName: true,
+  showEmployeePhone: true,
+};
+
 const fallbackWarehouses = [
   { id: 1, name: "کۆگای سەرەکی" },
   { id: 2, name: "کۆگای دووکان" },
 ];
+
+export function isProductService(product?: any): boolean {
+  if (!product) return false;
+  if (product.isExpense === true || String(product.isExpense) === "true") return false;
+  if (product.isService === true || String(product.isService) === "true") return true;
+
+  const rawName = String(product.name || product.productName || "");
+  const rawCat = String(product.category || "");
+
+  if (rawName.includes("گەیاندن") || rawName.includes("خزمەت")) return true;
+  if (rawCat.includes("گەیاندن") || rawCat.includes("خزمەت")) return true;
+
+  const normName = normalizeKurdishSearchText(rawName);
+  const normCat = normalizeKurdishSearchText(rawCat);
+
+  if (
+    normName.includes(normalizeKurdishSearchText("گەیاندن")) ||
+    normName.includes(normalizeKurdishSearchText("خزمەتگوزاری")) ||
+    normName.includes(normalizeKurdishSearchText("خزمەت")) ||
+    normCat.includes(normalizeKurdishSearchText("گەیاندن")) ||
+    normCat.includes(normalizeKurdishSearchText("خزمەتگوزاری")) ||
+    normCat.includes(normalizeKurdishSearchText("خزمەت"))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+// Alias for backward compatibility if imported elsewhere
+export const isProductServiceOrExpense = isProductService;
 
 export default function InvoicePage({ headerSelector, invoiceType, editId }: Props) {
   const router = useRouter();
@@ -150,6 +229,10 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const invoices = (useStore((s) => s.invoices) || []) as any[];
   const accountTypesStore = (useStore((s) => s.accountTypes) || []) as any[];
   const currentUser = useStore((s) => s.currentUser);
+  const hasPermission = useStore((s: any) => s.hasPermission);
+
+  const canViewCost = !currentUser || currentUser?.role === "admin" || hasPermission("materials_cost", "canView");
+  const canViewStock = !currentUser || currentUser?.role === "admin" || hasPermission("materials_stock", "canView");
 
   const fetchAccounts = useStore((s) => s.fetchAccounts);
   const storeCurrencies = useStore((s: any) => s.currencies) || [];
@@ -198,20 +281,53 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [employeeName, setEmployeeName] = useState("");
   const [employeePhone, setEmployeePhone] = useState("");
 
+  const [invoiceTemplates, setInvoiceTemplates] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("orient_invoice_selected_template_id");
+        if (saved) return saved;
+      } catch (e) {}
+    }
+    return "";
+  });
+
   useEffect(() => {
-    fetchAccounts();
+    if (typeof window !== "undefined") {
+      try {
+        if (selectedTemplateId) {
+          localStorage.setItem("orient_invoice_selected_template_id", String(selectedTemplateId));
+        } else {
+          localStorage.removeItem("orient_invoice_selected_template_id");
+        }
+      } catch (e) {}
+    }
+  }, [selectedTemplateId]);
+  const [priceTypesList, setPriceTypesList] = useState<string[]>(["جوملە", "تاک", "تایبەت"]);
+
+  useEffect(() => {
+    fetch("/api/attributes?type=priceType")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const names = data.filter((item: any) => item.isActive !== false).map((item: any) => item.name);
+          if (names.length > 0) {
+            setPriceTypesList(names);
+          }
+        }
+      })
+      .catch((err) => console.error("Error loading price types:", err));
+  }, []);
+
+  useEffect(() => {
+    fetchAccounts?.();
+    fetchProducts?.();
     if (storeCurrencies.length === 0) fetchCurrencies();
     if (cashboxes.length === 0) fetchCashboxes();
-    if (products.length === 0) fetchProducts();
     if (invoices.length === 0) fetchInvoices();
     if (accountTypesStore.length === 0) fetchAccountTypes();
     if (warehousesFromStore.length === 0) fetchWarehouses();
-  }, []);
 
-  const [invoiceTemplates, setInvoiceTemplates] = useState<any[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | string>("");
-
-  useEffect(() => {
     fetch("/api/invoice-templates")
       .then((res) => res.json())
       .then((data) => {
@@ -221,8 +337,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           if (savedId && data.some((t: any) => String(t.id) === savedId)) {
             setSelectedTemplateId(Number(savedId));
           } else {
-            const main = data.find((t: any) => t.isMain && t.isActive) || data[0];
-            if (main) setSelectedTemplateId(main.id);
+            setSelectedTemplateId(data[0].id);
           }
         }
       })
@@ -233,7 +348,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (!editId && defaultCurrency?.id) {
       setInvoiceDiscountCurrencyId(defaultCurrency.id);
     }
-  }, [defaultCurrency, editId]);
+    if (!editId && storeCurrencies && storeCurrencies.length > 0) {
+      const iqd = storeCurrencies.find((c: any) => c.code === "IQD" || c.id === 2 || c.symbol === "دینار" || c.symbol === "د.ع");
+      if (iqd && iqd.exchangeRate) {
+        const rateVal = iqd.exchangeRate > 1000 ? iqd.exchangeRate : iqd.exchangeRate * 100;
+        setExchangeRate(String(rateVal));
+      }
+    }
+  }, [defaultCurrency, storeCurrencies, editId]);
 
   useEffect(() => {
     setInvoiceNumber("");
@@ -263,10 +385,17 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [tempCustomerAddress, setTempCustomerAddress] = useState("");
 
   const [cashboxId, setCashboxId] = useState<number | undefined>(
-    cashboxes[0]?.id
+    () => getDefaultCashbox(cashboxes)?.id
   );
 
-  const [invoiceCurrencyId] = useState<number>(defaultCurrency.id);
+  useEffect(() => {
+    if (!editId && !cashboxId && cashboxes.length > 0) {
+      const def = getDefaultCashbox(cashboxes);
+      if (def?.id) setCashboxId(def.id);
+    }
+  }, [cashboxes, editId, cashboxId]);
+
+  const [invoiceCurrencyId, setInvoiceCurrencyId] = useState<number>(defaultCurrency.id);
 
   const [paidCurrencyId, setPaidCurrencyId] = useState<number>(
     defaultCurrency.id
@@ -339,7 +468,27 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [deliveryFee, setDeliveryFee] = useState("");
   const [deliveryNote, setDeliveryNote] = useState("");
 
-  const [invoicePriceType, setInvoicePriceType] = useState<PriceTypeName | string>("جوملە");
+  const priceTypesFromStore = (useStore((s: any) => (s as any).priceTypes) || []) as any[];
+  const fetchPriceTypes = useStore((s: any) => (s as any).fetchPriceTypes);
+
+  useEffect(() => {
+    if (fetchPriceTypes) fetchPriceTypes();
+  }, [fetchPriceTypes]);
+
+  const activePriceTypeNames = useMemo(() => {
+    if (priceTypesFromStore.length > 0) {
+      return priceTypesFromStore.map((pt: any) => pt.name);
+    }
+    return ["نرخی تاک"];
+  }, [priceTypesFromStore]);
+
+  const [invoicePriceType, setInvoicePriceType] = useState<string>("نرخی تاک");
+
+  useEffect(() => {
+    if (activePriceTypeNames.length > 0 && (invoicePriceType === "جوملە" || !invoicePriceType)) {
+      setInvoicePriceType(activePriceTypeNames[0]);
+    }
+  }, [activePriceTypeNames]);
 
   const [savedInvoiceSnapshot, setSavedInvoiceSnapshot] = useState("");
   const [originalVoucher, setOriginalVoucher] = useState<any>(null);
@@ -362,25 +511,32 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         const main = data.find((t: any) => t.isMain && t.isActive);
         if (main) setActiveTemplate(main);
       })
-      .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
+      .catch((err) => console.error("Error loading templates:", err));
   }, []);
 
-  const [tableColumns, setTableColumns] = useState<TableColumns>({
-    product: true,
-    code: true,
-    qty: true,
-    price: true,
-    discount: true,
-    total: true,
-    action: true,
+  const [tableColumns, setTableColumns] = useState<TableColumns>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("orient_invoice_table_columns");
+        if (saved) {
+          return { ...defaultTableColumns, ...JSON.parse(saved) };
+        }
+      } catch (e) {
+        console.error("Error reading orient_invoice_table_columns:", e);
+      }
+    }
+    return defaultTableColumns;
   });
 
   useEffect(() => {
-    if (accountId && accounts && accounts.length > 0 && !accountSearch) {
-      const acc = accounts.find((a: any) => a.id === accountId);
-      if (acc) setAccountSearch(acc.name);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("orient_invoice_table_columns", JSON.stringify(tableColumns));
+      } catch (e) {
+        console.error("Error saving orient_invoice_table_columns:", e);
+      }
     }
-  }, [accountId, accounts, accountSearch]);
+  }, [tableColumns]);
 
   useEffect(() => {
     if (editId) {
@@ -438,6 +594,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             }
             
             setCashboxId(voucher.cashboxId || undefined);
+            if (voucher.currencyId) {
+              setInvoiceCurrencyId(voucher.currencyId);
+            }
             
             if (voucher.lines && Array.isArray(voucher.lines)) {
               const mappedRows = voucher.lines.map((line: any) => ({
@@ -463,6 +622,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
                   return tx ? tx.unitCost : (line.product?.costPrice || 0);
                 })(),
+                exchangeRateType: (line.product as any)?.exchangeRateType || "DAILY_MARKET",
+                customExchangeRate: (line.product as any)?.customExchangeRate || 132000,
                 showCost: false,
                 previousPrice: getPreviousPrice(line.productId),
               }));
@@ -476,27 +637,43 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             }
             
             const initialPaid: PaidAmounts = {};
-            let totalPaidSum = 0;
             if (voucher.paidAmounts && Array.isArray(voucher.paidAmounts)) {
               voucher.paidAmounts.forEach((pa: any) => {
-                const amt = Number(pa.amount || 0);
-                if (amt > 0) {
-                  initialPaid[pa.currencyId] = String(pa.amount);
-                  totalPaidSum += amt;
-                }
+                initialPaid[pa.currencyId] = String(pa.amount);
               });
             }
             setPaidAmounts(initialPaid);
 
-            const netAmt = Number(voucher.netAmount || 0);
-            if (totalPaidSum === 0 || Object.keys(initialPaid).length === 0) {
+            const rawVoucherRate = Number(voucher.exchangeRate || 0);
+            const voucherRate = rawVoucherRate > 10000
+              ? rawVoucherRate / 100
+              : (rawVoucherRate < 100 && rawVoucherRate > 0 ? rawVoucherRate * 100 : (rawVoucherRate || 1500));
+
+            const totalPaidValConverted = (voucher.paidAmounts || []).reduce((sum: number, pa: any) => {
+              const amount = Number(pa.amount) || 0;
+              const paCurId = pa.currencyId;
+              const vCurId = voucher.currencyId || 1;
+              let inVoucherCur = amount;
+              if (paCurId !== vCurId) {
+                if ((paCurId === 2 || paCurId === 12) && (vCurId === 1 || vCurId === 11)) {
+                  inVoucherCur = amount / voucherRate;
+                } else if ((paCurId === 1 || paCurId === 11) && (vCurId === 2 || vCurId === 12)) {
+                  inVoucherCur = amount * voucherRate;
+                }
+              }
+              return sum + inVoucherCur;
+            }, 0);
+
+            const netVal = Number(voucher.netAmount) || 0;
+            const paidDiff = Math.abs(totalPaidValConverted - netVal);
+            if (totalPaidValConverted <= 0.01) {
               setPaymentTypeMode("debt");
-            } else if (totalPaidSum >= netAmt - 0.01) {
+            } else if (paidDiff < 1.0 || totalPaidValConverted >= netVal - 1) {
               setPaymentTypeMode("cash");
             } else {
               setPaymentTypeMode("partial");
             }
-            
+
             // Set the paid currency dropdown to the currency that was actually paid
             if (voucher.paidAmounts && Array.isArray(voucher.paidAmounts) && voucher.paidAmounts.length > 0) {
               const firstPaidCurrency = voucher.paidAmounts.find((pa: any) => pa.amount > 0);
@@ -515,7 +692,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             }
             
             if (voucher.exchangeRate) {
-              setExchangeRate(String(voucher.exchangeRate * 100));
+              setExchangeRate(String(voucherRate * 100));
             }
             if (voucher.totalDiscount > 0) {
               setInvoiceDiscountValue(String(voucher.totalDiscount));
@@ -549,7 +726,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         })
         .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
     }
-  }, [editId, accounts]);
+  }, [editId]);
 
   useEffect(() => {
     if (!editId && currencies && currencies.length > 0) {
@@ -560,29 +737,29 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }
   }, [currencies, editId]);
 
-  const [printOptions, setPrintOptions] = useState<PrintOptions>({
-    showInvoiceInfo: true,
-    showInvoiceType: true,
-    showInvoiceNumber: true,
-    showInvoiceDate: true,
-    showCreatedTime: true,
-    showCashbox: true,
-
-    showAccountInfo: true,
-    showAccountName: true,
-    showAccountPhone: true,
-    showAccountAddress: true,
-
-    showCode: true,
-    showDiscount: true,
-    showNotes: true,
-    showDelivery: true,
-    showPriceType: true,
-
-    showPrintBalance: false,
-    showEmployeeName: true,
-    showEmployeePhone: true,
+  const [printOptions, setPrintOptions] = useState<PrintOptions>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("orient_invoice_print_options");
+        if (saved) {
+          return { ...defaultPrintOptions, ...JSON.parse(saved) };
+        }
+      } catch (e) {
+        console.error("Error reading orient_invoice_print_options:", e);
+      }
+    }
+    return defaultPrintOptions;
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("orient_invoice_print_options", JSON.stringify(printOptions));
+      } catch (e) {
+        console.error("Error saving orient_invoice_print_options:", e);
+      }
+    }
+  }, [printOptions]);
 
   const selectedAccount = accounts.find((a: any) => a.id === accountId);
 
@@ -618,50 +795,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
+    const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
-  }
-
-  function getCanonicalCurrencyId(curId?: number | string) {
-    const rawId = Number(curId || invoiceCurrencyId || 11);
-    const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
-
-    const getGroupCode = (c: any) => {
-      if (!c) return "";
-      const code = (c.code || "").toUpperCase().trim();
-      const symbol = (c.symbol || "").trim();
-      if (code.includes("USD") || symbol === "$") return "USD";
-      if (code.includes("IQD") || symbol === "دینار" || symbol === "د.ع") return "IQD";
-      return code || symbol;
-    };
-
-    const targetGroup = getGroupCode(found);
-    if (targetGroup) {
-      const mainCur = (currencies || []).find((c: any) => getGroupCode(c) === targetGroup && (c.isActive !== false));
-      if (mainCur) return Number(mainCur.id);
-    }
-
-    const mainCur = (currencies || []).find((c: any) => found && c.code === found.code && (c.isActive !== false));
-    return mainCur ? Number(mainCur.id) : rawId;
-  }
-
-  function normalizeCurrencyMap(map: Record<string, number>): Record<string, number> {
-    if (!map) return {};
-    const normalized: Record<string, number> = {};
-    for (const [curIdText, val] of Object.entries(map)) {
-      if (typeof val !== "number" || isNaN(val)) continue;
-      const canonicalId = getCanonicalCurrencyId(curIdText);
-      const key = String(canonicalId);
-      normalized[key] = (normalized[key] || 0) + val;
-    }
-    return normalized;
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
-    const normalized = normalizeCurrencyMap(map);
-    const activeEntries = Object.entries(normalized).filter(([_, val]) => Math.abs(val) > 0.01);
+    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -680,30 +822,72 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     );
   }
 
-  function formatCurrencyMap(map: Record<string, number>) {
-    const parts = Object.entries(map)
-      .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
-      .map(([currencyIdText, amount]) =>
-        formatCurrencyAmount(amount, Number(currencyIdText))
+  function formatPrintBalanceMap(map: Record<string, number>, isSupplier = false) {
+    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    if (activeEntries.length === 0) {
+      return (
+        <strong style={{ color: "#374151", fontSize: 14 }}>
+          {formatCurrencyAmountJSX(0, defaultCurrency?.id || 1)}
+        </strong>
       );
-    return parts.length ? parts.join(" + ") : "0";
+    }
+
+    return (
+      <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {activeEntries.map(([curIdText, val]) => {
+          const curId = Number(curIdText);
+          const absVal = Math.abs(val);
+          let isRed = false;
+          if (isSupplier) {
+            isRed = val < -0.01;
+          } else {
+            isRed = val > 0.01;
+          }
+          const color = isRed ? "#dc2626" : "#16a34a";
+
+          return (
+            <strong key={curIdText} style={{ color, fontSize: 14 }}>
+              {formatCurrencyAmountJSX(absVal, curId, false)}
+            </strong>
+          );
+        })}
+      </span>
+    );
   }
 
-  function formatCurrencyAmountJSX(value: number, currencyId: number) {
+  function formatCurrencyMap(map: Record<string, number>) {
+    const active = Object.entries(map).filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001);
+    if (active.length === 0) {
+      return formatCurrencyAmountJSX(0, defaultCurrency?.id || 1);
+    }
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
+        {active.map(([currencyIdText, amount], idx) => (
+          <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {formatCurrencyAmountJSX(amount, Number(currencyIdText))}
+          </span>
+        ))}
+      </span>
+    );
+  }
+
+  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
     const code = currencies.find((c: any) => c.id === currencyId)?.code || "";
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
-    const isRounding = currencies.find((c: any) => c.id === currencyId)?.rounding || false;
+    const isIQD = code === "IQD";
+    // IQD: never show decimals. Others: show up to 2 decimals but drop trailing zeros
     const formatted = Math.abs(value).toLocaleString("en-US", { 
-      minimumFractionDigits: isRounding ? 0 : 2, 
-      maximumFractionDigits: isRounding ? 0 : 2 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: isIQD ? 0 : 2 
     });
 
     const parts = formatted.split('.');
     const whole = parts[0];
-    const decimal = parts[1];
+    const decimal = parts[1]; // undefined when no decimal part (IQD always, USD when .00)
 
-    const displaySymbol = code === "IQD" ? "دینار" : symbol;
-    const isNegative = value < 0;
+    const displaySymbol = isIQD ? "دینار" : symbol;
+    const isNegative = isNegativeParam !== undefined ? isNegativeParam : value < 0;
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 2 }} dir="ltr">
@@ -711,7 +895,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
         <span>
           <span>{whole}</span>
-          {decimal !== undefined && (
+          {decimal !== undefined && decimal !== "0" && decimal !== "00" && (
             <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
@@ -720,8 +904,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function formatCurrencyMapJSX(map: Record<string, number>) {
-    const normalized = normalizeCurrencyMap(map);
-    const activeEntries = Object.entries(normalized).filter(([_, val]) => Math.abs(val) > 0.01);
+    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
@@ -857,22 +1040,21 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, [invoiceCurrencyId, exchangeRate, currencies]);
 
   useEffect(() => {
-    if (isEditLoading) return;
     if (paymentTypeMode === "cash") {
       const itemTotals = getItemsTotalsByCurrency();
       const newPaid: PaidAmounts = {};
       Object.entries(itemTotals).forEach(([curIdText, amount]) => {
         if (amount > 0) {
-          newPaid[Number(curIdText)] = String(amount);
+          newPaid[Number(curIdText)] = String(Number(amount.toFixed(2)));
         }
       });
       if (Object.keys(newPaid).length === 0) {
         const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
-        if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
+        if (fullVal > 0) newPaid[paidCurrencyId] = String(Number(fullVal.toFixed(2)));
       }
       setPaidAmounts(newPaid);
     }
-  }, [rows, total, paymentTypeMode, paidCurrencyId, getFullPaidAmountForCurrency, isEditLoading]);
+  }, [rows, total, paymentTypeMode, paidCurrencyId, getFullPaidAmountForCurrency]);
 
   const accountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
@@ -1033,16 +1215,30 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     });
   }, [accounts]);
 
+  const isDailyCashSalesAccount = (acc: any): boolean => {
+    if (!acc?.name) return false;
+    const n = normalizeKurdishSearchText(acc.name).toLowerCase();
+    const target1 = normalizeKurdishSearchText("فرۆشی رۆژانەی نەقدی").toLowerCase();
+    const target2 = normalizeKurdishSearchText("فرۆشی ڕۆژانەی نەقدی").toLowerCase();
+    const target3 = normalizeKurdishSearchText("فرۆشی رۆژانە").toLowerCase();
+    return (
+      n.includes(target1) ||
+      n.includes(target2) ||
+      n.includes(target3) ||
+      (n.includes("فرۆش") && n.includes("نەقد"))
+    );
+  };
+
   const filteredAccounts = useMemo(() => {
-    const q = accountSearch.trim().toLowerCase();
+    const q = normalizeKurdishSearchText(accountSearch).trim();
     const searched = q
       ? salesAccounts.filter((account: any) => {
           const typeName = getAccountTypeName(account.accountTypeId);
           return (
-            String(account.name || "").toLowerCase().includes(q) ||
-            String(account.phone || "").toLowerCase().includes(q) ||
-            String(account.city || "").toLowerCase().includes(q) ||
-            typeName.toLowerCase().includes(q)
+            normalizeKurdishSearchText(account.name || "").includes(q) ||
+            normalizeKurdishSearchText(account.phone || "").includes(q) ||
+            normalizeKurdishSearchText(account.city || "").includes(q) ||
+            normalizeKurdishSearchText(typeName).includes(q)
           );
         })
       : salesAccounts;
@@ -1058,24 +1254,35 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         unique.push(acc);
       }
     }
+
+    // Pin (فرۆشی رۆژانەی نەقدی) as the first item
+    unique.sort((a: any, b: any) => {
+      const isPinnedA = isDailyCashSalesAccount(a);
+      const isPinnedB = isDailyCashSalesAccount(b);
+      if (isPinnedA && !isPinnedB) return -1;
+      if (!isPinnedA && isPinnedB) return 1;
+      return 0;
+    });
+
     return unique;
   }, [accountSearch, salesAccounts]);
 
   const filteredProducts = useMemo(() => {
-    const q = productSearch.trim().toLowerCase();
+    const q = normalizeKurdishSearchText(productSearch).trim();
+    // Strictly exclude expense products from Sales Invoice
     let list = products.filter((product: any) => !product.isExpense);
     if (invoiceType === "فرۆشتن") {
-      list = list.filter((product: any) => (product.stock || 0) > 0 || product.isService);
+      list = list.filter((product: any) => (product.stock || 0) > 0 || isProductService(product));
     }
     if (!q) return list;
 
     return list.filter((product: any) => {
       return (
-        String(product.name || "").toLowerCase().includes(q) ||
-        String(product.code || "").toLowerCase().includes(q) ||
-        String(product.barcode || "").toLowerCase().includes(q) ||
-        String(product.category || "").toLowerCase().includes(q) ||
-        String(product.brand || "").toLowerCase().includes(q)
+        normalizeKurdishSearchText(product.name || "").includes(q) ||
+        normalizeKurdishSearchText(product.code || "").includes(q) ||
+        normalizeKurdishSearchText(product.barcode || "").includes(q) ||
+        normalizeKurdishSearchText(product.category || "").includes(q) ||
+        normalizeKurdishSearchText(product.brand || "").includes(q)
       );
     });
   }, [productSearch, products, invoiceType]);
@@ -1148,7 +1355,6 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function getPaidCurrencies() {
-    if (paymentTypeMode === "debt") return [];
     return Object.entries(paidAmounts)
       .map(([currencyIdText, amountText]) => ({
         currencyId: Number(currencyIdText),
@@ -1222,6 +1428,82 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     );
   }
 
+  function getCanonicalCurrencyId(curId?: number | string) {
+    const rawId = Number(curId || invoiceCurrencyId || 11);
+    const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
+    if (!found) return rawId;
+    const mainCur = (currencies || []).find((c: any) => c.code === found.code && (c.isActive !== false));
+    return mainCur ? Number(mainCur.id) : rawId;
+  }
+
+  function getItemsTotalsByCurrency() {
+    const map: Record<string, number> = {};
+
+    for (const row of rows) {
+      const canonicalId = getCanonicalCurrencyId(row.currencyId || invoiceCurrencyId);
+      const key = String(canonicalId);
+      map[key] = (map[key] || 0) + getRowNetTotalInRowCurrency(row);
+    }
+
+    Object.keys(map).forEach((k) => {
+      map[k] = Number(map[k].toFixed(2));
+    });
+
+    return map;
+  }
+
+  function getPaidAmountsByCurrency() {
+    const map: Record<string, number> = {};
+
+    for (const item of getPaidCurrencies()) {
+      const canonicalId = getCanonicalCurrencyId(item.currencyId);
+      const key = String(canonicalId);
+      map[key] = (map[key] || 0) + item.amount;
+    }
+
+    return map;
+  }
+
+  function getInvoiceNetTotalsByCurrency() {
+    const map = { ...getItemsTotalsByCurrency() };
+
+    if (invoiceDiscountAmount > 0) {
+      const discCurKey = String(getCanonicalCurrencyId(invoiceDiscountCurrencyId || invoiceCurrencyId));
+      if (map[discCurKey] !== undefined) {
+        map[discCurKey] = Math.max(0, map[discCurKey] - invoiceDiscountAmount);
+      } else {
+        const invCurKey = String(getCanonicalCurrencyId(invoiceCurrencyId));
+        map[invCurKey] = Math.max(0, (map[invCurKey] || 0) - invoiceDiscountAmount);
+      }
+    }
+
+    if (hasDelivery && deliveryFee.trim() && deliveryFeeAmount > 0) {
+      const delCurKey = String(getCanonicalCurrencyId(iqdCurrencyId));
+      map[delCurKey] = (map[delCurKey] || 0) + toNumber(deliveryFee);
+    }
+
+    return map;
+  }
+
+  function getInvoiceRemainingByCurrency() {
+    const totals = getInvoiceNetTotalsByCurrency();
+    const paid = getPaidAmountsByCurrency();
+    const result: Record<string, number> = {};
+
+    const currencyKeys = Array.from(
+      new Set([...Object.keys(totals), ...Object.keys(paid)])
+    );
+
+    for (const key of currencyKeys) {
+      const diff = (totals[key] || 0) - (paid[key] || 0);
+      if (Math.abs(diff) > 0.001) {
+        result[key] = diff;
+      }
+    }
+
+    return result;
+  }
+
   function getAccountTypeName(accountTypeId?: number) {
     const type = accountTypesStore.find((x: any) => Number(x.id) === Number(accountTypeId)) || accountTypes.find((x: any) => Number(x.id) === Number(accountTypeId));
     return type?.name || "-";
@@ -1238,8 +1520,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const displaySymbol = isIqd ? "دینار" : symbol;
     const isRounding = isIqd;
     const formatted = Math.abs(value).toLocaleString("en-US", { 
-      minimumFractionDigits: isRounding ? 0 : 2, 
-      maximumFractionDigits: isRounding ? 0 : 2 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: isIqd ? 0 : 2 
     });
 
     const parts = formatted.split('.');
@@ -1253,7 +1535,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
         <span>
           <span>{whole}</span>
-          {decimal !== undefined && (
+          {decimal !== undefined && decimal !== "0" && decimal !== "00" && (
             <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
@@ -1304,29 +1586,59 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function availableText(row: InvoiceRow) {
-    const totalAvailable = getRowAvailableQty(row.productId, row.warehouseName);
-    const packageQty = row.packageQuantity || 1;
-    if (packageQty > 1) {
-      const packs = Math.floor(totalAvailable / packageQty);
-      return `${packs} ${row.packageName} / ${totalAvailable} دانە`;
+    const prod = products.find((p: any) => p.id === row.productId);
+    const isServiceOrExpense = isProductServiceOrExpense(row) || isProductServiceOrExpense(prod);
+    if (isServiceOrExpense) {
+      return "-";
     }
 
-    return `${totalAvailable} دانە`;
+    const totalAvailable = getRowAvailableQty(row.productId, row.warehouseName);
+    const otherRowsQty = rows
+      .filter((r: any) => r.id !== row.id && r.productId === row.productId && r.warehouseName === row.warehouseName)
+      .reduce((sum, r) => sum + (toNumber(r.qty) * r.packageQuantity), 0);
+    const remainingAvailable = Math.max(totalAvailable - otherRowsQty, 0);
+
+    const packageQty = row.packageQuantity || 1;
+    if (packageQty > 1) {
+      const packs = Math.floor(remainingAvailable / packageQty);
+      return `${packs} ${row.packageName} / ${remainingAvailable} دانە`;
+    }
+
+    return `${remainingAvailable} دانە`;
   }
 
   function validateStockBeforeSave() {
+    const totals: Record<string, { name: string; qty: number; available: number }> = {};
+
     for (const row of rows) {
       const requestedQty = toNumber(row.qty) * row.packageQuantity;
-      const availableQty = getRowAvailableQty(row.productId, row.warehouseName);
 
       if (requestedQty <= 0) {
         showToast(`عەددی کەرەستەی "${row.productName}" دروست نییە.`);
         return false;
       }
 
-      if (requestedQty > availableQty) {
+      const prod = products.find((p: any) => p.id === row.productId);
+      const isServiceOrExpense = isProductServiceOrExpense(row) || isProductServiceOrExpense(prod);
+      if (isServiceOrExpense) continue;
+
+      const key = `${row.productId}_${row.warehouseName}`;
+      if (!totals[key]) {
+        const availableQty = getRowAvailableQty(row.productId, row.warehouseName);
+        totals[key] = {
+          name: row.productName,
+          qty: 0,
+          available: availableQty
+        };
+      }
+      totals[key].qty += requestedQty;
+    }
+
+    for (const key of Object.keys(totals)) {
+      const item = totals[key];
+      if (item.qty > item.available) {
         showToast(
-          `ناتوانیت "${row.productName}" بفرۆشیت. بەردەست: ${availableQty} دانە / داواکراو: ${requestedQty} دانە`
+          `ناتوانیت "${item.name}" بفرۆشیت. بەردەست: ${item.available} دانە / کۆی داواکراوی ئەم پسووڵەیە: ${item.qty} دانە`
         );
         return false;
       }
@@ -1348,13 +1660,22 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     const clean = onlyDecimal(nextQtyText);
     const requestedQty = toNumber(clean) * row.packageQuantity;
-    const availableQty = getRowAvailableQty(row.productId, row.warehouseName);
 
-    if (requestedQty > availableQty) {
-      showToast(
-        `ناتوانیت "${row.productName}" بەو عەددە بفرۆشیت. تەنها ${availableQty} بەردەستە لە کۆگا.`
-      );
-      return;
+    const prod = products.find((p: any) => p.id === row.productId);
+    const isServiceOrExpense = isProductServiceOrExpense(row) || isProductServiceOrExpense(prod);
+
+    if (!isServiceOrExpense) {
+      const availableQty = getRowAvailableQty(row.productId, row.warehouseName);
+      const otherRowsQty = rows
+        .filter((r: any) => r.id !== row.id && r.productId === row.productId && r.warehouseName === row.warehouseName)
+        .reduce((sum, r) => sum + (toNumber(r.qty) * r.packageQuantity), 0);
+
+      if (otherRowsQty + requestedQty > availableQty) {
+        showToast(
+          `ناتوانیت "${row.productName}" بەو عەددە بفرۆشیت. تەنها ${Math.max(availableQty - otherRowsQty, 0)} دانە بەردەستە لە کۆگا.`
+        );
+        return;
+      }
     }
 
     updateRow(row.id, { qty: clean });
@@ -1403,7 +1724,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   function chooseProduct(product: ProductLike) {
     if (blockIfLocked()) return;
 
-    if ((product.stock || 0) <= 0) {
+    const isServiceOrExpense = isProductServiceOrExpense(product);
+
+    if (!isServiceOrExpense && (product.stock || 0) <= 0) {
       showToast(`"${product.name}" لە کۆگادا بەردەست نییە.`);
       setProductSearch("");
       setShowProductList(false);
@@ -1419,32 +1742,23 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         (selectedPrice as any).amount || (selectedPrice as any).price || 0
       ) || 0;
 
-    const existing = rows.find((row: any) => row.productId === product.id);
+    const defaultWarehouseName = warehouses[0]?.name || "کۆگای سەرەکی";
+    const availableQty = getRowAvailableQty(product.id, defaultWarehouseName);
+    const currentRequestedTotal = rows
+      .filter((r: any) => r.productId === product.id && r.warehouseName === defaultWarehouseName)
+      .reduce((sum, r) => sum + (toNumber(r.qty) * r.packageQuantity), 0);
 
-    if (existing) {
-      const nextQty = toNumber(existing.qty) + 1;
-      const requestedQty = nextQty * existing.packageQuantity;
-      const availableQty = getRowAvailableQty(existing.productId, existing.warehouseName);
-
-      if (requestedQty > availableQty) {
-        showToast(
-          `ناتوانیت "${existing.productName}" زیاتر زیاد بکەیت. تەنها ${availableQty} بەردەستە لە کۆگا.`
-        );
-        setProductSearch("");
-        setShowProductList(false);
-        return;
-      }
-
-      updateRow(existing.id, {
-        qty: String(nextQty),
-      });
-
+    if (!isServiceOrExpense && currentRequestedTotal + 1 > availableQty) {
+      showToast(`"${product.name}" لە کۆگادا بەردەست نییە بەو بڕە.`);
       setProductSearch("");
       setShowProductList(false);
       return;
     }
 
-    const defaultWarehouseName = warehouses[0]?.name || "کۆگای سەرەکی";
+    const targetCurrencyId = selectedPrice?.currencyId || invoiceCurrencyId;
+    if (targetCurrencyId && targetCurrencyId !== invoiceCurrencyId) {
+      setInvoiceCurrencyId(targetCurrencyId);
+    }
 
     const newRow: InvoiceRow = {
       id: Date.now() + Math.floor(Math.random() * 100000),
@@ -1458,16 +1772,21 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       note: "",
       packageName: firstPackage.name,
       packageQuantity: firstPackage.quantity || 1,
-      warehouseName: defaultWarehouseName,
+      warehouseName: isServiceOrExpense ? "خزمەتگوزاری" : defaultWarehouseName,
       priceType:
-        (selectedPrice as any).priceType ||
-        (selectedPrice as any).name ||
+        (selectedPrice as any)?.priceType ||
+        (selectedPrice as any)?.name ||
         invoicePriceType,
-      currencyId: selectedPrice.currencyId || invoiceCurrencyId,
-      availableQty: getRowAvailableQty(product.id, defaultWarehouseName),
+      currencyId: targetCurrencyId,
+      availableQty: 0,
       previousPrice: getPreviousPrice(product.id),
-      costPrice: product.costPrice || 0,
+      costPrice: isServiceOrExpense ? 0 : (product.costPrice || 0),
+      costCurrencyId: product.costCurrencyId || (product.costPrice && product.costPrice > 1000 ? 2 : 1),
+      exchangeRateType: product.exchangeRateType || "DAILY_MARKET",
+      customExchangeRate: product.customExchangeRate || 132000,
       showCost: false,
+      isExpense: Boolean(product.isExpense),
+      isService: isServiceOrExpense,
     };
 
     setRows((prev) => [newRow, ...prev]);
@@ -1505,12 +1824,20 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     const nextPackageQuantity = selectedPackage?.quantity || 1;
     const requestedQty = toNumber(row.qty) * nextPackageQuantity;
+    const isServiceOrExpense = isProductServiceOrExpense(row) || isProductServiceOrExpense(product);
 
-    if (requestedQty > row.availableQty) {
-      showToast(
-        `ناتوانیت ئەم پێچانەوەیە هەڵبژێریت. داواکراو ${requestedQty} دانەیە، بەڵام بەردەست ${row.availableQty} دانەیە.`
-      );
-      return;
+    if (!isServiceOrExpense) {
+      const availableQty = getRowAvailableQty(row.productId, row.warehouseName);
+      const otherRowsQty = rows
+        .filter((r: any) => r.id !== row.id && r.productId === row.productId && r.warehouseName === row.warehouseName)
+        .reduce((sum, r) => sum + (toNumber(r.qty) * r.packageQuantity), 0);
+
+      if (otherRowsQty + requestedQty > availableQty) {
+        showToast(
+          `ناتوانیت ئەم پێچانەوەیە هەڵبژێریت. کۆی داواکراو لەم پسووڵەیە ${otherRowsQty + requestedQty} دانەیە، بەڵام بەردەست ${availableQty} دانەیە.`
+        );
+        return;
+      }
     }
 
     updateRow(row.id, {
@@ -1559,6 +1886,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           )
         : row.price,
     });
+
+    setInvoiceCurrencyId(currencyId);
   }
 
   function changePaidCurrency(currencyId: number) {
@@ -1570,51 +1899,36 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (blockIfLocked()) return;
 
     const clean = onlyDecimal(value);
-
-    setPaidAmounts((prev) => ({
-      ...prev,
+    const newPaidState = {
+      ...paidAmounts,
       [currencyId]: clean,
-    }));
-  }
+    };
 
-  function getItemsTotalsByCurrency() {
-    const map: Record<string, number> = {};
+    const rate = (toNumber(exchangeRate) / 100) || 1500;
+    const totalPaidValConverted = Object.entries(newPaidState).reduce((sum, [cIdStr, amtStr]) => {
+      const amt = parseFloat(amtStr || "0") || 0;
+      const cId = Number(cIdStr);
+      let inInvoiceCur = amt;
+      if (cId !== invoiceCurrencyId) {
+        if ((cId === 2 || cId === 12) && (invoiceCurrencyId === 1 || invoiceCurrencyId === 11)) {
+          inInvoiceCur = amt / rate;
+        } else if ((cId === 1 || cId === 11) && (invoiceCurrencyId === 2 || invoiceCurrencyId === 12)) {
+          inInvoiceCur = amt * rate;
+        }
+      }
+      return sum + inInvoiceCur;
+    }, 0);
 
-    for (const row of rows) {
-      const canonicalId = getCanonicalCurrencyId(row.currencyId || invoiceCurrencyId);
-      const key = String(canonicalId);
-      map[key] = (map[key] || 0) + getRowNetTotalInRowCurrency(row);
+    const diff = Math.abs(totalPaidValConverted - total);
+    if (totalPaidValConverted <= 0.01) {
+      setPaymentTypeMode("debt");
+    } else if (diff < 1.0 || totalPaidValConverted >= total - 0.01) {
+      setPaymentTypeMode("cash");
+    } else {
+      setPaymentTypeMode("partial");
     }
 
-    return map;
-  }
-
-  function getPaidAmountsByCurrency() {
-    const map: Record<string, number> = {};
-
-    for (const item of getPaidCurrencies()) {
-      const canonicalId = getCanonicalCurrencyId(item.currencyId);
-      const key = String(canonicalId);
-      map[key] = (map[key] || 0) + item.amount;
-    }
-
-    return map;
-  }
-
-  function getInvoiceRemainingByCurrency() {
-    const totals = getItemsTotalsByCurrency();
-    const paid = getPaidAmountsByCurrency();
-    const result: Record<string, number> = {};
-
-    const currencyKeys = Array.from(
-      new Set([...Object.keys(totals), ...Object.keys(paid)])
-    );
-
-    for (const key of currencyKeys) {
-      result[key] = (totals[key] || 0) - (paid[key] || 0);
-    }
-
-    return result;
+    setPaidAmounts(newPaidState);
   }
 
   function handleSelectPaymentMode(mode: "cash" | "partial" | "debt") {
@@ -1626,12 +1940,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       const newPaid: PaidAmounts = {};
       Object.entries(itemTotals).forEach(([curIdText, amount]) => {
         if (amount > 0) {
-          newPaid[Number(curIdText)] = String(amount);
+          newPaid[Number(curIdText)] = String(Number(amount.toFixed(2)));
         }
       });
       if (Object.keys(newPaid).length === 0) {
         const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
-        if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
+        if (fullVal > 0) newPaid[paidCurrencyId] = String(Number(fullVal.toFixed(2)));
       }
       setPaidAmounts(newPaid);
     } else if (mode === "partial") {
@@ -1641,12 +1955,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       if (!hasAny) {
         Object.entries(itemTotals).forEach(([curIdText, amount]) => {
           if (amount > 0) {
-            newPaid[Number(curIdText)] = String(amount);
+            newPaid[Number(curIdText)] = String(Number(amount.toFixed(2)));
           }
         });
         if (Object.keys(newPaid).length === 0) {
           const fullVal = getFullPaidAmountForCurrency(paidCurrencyId, total);
-          if (fullVal > 0) newPaid[paidCurrencyId] = String(fullVal);
+          if (fullVal > 0) newPaid[paidCurrencyId] = String(Number(fullVal.toFixed(2)));
         }
       }
       setPaidAmounts(newPaid);
@@ -1693,12 +2007,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       })
     );
     setRows([]);
+    setInvoiceCurrencyId(defaultCurrency.id);
     setOpenedDetailRowId(null);
     setProductSearch("");
     setInvoiceDiscountValue("");
     setShowInvoiceDiscount(false);
-    setPaymentTypeMode("cash");
     setPaidAmounts({});
+    setPaymentTypeMode("cash");
     setPaidCurrencyId(defaultCurrency.id);
     const iqd = currencies.find((c: any) => c.code === "IQD");
     if (iqd && iqd.rate) {
@@ -1726,6 +2041,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setTempCustomerName("");
     setTempCustomerPhone("");
     setTempCustomerAddress("");
+    setCashboxId(getDefaultCashbox(cashboxes)?.id);
     lastLoadedEditIdRef.current = null;
   }
 
@@ -1762,7 +2078,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       ? "convert_to_other_currency"
       : (action === "keep_credit" ? "keep_as_same_currency_balance" : null);
 
-    const paidList = getPaidCurrencies();
+    const paidList = Object.entries(paidAmounts)
+      .map(([currencyIdText, amountText]) => ({
+        currencyId: Number(currencyIdText),
+        amount: toNumber(amountText),
+      }))
+      .filter((x: any) => x.amount > 0);
 
     const result = calculateLedgerEntries({
       type: mappedType,
@@ -1795,7 +2116,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(`${dateStr}T${hours}:${minutes}:00Z`).toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`);
+          if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(`${dateStr} ${cleanTime}`);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -1820,7 +2142,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       netAmount: total,
       internalNote: internalNote,
       printNote: printNote,
-      employeeName: employeeName || "کۆساری مەلا فەرهاد",
+      employeeName: employeeName || currentUser?.name || currentUser?.username || "بەڕێوەبەر",
       hasDelivery: hasDelivery,
       driverName: deliveryName || null,
       driverPhone: deliveryPhone || null,
@@ -1837,6 +2159,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           discountAmount: getRowDiscountAmount(row),
           lineTotal: getRowTotal(row),
           note: row.note,
+          currencyId: row.currencyId,
           warehouseId,
           unitCost: toNumber(row.costPrice || 0),
         };
@@ -1856,8 +2179,10 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       invoiceDiscountCurrencyId: invoiceDiscountCurrencyId
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res) => {
@@ -2000,138 +2325,88 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }
 
     setPrintPaperSize(size);
-    if (typeof document !== "undefined") {
-      let styleTag = document.getElementById("dynamic-print-paper-style");
-      if (!styleTag) {
-        styleTag = document.createElement("style");
-        styleTag.id = "dynamic-print-paper-style";
-        document.head.appendChild(styleTag);
-      }
 
-      if (size === "A5") {
-        styleTag.innerHTML = `
-          @media print {
-            @page {
-              size: A5 landscape !important;
-              margin: 3mm !important;
-            }
-            html, body {
-              width: 210mm !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              background: #ffffff !important;
-            }
-            #invoice-print-area, #purchase-print-area, [id$="-print-area"] {
-              width: 100% !important;
-              max-width: 100% !important;
-              margin: 0 auto !important;
-              padding: 0 !important;
-              box-sizing: border-box !important;
-              position: relative !important;
-              left: 0 !important;
-              top: 0 !important;
-            }
-            .print-header-spacer {
-              height: 50px !important;
-            }
-            #invoice-print-area div[style*="printInfoRightColStyle"],
-            #invoice-print-area div[style*="printInfoLeftColStyle"],
-            #purchase-print-area div[style*="printInfoRightColStyle"],
-            #purchase-print-area div[style*="printInfoLeftColStyle"] {
-              padding: 3px 6px !important;
-              font-size: 10px !important;
-              line-height: 1.3 !important;
-            }
-            #invoice-print-area div[style*="printInfoRowStyle"],
-            #purchase-print-area div[style*="printInfoRowStyle"] {
-              font-size: 10px !important;
-              line-height: 1.3 !important;
-            }
-            table {
-              width: 100% !important;
-              table-layout: fixed !important;
-              margin-bottom: 4px !important;
-              font-size: 10px !important;
-            }
-            th {
-              padding: 3px 4px !important;
-              font-size: 10px !important;
-            }
-            td {
-              padding: 2px 4px !important;
-              font-size: 9.5px !important;
-            }
-            #invoice-print-area div[style*="printBottomGridStyle"],
-            #purchase-print-area div[style*="printBottomGridStyle"] {
-              margin-top: 4px !important;
-              gap: 6px !important;
-            }
-            #invoice-print-area div[style*="printBottomBoxStyle"],
-            #purchase-print-area div[style*="printBottomBoxStyle"] {
-              padding: 3px 6px !important;
-            }
-            #invoice-print-area div[style*="printSummaryLineStyle"],
-            #purchase-print-area div[style*="printSummaryLineStyle"] {
-              font-size: 10px !important;
-              padding-bottom: 2px !important;
-              margin-bottom: 2px !important;
-            }
-          }
-        `;
-      } else {
-        styleTag.innerHTML = `
-          @media print {
-            @page {
-              size: A4 portrait !important;
-              margin: 0 !important;
-            }
-            html, body {
-              width: 210mm !important;
-              min-width: 0 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              background: #ffffff !important;
-            }
-            body, #root, #__next, .app, .main-layout {
-              min-width: 0 !important;
-            }
-            #invoice-print-area, #purchase-print-area, [id$="-print-area"] {
-              width: 210mm !important;
-              max-width: 210mm !important;
-              margin: 0 !important;
-              padding: 6mm 8mm !important;
-              box-sizing: border-box !important;
-              overflow: visible !important;
-              position: fixed !important;
-              top: 0 !important;
-              left: 50% !important;
-              transform: translateX(-50%) scale(0.91) !important;
-              transform-origin: top center !important;
-            }
-            .print-header-spacer {
-              height: 135px !important;
-            }
-            table {
-              width: 100% !important;
-              max-width: 100% !important;
-              table-layout: fixed !important;
-              font-size: 11px !important;
-            }
-            th {
-              padding: 4px 6px !important;
-              font-size: 11px !important;
-            }
-            td {
-              padding: 3px 6px !important;
-              font-size: 10.5px !important;
-            }
-          }
-        `;
-      }
-    }
-
+    // Wait for React to re-render with the correct printPaperSize
     setTimeout(() => {
-      window.print();
+      const printArea = document.getElementById("invoice-print-area");
+      if (!printArea) { window.print(); return; }
+
+      const html = printArea.innerHTML;
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const isA5 = size === "A5";
+
+      const printWindow = window.open("", "_blank", "width=900,height=700");
+      if (!printWindow) { window.print(); return; }
+
+      printWindow.document.write(`<!DOCTYPE html>
+<html dir="rtl" lang="ckb">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @font-face {
+      font-family: "Speda";
+      src: url("${origin}/fonts/Speda.ttf") format("truetype");
+      font-weight: 400;
+    }
+    @page {
+      size: ${isA5 ? "A5" : "auto"};
+      margin: 0;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      font-family: "Speda", "Segoe UI", Tahoma, Arial, sans-serif;
+      direction: rtl;
+      color: #000;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    #print-body {
+      padding: ${isA5 ? "2mm 3mm" : "3mm 6mm"};
+      width: 100%;
+    }
+    table {
+      width: 100% !important;
+      table-layout: fixed !important;
+      border-collapse: collapse !important;
+      box-sizing: border-box !important;
+    }
+    th {
+      padding: ${isA5 ? "2px 2px" : "4px 3px"} !important;
+      font-size: ${isA5 ? "8px" : "11px"} !important;
+      line-height: 1.3 !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      overflow: hidden;
+      white-space: normal;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    td {
+      padding: ${isA5 ? "1.5px 2px" : "4px 3px"} !important;
+      font-size: ${isA5 ? "7.5px" : "10px"} !important;
+      line-height: 1.3 !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      overflow: hidden;
+      white-space: normal;
+    }
+    tr { page-break-inside: avoid; break-inside: avoid; }
+    .no-print { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="print-body">${html}</div>
+  <script>
+    document.fonts.ready.then(function() {
+      setTimeout(function() { window.print(); window.close(); }, 300);
+    });
+  <\/script>
+</body>
+</html>`);
+      printWindow.document.close();
     }, 150);
   }
 
@@ -2332,23 +2607,38 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                     {filteredAccounts.length === 0 ? (
                       <div style={emptyText}>هیچ هەژمارێک نەدۆزرایەوە</div>
                     ) : (
-                      filteredAccounts.map((account: any) => (
-                        <button
-                          key={account.id}
-                          style={dropdownItem}
-                          onMouseDown={() => {
-                            setAccountId(account.id);
-                            setAccountSearch(account.name);
-                            setShowAccountList(false);
-                            setShowAccountInfo(false);
-                          }}
-                        >
-                        <strong>{account.name}</strong>
-                        <span style={smallMuted}>
-                          {account.phone || "-"} / {account.city || "-"}
-                        </span>
-                      </button>
-                    ))
+                      filteredAccounts.map((account: any) => {
+                        const isPinned = isDailyCashSalesAccount(account);
+                        return (
+                          <button
+                            key={account.id}
+                            style={{
+                              ...dropdownItem,
+                              ...(isPinned ? { background: "#f0fdf4", borderBottom: "1px solid #bbf7d0" } : {}),
+                            }}
+                            onMouseDown={() => {
+                              setAccountId(account.id);
+                              setAccountSearch(account.name);
+                              setShowAccountList(false);
+                              setShowAccountInfo(false);
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                              <strong style={isPinned ? { color: "#15803d" } : {}}>
+                                {isPinned ? "📌 " : ""}{account.name}
+                              </strong>
+                              {isPinned && (
+                                <span style={{ fontSize: 11, color: "#16a34a", fontWeight: "bold" }}>
+                                  پین کراو
+                                </span>
+                              )}
+                            </div>
+                            <span style={smallMuted}>
+                              {account.phone || "-"} / {account.city || "-"}
+                            </span>
+                          </button>
+                        );
+                      })
                   )}
                 </div>
               )}
@@ -2475,7 +2765,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               </InfoRow>
 
               <InfoRow label="قەرز">
-                {formatCurrencyMapWithColors(screenAccountBalanceBeforeByCurrency)}
+                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(selectedAccount))}
               </InfoRow>
 
               <InfoRow label="ئاگاداری دواکەوتن">
@@ -2494,7 +2784,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             <div style={totalGrid}>
               <StatBox
                 title="گشتی"
-                value={formatCurrencyMapJSX(getItemsTotalsByCurrency())}
+                value={formatCurrencyMapJSX(getInvoiceNetTotalsByCurrency())}
                 color="#16a34a"
               />
               <StatBox
@@ -2649,37 +2939,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               </button>
             </div>
 
-            <Field label="قاسە">
-              <select
-                value={cashboxId || ""}
-                disabled={isInvoiceLocked}
-                onChange={(e) => {
-                  if (blockIfLocked()) return;
-                  setCashboxId(Number(e.target.value));
-                }}
-                style={{ ...input, ...lockedFieldStyle }}
-              >
-                {cashboxes.map((cashbox: any) => (
-                  <option key={cashbox.id} value={cashbox.id}>
-                    {cashbox.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="بەروار">
-              <DateInput
-                value={invoiceDate}
-                disabled={isInvoiceLocked}
-                onChange={(val) => {
-                  if (blockIfLocked()) return;
-                  setInvoiceDate(val);
-                }}
-                style={{ ...input, ...lockedFieldStyle }}
-              />
-            </Field>
-
+            {/* --- پارەی دراو --- */}
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
+
               {currencies.filter((c: any) => c.id === paidCurrencyId || (paidAmounts[c.id] && paidAmounts[c.id].trim() !== "" && parseFloat(paidAmounts[c.id]) !== 0)).map((currency: any) => {
                 const isCurrent = currency.id === paidCurrencyId;
                 const showRate = paidCurrencyId !== invoiceCurrencyId || getPaidCurrencies().some(x => x.currencyId !== invoiceCurrencyId);
@@ -2768,8 +3030,58 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               </div>
             )}
 
+            {/* --- نرخی دۆلار (تایبەت بەم پسووڵەیە) --- */}
+            {printOptions.showExchangeRate !== false && (
+              <Field label="نرخی 100 دۆلار (تایبەت بەم پسووڵەیە)">
+                <div style={{ display: "flex", border: "1px solid #93c5fd", borderRadius: 8, overflow: "hidden", background: "#f0f9ff" }}>
+                  <FormattedNumberInput
+                    value={exchangeRate}
+                    disabled={isInvoiceLocked}
+                    onChange={(val) => {
+                      if (blockIfLocked()) return;
+                      setExchangeRate(val);
+                    }}
+                    style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 10px", background: "transparent", cursor: isInvoiceLocked ? "not-allowed" : "text", color: "#1e40af", fontWeight: "bold" }}
+                  />
+                  <span style={{ border: "none", borderRight: "1px solid #bfdbfe", background: "#e0f2fe", padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#0369a1", fontSize: "12px", minWidth: "45px" }}>
+                    دینار
+                  </span>
+                </div>
+              </Field>
+            )}
 
+            {/* --- قاسە و بەروار --- */}
+            <Field label="قاسە">
+              <select
+                value={cashboxId || ""}
+                disabled={isInvoiceLocked}
+                onChange={(e) => {
+                  if (blockIfLocked()) return;
+                  setCashboxId(Number(e.target.value));
+                }}
+                style={{ ...input, ...lockedFieldStyle }}
+              >
+                {cashboxes.map((cashbox: any) => (
+                  <option key={cashbox.id} value={cashbox.id}>
+                    {cashbox.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
+            <Field label="بەروار">
+              <DateInput
+                value={invoiceDate}
+                disabled={isInvoiceLocked}
+                onChange={(val) => {
+                  if (blockIfLocked()) return;
+                  setInvoiceDate(val);
+                }}
+                style={{ ...input, ...lockedFieldStyle }}
+              />
+            </Field>
+
+            {/* --- تێبینی --- */}
             <div style={noteToggleBox}>
               <button
                 type="button"
@@ -2784,25 +3096,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   setShowInvoiceNotes((prev) => !prev);
                 }}
               >
-                {showInvoiceNotes ? "▲ شاردنەوەی تێبینی و لەیبڵ" : "▼ تێبینی و لەیبڵ"}
+                {showInvoiceNotes ? "▲ شاردنەوەی تێبینی" : "▼ تێبینی"}
               </button>
 
               {showInvoiceNotes && (
                 <div style={notesInsidePayment}>
-                  <Field label="لەیبڵی پسووڵە">
-                    <input
-                      type="text"
-                      value={invoiceLabel}
-                      disabled={isInvoiceLocked}
-                      onChange={(e) => {
-                        if (blockIfLocked()) return;
-                        setInvoiceLabel(e.target.value);
-                      }}
-                      style={{ ...input, ...lockedFieldStyle }}
-                      placeholder="لەیبڵی پسووڵە بنووسە یان هەڵیبژێرە..."
-                    />
-                  </Field>
-
                   <Field label="تێبینی ناوخۆیی">
                     <textarea
                       value={internalNote}
@@ -2825,7 +3123,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         if (blockIfLocked()) return;
                         setPrintNote(e.target.value);
                       }}
-                      rows={2}
+                      rows={3}
                       style={{ ...textarea, ...lockedFieldStyle }}
                       placeholder="تێبینی چاپ..."
                     />
@@ -2971,6 +3269,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   setProductSearch(e.target.value);
                   setShowProductList(true);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && filteredProducts.length > 0) {
+                    e.preventDefault();
+                    chooseProduct(filteredProducts[0]);
+                  }
+                }}
                 placeholder="کەرەستە / ناو، کۆد، بارکۆد تایپ بکە..."
                 style={{ ...input, ...lockedFieldStyle }}
               />
@@ -2986,9 +3290,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         style={productDropdownItem}
                         onMouseDown={() => chooseProduct(product)}
                       >
-                        <strong style={{ color: "#1d4ed8" }}>
-                          {product.name}
-                        </strong>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <strong style={{ color: "#1d4ed8" }}>
+                            {product.name}
+                          </strong>
+                          {product.isService && (
+                            <span style={{ fontSize: "11px", backgroundColor: "#e0f2fe", color: "#0369a1", padding: "1px 6px", borderRadius: "4px", fontWeight: 600 }}>خزمەتگوزاری</span>
+                          )}
+                        </div>
                         <span style={smallMuted}>
                           کۆد: {product.code || "-"}
                         </span>
@@ -3032,15 +3341,30 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                               id={`product-name-${row.id}`}
                               onClick={(e) => {
                                 const rect = e.currentTarget.getBoundingClientRect();
+                                const panelHeight = 330;
+                                const fitsBelow = rect.bottom + panelHeight + 14 <= window.innerHeight;
+                                const calculatedTop = fitsBelow
+                                  ? rect.bottom + 8
+                                  : Math.max(10, rect.top - panelHeight - 8);
+
                                 setDetailCoords({
-                                  top: rect.bottom + 6,
-                                  right: window.innerWidth - rect.right,
+                                  top: calculatedTop,
+                                  right: Math.max(16, window.innerWidth - rect.right),
                                 });
                                 setOpenedDetailRowId(
                                   openedDetailRowId === row.id ? null : row.id
                                 );
                               }}
-                              style={productNameBlock}
+                              style={{
+                                ...productNameBlock,
+                                ...(openedDetailRowId === row.id
+                                  ? {
+                                      boxShadow: "0 0 0 2px #3b82f6",
+                                      background: "#eff6ff",
+                                      borderRadius: "6px",
+                                    }
+                                  : {}),
+                              }}
                             >
                               <strong>{row.productName}</strong>
                               <div style={smallMuted}>
@@ -3106,68 +3430,147 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                   </DetailField>
 
                                   <DetailField label="کۆگا">
-                                    <select
-                                      value={row.warehouseName}
-                                      disabled={isInvoiceLocked}
-                                      onChange={(e) => {
-                                        const nextWhName = e.target.value;
-                                        const nextAvail = getRowAvailableQty(row.productId, nextWhName);
-                                        updateRow(row.id, {
-                                          warehouseName: nextWhName,
-                                          availableQty: nextAvail,
-                                        });
-                                      }}
-                                      style={{
-                                        ...compactInput,
-                                        ...lockedFieldStyle,
-                                      }}
-                                    >
-                                      {warehouses.map((warehouse: any) => (
-                                        <option
-                                          key={warehouse.id}
-                                          value={warehouse.name}
-                                        >
-                                          {warehouse.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </DetailField>
-
-                                  <DetailField label="بەردەست">
-                                    <div style={compactReadonlyBox}>
-                                      {availableText(row)}
-                                    </div>
-                                  </DetailField>
-
-                                  <DetailField label="کۆست">
-                                    {row.showCost ? (
-                                      <div style={compactReadonlyBox}>
-                                        {formatMoney(
-                                          row.costPrice || 0,
-                                          getCurrencySymbol(row.currencyId)
-                                        )}
-                                      </div>
+                                    {isProductServiceOrExpense(row) ? (
+                                      <div style={compactReadonlyBox}>خزمەتگوزاری (بێ کۆگا)</div>
                                     ) : (
-                                      <button
-                                        style={{
-                                          ...showCostBtn,
-                                          opacity: isInvoiceLocked ? 0.45 : 1,
-                                          cursor: isInvoiceLocked
-                                            ? "not-allowed"
-                                            : "pointer",
-                                          fontSize: "11px",
-                                          padding: "4px 8px",
-                                          height: "26px",
-                                        }}
+                                      <select
+                                        value={row.warehouseName}
                                         disabled={isInvoiceLocked}
-                                        onClick={() =>
-                                          updateRow(row.id, { showCost: true })
-                                        }
+                                        onChange={(e) => {
+                                          const nextWhName = e.target.value;
+                                          const nextAvail = getRowAvailableQty(row.productId, nextWhName);
+                                          const otherRowsQty = rows
+                                            .filter((r: any) => r.id !== row.id && r.productId === row.productId && r.warehouseName === nextWhName)
+                                            .reduce((sum, r) => sum + (toNumber(r.qty) * r.packageQuantity), 0);
+                                          const requestedQty = toNumber(row.qty) * row.packageQuantity;
+                                          const prod = products.find((p: any) => p.id === row.productId);
+                                          const isServiceOrExpense = isProductServiceOrExpense(row) || isProductServiceOrExpense(prod);
+
+                                          if (!isServiceOrExpense && otherRowsQty + requestedQty > nextAvail) {
+                                            showToast(`ناتوانیت کۆگا بگۆڕیت بۆ "${nextWhName}"، چونکە بڕی پێویست بەردەست نییە لەم کۆگایە.`);
+                                            return;
+                                          }
+
+                                          updateRow(row.id, {
+                                            warehouseName: nextWhName,
+                                            availableQty: nextAvail,
+                                          });
+                                        }}
+                                        style={{
+                                          ...compactInput,
+                                          ...lockedFieldStyle,
+                                        }}
                                       >
-                                        پیشاندان
-                                      </button>
+                                        {warehouses.map((warehouse: any) => (
+                                          <option
+                                            key={warehouse.id}
+                                            value={warehouse.name}
+                                          >
+                                            {warehouse.name}
+                                          </option>
+                                        ))}
+                                      </select>
                                     )}
                                   </DetailField>
+
+                                  {canViewStock && (
+                                    <DetailField label="بەردەست">
+                                      <div style={compactReadonlyBox}>
+                                        {availableText(row)}
+                                      </div>
+                                    </DetailField>
+                                  )}
+
+                                  {canViewCost && (
+                                    <DetailField label="کۆست">
+                                      {row.showCost ? (
+                                        (() => {
+                                          const prod = products.find((p: any) => p.id === row.productId);
+                                          const isFixedRate = (row as any).exchangeRateType === "FIXED" || prod?.exchangeRateType === "FIXED";
+                                          const fixedRate = (row as any).customExchangeRate || prod?.customExchangeRate || 135000;
+                                          const fixedRate100 = fixedRate > 10000 ? fixedRate : fixedRate * 100;
+                                          const fixedRateDisplay = fixedRate100.toLocaleString("en-US");
+
+                                          if (isFixedRate) {
+                                            return (
+                                              <div
+                                                style={{
+                                                  ...compactReadonlyBox,
+                                                  backgroundColor: "#f5f3ff",
+                                                  borderColor: "#ddd6fe",
+                                                  color: "#7c3aed",
+                                                  fontWeight: 700,
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  justifyContent: "space-between",
+                                                  gap: "6px"
+                                                }}
+                                                title={`کۆستی دۆلاری جێگیر: 100$ = ${fixedRateDisplay} دینار`}
+                                              >
+                                                <span>
+                                                  {formatMoney(
+                                                    row.costPrice || 0,
+                                                    getCurrencySymbol(
+                                                      row.costCurrencyId ||
+                                                        (row.costPrice && row.costPrice > 1000
+                                                          ? 2
+                                                          : row.currencyId)
+                                                    )
+                                                  )}
+                                                </span>
+                                                <span
+                                                  style={{
+                                                    fontSize: "10px",
+                                                    backgroundColor: "#ede9fe",
+                                                    color: "#6d28d9",
+                                                    padding: "1px 5px",
+                                                    borderRadius: "4px",
+                                                    fontWeight: 600,
+                                                    whiteSpace: "nowrap"
+                                                  }}
+                                                >
+                                                  جێگیر ({fixedRateDisplay})
+                                                </span>
+                                              </div>
+                                            );
+                                          }
+
+                                          return (
+                                            <div style={compactReadonlyBox}>
+                                              {formatMoney(
+                                                row.costPrice || 0,
+                                                getCurrencySymbol(
+                                                  row.costCurrencyId ||
+                                                    (row.costPrice && row.costPrice > 1000
+                                                      ? 2
+                                                      : row.currencyId)
+                                                )
+                                              )}
+                                            </div>
+                                          );
+                                        })()
+                                      ) : (
+                                        <button
+                                          style={{
+                                            ...showCostBtn,
+                                            opacity: isInvoiceLocked ? 0.45 : 1,
+                                            cursor: isInvoiceLocked
+                                              ? "not-allowed"
+                                              : "pointer",
+                                            fontSize: "11px",
+                                            padding: "4px 8px",
+                                            height: "26px",
+                                          }}
+                                          disabled={isInvoiceLocked}
+                                          onClick={() =>
+                                            updateRow(row.id, { showCost: true })
+                                          }
+                                        >
+                                          پیشاندان
+                                        </button>
+                                      )}
+                                    </DetailField>
+                                  )}
 
                                   <DetailField label="جۆری نرخ">
                                     <select
@@ -3181,7 +3584,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                         ...lockedFieldStyle,
                                       }}
                                     >
-                                      {priceTypes.map((type: any) => (
+                                      {activePriceTypeNames.map((type: any) => (
                                         <option key={type} value={type}>
                                           {type}
                                         </option>
@@ -3308,7 +3711,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                 }
                                 style={{ ...smallInput, ...lockedFieldStyle }}
                               />
-                              <span style={{ fontSize: 13, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
+                              <span style={{ fontSize: 15, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
                                 {getCurrencySymbol(row.currencyId)}
                               </span>
                             </div>
@@ -3492,11 +3895,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
             <SummaryItem
               label="کۆی گشتی پسوڵە"
-              value={formatMoneyJSX(total)}
+              value={formatCurrencyMapJSX(getInvoiceNetTotalsByCurrency())}
               strong
             />
             <SummaryItem label="پارەی دراو" value={getPaidSummaryTextJSX()} />
-            <SummaryItem label="ماوە" value={formatMoneyJSX(remaining)} strong />
+            <SummaryItem label="ماوە" value={formatCurrencyMapWithColors(getInvoiceRemainingByCurrency())} strong />
           </div>
         </main>
       </div>
@@ -3522,7 +3925,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 <h3 style={settingsTitle}>جۆری نرخی ئەم پسوڵەیە</h3>
 
                 <div style={priceTypeBox}>
-                  {priceTypes.map((type: any) => (
+                  {priceTypesList.map((type: any) => (
                     <button
                       key={type}
                       type="button"
@@ -3575,10 +3978,10 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 </select>
               </div>
 
-                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+                              <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 10 }}>
                 <div>
-                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                  <h4 style={{ fontSize: "12px", fontWeight: "bold", color: "#374151", marginBottom: 4 }}>ڕێکخستنی زانیاری پسووڵە</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "6px 8px", border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#ffffff" }}>
                     <SettingCheck
                     label="زانیاری پسوڵە دەرکەوێت"
                     checked={printOptions.showInvoiceInfo}
@@ -3609,11 +4012,16 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                     checked={printOptions.showCashbox}
                     onChange={() => togglePrintOption("showCashbox")}
                   />
+                    <SettingCheck
+                    label="بۆکسی ڕەیتی دۆلار"
+                    checked={printOptions.showExchangeRate !== false}
+                    onChange={() => togglePrintOption("showExchangeRate")}
+                  />
                   </div>
                 </div>
                 <div>
-                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری هەژمار</h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>
+                  <h4 style={{ fontSize: "12px", fontWeight: "bold", color: "#374151", marginBottom: 4 }}>ڕێکخستنی زانیاری هەژمار</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, padding: "6px 8px", border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#ffffff" }}>
                     <SettingCheck
                     label="زانیاری هەژمار دەرکەوێت"
                     checked={printOptions.showAccountInfo}
@@ -3637,10 +4045,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   </div>
                 </div>
                 <div>
-                  <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری کارمەند</h4>
-                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, backgroundColor: "#f9fafb", display: "flex", flexDirection: "column", gap: 12 }}>
-                    
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <h4 style={{ fontSize: "12px", fontWeight: "bold", color: "#374151", marginBottom: 4 }}>ڕێکخستنی زانیاری کارمەند</h4>
+                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 8px", backgroundColor: "#ffffff", display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                       <SettingCheck
                     label="ناوی کارمەند"
                     checked={printOptions.showEmployeeName}
@@ -3652,7 +4059,6 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                     onChange={() => togglePrintOption("showEmployeePhone")}
                   />
                     </div>
-                    
                   </div>
                 </div>
               </div>
@@ -3841,6 +4247,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           </div>
         </div>
       )}
+
       {/* --- INVOICE PRINT AREA --- */}
       <div id="invoice-print-area">
         <div style={printSheetStyle}>
@@ -3848,64 +4255,94 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           <PrintHeader />
 
           {/* 2-Column Info Grid Box */}
-          <div style={printInfoGridStyle}>
-            {/* Right Column: Invoice Details */}
-            <div style={printInfoRightColStyle}>
-              <div style={printInfoRowStyle}>
-                <span style={printLabelBold}>جۆری پسووڵە :</span>
-                <span>فرۆشتن</span>
-              </div>
-              <div style={printInfoRowStyle}>
-                <span style={printLabelBold}>ژمارەی پسووڵە :</span>
-                <span>{editId || "-"}</span>
-              </div>
-              <div style={printInfoRowStyle}>
-                <span style={printLabelBold}>بەروار :</span>
-                <span>{invoiceDate}</span>
-              </div>
-              <div style={printInfoRowStyle}>
-                <span style={printLabelBold}>کاتژمێر :</span>
-                <span>{createdTime || "00:00"}</span>
-              </div>
-              <div style={printInfoRowStyle}>
-                <span style={printLabelBold}>دۆخی پارەدان :</span>
-                <span style={{
-                  fontWeight: 900,
-                  color: paymentTypeMode === "cash" ? "#16a34a" : paymentTypeMode === "partial" ? "#ea580c" : "#dc2626"
-                }}>
-                  {paymentTypeMode === "cash" ? "نەقد" : paymentTypeMode === "partial" ? "بەشێکی دراو" : "قەرز"}
-                </span>
-              </div>
-            </div>
+          {(printOptions.showInvoiceInfo || printOptions.showAccountInfo || printOptions.showEmployeeName || printOptions.showEmployeePhone) && (
+            <div style={printInfoGridStyle}>
+              {/* Right Column: Invoice Details */}
+              {printOptions.showInvoiceInfo ? (
+                <div style={printInfoRightColStyle}>
+                  {printOptions.showInvoiceType && (
+                    <div style={printInfoRowStyle}>
+                      <span style={printLabelBold}>جۆری پسووڵە :</span>
+                      <span>فرۆشتن</span>
+                    </div>
+                  )}
+                  {printOptions.showInvoiceNumber && (
+                    <div style={printInfoRowStyle}>
+                      <span style={printLabelBold}>ژمارەی پسووڵە :</span>
+                      <span>{editId || "-"}</span>
+                    </div>
+                  )}
+                  {printOptions.showInvoiceDate && (
+                    <div style={printInfoRowStyle}>
+                      <span style={printLabelBold}>بەروار :</span>
+                      <span>{invoiceDate}</span>
+                    </div>
+                  )}
+                  {printOptions.showCreatedTime && (
+                    <div style={printInfoRowStyle}>
+                      <span style={printLabelBold}>کاتژمێر :</span>
+                      <span>{createdTime || "00:00"}</span>
+                    </div>
+                  )}
+                  {printOptions.showCashbox && selectedCashbox && (
+                    <div style={printInfoRowStyle}>
+                      <span style={printLabelBold}>قاسە :</span>
+                      <span>{selectedCashbox.name}</span>
+                    </div>
+                  )}
+                  <div style={printInfoRowStyle}>
+                    <span style={printLabelBold}>دۆخی پارەدان :</span>
+                    <span style={{
+                      fontWeight: 900,
+                      color: paymentTypeMode === "cash" ? "#16a34a" : paymentTypeMode === "partial" ? "#ea580c" : "#dc2626"
+                    }}>
+                      {paymentTypeMode === "cash" ? "نەقد" : paymentTypeMode === "partial" ? "بەشێکی دراو" : "قەرز"}
+                    </span>
+                  </div>
+                </div>
+              ) : <div style={printInfoRightColStyle} />}
 
-            {/* Left Column: Account Info & Employee Info */}
-            <div style={printInfoLeftColStyle}>
-              <div style={{ borderBottom: "1px solid #000", paddingBottom: 6, marginBottom: 6 }}>
-                <div style={printInfoRowStyle}>
-                  <span style={printLabelBold}>هەژمار :</span>
-                  <span>{isTemporaryCustomer ? (tempCustomerName || "کڕیاری کاتی") : (selectedAccount?.name || "-")}</span>
-                </div>
-                <div style={printInfoRowStyle}>
-                  <span style={printLabelBold}>ژمارە تەلەفۆن :</span>
-                  <span>{isTemporaryCustomer ? (tempCustomerPhone || "-") : (selectedAccount?.phone || "-")}</span>
-                </div>
-                <div style={printInfoRowStyle}>
-                  <span style={printLabelBold}>ناونیشان :</span>
-                  <span>{isTemporaryCustomer ? (tempCustomerAddress || "-") : ([selectedAccount?.city, selectedAccount?.address].filter(Boolean).join(" - ") || "-")}</span>
-                </div>
-              </div>
-              <div>
-                <div style={printInfoRowStyle}>
-                  <span style={printLabelBold}>کارمەند :</span>
-                  <span>{employeeName || loggedInUser?.name || loggedInUser?.username || "هێمن"}</span>
-                </div>
-                <div style={printInfoRowStyle}>
-                  <span style={printLabelBold}>ژمارە تەلەفۆن :</span>
-                  <span>{employeePhone || loggedInUser?.phone || "-"}</span>
+              {/* Left Column: Account Info & Employee Info */}
+              <div style={printInfoLeftColStyle}>
+                {printOptions.showAccountInfo && (
+                  <div style={{ borderBottom: (printOptions.showEmployeeName || printOptions.showEmployeePhone) ? "1px solid #000" : "none", paddingBottom: 6, marginBottom: 6 }}>
+                    {printOptions.showAccountName && (
+                      <div style={printInfoRowStyle}>
+                        <span style={printLabelBold}>هەژمار :</span>
+                        <span>{isTemporaryCustomer ? (tempCustomerName || "کڕیاری کاتی") : (selectedAccount?.name || "-")}</span>
+                      </div>
+                    )}
+                    {printOptions.showAccountPhone && (
+                      <div style={printInfoRowStyle}>
+                        <span style={printLabelBold}>ژمارە تەلەفۆن :</span>
+                        <span>{isTemporaryCustomer ? (tempCustomerPhone || "-") : (selectedAccount?.phone || "-")}</span>
+                      </div>
+                    )}
+                    {printOptions.showAccountAddress && (
+                      <div style={printInfoRowStyle}>
+                        <span style={printLabelBold}>ناونیشان :</span>
+                        <span>{isTemporaryCustomer ? (tempCustomerAddress || "-") : ([selectedAccount?.city, selectedAccount?.address].filter(Boolean).join(" - ") || "-")}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div>
+                  {printOptions.showEmployeeName && (
+                    <div style={printInfoRowStyle}>
+                      <span style={printLabelBold}>کارمەند :</span>
+                      <span>{employeeName || loggedInUser?.name || loggedInUser?.username || "هێمن"}</span>
+                    </div>
+                  )}
+                  {printOptions.showEmployeePhone && (
+                    <div style={printInfoRowStyle}>
+                      <span style={printLabelBold}>ژمارە تەلەفۆن :</span>
+                      <span>{employeePhone || loggedInUser?.phone || "-"}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Items Table */}
           {(() => {
@@ -3940,32 +4377,34 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       <td style={printTdCenterStyle}>{idx + 1}</td>
                       {tableColumns.product && (
                         <td style={printTdRightStyle}>
-                          <strong>{row.productName}</strong>
-                          {row.note && <div style={{ fontSize: 11, color: "#4b5563" }}>{row.note}</div>}
+                          <strong style={{ fontSize: 13.5, fontWeight: 800 }}>{row.productName}</strong>
+                          {row.note && <div style={{ fontSize: 11.5, color: "#4b5563" }}>{row.note}</div>}
                         </td>
                       )}
                       {tableColumns.code && <td style={printTdCenterStyle}>{row.code || "-"}</td>}
                       {tableColumns.qty && (
                         <td style={printTdCenterStyle}>
-                          <strong>{row.qty}</strong> <span style={{ fontSize: 11 }}>{row.packageName || "دانە"}</span>
+                          <strong style={{ fontSize: 13.5 }}>{row.qty}</strong> <span style={{ fontSize: 12 }}>{row.packageName || "دانە"}</span>
                         </td>
                       )}
                       {tableColumns.price && (
                         <td style={printTdCenterStyle}>
-                          {formatCurrencyAmount(toNumber(row.price), row.currencyId)}
+                          <span style={{ fontSize: 13.5, fontWeight: 700 }}>
+                            {formatCurrencyAmountJSX(toNumber(row.price), row.currencyId)}
+                          </span>
                         </td>
                       )}
                       {tableColumns.discount && (
                         <td style={printTdCenterStyle}>
                           {toNumber(row.discountValue) > 0
-                            ? (row.discountMode === "percent" ? `${row.discountValue}%` : formatCurrencyAmount(toNumber(row.discountValue), row.currencyId))
+                            ? (row.discountMode === "percent" ? `${row.discountValue}%` : formatCurrencyAmountJSX(toNumber(row.discountValue), row.currencyId))
                             : "-"}
                         </td>
                       )}
                       {tableColumns.total && (
                         <td style={printTdCenterStyle}>
-                          <strong>
-                            {formatCurrencyAmount(getRowNetTotalInRowCurrency(row), row.currencyId)}
+                          <strong style={{ fontSize: 13.5, fontWeight: 800 }}>
+                            {formatCurrencyAmountJSX(getRowNetTotalInRowCurrency(row), row.currencyId)}
                           </strong>
                         </td>
                       )}
@@ -3975,7 +4414,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   {/* Table Total Qty Footer Row */}
                   <tr style={{ background: "#f8fafc" }}>
                     <td colSpan={visibleColumnCount} style={printTotalQtyTdStyle}>
-                      <strong>کۆی گشتی عەدد :</strong> <span style={{ fontSize: 14, color: "#0055d4", marginRight: 6 }}>{itemCount} دانە</span>
+                      <strong style={{ fontSize: 14 }}>کۆی گشتی عەدد :</strong> <span style={{ fontSize: 15, fontWeight: 900, color: "#0055d4", marginRight: 6 }}>{itemCount} دانە</span>
                     </td>
                   </tr>
                 </tbody>
@@ -3985,29 +4424,39 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
           {/* Bottom Summary Grid (2 Side-by-Side Boxes) */}
           <div style={printBottomGridStyle}>
-            {/* Right Box: Total & Remaining */}
+            {/* Right Box: Total, Paid & Remaining */}
             <div style={printBottomBoxStyle}>
               <div style={printSummaryLineStyle}>
                 <span>کۆی گشتی :</span>
                 <strong style={{ fontSize: 15 }}>{formatCurrencyMap(getItemsTotalsByCurrency())}</strong>
               </div>
-              <div style={{ ...printSummaryLineStyle, borderBottom: "none" }}>
-                <span>ماوە :</span>
-                <strong style={{ fontSize: 15, color: "#dc2626" }}>{formatCurrencyMap(getInvoiceRemainingByCurrency())}</strong>
-              </div>
+              {printOptions.showPrintBalance && (
+                <>
+                  <div style={printSummaryLineStyle}>
+                    <span>واسڵکراو :</span>
+                    <strong style={{ fontSize: 15, color: "#16a34a" }}>{formatCurrencyMap(getPaidAmountsByCurrency())}</strong>
+                  </div>
+                  <div style={{ ...printSummaryLineStyle, borderBottom: "none" }}>
+                    <span>ماوە :</span>
+                    <strong style={{ fontSize: 15, color: "#dc2626" }}>{formatCurrencyMap(getInvoiceRemainingByCurrency())}</strong>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Left Box: Previous Debt & Total Debt */}
-            <div style={printBottomBoxStyle}>
-              <div style={printSummaryLineStyle}>
-                <span>قەرزی پێشوو :</span>
-                <strong>{formatCurrencyMap(accountBalanceBeforeByCurrency)}</strong>
+            {printOptions.showPrintBalance && (
+              <div style={printBottomBoxStyle}>
+                <div style={printSummaryLineStyle}>
+                  <span>قەرزی پێشوو :</span>
+                  {formatPrintBalanceMap(accountBalanceBeforeByCurrency, false)}
+                </div>
+                <div style={{ ...printSummaryLineStyle, borderBottom: "none" }}>
+                  <span>کۆی گشتی قەرز :</span>
+                  {formatPrintBalanceMap(accountBalanceAfterByCurrency, false)}
+                </div>
               </div>
-              <div style={{ ...printSummaryLineStyle, borderBottom: "none" }}>
-                <span>کۆی گشتی قەرز :</span>
-                <strong style={{ fontSize: 15, color: "#16a34a" }}>{formatCurrencyMap(accountBalanceAfterByCurrency)}</strong>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Print Note if any */}
@@ -4133,6 +4582,17 @@ function SettingCheck({
 }
 
 /* Styles */
+
+const detailTitle: CSSProperties = { fontWeight: 800, fontSize: 13, color: "#1e293b", marginBottom: 6 };
+const detailGrid: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 };
+const compactReadonlyBox: CSSProperties = { padding: "4px 8px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 12, fontWeight: 700 };
+const showCostBtn: CSSProperties = { border: 0, background: "transparent", color: "#64748b", cursor: "pointer", fontSize: 11 };
+const priceTypeBox: CSSProperties = { display: "flex", gap: 6, alignItems: "center" };
+const priceTypeBtn: CSSProperties = { padding: "4px 8px", border: "1px solid #cbd5e1", borderRadius: 6, background: "white", cursor: "pointer", fontSize: 12 };
+const settingGrid2: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 };
+const modalFooter: CSSProperties = { marginTop: 16, display: "flex", justifyContent: "flex-end", gap: 8 };
+const settingCheck: CSSProperties = { display: "flex", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 13, cursor: "pointer" };
+
 
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
@@ -4664,47 +5124,7 @@ const detailPanel: CSSProperties = {
   border: "1px solid #cbd5e1",
   background: "white",
   width: "330px",
-  boxShadow: "0 10px 24px rgba(15,23,42,0.18)",
-  maxHeight: "none",
-  overflowY: "visible",
-};
-
-const detailTitle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 900,
-  marginBottom: 8,
-  color: "#1d4ed8",
-  textAlign: "center",
-};
-
-const detailGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 8,
-};
-
-const compactReadonlyBox: CSSProperties = {
-  padding: "5px 8px",
-  borderRadius: 7,
-  border: "1px solid #e5e7eb",
-  background: "#f8fafc",
-  fontWeight: 700,
-  fontSize: "12px",
-  minHeight: "30px",
-  display: "flex",
-  alignItems: "center",
-};
-
-const showCostBtn: CSSProperties = {
-  background: "#eff6ff",
-  color: "#1d4ed8",
-  border: "1px solid #bfdbfe",
-  borderRadius: 7,
-  padding: "6px 8px",
-  fontWeight: 800,
-  cursor: "pointer",
-  fontFamily: appFont,
-  fontSize: 12,
+  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
 };
 
 const detailFooter: CSSProperties = {
@@ -4813,18 +5233,21 @@ const modalHeader: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   borderBottom: "1px solid #e5e7eb",
-  paddingBottom: 12,
-  marginBottom: 16,
+  paddingBottom: 8,
+  marginBottom: 10,
 };
 
 const modalCloseBtn: CSSProperties = {
-  width: 36,
-  height: 36,
+  width: 32,
+  height: 32,
   borderRadius: "50%",
   border: "1px solid #d1d5db",
   background: "white",
-  fontSize: 20,
+  fontSize: 18,
   cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 };
 
 const settingsStack: CSSProperties = {
@@ -4835,51 +5258,14 @@ const settingsStack: CSSProperties = {
 
 const settingsSection: CSSProperties = {
   border: "1px solid #e5e7eb",
-  borderRadius: 14,
-  padding: 14,
+  borderRadius: 10,
+  padding: "10px 14px",
   background: "#fafafa",
 };
 
 const settingsTitle: CSSProperties = {
-  margin: "0 0 12px",
-  fontSize: 17,
-};
-
-const settingGrid2: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "var(--grid-2-cols, 1fr 1fr)",
-  gap: 8,
-};
-
-const settingCheck: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "8px 0",
-  borderBottom: "1px solid #f1f5f9",
-};
-
-const modalFooter: CSSProperties = {
-  marginTop: 20,
-  display: "flex",
-  gap: 14,
-  justifyContent: "flex-start",
-};
-
-const priceTypeBox: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, 1fr)",
-  gap: 8,
-};
-
-const priceTypeBtn: CSSProperties = {
-  border: "1px solid #d1d5db",
-  background: "white",
-  borderRadius: 12,
-  padding: "12px",
-  cursor: "pointer",
-  fontWeight: 800,
-  fontFamily: appFont,
+  margin: "0 0 6px",
+  fontSize: 13,
 };
 
 const priceTypeBtnActive: CSSProperties = {
@@ -4890,7 +5276,7 @@ const priceTypeBtnActive: CSSProperties = {
 
 const printSheetStyle: CSSProperties = {
   width: "100%",
-  padding: "0",
+  padding: "0 0 10px 0",
   boxSizing: "border-box",
   fontFamily: appFont,
   direction: "rtl",
@@ -4937,43 +5323,54 @@ const printTableStyle: CSSProperties = {
   borderCollapse: "collapse",
   border: "2px solid #000000",
   marginBottom: "10px",
-  fontSize: "12px",
+  fontSize: "13.5px",
   boxSizing: "border-box",
 };
 
 const printThStyle: CSSProperties = {
   border: "1px solid #0f2b5c",
-  padding: "8px 10px",
+  padding: "6px 5px",
   fontWeight: 900,
   textAlign: "center",
   background: "#0f2b5c",
   color: "#ffffff",
-  fontSize: "13px",
+  fontSize: "13.5px",
+  wordBreak: "break-word",
+  overflowWrap: "anywhere",
+  overflow: "hidden",
+  whiteSpace: "normal",
   WebkitPrintColorAdjust: "exact",
   printColorAdjust: "exact",
 };
 
 const printTdCenterStyle: CSSProperties = {
   border: "1px solid #000000",
-  padding: "6px 8px",
+  padding: "5px 5px",
   textAlign: "center",
+  fontSize: "13.5px",
+  fontWeight: 600,
   wordBreak: "break-word",
   overflowWrap: "anywhere",
+  overflow: "hidden",
+  whiteSpace: "normal",
 };
 
 const printTdRightStyle: CSSProperties = {
   border: "1px solid #000000",
-  padding: "6px 8px",
+  padding: "5px 6px",
   textAlign: "right",
+  fontSize: "13.5px",
   wordBreak: "break-word",
   overflowWrap: "anywhere",
+  overflow: "hidden",
+  whiteSpace: "normal",
 };
 
 const printTotalQtyTdStyle: CSSProperties = {
   border: "1px solid #000000",
   padding: "8px 12px",
   textAlign: "right",
-  fontSize: "13px",
+  fontSize: "14px",
   fontWeight: "bold",
 };
 

@@ -211,10 +211,6 @@ export default function InvoiceTemplatesPage() {
         body: JSON.stringify({ isMain: true }),
       });
       if (res.ok) {
-        if (template.id) {
-          localStorage.setItem("selected_invoice_template_id", String(template.id));
-          window.dispatchEvent(new Event("invoice-template-changed"));
-        }
         showToast("کڵێشەی سەرەکی گۆڕدرا 🎯", "success");
         fetchTemplates();
       }

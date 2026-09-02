@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useStore } from "../store/store";
 import InvoicePage from "../components/InvoicePage";
 import PurchasePage from "../components/PurchasePage";
 import MoneyInPage from "../components/MoneyInPage";
@@ -42,11 +43,49 @@ const menuItems = [
   { label: "جەردی کۆگا",           value: "warehouse_stock" },
 ];
 
+const itemPermMap: Record<string, string> = {
+  sales: "vouchers_sales",
+  purchase: "vouchers_purchase",
+  money_out: "vouchers_money_out",
+  money_in: "vouchers_money_in",
+  expense: "vouchers_expense",
+  quotation: "vouchers_sales",
+  sales_return: "vouchers_sales_return",
+  purchase_return: "vouchers_purchase_return",
+  my_debt: "vouchers_my_debt",
+  people_debt: "vouchers_people_debt",
+  my_debt_discount: "vouchers_debt_discount_mine",
+  people_debt_discount: "vouchers_debt_discount_people",
+  deposit: "vouchers_cash_deposit",
+  withdrawal: "vouchers_cash_withdrawal",
+  product_transfer: "vouchers_product_transfer",
+  material_issue: "vouchers_material_issue",
+  warehouse_damage: "vouchers_warehouse_damage",
+  warehouse_stock: "vouchers_warehouse_stock",
+};
+
 function InvoicesRouteContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const editId = searchParams.get("editId");
   const urlType = searchParams.get("type");
+
+  const currentUser = useStore((s: any) => s.currentUser);
+  const hasPermission = useStore((s: any) => s.hasPermission);
+
+  const allowedMenuItems = useMemo(() => {
+    const isEdit = Boolean(editId);
+    const action = isEdit ? "canUpdate" : "canCreate";
+
+    if (!currentUser || currentUser.role === "admin" || hasPermission("vouchers", action)) {
+      return menuItems;
+    }
+    const filtered = menuItems.filter((item: any) => {
+      const permKey = itemPermMap[item.value];
+      return permKey ? hasPermission(permKey, action) : false;
+    });
+    return filtered.length > 0 ? filtered : [];
+  }, [currentUser, hasPermission, editId]);
 
   // Type mapping for DB types to tab values
   const typeMap: Record<string, string> = {
@@ -92,7 +131,7 @@ function InvoicesRouteContent() {
     if (urlType && typeMap[urlType]) {
       return typeMap[urlType];
     }
-    return "sales";
+    return allowedMenuItems[0]?.value || "sales";
   });
   const [dbVoucherType, setDbVoucherType] = useState<string | null>(() => {
     if (urlType && typeMap[urlType]) return typeMap[urlType];
@@ -112,8 +151,10 @@ function InvoicesRouteContent() {
   useEffect(() => {
     if (urlType && typeMap[urlType]) {
       setActiveTab(typeMap[urlType]);
+    } else if (allowedMenuItems.length > 0 && !allowedMenuItems.some(m => m.value === activeTab)) {
+      setActiveTab(allowedMenuItems[0].value);
     }
-  }, [urlType]);
+  }, [urlType, allowedMenuItems]);
 
   useEffect(() => {
     if (editId) {
@@ -143,10 +184,19 @@ function InvoicesRouteContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const activeItem = menuItems.find((m) => m.value === activeTab) ?? menuItems[0];
+  const canPerformActionOnTab = (tab: string, isEdit: boolean): boolean => {
+    if (!currentUser || currentUser.role === "admin") return true;
+    const action = isEdit ? "canUpdate" : "canCreate";
+    if (hasPermission("vouchers", action)) return true;
+    const permModule = itemPermMap[tab];
+    if (!permModule) return true;
+    return hasPermission(permModule, action);
+  };
+
+  const activeItem = allowedMenuItems.find((m: any) => m.value === activeTab) ?? allowedMenuItems[0] ?? menuItems[0];
 
   const renderActiveComponent = () => {
-    const editIdProp = (editId && dbVoucherType === activeTab) ? editId : undefined;
+    const editIdProp = editId || undefined;
     switch (activeTab) {
       case "sales":               return <InvoicePage invoiceType="فرۆشتن" editId={editIdProp} />;
       case "purchase":            return <PurchasePage editId={editIdProp} />;
@@ -226,8 +276,6 @@ function InvoicesRouteContent() {
           </div>
         )}
 
-        {/* New invoice button has been removed as requested */}
-
         {/* Dropdown — tall 2-column grid, no scroll */}
         {isOpen && (
           <div
@@ -243,12 +291,12 @@ function InvoicesRouteContent() {
               boxShadow:  "0 12px 40px rgba(0,0,0,0.14)",
               padding:    12,
               display:              "grid",
-              gridTemplateColumns:  "1fr 1fr",
+              gridTemplateColumns:  allowedMenuItems.length > 1 ? "1fr 1fr" : "1fr",
               gap:                  6,
-              width:                340,
+              width:                allowedMenuItems.length > 1 ? 340 : 200,
             }}
           >
-            {menuItems.map((item) => {
+            {allowedMenuItems.map((item: any) => {
               const active = item.value === activeTab;
               return (
                 <button
@@ -309,7 +357,23 @@ function InvoicesRouteContent() {
 
       {/* ── Main content ── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-        {renderActiveComponent()}
+        {!canPerformActionOnTab(activeTab, Boolean(editId)) && (
+          <div className="bg-amber-100 border-b border-amber-300 px-4 py-2.5 text-center text-amber-950 font-black text-xs flex items-center justify-center gap-2 shadow-sm select-none">
+            <span>🔒</span>
+            <span>
+              {editId
+                ? "ئاگاداری: تۆ دەسەڵاتی نوێکردنەوە/دەستکاریکردنی ئەم پسووڵەیەت نییە، تەنها لە باری بینیندایت (View Only)."
+                : "ئاگاداری: تۆ دەسەڵاتی دروستکردنی ئەم پسووڵەیەت نییە، تەنها لە باری بینیندایت (View Only)."}
+            </span>
+          </div>
+        )}
+        {!canPerformActionOnTab(activeTab, Boolean(editId)) ? (
+          <fieldset disabled style={{ border: "none", padding: 0, margin: 0, flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+            {renderActiveComponent()}
+          </fieldset>
+        ) : (
+          renderActiveComponent()
+        )}
       </div>
       {pendingTab && (
         <div style={{

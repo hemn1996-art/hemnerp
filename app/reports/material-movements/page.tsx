@@ -37,9 +37,10 @@ export default function ItemsReportPage() {
   const [voucherReference, setVoucherReference] = useState("");
 
   // Item Filters
+  const [searchTerm, setSearchTerm] = useState("");
   const [filterProductIds, setFilterProductIds] = useState<number[]>([]);
-  const [category, setCategory] = useState("all");
-  const [brand, setBrand] = useState("all");
+  const [filterCategories, setFilterCategories] = useState<string[]>([]);
+  const [filterBrands, setFilterBrands] = useState<string[]>([]);
   const [itemCode, setItemCode] = useState("");
   const [batchCode, setBatchCode] = useState("");
 
@@ -180,7 +181,7 @@ export default function ItemsReportPage() {
   const employeeOptions = React.useMemo(() => {
     if (!invoices) return [];
     const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار کۆگای دۆستان", "هێمن حەمە فەرهاد"];
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [invoices]);
 
@@ -198,8 +199,8 @@ export default function ItemsReportPage() {
       if (voucherReference) query.append("voucherReference", voucherReference);
       
       if (filterProductIds.length > 0) query.append("productId", filterProductIds.join(","));
-      if (category !== "all") query.append("category", category);
-      if (brand !== "all") query.append("brand", brand);
+      if (filterCategories.length > 0) query.append("category", filterCategories.join(","));
+      if (filterBrands.length > 0) query.append("brand", filterBrands.join(","));
       if (batchCode) query.append("batchCode", batchCode);
 
       if (filterAccountIds.length > 0) query.append("accountId", filterAccountIds.join(","));
@@ -237,8 +238,8 @@ export default function ItemsReportPage() {
     if (filterVoucherTypes.length > 0) count++;
     if (voucherReference) count++;
     if (filterProductIds.length > 0) count++;
-    if (category !== "all" && category !== "") count++;
-    if (brand !== "all" && brand !== "") count++;
+    if (filterCategories.length > 0) count++;
+    if (filterBrands.length > 0) count++;
     if (itemCode) count++;
     if (batchCode) count++;
     if (filterAccountIds.length > 0) count++;
@@ -252,7 +253,7 @@ export default function ItemsReportPage() {
     if (groupReverse !== "all") count++;
     return count;
   }, [
-    filterVoucherTypes, voucherReference, filterProductIds, category, brand, itemCode, batchCode,
+    filterVoucherTypes, voucherReference, filterProductIds, filterCategories, filterBrands, itemCode, batchCode,
     filterAccountIds, filterAccountTypeIds, currencyId, filterWarehouseIds, label, filterCreatedBys,
     profitStatus, isGift, groupReverse
   ]);
@@ -261,8 +262,8 @@ export default function ItemsReportPage() {
     setFilterVoucherTypes([]);
     setVoucherReference("");
     setFilterProductIds([]);
-    setCategory("all");
-    setBrand("all");
+    setFilterCategories([]);
+    setFilterBrands([]);
     setItemCode("");
     setBatchCode("");
     setFilterAccountIds([]);
@@ -330,8 +331,19 @@ export default function ItemsReportPage() {
     if (filterVoucherTypes.length > 0) {
       result = result.filter((item: any) => filterVoucherTypes.includes(item.voucherType));
     }
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      result = result.filter((item: any) => 
+        (item.productName && item.productName.toLowerCase().includes(q)) ||
+        (item.productCode && String(item.productCode).toLowerCase().includes(q)) ||
+        (item.barcode && String(item.barcode).toLowerCase().includes(q)) ||
+        (item.category && item.category.toLowerCase().includes(q)) ||
+        (item.brand && item.brand.toLowerCase().includes(q)) ||
+        (item.note && item.note.toLowerCase().includes(q))
+      );
+    }
     return result;
-  }, [items, filterVoucherTypes]);
+  }, [items, filterVoucherTypes, searchTerm]);
 
   const paginatedItems = React.useMemo(() => {
     if (pageSize >= 100000) return filteredItems;
@@ -368,65 +380,100 @@ export default function ItemsReportPage() {
     const code = itemCode || curObj?.code;
     const symbol = itemSymbol || curObj?.symbol || curObj?.name || "";
 
+    const isNegative = num < 0;
     const isIQD = code === "IQD" || symbol === "دینار" || symbol === "د.ع";
     if (isIQD) {
       const roundedVal = Math.round(num).toLocaleString("en-US");
-      return `${roundedVal} دینار`;
+      return <span className={isNegative ? "text-rose-600 font-bold" : ""}>{roundedVal} دینار</span>;
     }
 
-    const isNegative = num < 0;
     const absNum = Math.abs(num);
     const formattedNumber = absNum.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
+      minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     });
 
     const parts = formattedNumber.split(".");
     const whole = parts[0];
-    const decimal = parts[1] || "00";
+    const decimal = parts[1];
     const displaySymbol = symbol || "$";
 
     return (
-      <span style={{ display: "inline-flex", alignItems: "baseline", gap: "2px" }} dir="ltr">
+      <span className={isNegative ? "text-rose-600 font-bold" : ""} style={{ display: "inline-flex", alignItems: "baseline", gap: "2px" }} dir="ltr">
         {isNegative && <span>-</span>}
         <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
         <span>
           <span>{whole}</span>
-          <span style={{ fontSize: "0.7em", opacity: 0.8 }}>.{decimal}</span>
+          {decimal && decimal !== "0" && decimal !== "00" && (
+            <span style={{ fontSize: "0.7em", opacity: 0.8 }}>.{decimal}</span>
+          )}
         </span>
       </span>
     );
   };
 
-  const perCurrencyProfit = React.useMemo(() => {
-    const totals: Record<string | number, number> = {};
-    filteredItems.forEach((i: any) => {
-      const curKey = i.currencyId || "USD";
-      totals[curKey] = (totals[curKey] || 0) + (i.profit || 0);
-    });
-    return totals;
-  }, [filteredItems]);
-
   return (
     <div className="p-4 bg-slate-50 min-h-screen font-ckb text-slate-800">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between mb-4 gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200 no-print">
+      <div className="flex flex-wrap items-center justify-between mb-4 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 no-print">
         <div className="flex items-center gap-3">
-          <div className="bg-blue-100 p-2 rounded-lg">
-            <span className="text-blue-700 text-lg">📊</span>
+          <div className="bg-blue-50 border border-blue-100 p-2.5 rounded-xl flex items-center justify-center text-blue-600 shadow-sm">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
           </div>
-          <h1 className="text-xl font-bold text-slate-800">ڕاپۆرتی جووڵەی کەرەستە</h1>
+          <div>
+            <h1 className="text-lg font-black text-slate-900 leading-tight">ڕاپۆرتی جووڵەی کەرەستە</h1>
+            <p className="text-[11px] text-slate-500 font-medium">چاودێری وردی هاتن و دەرچوون و جووڵەی کەرەستەکان</p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Search Bar and Quick Actions */}
+        <div className="flex flex-wrap items-center gap-3 flex-1 justify-end">
+          {/* Direct Real-time Material Search Input */}
+          <div className="relative min-w-[240px] max-w-[340px] w-full sm:w-auto">
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="گەڕان بەدوای ناوی کەرەستە، کۆد، بارکۆد..."
+              className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 rounded-xl pr-9 pl-8 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all shadow-inner"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400 hover:text-rose-500 transition"
+                title="پاککردنەوە"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+
           {/* Quick Dates */}
-          <div className="flex items-center gap-2 ml-4">
+          <div className="flex items-center gap-2">
             <DateInput value={startDate} onChange={setStartDate} label="لە بەرواری" />
             <DateInput value={endDate} onChange={setEndDate} label="تا بەرواری" />
           </div>
 
-          <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-xs hover:bg-slate-700 transition">
-            <span className="text-sm">🔍</span>
+          <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 bg-slate-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-700 transition shadow-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
             <span>فلتەرەکان</span>
             {activeFiltersCount > 0 && (
               <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
@@ -436,25 +483,47 @@ export default function ItemsReportPage() {
           </button>
           
           {activeFiltersCount > 0 && (
-            <button onClick={handleResetFilters} className="flex items-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 px-4 py-2 rounded-lg text-xs hover:bg-rose-200 transition">
-              🔄 ڕێکخستنەوە
+            <button onClick={handleResetFilters} className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-rose-100 transition shadow-sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span>ڕێکخستنەوە</span>
             </button>
           )}
           
-          <button onClick={() => setShowColumnsModal(true)} className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg text-xs hover:bg-blue-100 transition">
-            <span className="text-sm">⚙️</span> کۆڵۆمەکان
+          <button
+            onClick={() => setShowColumnsModal(true)}
+            className="flex items-center gap-2 text-white font-black px-3.5 py-2 rounded-xl text-xs transition-transform hover:scale-105 cursor-pointer shadow-sm border-none"
+            style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 6px rgba(2, 132, 199, 0.3)" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="12" y1="3" x2="12" y2="21" />
+              <path d="M3 9h18" />
+              <path d="M3 15h18" />
+            </svg>
+            <span>کۆڵۆمەکان</span>
           </button>
           
-          <button onClick={() => window.print()} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs hover:bg-slate-200 transition">
-            🖨 پرینت
+          <button onClick={() => window.print()} className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-100 transition shadow-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>پرینت</span>
           </button>
 
           <button onClick={() => exportTableToExcel("material-movements-table", "jwlay_kerestekan.xlsx")}
-            className="flex items-center gap-2 bg-emerald-600 border border-emerald-700 text-white px-4 py-2 rounded-lg text-xs hover:bg-emerald-700 transition cursor-pointer font-bold border-none shadow-sm">
-            ناردن بۆ ئێکسڵ 📊
+            className="flex items-center gap-1.5 bg-emerald-600 border border-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition cursor-pointer border-none shadow-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>ناردن بۆ ئێکسڵ</span>
           </button>
-          
-
         </div>
       </div>
 
@@ -472,17 +541,9 @@ export default function ItemsReportPage() {
               <p className="text-2xl font-bold text-slate-800">{filteredItems.reduce((s, i) => s + i.quantity, 0).toLocaleString("en-US")} عدد</p>
               <p className="text-xs text-slate-500 mt-1">{getQtyCardLabel()}</p>
             </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-green-500 flex flex-col justify-center items-center">
-              <div className="text-2xl font-bold text-green-600 flex flex-wrap gap-2 justify-center">
-                {Object.keys(perCurrencyProfit).length > 0 ? (
-                  Object.entries(perCurrencyProfit).map(([cId, val]) => (
-                    <span key={cId}>{formatCurrency(val, Number(cId))}</span>
-                  ))
-                ) : (
-                  <span>$0</span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">کۆی قازانج</p>
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 border-r-4 border-r-indigo-500 flex flex-col justify-center items-center">
+              <p className="text-2xl font-bold text-slate-800">{filteredItems.length.toLocaleString("en-US")} جووڵە</p>
+              <p className="text-xs text-slate-500 mt-1">کۆی ژمارەی تۆمارکراوەکان</p>
             </div>
           </div>
         )}
@@ -582,27 +643,37 @@ export default function ItemsReportPage() {
                         )}
                       </td>
                     )}
-                    {visibleColumns.productName && <td className="p-2 border-r border-slate-200 text-center font-bold text-[#334155] allow-wrap">{item.productName}</td>}
+                    {visibleColumns.productName && (
+                      <td className="p-2 border-r border-slate-200 text-center allow-wrap">
+                        <button
+                          onClick={() => router.push(`/materials?edit=${item.productId}`)}
+                          className="text-slate-800 font-bold hover:text-blue-600 hover:underline bg-transparent border-none p-0 cursor-pointer text-center inline-block text-[11px]"
+                          title="دەستکاری کردنی کەرەستە"
+                        >
+                          {item.productName}
+                        </button>
+                      </td>
+                    )}
                     {visibleColumns.category && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
                     {visibleColumns.brand && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
                     {visibleColumns.warehouseName && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.warehouseName}</td>}
-                    {visibleColumns.cost && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">{formatCurrency(item.cost, item.currencyId, item.currencySymbol, item.currencyCode)}</td>}
+                    {visibleColumns.cost && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">{formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}</td>}
                     {visibleColumns.quantity && (
                       <td className={`p-2 border-r border-slate-200 text-center font-bold ${item.quantity < 0 ? "text-rose-600" : "text-slate-700"}`}>
                         {item.quantity.toLocaleString("en-US")} دانە
                       </td>
                     )}
-                    {visibleColumns.price && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">{formatCurrency(item.price, item.currencyId, item.currencySymbol, item.currencyCode)}</td>}
+                    {visibleColumns.price && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">{formatCurrency(item.price, item.priceCurrencyId || item.currencyId, item.priceCurrencySymbol, item.priceCurrencyCode)}</td>}
                     {visibleColumns.offers && <td className="p-2 border-r border-slate-200 text-center text-slate-400">-</td>}
-                    {visibleColumns.discount && <td className="p-2 border-r border-slate-200 text-center text-slate-600">{item.discount > 0 ? formatCurrency(item.discount, item.currencyId, item.currencySymbol, item.currencyCode) : '-'}</td>}
+                    {visibleColumns.discount && <td className="p-2 border-r border-slate-200 text-center text-slate-600">{item.discount > 0 ? formatCurrency(item.discount, item.priceCurrencyId || item.currencyId, item.priceCurrencySymbol, item.priceCurrencyCode) : '-'}</td>}
                     {visibleColumns.lineTotal && (
                       <td className={`p-2 border-r border-slate-200 text-center bg-slate-50 font-bold ${item.lineTotal < 0 ? "text-rose-600" : "text-slate-800"}`}>
-                        {formatCurrency(item.lineTotal, item.currencyId, item.currencySymbol, item.currencyCode)}
+                        {formatCurrency(item.lineTotal, item.lineTotalCurrencyId || item.priceCurrencyId || item.currencyId, item.lineTotalCurrencySymbol || item.priceCurrencySymbol, item.lineTotalCurrencyCode || item.priceCurrencyCode)}
                       </td>
                     )}
                     {visibleColumns.profit && (
                       <td className={`p-2 border-r border-slate-200 text-center bg-green-50 font-bold ${item.profit < 0 ? "text-rose-600" : "text-green-700"}`}>
-                        {formatCurrency(item.profit, item.currencyId, item.currencySymbol, item.currencyCode)}
+                        {formatCurrency(item.profit, item.profitCurrencyId || 1, item.profitCurrencySymbol || "$", item.profitCurrencyCode || "USD")}
                       </td>
                     )}
                     {visibleColumns.date && <td className="p-2 border-r border-slate-200 text-center text-slate-500 text-[10px]">{formatDate(item.date)}</td>}
@@ -679,8 +750,16 @@ export default function ItemsReportPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowColumnsModal(false)}>
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="bg-[#0f172a] p-3 flex items-center justify-between text-white">
-              <h2 className="font-bold text-sm">کۆڵۆمە دیاریکراوەکان</h2>
-              <button onClick={() => setShowColumnsModal(false)} className="text-slate-400 hover:text-white">✕</button>
+              <div className="flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#38bdf8" }}>
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <line x1="12" y1="3" x2="12" y2="21" />
+                  <path d="M3 9h18" />
+                  <path d="M3 15h18" />
+                </svg>
+                <h2 className="font-bold text-sm m-0">کۆڵۆمە دیاریکراوەکان</h2>
+              </div>
+              <button onClick={() => setShowColumnsModal(false)} className="text-slate-400 hover:text-white bg-transparent border-none text-lg cursor-pointer">✕</button>
             </div>
             <div className="p-2 flex flex-col max-h-[60vh] overflow-y-auto">
               {Object.entries({
@@ -760,7 +839,7 @@ export default function ItemsReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">وردەکاری پسووڵە <span className="text-lg">📄</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2">
+                  <div>
                     <MultiSelectDropdown
                       label="پسووڵە"
                       options={[
@@ -779,6 +858,15 @@ export default function ItemsReportPage() {
                       onChange={setFilterVoucherTypes}
                     />
                   </div>
+                  <div className="mui-outline">
+                    <label>ژمارەی پسووڵە</label>
+                    <input
+                      type="text"
+                      placeholder="ژمارەی پسووڵە بنووسە..."
+                      value={voucherReference}
+                      onChange={e => setVoucherReference(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -786,23 +874,23 @@ export default function ItemsReportPage() {
               <div>
                 <div className="section-title flex-row-reverse">فلتەری کەرەستە <span className="text-lg">📦</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="mui-outline">
-                    <label>براند</label>
-                    <select value={brand} onChange={e => setBrand(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {brandOptions.map((bName) => (
-                        <option key={bName} value={bName}>{bName}</option>
-                      ))}
-                    </select>
+                  <div>
+                    <MultiSelectDropdown
+                      label="براند"
+                      options={brandOptions.map((bName) => ({ value: bName, label: bName }))}
+                      selectedValues={filterBrands}
+                      onChange={setFilterBrands}
+                      searchable
+                    />
                   </div>
-                  <div className="mui-outline">
-                    <label>کاتیگۆری</label>
-                    <select value={category} onChange={e => setCategory(e.target.value)}>
-                      <option value="all">هەموو</option>
-                      {categoryOptions.map((cName) => (
-                        <option key={cName} value={cName}>{cName}</option>
-                      ))}
-                    </select>
+                  <div>
+                    <MultiSelectDropdown
+                      label="کاتیگۆری"
+                      options={categoryOptions.map((cName) => ({ value: cName, label: cName }))}
+                      selectedValues={filterCategories}
+                      onChange={setFilterCategories}
+                      searchable
+                    />
                   </div>
                   <div className="mui-outline">
                     <label>کۆد</label>
@@ -885,12 +973,13 @@ export default function ItemsReportPage() {
                 <div className="section-title flex-row-reverse">ئۆپشنەکانی پیشاندان <span className="text-lg">👁</span></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="mui-outline">
-                    <label>گرووپکردنی کەرەستە</label>
-                    <select><option>نەخێر</option></select>
-                  </div>
-                  <div className="mui-outline">
-                    <label>کۆدی وەجبە</label>
-                    <select><option>پیشاندان</option></select>
+                    <label>دۆخی قازانج</label>
+                    <select value={profitStatus} onChange={e => setProfitStatus(e.target.value)}>
+                      <option value="all">١. هەمووی</option>
+                      <option value="profitable">٢. قازانجی کردوە</option>
+                      <option value="zero">٣. قازانج سفر</option>
+                      <option value="loss">٤. زەرەری کردوە</option>
+                    </select>
                   </div>
                   <div className="mui-outline">
                     <label>دیاری</label>
@@ -898,12 +987,6 @@ export default function ItemsReportPage() {
                       <option value="all">هەمووی</option>
                       <option value="yes">بەڵێ</option>
                       <option value="no">نەخێر</option>
-                    </select>
-                  </div>
-                  <div className="mui-outline">
-                    <label>گرووپ بەپێی پێچەوانەوە</label>
-                    <select value={groupReverse} onChange={e => setGroupReverse(e.target.value)}>
-                      <option value="all"></option>
                     </select>
                   </div>
                 </div>

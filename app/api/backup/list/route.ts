@@ -12,32 +12,45 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const backupDir = path.join(process.cwd(), "backups");
+    const localBackupDir = path.join(process.cwd(), "backups");
+    const tmpBackupDir = path.join("/tmp", "backups");
     
-    if (!fs.existsSync(backupDir)) {
-      return NextResponse.json({ backups: [] });
-    }
+    const filesMap = new Map();
 
-    const files = fs.readdirSync(backupDir)
-      .filter(f => f.startsWith("backup-") && f.endsWith(".json"))
-      .sort((a, b) => b.localeCompare(a)); // newest first
+    const scanDir = (dir: string) => {
+      if (fs.existsSync(dir)) {
+        try {
+          fs.readdirSync(dir)
+            .filter(f => f.startsWith("backup-") && f.endsWith(".json"))
+            .forEach(fileName => {
+              const filePath = path.join(dir, fileName);
+              try {
+                const stat = fs.statSync(filePath);
+                const sizeKB = (stat.size / 1024).toFixed(1);
+                const dateMatch = fileName.match(/backup-(\d{4}-\d{2}-\d{2})/);
+                const date = dateMatch ? dateMatch[1] : "";
+                
+                filesMap.set(fileName, {
+                  fileName,
+                  date,
+                  fileSize: `${sizeKB} KB`,
+                  createdAt: stat.mtime.toISOString(),
+                });
+              } catch (e) {
+                // Ignore individual file errors
+              }
+            });
+        } catch (e) {
+          console.warn(`Failed to read backup directory: ${dir}`, e);
+        }
+      }
+    };
 
-    const backups = files.map(fileName => {
-      const filePath = path.join(backupDir, fileName);
-      const stat = fs.statSync(filePath);
-      const sizeKB = (stat.size / 1024).toFixed(1);
-      
-      // Extract date from filename: backup-2026-06-05.json
-      const dateMatch = fileName.match(/backup-(\d{4}-\d{2}-\d{2})/);
-      const date = dateMatch ? dateMatch[1] : "";
+    scanDir(localBackupDir);
+    scanDir(tmpBackupDir);
 
-      return {
-        fileName,
-        date,
-        fileSize: `${sizeKB} KB`,
-        createdAt: stat.mtime.toISOString(),
-      };
-    });
+    const backups = Array.from(filesMap.values())
+      .sort((a, b) => b.fileName.localeCompare(a.fileName));
 
     return NextResponse.json({ backups });
   } catch (error) {

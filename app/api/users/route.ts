@@ -44,8 +44,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { username, password, name, role, isActive, phone, canSeeOthersData, allowedWarehouses, allowedCashboxes } = body;
+    const cleanUsername = String(username || "").trim();
+    const cleanName = String(name || "").trim();
 
-    if (!username || !password || !name) {
+    if (!cleanUsername || !password || !cleanName) {
       return NextResponse.json(
         { error: "یوزەرنەیم، پاسۆرد و ناو پێویستن" },
         { status: 400 }
@@ -53,8 +55,13 @@ export async function POST(request: Request) {
     }
 
     // Check if username already exists
-    const existing = await prisma.user.findUnique({
-      where: { username },
+    const existing = await prisma.user.findFirst({
+      where: {
+        username: {
+          equals: cleanUsername,
+          mode: "insensitive",
+        },
+      },
     });
     if (existing) {
       return NextResponse.json(
@@ -67,9 +74,9 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.create({
       data: {
-        username,
+        username: cleanUsername,
         password: hashedPassword,
-        name,
+        name: cleanName,
         role: role || "employee",
         isActive: isActive !== undefined ? isActive : true,
         phone: phone || null,
@@ -114,10 +121,19 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
+    const cleanUsername = username !== undefined ? String(username).trim() : undefined;
+    const cleanName = name !== undefined ? String(name).trim() : undefined;
+
     // Check if changing username to one that already exists
-    if (username) {
+    if (cleanUsername) {
       const existing = await prisma.user.findFirst({
-        where: { username, id: { not: id } },
+        where: {
+          username: {
+            equals: cleanUsername,
+            mode: "insensitive",
+          },
+          id: { not: id },
+        },
       });
       if (existing) {
         return NextResponse.json(
@@ -128,8 +144,8 @@ export async function PUT(request: Request) {
     }
 
     const updateData: any = {};
-    if (username !== undefined) updateData.username = username;
-    if (name !== undefined) updateData.name = name;
+    if (cleanUsername !== undefined) updateData.username = cleanUsername;
+    if (cleanName !== undefined) updateData.name = cleanName;
     if (role !== undefined) updateData.role = role;
     if (isActive !== undefined) updateData.isActive = isActive;
     if (password) updateData.password = await hashPassword(password);

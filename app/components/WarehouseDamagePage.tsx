@@ -1,6 +1,7 @@
 "use client";
 import { openPrintWindow } from "@/app/utils/printWindow";
-import DateInput from "./DateInput";
+﻿import DateInput from "./DateInput";
+import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 
 import {
@@ -372,10 +373,11 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
   function formatCurrencyAmount(value: number, currencyId: number) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
+    const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${Number(value || 0).toLocaleString("en-US")}`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
-    return `${symbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
 
   function formatCurrencyMap(map: Record<string, number>) {
@@ -385,7 +387,7 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
         formatCurrencyAmount(Number(amount || 0), Number(currencyIdText))
       );
 
-    return parts.length ? parts.join(" + ") : "0";
+    return parts.length ? parts.join(" ، ") : "0";
   }
 
   function formatDate(dateText: string) {
@@ -662,10 +664,14 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
 
     if (!validateBeforeSave()) return;
 
-    const totalLossNumber = Object.values(totalLossByCurrency).reduce(
-      (sum, value) => sum + Number(value || 0),
-      0
-    );
+    const iqdRate = ((currencies.find((c: any) => c.code === "IQD" || c.id === 2)?.exchangeRate || 152000) / 100) || 1520;
+    const totalLossNumber = rows.reduce((sum, row) => {
+      const qty = toNumber(row.quantity);
+      const unitCost = toNumber(row.purchaseCost);
+      const lineTotal = qty * unitCost;
+      const isIQD = Number(row.currencyId) === 2 || (currencies.find((c: any) => Number(c.id) === Number(row.currencyId))?.code === "IQD");
+      return sum + (isIQD ? (lineTotal / iqdRate) : lineTotal);
+    }, 0);
 
     const combineDateAndTime = (dateStr: string, timeStr: string) => {
       try {
@@ -684,7 +690,8 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
         if (hhmmMatch) {
           const hours = hhmmMatch[1].padStart(2, "0");
           const minutes = hhmmMatch[2];
-          return new Date(dateStr + "T" + hours + ":" + minutes + ":00Z").toISOString();
+          const d = new Date(`${dateStr}T${hours}:${minutes}:00`);
+          if (!isNaN(d.getTime())) return d.toISOString();
         }
         const fallback = new Date(dateStr + " " + cleanTime);
         if (!isNaN(fallback.getTime())) return fallback.toISOString();
@@ -723,8 +730,10 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
       ledgerEntries: [],
     };
 
-    const savePromise = editId
-      ? updateVoucher(Number(editId), payload)
+    const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
+    const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
+    const savePromise = isEditMode
+      ? updateVoucher(Number(effectiveEditId), payload)
       : addVoucher(payload);
 
     savePromise.then((res: any) => {
@@ -1093,13 +1102,10 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
 
                                 <div style={detailGridCompact}>
                                   <Field label="بڕ">
-                                    <input
+                                    <FormattedNumberInput
                                       value={row.quantity}
-                                      onChange={(event) => {
-                                        const value = onlyDecimal(
-                                          event.target.value
-                                        );
-                                        const n = toNumber(value);
+                                      onChange={(val) => {
+                                        const n = toNumber(val);
 
                                         if (n > row.availableQty) {
                                           showToast(
@@ -1108,29 +1114,21 @@ export default function WarehouseDamagePage({ headerSelector, editId }: Props) {
                                           return;
                                         }
 
-                                        updateRow(row.id, { quantity: value });
+                                        updateRow(row.id, { quantity: val });
                                       }}
-                                      inputMode="decimal"
-                                      lang="en"
-                                      dir="ltr"
                                       placeholder="0"
                                       style={detailInput}
                                     />
                                   </Field>
 
                                   <Field label="نرخی کڕین">
-                                    <input
+                                    <FormattedNumberInput
                                       value={row.purchaseCost}
-                                      onChange={(event) =>
+                                      onChange={(val) =>
                                         updateRow(row.id, {
-                                          purchaseCost: onlyDecimal(
-                                            event.target.value
-                                          ),
+                                          purchaseCost: val,
                                         })
                                       }
-                                      inputMode="decimal"
-                                      lang="en"
-                                      dir="ltr"
                                       placeholder="0"
                                       style={detailInput}
                                     />
@@ -1555,7 +1553,7 @@ function StatBox({
   color,
 }: {
   title: string;
-  value: string;
+  value: React.ReactNode;
   color: string;
 }) {
   return (
@@ -1568,7 +1566,7 @@ function StatBox({
   );
 }
 
-function PrintInfoLine({ label, value }: { label: string; value: string }) {
+function PrintInfoLine({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={printInfoRow}>
       <b>{label}:</b>
@@ -1583,7 +1581,7 @@ function PrintSummaryLine({
   bold,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
 }) {
   let hideZero = false;
@@ -1596,7 +1594,7 @@ function PrintSummaryLine({
     }
   }
 
-  if (hideZero) {
+  if (hideZero && typeof value === "string") {
     const clean = (value || "").replace(/[$,\s\-\+]|دینار|د\.ع/g, "");
     if (clean === "0" || clean === "" || Number(clean) === 0) {
       return null;
@@ -1631,8 +1629,8 @@ function SettingCheck({
 const appFont = '"Speda", "Segoe UI", Tahoma, Arial, sans-serif';
 
 const printCss = `
+@page { size: auto; margin: 0; }
 @media print {
-  @page { size: auto; margin: 0 !important; }
 
   body * { visibility: hidden !important; }
 

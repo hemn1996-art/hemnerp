@@ -59,13 +59,11 @@ export default function ProfitReportPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [showReportStats, setShowReportStats] = useState(true);
   
+  const [quickRange, setQuickRange] = useState<string>("year");
+
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return `${d.getFullYear()}-01-01`;
   });
   
   const [endDate, setEndDate] = useState(() => {
@@ -75,6 +73,41 @@ export default function ProfitReportPage() {
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   });
+
+  const handleQuickRangeChange = (rangeKey: string) => {
+    setQuickRange(rangeKey);
+    if (rangeKey === "custom") return;
+
+    const now = new Date();
+    const formatDate = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const todayStr = formatDate(now);
+
+    if (rangeKey === "today") {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (rangeKey === "week") {
+      const dayOfWeek = now.getDay();
+      const diffToSaturday = (dayOfWeek + 1) % 7;
+      const saturday = new Date(now);
+      saturday.setDate(now.getDate() - diffToSaturday);
+      setStartDate(formatDate(saturday));
+      setEndDate(todayStr);
+    } else if (rangeKey === "month") {
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(formatDate(firstOfMonth));
+      setEndDate(todayStr);
+    } else if (rangeKey === "year") {
+      const firstOfYear = new Date(now.getFullYear(), 0, 1);
+      setStartDate(formatDate(firstOfYear));
+      setEndDate(todayStr);
+    }
+  };
 
   useEffect(() => {
     fetchAccounts?.();
@@ -143,6 +176,10 @@ export default function ProfitReportPage() {
       if (createdBys.length > 0) params.append("createdBy", createdBys.join(","));
 
       const res = await fetch(`/api/reports/profit?${params.toString()}`);
+      if (res.status === 401 || res.status === 403) {
+        router.push("/login");
+        return;
+      }
       const json = await res.json();
       setData(json);
     } catch (e) {
@@ -176,11 +213,11 @@ export default function ProfitReportPage() {
     setWarehouseIds([]);
     setCreatedBys([]);
     
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    setStartDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
     const today = new Date();
-    setEndDate(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    setStartDate(`${today.getFullYear()}-01-01`);
+    setEndDate(todayStr);
+    setQuickRange("year");
   };
 
   const handleCardClick = (type: string) => {
@@ -226,7 +263,7 @@ export default function ProfitReportPage() {
     const decimalPart = parts[1];
 
     return (
-      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", direction: "ltr" }}>
+      <span className={isNegative ? "text-rose-600 font-bold" : ""} style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", direction: "ltr" }}>
         {isNegative && <span style={{ marginRight: "2px" }}>-</span>}
         <span style={{ fontSize: "0.8em", opacity: 0.7, marginRight: "4px" }}>
           {symbol}
@@ -307,6 +344,21 @@ export default function ProfitReportPage() {
                   {c.name} ({c.symbol})
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 border-r border-slate-200 pr-4">
+            <span className="text-[11px] font-bold text-slate-500">فلتەری خێرا:</span>
+            <select
+              value={quickRange}
+              onChange={(e) => handleQuickRangeChange(e.target.value)}
+              className="border border-blue-400 bg-blue-50/80 text-blue-900 p-1.5 text-xs rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer hover:bg-blue-100 transition shadow-sm"
+            >
+              <option value="custom">دیاریکراو (دەیستی)</option>
+              <option value="today">ئەمڕۆ</option>
+              <option value="week">ئەم هەفتەیە</option>
+              <option value="month">ئەم مانگە</option>
+              <option value="year">ئەم ساڵە</option>
             </select>
           </div>
         </div>
@@ -391,14 +443,14 @@ export default function ProfitReportPage() {
             {/* قازانجی فرۆش - Sales Profit */}
             <div
               onClick={() => handleCardClick("sales_profit")}
-              className="bg-emerald-50 p-5 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-lg hover:border-emerald-400 transition-all cursor-pointer"
+              className={`p-5 rounded-2xl border shadow-sm hover:shadow-lg transition-all cursor-pointer ${data.salesProfit >= 0 ? "bg-emerald-50 border-emerald-200 hover:border-emerald-400" : "bg-rose-50 border-rose-200 hover:border-rose-400"}`}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-emerald-900 font-black text-lg m-0">قازانجی فرۆش</h3>
-                <div className="w-11 h-11 bg-emerald-200 text-emerald-700 rounded-xl flex items-center justify-center text-xl shadow-inner">📈</div>
+                <h3 className={`font-black text-lg m-0 ${data.salesProfit >= 0 ? "text-emerald-900" : "text-rose-900"}`}>قازانجی فرۆش</h3>
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shadow-inner ${data.salesProfit >= 0 ? "bg-emerald-200 text-emerald-700" : "bg-rose-200 text-rose-700"}`}>{data.salesProfit >= 0 ? "📈" : "📉"}</div>
               </div>
-              <div className="text-2xl font-black text-emerald-800 mb-2" dir="ltr">{formatCur(data.salesProfit)}</div>
-              <p className="text-xs text-emerald-500 font-medium m-0">کۆی گشتی قازانجی فرۆش دوای گەڕاندنەوە</p>
+              <div className={`text-2xl font-black mb-2 ${data.salesProfit >= 0 ? "text-emerald-800" : "text-rose-700"}`} dir="ltr">{formatCur(data.salesProfit)}</div>
+              <p className={`text-xs font-medium m-0 ${data.salesProfit >= 0 ? "text-emerald-500" : "text-rose-500"}`}>کۆی گشتی قازانجی فرۆش دوای گەڕاندنەوە</p>
             </div>
 
             {/* داشکاندنم بۆ کراوە - My Debt Discount */}

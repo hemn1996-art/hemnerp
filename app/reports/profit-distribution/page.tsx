@@ -166,11 +166,24 @@ export default function ProfitDistributionPage() {
     }
   };
 
-  const fmt = (n: number) => {
-    return n.toLocaleString("en-US", {
+  const fmt = (n: number, showMinus: boolean = false) => {
+    const isNeg = n < 0 || showMinus;
+    const formattedStr = Math.abs(n).toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
-    }) + " $";
+    });
+    const parts = formattedStr.split(".");
+
+    return (
+      <span className="inline-flex items-baseline gap-1" dir="ltr">
+        {isNeg && <span>-</span>}
+        <span>{parts[0]}</span>
+        {parts.length > 1 && (
+          <span className="text-[0.72em] opacity-80 font-bold">.{parts[1]}</span>
+        )}
+        <span>$</span>
+      </span>
+    );
   };
 
   if (!currentUser || currentUser.role !== "admin") {
@@ -186,8 +199,7 @@ export default function ProfitDistributionPage() {
   const cash = data?.assets?.cash || 0;
   const accountsReceivable = data?.assets?.accountsReceivable || 0;
   const otherAssets = data?.assets?.allInventory || 0;
-  const rawMyDebts = data?.liabilitiesEquity?.myDebts || 0;
-  const myDebts = rawMyDebts >= 1 ? rawMyDebts : 0;
+  const myDebts = data?.liabilitiesEquity?.myDebts || 0;
   const capital = data?.liabilitiesEquity?.capital || 0;
   const calculatedProfit = warehouseValue + cash + accountsReceivable + otherAssets - myDebts - capital;
   const profitToDistribute = calculatedProfit;
@@ -306,23 +318,29 @@ export default function ProfitDistributionPage() {
                   }, 100);
                 }
               }}
-              className="bg-gradient-to-l from-emerald-50 to-green-50 border-2 border-emerald-300 rounded-2xl p-5 cursor-pointer hover:border-emerald-500 transition-all"
+              className={`border-2 rounded-2xl p-5 cursor-pointer transition-all ${
+                calculatedProfit < 0
+                  ? "bg-gradient-to-l from-red-50 to-rose-50 border-red-300 hover:border-red-500"
+                  : "bg-gradient-to-l from-emerald-50 to-green-50 border-emerald-300 hover:border-emerald-500"
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div className="text-right">
-                  <div className="text-emerald-700 font-bold text-sm mb-1">قازانجی فعلی</div>
-                  <div className="text-3xl font-black text-emerald-800" dir="ltr">
+                  <div className={`font-bold text-sm mb-1 ${calculatedProfit < 0 ? "text-red-700" : "text-emerald-700"}`}>
+                    قازانجی فعلی
+                  </div>
+                  <div className={`text-3xl font-black ${calculatedProfit < 0 ? "text-red-600" : "text-emerald-800"}`} dir="ltr">
                     {fmt(calculatedProfit)}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-emerald-500 text-xs font-bold">
+                <div className={`flex items-center gap-2 text-xs font-bold ${calculatedProfit < 0 ? "text-red-500" : "text-emerald-500"}`}>
                   <span>{profitBreakdownExpanded ? '▲ شاردنەوەی وردەکاری' : '▼ کلیک بکە بۆ بینینی وردەکاری'}</span>
                 </div>
               </div>
 
               {/* Breakdown */}
               {profitBreakdownExpanded && (
-                <div className="mt-4 pt-4 border-t border-emerald-200 space-y-2 flex flex-col items-end">
+                <div className={`mt-4 pt-4 border-t space-y-2 flex flex-col items-end ${calculatedProfit < 0 ? "border-red-200" : "border-emerald-200"}`}>
                   <div className="w-full max-w-md space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="font-bold text-slate-700" dir="ltr">{fmt(warehouseValue)}</span>
@@ -343,16 +361,16 @@ export default function ProfitDistributionPage() {
                       </div>
                     )}
                     <div className="flex justify-between text-sm">
-                      <span className="font-bold text-red-600" dir="ltr">{myDebts >= 1 ? `-${fmt(myDebts)}` : fmt(0)}</span>
-                      <span className="text-red-500 font-bold">من قەرزارم 💳</span>
+                      <span className="font-bold text-red-600" dir="ltr">{fmt(myDebts, true)}</span>
+                      <span className="text-red-500 font-bold">من قەرزارم (قەرزی لایەنی تر) 💳</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="font-bold text-red-600" dir="ltr">-{fmt(capital)}</span>
+                      <span className="font-bold text-red-600" dir="ltr">{fmt(capital, true)}</span>
                       <span className="text-red-500 font-bold">سەرمایەی خاوەن پشکەکان 🏦</span>
                     </div>
-                    <div className="flex justify-between text-sm pt-2 border-t border-emerald-300">
-                      <span className="font-black text-emerald-800 text-base" dir="ltr">{fmt(calculatedProfit)}</span>
-                      <span className="text-emerald-700 font-black">کۆی قازانجی فعلی</span>
+                    <div className={`flex justify-between text-sm pt-2 border-t ${calculatedProfit < 0 ? "border-red-300" : "border-emerald-300"}`}>
+                      <span className={`font-black text-base ${calculatedProfit < 0 ? "text-red-600" : "text-emerald-800"}`} dir="ltr">{fmt(calculatedProfit)}</span>
+                      <span className={`font-black ${calculatedProfit < 0 ? "text-red-600" : "text-emerald-700"}`}>کۆی قازانجی فعلی</span>
                     </div>
                   </div>
                 </div>

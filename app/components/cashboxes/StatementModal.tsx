@@ -3,10 +3,6 @@ import { useRouter } from "next/navigation";
 import { CashboxLike, CurrencyLike } from "./types";
 import DateInput from "../DateInput";
 
-function getResetDates(_movementsList?: any[]) {
-  return { start: "", end: "" };
-}
-
 type Props = {
   statementCashbox: CashboxLike | null;
   vouchers: any[];
@@ -32,9 +28,21 @@ export default function StatementModal({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const lastCashboxIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (statementCashbox) {
+      if (lastCashboxIdRef.current !== statementCashbox.id) {
+        lastCashboxIdRef.current = statementCashbox.id;
+        setStartDate("");
+        setEndDate("");
+        setCurrentPage(1);
+      }
+    }
+  }, [statementCashbox?.id]);
+
   if (!statementCashbox) return null;
 
-  // Helper formatting functions
   function getCurrencySymbol(currencyId: number) {
     return currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
   }
@@ -43,21 +51,36 @@ export default function StatementModal({
     return currencies.find((c: any) => c.id === currencyId)?.code || "";
   }
 
-  function formatMoney(amount: number, currencyId: number) {
+  function formatMoney(amount: number, currencyId: number, isChange = false) {
     const symbol = getCurrencySymbol(currencyId);
     const code = getCurrencyCode(currencyId);
-    if (code === "IQD") {
-      return `${Math.round(Number(amount || 0)).toLocaleString("en-US")} دینار`;
+    const num = Number(amount || 0);
+    const absVal = Math.abs(num);
+    const isIQD = code === "IQD";
+    const formattedNum = isIQD
+      ? Math.round(absVal).toLocaleString("en-US")
+      : absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+    const isNegative = num < -0.0001;
+
+    if (isIQD) {
+      if (isChange) {
+        return num >= 0 ? `+ ${formattedNum} دینار` : `- ${formattedNum} دینار`;
+      }
+      return isNegative ? `- ${formattedNum} دینار` : `${formattedNum} دینار`;
     }
-    return `${Number(amount || 0).toLocaleString("en-US")} ${symbol}`;
+
+    if (isChange) {
+      return num >= 0 ? `+ ${symbol} ${formattedNum}` : `- ${symbol} ${formattedNum}`;
+    }
+    return isNegative ? `- ${symbol} ${formattedNum}` : `${symbol} ${formattedNum}`;
   }
 
   function formatChanges(changesMap: Record<number, number>) {
     const parts = Object.entries(changesMap)
       .filter(([, amt]) => Math.abs(amt) > 0.001)
       .map(([curId, amt]) => {
-        const formatted = formatMoney(Math.abs(amt), Number(curId));
-        return amt >= 0 ? `+ ${formatted}` : `- ${formatted}`;
+        return formatMoney(amt, Number(curId), true);
       });
     return parts.length ? parts.join(" و ") : "0";
   }
@@ -65,13 +88,14 @@ export default function StatementModal({
   function formatRunningBalanceMap(balanceMap: Record<number, number>) {
     const parts = Object.entries(balanceMap)
       .filter(([, amt]) => Math.abs(amt) > 0.001)
-      .map(([curId, amt]) => formatMoney(amt, Number(curId)));
+      .map(([curId, amt]) => formatMoney(amt, Number(curId), false));
     return parts.length ? parts.join(" + ") : "0";
   }
 
   function formatRowDate(dateStr: string) {
     if (!dateStr) return "-";
     const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "-";
     const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const year = d.getFullYear();
@@ -86,7 +110,6 @@ export default function StatementModal({
     return `${day}/${month}/${year}, ${formattedTime}`;
   }
 
-  // Translates English invoice/voucher type names to Kurdish
   function getKurdishType(type: string) {
     if (type === "sales") return "فرۆشتن";
     if (type === "purchase") return "کڕین";
@@ -107,12 +130,12 @@ export default function StatementModal({
     if (type === "warehouse_damage" || type === "خەسارەی کۆگا" || type === "زیانی کۆگا") return "زیانی کۆگا";
     if (type === "warehouse_stock" || type === "جەردی کۆگا") return "جەردی کۆگا";
     if (type === "product_transfer" || type === "گواستنەوەی کاڵا" || type === "گواستنەوەی کەرەستە") return "گواستنەوەی کەرەستە";
+    if (type === "initial_balance") return "باڵانسی سەرەتایی";
 
-    // Fallback if already translated in store
     return type;
   }
 
-  // 1. Compute all chronological movements for this cashbox
+  // 1. Compute all chronological movements for this cashbox including initial balance
   const allMovements = useMemo(() => {
     const list: any[] = [];
 
@@ -120,24 +143,31 @@ export default function StatementModal({
       const changes: { currencyId: number; amount: number }[] = [];
 
       if (v.cashboxId === statementCashbox.id) {
-        const isIncoming = [
-          "sales",
-          "money_in",
-          "shareholder_deposit",
-          "cashbox_exchange",
-        ].includes(v.rawType || v.type);
+        if (v.rawType === "cashbox_exchange" || v.type === "cashbox_exchange") {
+          v.paidAmounts?.forEach((pa: any) => {
+            changes.push({ currencyId: Number(pa.currencyId), amount: Number(pa.amount) });
+          });
+        } else {
+          const isIncoming = [
+            "sales",
+            "money_in",
+            "shareholder_deposit",
+            "purchase_return",
+          ].includes(v.rawType || v.type);
 
-        v.paidAmounts?.forEach((pa: any) => {
-          const change = isIncoming ? Number(pa.amount) : -Number(pa.amount);
-          changes.push({ currencyId: pa.currencyId, amount: change });
-        });
+          v.paidAmounts?.forEach((pa: any) => {
+            const amt = Math.abs(Number(pa.amount));
+            const change = isIncoming ? amt : -amt;
+            changes.push({ currencyId: Number(pa.currencyId), amount: change });
+          });
+        }
       } else if (v.fromCashboxId === statementCashbox.id) {
         v.paidAmounts?.forEach((pa: any) => {
-          changes.push({ currencyId: pa.currencyId, amount: -Number(pa.amount) });
+          changes.push({ currencyId: Number(pa.currencyId), amount: -Math.abs(Number(pa.amount)) });
         });
       } else if (v.toCashboxId === statementCashbox.id) {
         v.paidAmounts?.forEach((pa: any) => {
-          changes.push({ currencyId: pa.currencyId, amount: Number(pa.amount) });
+          changes.push({ currencyId: Number(pa.currencyId), amount: Math.abs(Number(pa.amount)) });
         });
       }
 
@@ -151,43 +181,72 @@ export default function StatementModal({
           id: v.id,
           date: new Date(v.date),
           dateStr: v.date,
-          type: v.type, // UI mapped Kurdish type
+          type: v.type,
           rawType: v.rawType || v.type,
-          accountName: v.accountName || "-",
-          note: v.internalNote || "-",
+          accountName: v.accountName || v.account?.name || "-",
+          note: v.internalNote || v.printNote || "-",
           changes: combined,
+          isInitial: false,
         });
       }
     });
 
-    // Sort chronologically ascending to calculate correct running balance
-    list.sort((a, b) => a.date.getTime() - b.date.getTime());
+    // Sort chronologically ascending (stable with id)
+    list.sort((a, b) => a.date.getTime() - b.date.getTime() || (typeof a.id === "number" && typeof b.id === "number" ? a.id - b.id : 0));
 
-    // Calculate running balance map
-    const runningMap: Record<number, number> = {};
+    // Sum all voucher movements per currency across all time
+    const totalMovementSum: Record<number, number> = {};
+    list.forEach((m) => {
+      Object.entries(m.changes).forEach(([curId, change]) => {
+        const cId = Number(curId);
+        totalMovementSum[cId] = (totalMovementSum[cId] || 0) + Number(change);
+      });
+    });
+
+    // Compute initial starting balance from current DB balance:
+    // initial = currentInDB - totalMovementSum
+    const initialBalanceMap: Record<number, number> = {};
+    (statementCashbox.balances || []).forEach((b) => {
+      const cId = Number(b.currencyId);
+      const currentAmount = Number(b.amount || 0);
+      const totalMovement = totalMovementSum[cId] || 0;
+      const initialAmount = currentAmount - totalMovement;
+      if (Math.abs(initialAmount) > 0.0001) {
+        initialBalanceMap[cId] = initialAmount;
+      }
+    });
+
+    // Start running map from initialBalanceMap
+    const runningMap: Record<number, number> = { ...initialBalanceMap };
+    const movementsWithInitial: any[] = [];
+
+    const hasInitialBalance = Object.values(initialBalanceMap).some((amt) => Math.abs(amt) > 0.0001);
+    if (hasInitialBalance) {
+      movementsWithInitial.push({
+        id: "initial",
+        date: new Date(statementCashbox.createdAt || 0),
+        dateStr: statementCashbox.createdAt || "",
+        type: "باڵانسی سەرەتایی",
+        rawType: "initial_balance",
+        accountName: "-",
+        note: "باڵانسی سەرەتایی قاسە لە کاتی دروستکردندا",
+        changes: { ...initialBalanceMap },
+        runningBalance: { ...initialBalanceMap },
+        isInitial: true,
+      });
+    }
+
     list.forEach((m) => {
       Object.entries(m.changes).forEach(([curId, change]) => {
         const cId = Number(curId);
         runningMap[cId] = (runningMap[cId] || 0) + Number(change);
       });
       m.runningBalance = { ...runningMap };
+      movementsWithInitial.push(m);
     });
 
-    return list;
-  }, [vouchers, statementCashbox.id]);
-
-  const lastCashboxIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (statementCashbox) {
-      if (lastCashboxIdRef.current !== statementCashbox.id) {
-        lastCashboxIdRef.current = statementCashbox.id;
-        setStartDate("");
-        setEndDate("");
-        setCurrentPage(1);
-      }
-    }
-  }, [statementCashbox?.id]);
+    return movementsWithInitial;
+  }, [vouchers, statementCashbox]);
 
   const handleReset = () => {
     setStartDate("");
@@ -195,12 +254,13 @@ export default function StatementModal({
     setCurrentPage(1);
   };
 
-  // 2. Filter movements by date
+  // 2. Filter movements by date (reversed for display: newest first)
   const filteredMovements = useMemo(() => {
     const list = allMovements.filter((m) => {
-      if (!m.dateStr) return false;
+      if (m.isInitial && !startDate) return true;
+      if (!m.dateStr) return true;
       const d = new Date(m.dateStr);
-      if (isNaN(d.getTime())) return false;
+      if (isNaN(d.getTime())) return true;
       const y = d.getFullYear();
       const mon = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
@@ -220,14 +280,20 @@ export default function StatementModal({
 
   const totalPages = Math.ceil(filteredMovements.length / pageSize) || 1;
 
-  // 4. Calculate statement totals (for the banner display)
-  const statementBalance = useMemo(() => {
-    if (filteredMovements.length === 0) return "0";
-    // We show the final running balance of the filtered movements list
-    // Since filteredMovements is reversed, the chronologically last item is now at index 0
-    const lastMovement = filteredMovements[0];
-    return formatRunningBalanceMap(lastMovement.runningBalance);
-  }, [filteredMovements]);
+  // 4. Calculate statement totals (banner display represents the latest running balance)
+  const latestRunningBalanceMap = useMemo(() => {
+    if (allMovements.length === 0) {
+      const emptyMap: Record<number, number> = {};
+      (statementCashbox.balances || []).forEach((b) => {
+        if (Math.abs(Number(b.amount || 0)) > 0.0001) {
+          emptyMap[b.currencyId] = Number(b.amount || 0);
+        }
+      });
+      return emptyMap;
+    }
+    const lastItem = allMovements[allMovements.length - 1];
+    return lastItem.runningBalance || {};
+  }, [allMovements, statementCashbox]);
 
   // Export to CSV Function
   const handleExportCSV = () => {
@@ -247,10 +313,10 @@ export default function StatementModal({
       const row = [
         idx + 1,
         formatRowDate(m.dateStr),
-        m.id,
+        m.isInitial ? "سەرەتایی" : m.id,
         getKurdishType(m.type),
-        m.accountName.replace(/,/g, " "),
-        m.note.replace(/,/g, " "),
+        String(m.accountName || "-").replace(/,/g, " "),
+        String(m.note || "-").replace(/,/g, " "),
         formatChanges(m.changes).replace(/,/g, " | "),
         formatRunningBalanceMap(m.runningBalance).replace(/,/g, " | "),
       ];
@@ -268,6 +334,72 @@ export default function StatementModal({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const renderBannerBalances = () => {
+    const activeEntries = Object.entries(latestRunningBalanceMap).filter(
+      ([, amt]) => Math.abs(Number(amt || 0)) > 0.001
+    );
+
+    if (activeEntries.length === 0) {
+      return <span className="text-2xl font-black text-slate-800">0</span>;
+    }
+
+    return (
+      <div className="flex items-center gap-3 flex-wrap justify-end">
+        {activeEntries.map(([curId, amt]) => {
+          const numAmt = Number(amt || 0);
+          const isNeg = numAmt < -0.001;
+          const formatted = formatMoney(numAmt, Number(curId), false);
+          return (
+            <span
+              key={curId}
+              dir="ltr"
+              className={`text-xl md:text-2xl font-black px-4 py-1.5 rounded-xl shadow-sm border ${
+                isNeg
+                  ? "text-red-700 bg-red-50 border-red-200"
+                  : "text-emerald-900 bg-emerald-50 border-emerald-300"
+              }`}
+            >
+              {formatted}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderRunningBalanceBadges = (balanceMap: Record<number, number>) => {
+    const activeEntries = Object.entries(balanceMap || {}).filter(
+      ([, amt]) => Math.abs(Number(amt || 0)) > 0.001
+    );
+
+    if (activeEntries.length === 0) {
+      return <span className="text-slate-400 font-bold text-sm">0</span>;
+    }
+
+    return (
+      <div className="flex flex-col gap-1 items-center justify-center">
+        {activeEntries.map(([curId, amt]) => {
+          const numAmt = Number(amt || 0);
+          const isNeg = numAmt < -0.001;
+          const formatted = formatMoney(numAmt, Number(curId), false);
+          return (
+            <span
+              key={curId}
+              dir="ltr"
+              className={`font-black text-sm px-2.5 py-0.5 rounded-md ${
+                isNeg
+                  ? "text-red-700 bg-red-50 border border-red-200"
+                  : "text-slate-900 bg-slate-50 border border-slate-200"
+              }`}
+            >
+              {formatted}
+            </span>
+          );
+        })}
+      </div>
+    );
   };
 
   const wrapperClass = isFullPage
@@ -312,8 +444,11 @@ export default function StatementModal({
             onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
             className="w-full px-5 py-4 bg-slate-50/60 border-b border-slate-100 flex justify-between items-center text-slate-700 hover:bg-slate-50 transition-all rounded-t-2xl"
           >
-            <div className="flex items-center gap-2 font-bold">
-              <span>🔍</span> فلتەرەکان
+            <div className="flex items-center gap-2 font-bold text-slate-800">
+              <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span>فلتەرەکان</span>
             </div>
             <span className="text-slate-400 text-sm">
               {isFiltersExpanded ? "▲ شاردنەوە" : "▼ نیشاندان"}
@@ -352,21 +487,30 @@ export default function StatementModal({
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-750 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-slate-200 cursor-pointer"
                   title="ڕێکخستنەوە"
                 >
-                  🔄 ڕێکخستنەوە
+                  <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>ڕێکخستنەوە</span>
                 </button>
                 <button
                   onClick={() => window.print()}
                   className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-blue-200 cursor-pointer"
                   title="پرێنت"
                 >
-                  🖨️ پرێنت
+                  <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  <span>پرێنت</span>
                 </button>
                 <button
                   onClick={handleExportCSV}
                   className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border border-emerald-200 cursor-pointer"
                   title="ئێکسڵ"
                 >
-                  📊 ئێکسڵ
+                  <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>ئێکسڵ</span>
                 </button>
               </div>
             </div>
@@ -379,8 +523,11 @@ export default function StatementModal({
             onClick={() => setIsMovementsExpanded(!isMovementsExpanded)}
             className="w-full px-5 py-4 bg-slate-50/60 border-b border-slate-100 flex justify-between items-center text-slate-700 hover:bg-slate-50 transition-all no-print"
           >
-            <div className="flex items-center gap-2 font-bold">
-              <span>📊</span> جووڵەکان
+            <div className="flex items-center gap-2 font-bold text-slate-800">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>جووڵەکان</span>
             </div>
             <span className="text-slate-400 text-sm">
               {isMovementsExpanded ? "▲ شاردنەوە" : "▼ نیشاندان"}
@@ -390,11 +537,9 @@ export default function StatementModal({
           {isMovementsExpanded && (
             <div className="p-5 grid gap-5 print:p-0">
               {/* Balance Summary Display */}
-              <div className="bg-emerald-50/60 border border-emerald-250 rounded-2xl p-4 flex justify-between items-center text-emerald-850 shadow-sm print:bg-slate-50 print:border-black print:border-2">
+              <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 flex justify-between items-center text-emerald-900 shadow-sm print:bg-slate-50 print:border-black print:border-2">
                 <strong className="text-lg">باڵانس:</strong>
-                <span className="text-2xl font-black ltr tracking-tight">
-                  {statementBalance}
-                </span>
+                {renderBannerBalances()}
               </div>
 
               {/* Table Container */}
@@ -436,7 +581,9 @@ export default function StatementModal({
                           className="p-14 text-slate-400 font-bold border-b border-slate-100"
                         >
                           <div className="flex flex-col items-center gap-3">
-                            <span className="text-5xl opacity-40">📭</span>
+                            <svg className="w-12 h-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                            </svg>
                             <div className="text-lg">هیچ جوڵەیەک نەدۆزرایەوە بۆ ئەم ماوەیە.</div>
                           </div>
                         </td>
@@ -455,15 +602,16 @@ export default function StatementModal({
                             ([curId, amt]: any, idx) => {
                               const isPositive = amt >= 0;
                               const textClass = isPositive
-                                ? "text-green-600 font-bold"
-                                : "text-red-600 font-bold";
+                                ? "text-emerald-700 font-black"
+                                : "text-red-700 font-black";
                               const formatted = formatMoney(
-                                Math.abs(amt),
-                                Number(curId)
+                                amt,
+                                Number(curId),
+                                true
                               );
                               return (
-                                <div key={idx} className={`${textClass} ltr`}>
-                                  {isPositive ? `+ ${formatted}` : `- ${formatted}`}
+                                <div key={idx} className={`${textClass}`} dir="ltr">
+                                  {formatted}
                                 </div>
                               );
                             }
@@ -472,33 +620,43 @@ export default function StatementModal({
 
                         return (
                           <tr
-                            key={row.id}
-                            className="hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-b-0 print:border-b print:border-black"
+                            key={row.isInitial ? "initial" : row.id}
+                            className={`hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-b-0 print:border-b print:border-black ${
+                              row.isInitial ? "bg-amber-50/40 font-semibold" : ""
+                            }`}
                           >
                             <td className="p-4 text-slate-500 font-bold text-sm">
                               {originalIndex}
                             </td>
-                            <td className="p-4 text-slate-700 text-sm ltr">
-                              {formatRowDate(row.dateStr)}
+                            <td className="p-4 text-slate-700 text-sm" dir="ltr">
+                              {row.isInitial ? "سەرەتایی" : formatRowDate(row.dateStr)}
                             </td>
                             <td className="p-4">
-                              <button
-                                onClick={() => {
-                                  closeStatement();
-                                  const url = (row.rawType === "cashbox_transfer")
-                                    ? `/currency-transfer?editId=${row.id}`
-                                    : (row.rawType === "cashbox_exchange")
-                                      ? `/currency-exchange?editId=${row.id}`
-                                      : `/invoices?editId=${row.id}&type=${row.rawType}&t=${Date.now()}`;
-                                  router.push(url);
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-3.5 py-1 rounded-lg text-sm transition-all cursor-pointer shadow-sm active:scale-95 print:bg-white print:text-black print:border print:border-black no-print"
-                              >
-                                {row.id}
-                              </button>
-                              <span className="hidden print:inline font-extrabold text-sm text-black">
-                                {row.id}
-                              </span>
+                              {row.isInitial ? (
+                                <span className="inline-block bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-1 rounded-lg text-xs font-black">
+                                  سەرەتایی
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      closeStatement();
+                                      const url = (row.rawType === "cashbox_transfer")
+                                        ? `/currency-transfer?editId=${row.id}`
+                                        : (row.rawType === "cashbox_exchange")
+                                          ? `/currency-exchange?editId=${row.id}`
+                                          : `/invoices?editId=${row.id}&type=${row.rawType}&t=${Date.now()}`;
+                                      router.push(url);
+                                    }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-3.5 py-1 rounded-lg text-sm transition-all cursor-pointer shadow-sm active:scale-95 print:bg-white print:text-black print:border print:border-black no-print"
+                                  >
+                                    {row.id}
+                                  </button>
+                                  <span className="hidden print:inline font-extrabold text-sm text-black">
+                                    {row.id}
+                                  </span>
+                                </>
+                              )}
                             </td>
                             <td className="p-4 font-bold text-slate-800 text-sm">
                               {getKurdishType(row.type)}
@@ -510,12 +668,12 @@ export default function StatementModal({
                               {row.note}
                             </td>
                             <td className="p-4 text-center">
-                              <div className="flex flex-col gap-1 items-center">
+                              <div className="flex flex-col gap-1 items-center justify-center">
                                 {renderPaidAmount()}
                               </div>
                             </td>
-                            <td className="p-4 text-slate-900 font-extrabold text-sm ltr">
-                              {formatRunningBalanceMap(row.runningBalance)}
+                            <td className="p-4 text-slate-900 font-extrabold text-sm">
+                              {renderRunningBalanceBadges(row.runningBalance)}
                             </td>
                           </tr>
                         );

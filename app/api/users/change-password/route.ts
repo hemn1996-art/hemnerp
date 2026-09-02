@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { hashPassword, verifyPassword, getCurrentUser } from "../../../lib/auth";
+import { hashPassword, verifyPassword, getCurrentUser, signSessionToken } from "../../../lib/auth";
 
 // PUT - Change password for current user
 export async function PUT(request: Request) {
@@ -51,9 +51,16 @@ export async function PUT(request: Request) {
     }
 
     // Update username if provided
-    if (newUsername && newUsername !== currentUser.username) {
+    const cleanNewUsername = newUsername ? String(newUsername).trim() : undefined;
+    if (cleanNewUsername && cleanNewUsername !== currentUser.username) {
       const existing = await prisma.user.findFirst({
-        where: { username: newUsername, id: { not: currentUser.id } },
+        where: {
+          username: {
+            equals: cleanNewUsername,
+            mode: "insensitive",
+          },
+          id: { not: currentUser.id },
+        },
       });
       if (existing) {
         return NextResponse.json(
@@ -61,7 +68,7 @@ export async function PUT(request: Request) {
           { status: 400 }
         );
       }
-      updateData.username = newUsername;
+      updateData.username = cleanNewUsername;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -82,17 +89,24 @@ export async function PUT(request: Request) {
       select: { id: true, username: true, name: true, role: true },
     });
 
-    // Set updated cookie
-    const sessionData = JSON.stringify(updatedUser);
-    const response = NextResponse.json({ success: true, user: updatedUser });
-    response.cookies.set("user_session", sessionData, {
-      httpOnly: false,
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-      sameSite: "lax",
-    });
-
-    return response;
+    // Set updated signed cookie
+    if (updatedUser) {
+      const signedToken = signSessionToken({
+        id: updatedUser.id,
+        username: updatedUser.username,
+        name: updatedUser.name,
+      });
+      const response = NextResponse.json({ success: true, user: updatedUser });
+      response.cookies.set("user_session", signedToken, {
+        httpOnly: true,
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+      return response;
+    }
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("PUT /api/users/change-password error:", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

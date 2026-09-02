@@ -1,33 +1,29 @@
-# Project Progress & Session Memory Log - HemnERP (Client 1: کۆگای دۆستان)
+## Checkpoint: Multi-Currency Profit Normalization & Invoice Row Fixed Cost Styling
+- **Status**: Completed & Deployed to Live Production (**hemnerp.org**) (2026-09-01)
+- **Key Enhancements**:
+  1. **Multi-Currency Cost Normalization**: Fixed `isCostIQD` logic across `app/reports/invoices/page.tsx`, `lib/profitCalculator.ts`, and `app/api/reports/profit/route.ts` to detect IQD based on cost magnitude (> 500) rather than sale voucher transaction currency. Corrected profit calculations for IQD sales vouchers (e.g. Vouchers 200, 201, 202).
+  2. **Product Details Drawer Cost Styling**: In `/invoices`, product cost inside the item detail drawer displays in vibrant purple (`#7c3aed`) with a fixed rate badge `جێگیر (135,000)` and tooltip when the product originated from fixed-rate dollar suppliers.
+  3. **Product API Fixed Rate Propagation**: Enhanced `/api/products` to calculate moving average costs and propagate `exchangeRateType` and `customExchangeRate` from incoming vouchers.
+  4. **Perpetual Moving Average Cost**: System uses strict perpetual moving average cost based on available on-hand stock whenever new inventory enters the warehouse.
+  5. **Expense Item Strict Isolation**: Non-inventory expense products (`isExpense: true`) are strictly isolated to Expense Vouchers.
 
-## Date: 2026-07-29
+## Checkpoint: Fixed-Rate Supplier Profit & Weighted Average Cost Fix
+- **Status**: Completed & Deployed to Live Production (**hemnerp.org**) (2026-09-01)
+- **Root Cause & Resolution**:
+  1. `app/api/vouchers/route.ts`: Added `exchangeRateType` & `customExchangeRate` to account selection, and selected `versions` so stock/inventory count vouchers pass their fixed rate data.
+  2. `app/reports/invoices/page.tsx`: Fixed `productFixedRateMap` to read from version JSON snapshots, and `getItemCostUsdForVoucher` converts IQD cost at sale voucher daily exchange rate.
+  3. `app/api/reports/stock/route.ts` & `app/api/reports/stock-snapshot/route.ts`: Non-multi-batch items use Weighted Average Cost (WAC) across incoming batches instead of overwriting with latest.
+- **Visual**: Fixed-rate products appear in purple (#7c3aed) with tooltip in expanded voucher detail.
+- **Schema Updated**: Rule #2, Rule #4 (WAC for non-multi-batch), Rule #7, Data Flow section #3.
 
-### Key Accomplishments Today:
-1. **Unified Auto-Notes Format**:
-   - Standardized `internalNote` and `printNote` formatting across all voucher types.
-   - Dual currency representation and exchange rates formatted cleanly: `$ 2,400   1,981,000 دینار   ڕەیتی گۆڕینەوە 1,523.85   کۆی گشتی $ 3,700`.
-   - Applied across both Client 1 (`hemnerp.org`) and Client 2 (`orientiraq.xyz`).
+## Checkpoint: Currency & Report Core Stabilization
+- **Status**: Completed & Deployed to Production (hemnerp.org)
+- **Verified Areas**:
+  - Stock Report (`/reports/stock`) - Currency isolation, clean latest cost, instant quick search.
+  - Stock Snapshot Report (`/reports/stock-snapshot`) - Currency isolation, clean latest cost.
+  - Invoices Report (`/reports/invoices`) - Full text Kurdish/digit product search across lines, transactions, products, and version snapshots.
+  - Invoice Page (`/invoices`) - Popup positioning (never obscures product name), native cost currency symbol display.
+  - Database - Audited and reconciled 100% of inventory transactions and voucher lines.
+  - Audit Script - Created `scripts/audit-currency-integrity.mjs`.
+  - Profit Calculations - Standardized IQD purchase cost conversion to USD using sale voucher's exchange rate (`ڕەیتی کاتی فرۆشتنەکە`) across both `/api/reports/profit` and `/reports/invoices`. Exact IQD profit for IQD sales (net IQD - cost IQD) and synchronized USD totals box.
 
-2. **Fixed Expense Page Edit Mode (`ExpensePage.tsx`)**:
-   - Added missing `useEffect` fetch for `editId` to prevent perpetual loading spinner.
-   - Mapped `voucher.lines` with fallback to `lineTotal` property so expense amounts and category names display accurately.
-
-3. **Removed Cashbox Statement 10-Item Restriction**:
-   - Updated `StatementModal.tsx` to display all cashbox movements instead of capping default date inputs to 10 records.
-   - Restored full pagination (10, 20, 50, 100 rows per page) and date picker flexibility.
-
-4. **Cashbox Balance Synchronization & Audit**:
-   - Identified root cause of cashbox drift (credit sales vs paid amounts, missing `purchase_return` in `isIncoming` array).
-   - Fixed `purchase_return` logic in POST, PUT, and DELETE voucher API endpoints.
-   - Cleared test/movement vouchers and reset initial opening balances for all 4 cashboxes:
-     - نووسینگەی بازار: 66,895,007.77 IQD | $ 162,736.621 USD
-     - لای خۆم هێمن: 5,065 IQD | $ 3,336.2 USD
-     - قاسەی دووکان: 707,780.55 IQD | $ 0 USD
-     - حوالە صبن: 0 IQD | $ 0 USD
-
-5. **Deployments**:
-   - Both Client 1 (`hemnerp.org`) and Client 2 (`orientiraq.xyz`) successfully built and deployed to Vercel production.
-
-### Next Steps / Current Checkpoint:
-- System is in a 100% clean, verified, and production-ready state.
-- Ready to resume on user's next request (`resume` or `continue`).

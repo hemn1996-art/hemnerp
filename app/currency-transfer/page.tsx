@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import { useStore } from "../store/store";
+import { getDefaultCashbox } from "../utils/accounting";
 import FormattedNumberInput from "../components/FormattedNumberInput";
 import AlertModal from "../components/AlertModal";
 
@@ -35,6 +36,13 @@ export default function CurrencyTransferPage() {
   const closeAlert = () => setAlertConfig(a => ({...a, isOpen: false}));
 
   const [fromCashboxId, setFromCashboxId] = useState("");
+
+  useEffect(() => {
+    if (!fromCashboxId && cashboxes.length > 0) {
+      const def = getDefaultCashbox(cashboxes);
+      if (def?.id) setFromCashboxId(def.id.toString());
+    }
+  }, [cashboxes, fromCashboxId]);
   const [toCashboxId, setToCashboxId] = useState("");
   
   const iqdCurrency = currencies.find(c => c.code === "IQD" || c.name.includes("دینار"));
@@ -81,20 +89,7 @@ export default function CurrencyTransferPage() {
 
     if (numIqd <= 0 && numUsd <= 0) return showAlert("warning", "ئاگاداری", "بڕی پارە نادروستە");
 
-    if (fromCashbox) {
-      const fromIqdBal = fromCashbox.balances.find((b: any) => b.currencyId === iqdCurrency?.id)?.amount || 0;
-      const fromUsdBal = fromCashbox.balances.find((b: any) => b.currencyId === usdCurrency?.id)?.amount || 0;
-      
-      const origIqd = (editId && fromCashboxId === originalFromCashboxId) ? originalIqdAmount : 0;
-      const origUsd = (editId && fromCashboxId === originalFromCashboxId) ? originalUsdAmount : 0;
 
-      if (numIqd > (fromIqdBal + origIqd)) {
-        return showAlert("warning", "ئاگاداری", "باڵانسی دینار لە قاسەی سەرچاوە بەشی ئەم گواستنەوەیە ناکات.");
-      }
-      if (numUsd > (fromUsdBal + origUsd)) {
-        return showAlert("warning", "ئاگاداری", "باڵانسی دۆلار لە قاسەی سەرچاوە بەشی ئەم گواستنەوەیە ناکات.");
-      }
-    }
 
     const paidAmounts = [];
     if (numIqd > 0 && iqdCurrency) paidAmounts.push({ currencyId: iqdCurrency.id, amount: numIqd });

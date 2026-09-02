@@ -52,7 +52,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.companyName === "سەنتەری کارەبای لەندەن") {
+        if (parsed.companyName === "کۆگای دۆستان") {
           parsed.companyName = "کۆگای دۆستان";
           localStorage.setItem("general_settings", JSON.stringify(parsed));
         }
@@ -101,11 +101,12 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   };
 
   const formatInvoiceCurrency = (val: number, currencyCode: string) => {
+    const formatted = val.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     if (currencyCode === "IQD") {
-      return `${val.toLocaleString()} دینار`;
+      return `${formatted} دینار`;
     }
     const cur = currencies.find((c: any) => c.code === currencyCode);
-    return `${cur?.symbol || "$"}${val.toLocaleString()}`;
+    return `${cur?.symbol || "$"}${formatted}`;
   };
 
   const getFilteredInvoices = (period: string) => {
@@ -236,7 +237,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const chartSumUsd = barData.reduce((sum, item) => sum + item.usd, 0);
   const chartSumIqd = barData.reduce((sum, item) => sum + item.iqd, 0);
 
-  // Donut Chart Data
+  // 3. Chart Data: Vouchers Donut
   const donutInvoices = getFilteredInvoices(donutPeriod);
   const pieData = [
     { name: "فرۆشتن", typeKey: "sales", value: donutInvoices.filter((x: any) => x.type === "فرۆشتن").length, color: "#ef4444" },
@@ -245,6 +246,15 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     { name: "پارەی ڕۆشتوو", typeKey: "money_out", value: donutInvoices.filter((x: any) => x.type === "پارەی ڕۆشتوو").length, color: "#14b8a6" },
     { name: "خەرجی", typeKey: "expense", value: donutInvoices.filter((x: any) => x.type === "خەرجی").length, color: "#f59e0b" },
   ];
+
+  // Colors for styling
+  const COLORS = {
+    sales: "#ef4444", // Red
+    purchases: "#10b981", // Green
+    expenses: "#f59e0b", // Yellow
+    moneyIn: "#8b5cf6", // Purple
+    moneyOut: "#14b8a6", // Teal
+  };
 
   // Calculate Alerts
   const alerts: Array<{
@@ -367,6 +377,10 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     const isUsdZero = usd === 0;
     const isIqdZero = iqd === 0;
 
+    // Default sizes:
+    // If both are non-zero: same size (e.g. text-[15px])
+    // If one is zero: the zero one is text-[12px] (smaller), the non-zero one is text-[15px]
+    // If both are zero: same size text-[13px]
     let usdSize = "text-[15px] font-extrabold text-gray-800";
     let iqdSize = "text-[15px] font-extrabold text-gray-855";
 
@@ -387,10 +401,10 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     return (
       <div className="flex flex-col text-right">
         <span className={`${usdSize} mb-0.5`}>
-          $ {usd.toLocaleString()}
+          $ {usd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
         </span>
         <span className={`${iqdSize}`}>
-          {iqd.toLocaleString()} دینار
+          {iqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} دینار
         </span>
       </div>
     );
@@ -485,6 +499,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                           className="p-4 hover:bg-slate-800/50 transition-colors cursor-pointer block text-right text-slate-100 relative"
                         >
                           <div className="flex items-center gap-2 mb-1 justify-start">
+                            {/* Sequence Number Badge */}
                             <span className="bg-indigo-600/40 text-indigo-200 text-[11px] font-black px-1.5 py-0.5 rounded border border-indigo-400/30">
                               #{idx + 1}
                             </span>
@@ -538,7 +553,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
       {/* Dhikr & Duaa Ticker Bar for Rizq and Barakah */}
       <div
-        className="rounded-xl px-3.5 py-2 mb-4 shadow-sm flex items-center gap-3 overflow-hidden text-white relative border z-10 h-14"
+        className="rounded-xl px-3.5 py-2 mb-4 shadow-sm flex items-center gap-3 overflow-hidden text-white relative border z-10 h-13"
         style={{
           background: "linear-gradient(135deg, #064e3b 0%, #022c22 60%, #061f5f 100%)",
           borderColor: "rgba(52, 211, 153, 0.3)",
@@ -557,6 +572,10 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
           .dhikr-track:hover {
             animation-play-state: paused;
           }
+          .arabic-dhikr-font {
+            font-family: 'Amiri', serif !important;
+            font-weight: 700 !important;
+          }
         `}</style>
 
         <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 shrink-0 z-20 backdrop-blur-md shadow-sm">
@@ -569,38 +588,38 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
             {[1, 2].map((loopIdx) => (
               <div key={loopIdx} className="flex items-center gap-10 whitespace-nowrap pr-10">
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ</span>
-                  <span className="text-emerald-300/80 text-xs font-bold">(سەڵاوات)</span>
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(سەڵاوات)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ اكْفِنِي بِحَلَالِكَ عَنْ حَرَامِكَ، وَأَغْنِنِي بِفَضْلِكَ عَمَّنْ سِوَاكَ</span>
-                  <span className="text-emerald-300/80 text-xs font-bold">(ڕزقی حەڵاڵ)</span>
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ اكْفِنِي بِحَلَالِكَ عَنْ حَرَامِكَ، وَأَغْنِنِي بِفَضْلِكَ عَمَّنْ سِوَاكَ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(ڕزقی حەڵاڵ)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ</span>
-                  <span className="text-emerald-300/80 text-xs font-bold">(تەسبیحات)</span>
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(تەسبیحات)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ وَأَتُوبُ إِلَيْهِ</span>
-                  <span className="text-emerald-300/80 text-xs font-bold">(ئیستغفار)</span>
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ وَأَتُوبُ إِلَيْهِ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(ئیستغفار)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ بَارِكْ لَنَا فِي رِزْقِنَا وَقِنَا عَذَابَ النَّارِ</span>
-                  <span className="text-emerald-300/80 text-xs font-bold">(بەرەکەتی ڕزق)</span>
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ بَارِكْ لَنَا فِي رِزْقِنَا وَقِنَا عَذَابَ النَّارِ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(بەرەکەتی ڕزق)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلًا مُتَقَبَّلًا</span>
-                  <span className="text-emerald-300/80 text-xs font-bold">(ڕزقی پاک)</span>
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلًا مُتَقَبَّلًا</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(ڕزقی پاک)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
                 <span className="inline-flex items-center gap-2">
-                  <span className="text-amber-300 font-bold text-2xl drop-shadow-sm arabic-dhikr-font">لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ</span>
-                  <span className="text-emerald-300/80 text-xs font-bold">(گه‌نجینەی بەهەشت)</span>
+                  <span className="text-amber-300 font-bold text-xl drop-shadow-sm arabic-dhikr-font">لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ</span>
+                  <span className="text-emerald-300/80 text-[11px] font-bold">(گه‌نجینەی بەهەشت)</span>
                 </span>
                 <span className="text-emerald-500/60 font-black">•</span>
               </div>
@@ -738,20 +757,20 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               </span>
               {chartCurrency === "all" ? (
                 <div className="flex flex-col gap-0">
-                  <span className="text-lg font-black font-mono text-[#3b82f6]">
-                    $ {chartSumUsd.toLocaleString()}
+                  <span className="text-base font-black font-mono text-[#3b82f6]">
+                    $ {chartSumUsd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </span>
-                  <span className="text-lg font-black font-mono text-[#22c55e]">
-                    {chartSumIqd.toLocaleString()} دینار
+                  <span className="text-base font-black font-mono text-[#22c55e]">
+                    {chartSumIqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} دینار
                   </span>
                 </div>
               ) : chartCurrency === "USD" ? (
-                <span className="text-2xl font-black font-mono text-[#3b82f6]">
-                  $ {chartSumUsd.toLocaleString()}
+                <span className="text-xl font-black font-mono text-[#3b82f6]">
+                  $ {chartSumUsd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
               ) : (
-                <span className="text-2xl font-black font-mono text-[#22c55e]">
-                  {chartSumIqd.toLocaleString()} دینار
+                <span className="text-xl font-black font-mono text-[#22c55e]">
+                  {chartSumIqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} دینار
                 </span>
               )}
             </div>
@@ -790,8 +809,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                 <BarChart data={barData} margin={{ top: 10, right: 0, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} width={75} tickFormatter={(val) => chartCurrency === "IQD" ? val.toLocaleString() + ' د.ع' : '$' + val.toLocaleString()} />
-                  <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontFamily: 'Outfit' }} width={75} tickFormatter={(val) => chartCurrency === "IQD" ? val.toLocaleString("en-US", { maximumFractionDigits: 0 }) + ' د.ع' : '$' + val.toLocaleString("en-US", { maximumFractionDigits: 2 })} />
+                  <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }} formatter={(value: any) => Number(value).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} />
                   {(chartCurrency === "all" || chartCurrency === "USD") && (
                     <Bar dataKey="usd" name="$" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={chartCurrency === "all" ? 16 : 22} />
                   )}

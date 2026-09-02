@@ -33,44 +33,42 @@ export default function CashboxTable({
     );
 
     if (activeBalances.length === 0) {
-      return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+      return <span className="text-slate-400 font-bold text-sm">0</span>;
     }
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
+      <div className="flex flex-col gap-1.5 items-center justify-center">
         {activeBalances.map((b) => {
           const currency = getCurrency(b.currencyId);
           const symbol = currency?.symbol || "$";
           const amount = Number(b.amount || 0);
           const isNegative = amount < -0.01;
+          const isIQD = currency?.code === "IQD" || currency?.name?.includes("دینار");
+
           return (
             <span
               key={b.currencyId}
               dir="ltr"
-              style={{
-                color: isNegative ? "#dc2626" : "#111827",
-                fontWeight: 900,
-                fontSize: 14,
-                display: "inline-block",
-                padding: "2px 8px",
-                borderRadius: "6px",
-                background: isNegative ? "rgba(220, 38, 38, 0.08)" : "transparent",
-                border: isNegative ? "1px solid rgba(220, 38, 38, 0.15)" : "none",
-              }}
+              className={`font-black text-sm px-3 py-1 rounded-lg border inline-flex items-center gap-1 ${
+                isNegative
+                  ? "text-red-700 bg-red-50 border-red-200"
+                  : "text-slate-900 bg-slate-50 border-slate-200"
+              }`}
             >
               <FormattedNumber 
                 value={isNegative ? -amount : amount} 
-                currencySymbol={currency?.code === "IQD" ? "دینار" : symbol} 
+                currencySymbol={isIQD ? "دینار" : symbol} 
               />
-              {isNegative && <span className="mr-1">-</span>}
+              {isNegative && <span className="mr-1 text-red-600 font-black">-</span>}
             </span>
           );
         })}
       </div>
     );
   }
+
   const filtered = cashboxesState.filter(
-    (c: any) => c.name.includes(search) || c.id.toString() === search
+    (c: any) => (c.name || "").includes(search) || String(c.id || "") === search
   );
 
   return (
@@ -100,17 +98,19 @@ export default function CashboxTable({
             <tr>
               <td
                 colSpan={5}
-                className="p-10 text-center text-gray-400 font-bold border-b border-gray-100"
+                className="p-12 text-center text-gray-400 font-bold border-b border-gray-100"
               >
-                <div className="flex flex-col items-center gap-2">
-                  <span className="text-4xl opacity-50">📭</span>
-                  هیچ قاسەیەک نەدۆزرایەوە.
+                <div className="flex flex-col items-center gap-3">
+                  <svg className="w-12 h-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  <span>هیچ قاسەیەک نەدۆزرایەوە.</span>
                 </div>
               </td>
             </tr>
           ) : (
             filtered.map((cashbox: any) => {
-              const hasNonZeroBalance = cashbox.balances.some((b: any) => Math.abs(b.amount) > 0.0001);
+              const hasNonZeroBalance = (cashbox.balances || []).some((b: any) => Math.abs(Number(b.amount || 0)) > 0.0001);
               const hasMovements = cashboxMovements.some(
                 (m: any) => m.cashboxId === cashbox.id || m.fromCashboxId === cashbox.id || m.toCashboxId === cashbox.id
               );
@@ -121,7 +121,6 @@ export default function CashboxTable({
                   key={cashbox.id}
                   className="hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0"
                 >
-
                   <td className="p-4 text-right min-w-[220px] font-bold text-gray-800 align-middle">
                     {cashbox.name}
                   </td>
@@ -154,7 +153,7 @@ export default function CashboxTable({
                     <div className="flex items-center justify-center gap-2">
                       {!hasData && (
                         <button
-                          className="w-8 h-8 rounded-full border border-red-200 bg-red-50 text-red-600 font-black flex items-center justify-center hover:bg-red-100 transition-colors"
+                          className="w-8 h-8 rounded-full border border-red-200 bg-red-50 text-red-600 font-black flex items-center justify-center hover:bg-red-100 transition-colors cursor-pointer"
                           onClick={() => confirmDelete(cashbox.id)}
                           title="سڕینەوە"
                         >
@@ -162,13 +161,13 @@ export default function CashboxTable({
                         </button>
                       )}
                       <button
-                        className="px-3 py-1.5 h-8 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 font-black flex items-center justify-center hover:bg-blue-100 transition-colors"
+                        className="px-3.5 py-1.5 h-8 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 font-black flex items-center justify-center hover:bg-blue-100 transition-colors cursor-pointer text-xs"
                         onClick={() => openStatement(cashbox.id)}
                       >
                         جوڵەکان
                       </button>
                       <button
-                        className="px-3 py-1.5 h-8 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 font-black flex items-center justify-center hover:bg-gray-100 transition-colors"
+                        className="px-3.5 py-1.5 h-8 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 font-black flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer text-xs"
                         onClick={() => handleEdit(cashbox.id)}
                       >
                         گۆڕانکاری
