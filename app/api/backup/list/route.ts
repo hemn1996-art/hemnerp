@@ -52,7 +52,16 @@ export async function GET() {
     const backups = Array.from(filesMap.values())
       .sort((a, b) => b.fileName.localeCompare(a.fileName));
 
-    return NextResponse.json({ backups });
+    return NextResponse.json(
+      { backups },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("List backups error:", error);
     return NextResponse.json(

@@ -110,7 +110,10 @@ export default function BackupSettingsPage() {
   // Fetch backup list
   const fetchBackupList = useCallback(async () => {
     try {
-      const res = await fetch("/api/backup/list");
+      const res = await fetch(`/api/backup/list?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
       const data = await res.json();
       if (data.backups) {
         const mapped: BackupFile[] = data.backups.map((b: any) => ({
@@ -258,13 +261,18 @@ export default function BackupSettingsPage() {
 
   const downloadBackup = async () => {
     try {
-      const res = await fetch("/api/backup");
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      const res = await fetch(`/api/backup?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" },
+      });
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `backup-${dateStr}.json`;
       a.click();
       URL.revokeObjectURL(url);
       showToast("فایلی باکئەپ دابەزێنرا 📥", "success");

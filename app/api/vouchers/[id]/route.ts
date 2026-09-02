@@ -309,6 +309,8 @@ export async function PUT(
           deliveryAddress: data.deliveryAddress,
           deliveryFee: data.deliveryFee ? Number(data.deliveryFee) : null,
           extraPaymentHandling: data.extraPaymentHandling || null,
+          isArrived: data.isArrived !== undefined ? Boolean(data.isArrived) : true,
+          arrivalDate: data.arrivalDate ? new Date(data.arrivalDate) : (data.isArrived === false ? null : (data.date ? new Date(data.date) : new Date())),
         },
       });
 
@@ -341,7 +343,9 @@ export async function PUT(
             (product?.name && (product.name.includes("گەیاندن") || product.name.includes("خزمەتگوزاری")))
           );
 
-          if (!isServiceOrExpense && ["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
+          const shouldCreateInventory = !isServiceOrExpense && (updated.type !== "purchase" || updated.isArrived !== false);
+
+          if (shouldCreateInventory && ["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
             let qtyChange = Number(line.qty);
             if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(updated.type)) {
               qtyChange = -qtyChange;
@@ -358,7 +362,7 @@ export async function PUT(
                   // Fall back to the voucher's currencyId if line doesn't have one.
                   // Never fall back to hardcoded 1 (USD) because that causes IQD items to get tagged as USD.
                   currencyId: Number(line.currencyId ?? data.currencyId),
-                  date: updated.date,
+                  date: updated.arrivalDate || updated.date,
                 },
               });
 

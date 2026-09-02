@@ -27,9 +27,36 @@ interface StockItem {
   purchaseDate: string;
 }
 
+interface PendingStockItem {
+  id: string;
+  voucherId: number;
+  referenceNo: string;
+  purchaseDate: string;
+  sellerName: string;
+  sellerId: number | null;
+  productId: number;
+  productName: string;
+  productCode: string;
+  category: string;
+  brand: string;
+  warehouseName: string;
+  quantity: number;
+  purchasePrice: number;
+  expense: number;
+  cost: number;
+  totalValueUsd: number;
+  currencyCode: string;
+  isIQD: boolean;
+  rawPurchasePrice?: number;
+  rawCost?: number;
+}
+
 export default function StockSnapshotReportPage() {
   const router = useRouter();
   const [stockData, setStockData] = useState<StockItem[]>([]);
+  const [viewMode, setViewMode] = useState<"available" | "pending">("available");
+  const [pendingGoods, setPendingGoods] = useState<PendingStockItem[]>([]);
+  const [pendingArrivalValueUsd, setPendingArrivalValueUsd] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showReportStats, setShowReportStats] = useState(true);
 
@@ -107,6 +134,76 @@ export default function StockSnapshotReportPage() {
     }
   }, [visibleColumns]);
 
+  const fetchPendingGoods = async () => {
+    try {
+      const res = await fetch("/api/vouchers?type=purchase");
+      if (!res.ok) return;
+      const vouchers = await res.json();
+      if (!Array.isArray(vouchers)) return;
+
+      const unarrived = vouchers.filter((v: any) => v.isArrived === false && !v.isDeleted);
+      const items: PendingStockItem[] = [];
+      let totalUsd = 0;
+
+      for (const v of unarrived) {
+        const sellerName = v.account?.name || "نادیار";
+        const sellerId = v.accountId || null;
+        const purchaseDate = v.date ? v.date.slice(0, 10) : "-";
+        const refNo = v.referenceNo || String(v.id);
+        const rate = (v.exchangeRate > 100 ? v.exchangeRate / 100 : v.exchangeRate) || 1520;
+
+        const totalVoucherExpense = (v.expenses || []).reduce((acc: number, exp: any) => acc + (Number(exp.amount) || 0), 0);
+        const totalVoucherQty = (v.lines || []).reduce((acc: number, l: any) => acc + (Number(l.qty) || 0), 0);
+        const expensePerUnit = totalVoucherQty > 0 ? (totalVoucherExpense / totalVoucherQty) : 0;
+
+        if (v.lines && Array.isArray(v.lines)) {
+          v.lines.forEach((l: any, idx: number) => {
+            const qty = Number(l.qty || 0);
+            const purchasePrice = Number(l.unitPrice || 0);
+            const isIQD = l.currencyId === 2 || v.currencyId === 2 || purchasePrice > 1000;
+            const expUnit = expensePerUnit;
+            const cost = purchasePrice + expUnit;
+            const lineTotal = Number(l.lineTotal || (qty * purchasePrice));
+            const lineUsd = isIQD ? (lineTotal / rate) : lineTotal;
+            totalUsd += lineUsd;
+
+            const product = products.find((p: any) => p.id === l.productId);
+            const warehouse = warehouses.find((w: any) => w.id === l.warehouseId);
+
+            items.push({
+              id: `pending-${v.id}-${l.id || idx}`,
+              voucherId: v.id,
+              referenceNo: refNo,
+              purchaseDate,
+              sellerName,
+              sellerId,
+              productId: l.productId,
+              productName: l.product?.name || product?.name || `کەرەستە #${l.productId}`,
+              productCode: l.product?.code || product?.code || "-",
+              category: l.product?.category || product?.category || "-",
+              brand: l.product?.brand || product?.brand || "-",
+              warehouseName: warehouse?.name || "کۆگای سەرەکی",
+              quantity: qty,
+              purchasePrice,
+              expense: expUnit,
+              cost,
+              totalValueUsd: lineUsd,
+              currencyCode: isIQD ? "IQD" : "USD",
+              isIQD,
+              rawPurchasePrice: purchasePrice,
+              rawCost: cost,
+            });
+          });
+        }
+      }
+
+      setPendingGoods(items);
+      setPendingArrivalValueUsd(Math.round(totalUsd * 100) / 100);
+    } catch (e) {
+      console.error("Error fetching pending goods:", e);
+    }
+  };
+
   useEffect(() => {
     loadStockData();
 
@@ -146,6 +243,7 @@ export default function StockSnapshotReportPage() {
   const loadStockData = async () => {
     try {
       setLoading(true);
+      fetchPendingGoods();
       const res = await fetch(`/api/reports/stock-snapshot?asOfDate=${asOfDate}`);
       if (res.ok) {
         setStockData(await res.json());
@@ -236,6 +334,70 @@ export default function StockSnapshotReportPage() {
     });
   }, [filteredStockData, sortColumn, sortDirection]);
 
+  const filteredPendingGoods = useMemo(() => {
+    return pendingGoods.filter((item: any) => {
+      if (filters.sellerNames.length > 0 && !filters.sellerNames.includes(item.sellerName)) return false;
+      if (filters.categories.length > 0 && !filters.categories.includes(item.category)) return false;
+      if (filters.brands.length > 0 && !filters.brands.includes(item.brand)) return false;
+      if (filters.productIds.length > 0 && !filters.productIds.includes(item.productId)) return false;
+      if (filters.code && !item.productCode?.toLowerCase().includes(filters.code.toLowerCase())) return false;
+      return true;
+    });
+  }, [pendingGoods, filters]);
+
+  const totalPendingQty = useMemo(() => {
+    return filteredPendingGoods.reduce((sum, item) => sum + item.quantity, 0);
+  }, [filteredPendingGoods]);
+
+  const totalPendingVal = useMemo(() => {
+    return filteredPendingGoods.reduce((sum, item) => sum + item.totalValueUsd, 0);
+  }, [filteredPendingGoods]);
+
+  const sortedPendingData = useMemo(() => {
+    if (!sortColumn) return filteredPendingGoods;
+    return [...filteredPendingGoods].sort((a: any, b: any) => {
+      let valA: any = "";
+      let valB: any = "";
+      if (sortColumn === "productName") {
+        valA = a.productName || "";
+        valB = b.productName || "";
+        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
+      } else if (sortColumn === "category") {
+        valA = a.category || "";
+        valB = b.category || "";
+        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
+      } else if (sortColumn === "brand") {
+        valA = a.brand || "";
+        valB = b.brand || "";
+        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
+      } else if (sortColumn === "warehouseName") {
+        valA = a.warehouseName || "";
+        valB = b.warehouseName || "";
+        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
+      } else if (sortColumn === "sellerName") {
+        valA = a.sellerName || "";
+        valB = b.sellerName || "";
+        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
+      } else if (sortColumn === "purchaseDate") {
+        const dateA = a.purchaseDate && a.purchaseDate !== "-" ? new Date(a.purchaseDate).getTime() : 0;
+        const dateB = b.purchaseDate && b.purchaseDate !== "-" ? new Date(b.purchaseDate).getTime() : 0;
+        return sortDirection === "desc" ? dateB - dateA : dateA - dateB;
+      } else if (sortColumn === "quantity") {
+        valA = a.quantity || 0;
+        valB = b.quantity || 0;
+      } else if (sortColumn === "warehouseValue") {
+        valA = a.totalValueUsd || 0;
+        valB = b.totalValueUsd || 0;
+      } else if (sortColumn === "cost") {
+        valA = a.cost || 0;
+        valB = b.cost || 0;
+      }
+      return sortDirection === "desc" ? valB - valA : valA - valB;
+    });
+  }, [filteredPendingGoods, sortColumn, sortDirection]);
+
+  const activeDisplayList = viewMode === "available" ? sortedStockData : sortedPendingData;
+
   const handlePrint = () => {
     window.print();
   };
@@ -290,7 +452,9 @@ export default function StockSnapshotReportPage() {
         {/* Print Header */}
         <div className="hidden print:block mb-6">
           <PrintHeader />
-          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی ئاستی کۆگا</h2>
+          <h2 className="text-center font-black text-lg mb-6">
+            {viewMode === "pending" ? "ڕاپۆرتی کاڵا نەگەیشتووەکان بە کۆگا (لە ڕێگادایە)" : "ڕاپۆرتی ئاستی کۆگا"}
+          </h2>
         </div>
         
         {/* Actions Bar */}
@@ -319,7 +483,7 @@ export default function StockSnapshotReportPage() {
           <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-md hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
             پرینت 🖨️
           </button>
-          <button onClick={() => exportTableToExcel("stock-snapshot-table", "raporti_ast_koga.xlsx")}
+          <button onClick={() => exportTableToExcel("stock-snapshot-table", viewMode === "pending" ? "kala_nageyshtuwekan_snapshot.xlsx" : "raporti_ast_koga.xlsx")}
             className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 py-2.5 rounded-md hover:bg-emerald-700 transition-colors cursor-pointer text-sm shadow-sm border-none">
             ناردن بۆ ئێکسڵ 📊
           </button>
@@ -338,34 +502,146 @@ export default function StockSnapshotReportPage() {
           </button>
         </div>
 
-        {/* Totals Cards */}
-        {showReportStats && (
-          <div className={`grid grid-cols-1 ${visibleColumns.warehouseValue ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-6 animate-in fade-in duration-200`}>
-            {visibleColumns.warehouseValue && (
-              <div className="bg-white rounded-md p-5 border-r-4 border-blue-500 shadow-sm flex flex-col items-center justify-center">
-                <span className="text-blue-900 font-medium text-sm mb-2">بەهای کۆگا بە دۆلاری ڕۆژ</span>
-                <span className="text-2xl font-medium text-gray-800" dir="ltr">{formatMoney(totalValue)}</span>
+        {/* Pending Arrival Highlight Interactive Card */}
+        {pendingArrivalValueUsd > 0 && (
+          <div 
+            onClick={() => setViewMode(prev => prev === "pending" ? "available" : "pending")}
+            className={`mb-6 rounded-xl p-4.5 transition-all duration-200 cursor-pointer border shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 select-none ${
+              viewMode === "pending"
+                ? "bg-gradient-to-r from-amber-500 to-amber-600 border-amber-600 text-white ring-4 ring-amber-300/60 shadow-lg scale-[1.005]"
+                : "bg-gradient-to-r from-amber-50 to-orange-50/90 border-amber-300 hover:border-amber-400 hover:bg-amber-100/70"
+            }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-inner ${
+                viewMode === "pending" ? "bg-white/20 text-white" : "bg-amber-200/90 text-amber-900"
+              }`}>
+                📦
               </div>
-            )}
-            <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-gray-500 font-normal text-sm mb-2">گشتی عدد</span>
-              <div className="text-2xl font-normal text-gray-800" dir="ltr">
-                <span className="text-sm font-normal text-gray-400 ml-1">دانە</span>
-                {totalQuantity.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className={`font-black text-base md:text-lg ${viewMode === "pending" ? "text-white" : "text-amber-950"}`}>
+                    کۆی کاڵای نەگەیشتوو بە کۆگا (لە ڕێگادایە)
+                  </span>
+                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                    viewMode === "pending" ? "bg-white text-amber-900 shadow-xs" : "bg-amber-200 text-amber-900"
+                  }`}>
+                    {pendingGoods.length} کاڵا
+                  </span>
+                </div>
+                <span className={`text-xs font-medium block mt-1 ${
+                  viewMode === "pending" ? "text-amber-100" : "text-amber-800/90"
+                }`}>
+                  {viewMode === "pending"
+                    ? "ئێستا لە بینینی لیستی کاڵا نەگەیشتووەکاندایت — کلیک بکە بۆ گەڕانەوە بۆ ئاستی کاڵاکانی ناو کۆگا"
+                    : "ئەم بڕە لە پسووڵەی کڕیندایە بەڵام هێشتا نەگەیشتۆتە کۆگا — کلیک بکە بۆ پیشاندانی لیستی کاڵا نەگەیشتووەکان"}
+                </span>
               </div>
             </div>
-            <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-gray-500 font-normal text-sm mb-2">گشتی کەرەستە</span>
-              <span className="text-2xl font-normal text-gray-800">{totalItems}</span>
+
+            <div className="flex items-center gap-3">
+              <span className={`text-2xl md:text-3xl font-black font-mono tracking-tight ${
+                viewMode === "pending" ? "text-white" : "text-amber-900"
+              }`} dir="ltr">
+                $ {pendingArrivalValueUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <button 
+                type="button"
+                className={`text-xs font-black px-4 py-2 rounded-lg transition-all shadow-xs flex items-center gap-1.5 ${
+                  viewMode === "pending"
+                    ? "bg-white text-amber-900 hover:bg-amber-50"
+                    : "bg-amber-600 text-white hover:bg-amber-700"
+                }`}
+              >
+                {viewMode === "pending" ? "گەڕانەوە بۆ کۆگا ↩" : "پیشاندانی لیست 👁️"}
+              </button>
             </div>
           </div>
+        )}
+
+        {/* View Mode Switcher Tabs */}
+        <div className="flex items-center gap-2 mb-4 no-print">
+          <button
+            onClick={() => setViewMode("available")}
+            className={`px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs ${
+              viewMode === "available"
+                ? "bg-[#0b1f50] text-white ring-2 ring-[#0b1f50]/30 shadow-sm"
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <span>🏢 کاڵاکانی بەردەست لە کۆگا</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs ${viewMode === "available" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"}`}>
+              {filteredStockData.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setViewMode("pending")}
+            className={`px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs ${
+              viewMode === "pending"
+                ? "bg-amber-600 text-white ring-2 ring-amber-600/30 shadow-sm"
+                : "bg-white border border-amber-300 text-amber-900 hover:bg-amber-50"
+            }`}
+          >
+            <span>📦 کاڵا نەگەیشتووەکان (لە ڕێگادایە)</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs ${viewMode === "pending" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900 font-black"}`}>
+              {filteredPendingGoods.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Totals Cards */}
+        {showReportStats && (
+          viewMode === "available" ? (
+            <div className={`grid grid-cols-1 ${visibleColumns.warehouseValue ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mb-6 animate-in fade-in duration-200`}>
+              {visibleColumns.warehouseValue && (
+                <div className="bg-white rounded-md p-5 border-r-4 border-blue-500 shadow-sm flex flex-col items-center justify-center">
+                  <span className="text-blue-900 font-medium text-sm mb-2">بەهای کۆگا بە دۆلاری ڕۆژ</span>
+                  <span className="text-2xl font-medium text-gray-800" dir="ltr">{formatMoney(totalValue)}</span>
+                </div>
+              )}
+              <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
+                <span className="text-gray-500 font-normal text-sm mb-2">گشتی عدد</span>
+                <div className="text-2xl font-normal text-gray-800" dir="ltr">
+                  <span className="text-sm font-normal text-gray-400 ml-1">دانە</span>
+                  {totalQuantity.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
+                <span className="text-gray-500 font-normal text-sm mb-2">گشتی کەرەستە</span>
+                <span className="text-2xl font-normal text-gray-800">{totalItems}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-in fade-in duration-200">
+              <div className="bg-amber-50 rounded-md p-5 border-r-4 border-amber-500 shadow-sm flex flex-col items-center justify-center border border-amber-200">
+                <span className="text-amber-900 font-black text-sm mb-2">کۆی بەهای نەگەیشتوو ($) 📦</span>
+                <span className="text-2xl font-black text-amber-950" dir="ltr">
+                  $ {totalPendingVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="bg-white rounded-md p-5 border-r-4 border-orange-400 shadow-sm flex flex-col items-center justify-center">
+                <span className="text-gray-500 font-bold text-sm mb-2">گشتی عددی لە ڕێگا</span>
+                <div className="text-2xl font-black text-gray-800" dir="ltr">
+                  <span className="text-sm font-normal text-gray-400 ml-1">دانە</span>
+                  {totalPendingQty.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
+                <span className="text-gray-500 font-bold text-sm mb-2">گشتی کاڵای لە ڕێگا</span>
+                <span className="text-2xl font-black text-gray-800">{filteredPendingGoods.length}</span>
+              </div>
+            </div>
+          )
         )}
 
         {/* Main Table */}
         <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table id="stock-snapshot-table" className="w-full text-xs text-right whitespace-nowrap">
-              <thead className="bg-[#0b1f50] text-white">
+              <thead className={`${viewMode === "pending" ? "bg-amber-800" : "bg-[#0b1f50]"} text-white transition-colors`}>
                 <tr>
                   {visibleColumns.id && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center w-10">#</th>}
                   {visibleColumns.productName && (
@@ -400,7 +676,7 @@ export default function StockSnapshotReportPage() {
                   )}
                   {visibleColumns.warehouseValue && (
                     <th onClick={() => handleSort("warehouseValue")} className="px-2 py-2.5 font-bold border-l border-white/10 text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی زۆر/کەم">
-                      بەهای کۆگا {sortColumn === "warehouseValue" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
+                      {viewMode === "pending" ? "کۆی بەها ($)" : "بەهای کۆگا"} {sortColumn === "warehouseValue" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
                     </th>
                   )}
                   {visibleColumns.sellerName && (
@@ -410,7 +686,12 @@ export default function StockSnapshotReportPage() {
                   )}
                   {visibleColumns.purchaseDate && (
                     <th onClick={() => handleSort("purchaseDate")} className="px-2 py-2.5 font-bold text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی بەپێی بەروار">
-                      بەرواری کۆتا کڕین {sortColumn === "purchaseDate" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
+                      بەرواری پسووڵە {sortColumn === "purchaseDate" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
+                    </th>
+                  )}
+                  {viewMode === "pending" && (
+                    <th className="px-2 py-2.5 font-bold text-center bg-amber-900 border-r border-white/10">
+                      کردار و گەیاندن 🚚
                     </th>
                   )}
                 </tr>
@@ -418,12 +699,78 @@ export default function StockSnapshotReportPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={13} className="p-8 text-center text-gray-500 font-bold">باردەکرێت...</td>
+                    <td colSpan={14} className="p-8 text-center text-gray-500 font-bold">باردەکرێت...</td>
                   </tr>
-                ) : sortedStockData.length === 0 ? (
+                ) : activeDisplayList.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="p-8 text-center text-gray-500 font-bold">هیچ داتایەک نەدۆزرایەوە لەم بەروارەدا</td>
+                    <td colSpan={14} className="p-8 text-center text-gray-500 font-bold">
+                      {viewMode === "pending" ? "هیچ کاڵایەکی لە ڕێگا (نەگەیشتوو بە کۆگا) بوونی نییە" : "هیچ داتایەک نەدۆزرایەوە لەم بەروارەدا"}
+                    </td>
                   </tr>
+                ) : viewMode === "pending" ? (
+                  sortedPendingData.map((item: any, idx: number) => (
+                    <tr key={item.id || idx} className="border-b border-gray-100 hover:bg-amber-50/60 transition-colors">
+                      {visibleColumns.id && <td className="px-2 py-2.5 text-center text-gray-500 font-bold">{idx + 1}</td>}
+                      {visibleColumns.productName && (
+                        <td 
+                          className="px-2 py-2.5 text-center text-[#4f46e5] font-bold cursor-pointer hover:underline"
+                          onClick={() => router.push(`/materials?search=${encodeURIComponent(item.productName)}`)}
+                        >
+                          {item.productName}
+                        </td>
+                      )}
+                      {visibleColumns.category && <td className="px-2 py-2.5 text-center text-gray-600 font-medium">{item.category}</td>}
+                      {visibleColumns.brand && <td className="px-2 py-2.5 text-center text-gray-600 font-medium">{item.brand}</td>}
+                      {visibleColumns.warehouseName && <td className="px-2 py-2.5 text-center text-gray-600 font-medium">{item.warehouseName}</td>}
+                      {visibleColumns.quantity && (
+                        <td className="px-2 py-2.5 text-center font-black text-amber-900">
+                          <span className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-md">
+                            {item.quantity} <span className="text-amber-700 font-normal text-[10px]">دانە</span>
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.cost && (
+                        <td className="px-2 py-2.5 text-center font-bold text-gray-900" dir="ltr">
+                          <FormattedNumber value={item.cost} currencySymbol={item.isIQD ? "دینار" : "$"} decimals={item.isIQD ? 0 : 2} />
+                        </td>
+                      )}
+                      {visibleColumns.warehouseValue && (
+                        <td className="px-2 py-2.5 text-center font-black text-amber-900" dir="ltr">
+                          $ {item.totalValueUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      )}
+                      {visibleColumns.sellerName && (
+                        <td className="px-2 py-2.5 text-center font-bold">
+                          {item.sellerId ? (
+                            <span
+                              className="text-[#4f46e5] cursor-pointer hover:underline"
+                              onClick={() => router.push(`/reports/account-statement?accountId=${item.sellerId}`)}
+                            >
+                              {item.sellerName}
+                            </span>
+                          ) : (
+                            <span>{item.sellerName}</span>
+                          )}
+                        </td>
+                      )}
+                      {visibleColumns.purchaseDate && (
+                        <td className="px-2 py-2.5 text-center text-gray-500 font-medium" dir="ltr">
+                          {formatDate(item.purchaseDate)}
+                        </td>
+                      )}
+                      <td className="px-2 py-2.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/invoices?type=purchase&editId=${item.voucherId}`)}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-black text-[11px] px-3 py-1.5 rounded-md shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto"
+                          title="کردنەوەی پسووڵە بۆ گەیاندن یان دەستکاریکردن"
+                        >
+                          <span>پسووڵە #{item.referenceNo}</span>
+                          <span>✏️</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 ) : (
                   sortedStockData.map((item, idx) => (
                     <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">

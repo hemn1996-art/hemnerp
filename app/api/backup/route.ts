@@ -123,7 +123,13 @@ export async function GET() {
     }
 
     const backupData = await getFullBackupData();
-    return NextResponse.json(backupData);
+    return NextResponse.json(backupData, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
   } catch (error) {
     console.error("Backup GET error:", error);
     return NextResponse.json(
@@ -182,15 +188,24 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      fileName,
-      filePath: savedOnServer ? filePath : null,
-      fileSize,
-      savedOnServer,
-      createdAt: now.toISOString(),
-      stats: backupData.stats,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        fileName,
+        filePath: savedOnServer ? filePath : null,
+        fileSize,
+        savedOnServer,
+        createdAt: now.toISOString(),
+        stats: backupData.stats,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("Backup POST error:", error);
     return NextResponse.json(

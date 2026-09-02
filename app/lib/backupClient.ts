@@ -64,7 +64,11 @@ export async function performBackupFlow(): Promise<{ success: boolean; savedOnSe
 
   // 1. Try to trigger server-side backup (with /tmp fallback)
   try {
-    const res = await fetch("/api/backup", { method: "POST" });
+    const res = await fetch(`/api/backup?_t=${Date.now()}`, { 
+      method: "POST",
+      cache: "no-store",
+      headers: { "Cache-Control": "no-store" }
+    });
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
@@ -80,7 +84,10 @@ export async function performBackupFlow(): Promise<{ success: boolean; savedOnSe
   try {
     const handle = await loadHandle();
     if (handle) {
-      const dataRes = await fetch("/api/backup");
+      const dataRes = await fetch(`/api/backup?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-store" }
+      });
       if (dataRes.ok) {
         const data = await dataRes.json();
         const saved = await writeToChosenDir(handle, data);

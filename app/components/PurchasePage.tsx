@@ -190,6 +190,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [createdTime, setCreatedTime] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
+  const [isArrived, setIsArrived] = useState(true);
+  const [arrivalDate, setArrivalDate] = useState("");
 
   useEffect(() => {
     if (!editId) {
@@ -224,6 +226,16 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               setInvoiceNumber("");
             }
             setInvoiceDate(voucher.date.slice(0, 10));
+            if (voucher.isArrived !== undefined) {
+              setIsArrived(Boolean(voucher.isArrived));
+            } else {
+              setIsArrived(true);
+            }
+            if (voucher.arrivalDate) {
+              setArrivalDate(voucher.arrivalDate.slice(0, 10));
+            } else {
+              setArrivalDate("");
+            }
             const d = new Date(voucher.date);
             setCreatedTime(
               d.toLocaleTimeString("en-US", {
@@ -1660,6 +1672,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setOriginalVoucher(null);
     setExpenseAllocationMode("quantity");
     setExpenseTotalCurrencyId(defaultCurrency.id);
+    setIsArrived(true);
+    setArrivalDate("");
     setCashboxId(getDefaultCashbox(cashboxes)?.id);
   }
 
@@ -1761,6 +1775,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       type: "purchase",
       referenceNo: String(invoiceNumber),
       date: combineDateAndTime(invoiceDate, createdTime),
+      isArrived: isArrived,
+      arrivalDate: isArrived ? (arrivalDate ? combineDateAndTime(arrivalDate, createdTime) : combineDateAndTime(invoiceDate, createdTime)) : null,
       accountId: supplierId || null,
       cashboxId: cashboxId || null,
       currencyId: purchaseCurrencyId,
@@ -2585,27 +2601,71 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               </span>
             </div>
             
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای فرۆشیار:</span>
-              <input
-                value={invoiceNumber}
-                disabled={isLocked}
-                onChange={(e) => {
-                  if (blockIfLocked()) return;
-                  setInvoiceNumber(e.target.value);
-                }}
-                placeholder="ژمارەی پسوڵە بنووسە..."
-                style={{
-                  ...input,
-                  width: "180px",
-                  padding: "6px 12px",
-                  fontSize: "14px",
-                  borderRadius: "8px",
-                  border: "1px solid #d1d5db",
-                  textAlign: "center",
-                  ...lockedFieldStyle
-                }}
-              />
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای فرۆشیار:</span>
+                <input
+                  value={invoiceNumber}
+                  disabled={isLocked}
+                  onChange={(e) => {
+                    if (blockIfLocked()) return;
+                    setInvoiceNumber(e.target.value);
+                  }}
+                  placeholder="ژمارەی پسوڵە بنووسە..."
+                  style={{
+                    ...input,
+                    width: "180px",
+                    padding: "6px 12px",
+                    fontSize: "14px",
+                    borderRadius: "8px",
+                    border: "1px solid #d1d5db",
+                    textAlign: "center",
+                    ...lockedFieldStyle
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", background: isArrived ? "#f0fdf4" : "#fff7ed", padding: "6px 12px", borderRadius: "8px", border: isArrived ? "1px solid #bbf7d0" : "1px solid #fed7aa" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: isLocked ? "not-allowed" : "pointer", fontWeight: "bold", fontSize: "13px", color: isArrived ? "#15803d" : "#c2410c" }}>
+                  <input
+                    type="checkbox"
+                    checked={isArrived}
+                    disabled={isLocked}
+                    onChange={(e) => {
+                      if (blockIfLocked()) return;
+                      const checked = e.target.checked;
+                      setIsArrived(checked);
+                      if (checked && !arrivalDate) {
+                        setArrivalDate(invoiceDate || new Date().toISOString().slice(0, 10));
+                      }
+                    }}
+                    style={{ width: "16px", height: "16px", accentColor: "#16a34a", cursor: "pointer" }}
+                  />
+                  {isArrived ? "گەیشتۆتە کۆگا" : "نەگەیشتۆتە کۆگا (لە ڕێگادایە)"}
+                </label>
+
+                {isArrived && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span style={{ fontSize: "12px", color: "#64748b" }}>بەرواری گەیشتن:</span>
+                    <input
+                      type="date"
+                      value={arrivalDate || invoiceDate}
+                      disabled={isLocked}
+                      onChange={(e) => {
+                        if (blockIfLocked()) return;
+                        setArrivalDate(e.target.value);
+                      }}
+                      style={{
+                        padding: "3px 8px",
+                        fontSize: "12px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        ...lockedFieldStyle
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
