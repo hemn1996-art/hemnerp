@@ -5,6 +5,7 @@ import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
 
 import {
+  Fragment,
   useEffect,
   useMemo,
   useState,
@@ -624,7 +625,12 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     return `${symbol} ${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
 
-  function formatCurrencyAmountJSX(value: number, currencyId: number, isNegativeParam?: boolean) {
+  function formatCurrencyAmountJSX(
+    value: number,
+    currencyId: number,
+    isNegativeParam?: boolean,
+    showSign: boolean = false
+  ) {
     const code = getCurrencyCode(currencyId);
     const symbol = getCurrencySymbol(currencyId);
     const isIQD = code === "IQD";
@@ -638,16 +644,30 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     const parts = formatted.split('.');
     const whole = parts[0];
     const decimal = parts[1];
-    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    const numberJSX = (
+      <span>
+        <span>{whole}</span>
+        {decimal && decimal !== "0" && decimal !== "00" && (
+          <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>
+        )}
+      </span>
+    );
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {isNegative && <span>-</span>}
-        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
-        <span>
-          <span>{whole}</span>
-          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
-        </span>
+        {showSign && isNegative && <span>-</span>}
+        {isIQD ? (
+          <>
+            {numberJSX}
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>دینار</span>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{symbol}</span>
+            {numberJSX}
+          </>
+        )}
       </span>
     );
   }
@@ -683,7 +703,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     );
   }
 
-  function formatCurrencyMapForPrint(map: Record<string, number>) {
+  function formatCurrencyMapForPrint(map: Record<string, number>, forceType?: "debt" | "paid" | "auto") {
     const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(Number(val || 0)) > 0.01);
     if (activeEntries.length === 0) {
       return <span style={{ color: "#6b7280", fontWeight: 900, display: "inline-block", width: "100%", textAlign: "center" }}>0</span>;
@@ -694,14 +714,23 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
         {activeEntries.map(([curIdText, val], idx) => {
           const numVal = Number(val || 0);
           const isNegative = numVal < -0.01;
-          const color = isNegative ? "#dc2626" : "#16a34a";
+          
+          let color = "#111827";
+          if (forceType === "debt") {
+            color = "#dc2626";
+          } else if (forceType === "paid") {
+            color = "#16a34a";
+          } else {
+            color = isNegative ? "#dc2626" : (numVal > 0.01 ? "#16a34a" : "#6b7280");
+          }
+
           const curId = Number(curIdText);
 
           return (
             <span key={curIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
               {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
               <span style={{ color, fontWeight: 900 }}>
-                {formatCurrencyAmountJSX(numVal, curId, isNegative)}
+                {formatCurrencyAmountJSX(numVal, curId, false, false)}
               </span>
             </span>
           );
@@ -846,16 +875,70 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
   function getPaidSummaryJSX() {
     const list = getPaidCurrencies();
-    if (list.length === 0) return <span style={{ fontWeight: 900 }}>0</span>;
+    if (list.length === 0) return <span style={{ color: "#6b7280" }}>0</span>;
+
+    const isFixedAccountRate = selectedAccount?.exchangeRateType === "FIXED";
+    const usdCurrency = currencies.find((c: any) => c.code === "USD") || { id: 1, symbol: "$" };
+    const rateVal = (toNumber(exchangeRate) || selectedAccount?.customExchangeRate || 150000) / 100;
 
     return (
-      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 6 }}>
-        {list.map((item: any, idx: number) => (
-          <span key={item.currencyId} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
-            {formatCurrencyAmountJSX(item.amount, item.currencyId)}
+      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
+        {list.map((item: any, idx: number) => {
+          const isItemUsd = item.currencyId === usdCurrency.id;
+          if (isFixedAccountRate && !isItemUsd && rateVal > 0) {
+            const usdAmount = item.amount / rateVal;
+            return (
+              <Fragment key={idx}>
+                <span style={{ color: "#16a34a", fontWeight: 900 }}>
+                  {formatCurrencyAmountJSX(usdAmount, usdCurrency.id, false, false)}
+                </span>
+                <span style={{ position: "absolute", left: 0, fontSize: "0.85em", opacity: 0.85, fontWeight: "bold", color: "#15803d" }} dir="ltr">
+                  ({formatCurrencyAmountJSX(item.amount, item.currencyId, false, false)})
+                </span>
+              </Fragment>
+            );
+          }
+
+          return (
+            <span key={idx}>
+              {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+              <span style={{ color: "#16a34a", fontWeight: 900 }}>
+                {formatCurrencyAmountJSX(item.amount, item.currencyId, false, false)}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function getDiscountSummaryJSX() {
+    const rawDiscount = toNumber(discountAmount);
+    if (rawDiscount <= 0) return null;
+
+    const isFixedAccountRate = selectedAccount?.exchangeRateType === "FIXED";
+    const usdCurrency = currencies.find((c: any) => c.code === "USD") || { id: 1, symbol: "$" };
+    const rateVal = (toNumber(exchangeRate) || selectedAccount?.customExchangeRate || 150000) / 100;
+    const curId = activeDiscountCurrencyId || defaultCurrency.id;
+    const isDiscountUsd = curId === usdCurrency.id;
+
+    if (isFixedAccountRate && !isDiscountUsd && rateVal > 0) {
+      const usdAmount = rawDiscount / rateVal;
+      return (
+        <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
+          <span style={{ color: "#16a34a", fontWeight: 900 }}>
+            {formatCurrencyAmountJSX(usdAmount, usdCurrency.id, false, false)}
           </span>
-        ))}
+          <span style={{ position: "absolute", left: 0, fontSize: "0.85em", opacity: 0.85, fontWeight: "bold", color: "#15803d" }} dir="ltr">
+            ({formatCurrencyAmountJSX(rawDiscount, curId, false, false)})
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <span style={{ color: "#16a34a", fontWeight: 900 }}>
+        {formatCurrencyAmountJSX(rawDiscount, curId, false, false)}
       </span>
     );
   }
@@ -1811,19 +1894,20 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             </div>
           )}
 
-          {/* Balance Section — 3 stacked rows, full width */}
+          {/* Balance Section — stacked rows, full width */}
           <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #94a3b8", marginTop: 12, fontSize: 15 }}>
             <tbody>
-              {/* Row 1: Previous Balance */}
+              {/* Row 1: Previous Debt (Red) */}
               <tr>
                 <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
-                  باڵانسی پێش پسوڵە
+                  قەرزی پێش پسووڵە
                 </td>
                 <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
-                  {formatCurrencyMapForPrint(accountBalanceBeforeByCurrency)}
+                  {formatCurrencyMapForPrint(accountBalanceBeforeByCurrency, "debt")}
                 </td>
               </tr>
-              {/* Row 2: Paid Amount */}
+
+              {/* Row 2: Paid Amount (Green, converted to USD for fixed dollar rate) */}
               <tr>
                 <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
                   بڕی پارەی دراو
@@ -1832,41 +1916,42 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                   {getPaidSummaryJSX()}
                 </td>
               </tr>
-              {/* Row 3: Current Balance */}
+
+              {/* Row 3: Discount (Green, inside table) */}
+              {toNumber(discountAmount) > 0 && (
+                <tr>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
+                    بڕی داشکاندن
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
+                    {getDiscountSummaryJSX()}
+                  </td>
+                </tr>
+              )}
+
+              {/* Row 4: Current Balance (Centered, same font, no monospace, color-coded) */}
               <tr style={{ background: "#f8fafc" }}>
-                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", width: "40%" }}>
+                <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, color: "#374151", whiteSpace: "nowrap", fontSize: 15, width: "40%" }}>
                   باڵانسی ئێستا
                 </td>
                 <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
-                  {formatCurrencyMapForPrint(accountBalanceAfterByCurrency)}
+                  {formatCurrencyMapForPrint(editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency)}
                 </td>
               </tr>
+
+              {/* Row 5: Exchange Rate (if applicable) */}
+              {showRate && (
+                <tr style={{ background: "#f8fafc" }}>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "8px 14px", textAlign: "center", fontWeight: 900, color: "#475569", whiteSpace: "nowrap", fontSize: 13, width: "40%" }}>
+                    ڕەیتی 100 دۆلار
+                  </td>
+                  <td style={{ border: "1px solid #cbd5e1", padding: "8px 14px", textAlign: "center", fontWeight: 900, fontSize: 13, color: "#1e40af" }}>
+                    {`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-
-          {/* Additional info: discount & rate */}
-          {(toNumber(discountAmount) > 0 || showRate) && (
-            <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #cbd5e1", marginTop: 6, fontSize: 12 }}>
-              <tbody>
-                {toNumber(discountAmount) > 0 && (
-                  <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap", width: "40%" }}>داشکاندن</td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
-                      <span dir="ltr">{`${toNumber(discountAmount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${activeTargetCurrencyId ? (currencies.find((c: any) => c.id === activeTargetCurrencyId)?.symbol || "$") : "$"}`}</span>
-                    </td>
-                  </tr>
-                )}
-                {showRate && (
-                  <tr>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>
-                      {`${Number(exchangeRate || 0).toLocaleString("en-US")} دینار`}
-                    </td>
-                    <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>ڕەیتی 100 دۆلار</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
 
           {printNote && printNote.trim() !== "" && (
             <div style={{
