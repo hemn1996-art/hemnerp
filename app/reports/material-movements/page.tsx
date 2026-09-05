@@ -181,7 +181,7 @@ export default function ItemsReportPage() {
   const employeeOptions = React.useMemo(() => {
     if (!invoices) return [];
     const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار کۆگای دۆستان", "هێمن حەمە فەرهاد"];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [invoices]);
 
@@ -657,7 +657,27 @@ export default function ItemsReportPage() {
                     {visibleColumns.category && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.category}</td>}
                     {visibleColumns.brand && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.brand}</td>}
                     {visibleColumns.warehouseName && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.warehouseName}</td>}
-                    {visibleColumns.cost && <td className="p-2 border-r border-slate-200 text-center text-slate-600 font-medium">{formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}</td>}
+                    {visibleColumns.cost && (
+                      <td className="p-2 border-r border-slate-200 text-center font-medium">
+                        {item.isFixedRate ? (
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-black shadow-xs cursor-help"
+                            style={{
+                              backgroundColor: "#f3e8ff",
+                              borderColor: "#c084fc",
+                              color: "#6b21a8"
+                            }}
+                            title={`📌 دۆلاری جێگیر: 100$ = ${Number(item.customExchangeRate || 135000).toLocaleString("en-US")} دینار`}
+                          >
+                            {formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">
+                            {formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}
+                          </span>
+                        )}
+                      </td>
+                    )}
                     {visibleColumns.quantity && (
                       <td className={`p-2 border-r border-slate-200 text-center font-bold ${item.quantity < 0 ? "text-rose-600" : "text-slate-700"}`}>
                         {item.quantity.toLocaleString("en-US")} دانە
@@ -672,7 +692,10 @@ export default function ItemsReportPage() {
                       </td>
                     )}
                     {visibleColumns.profit && (
-                      <td className={`p-2 border-r border-slate-200 text-center bg-green-50 font-bold ${item.profit < 0 ? "text-rose-600" : "text-green-700"}`}>
+                      <td
+                        className={`p-2 border-r border-slate-200 text-center font-bold ${item.profit < -0.001 ? "text-rose-600 bg-rose-50/70" : item.profit > 0.001 ? "text-emerald-700 bg-emerald-50/70" : "text-slate-600 bg-slate-50/50"}`}
+                        title={item.profitIQD ? `قازانج بە دینار: ${Math.round(item.profitIQD).toLocaleString("en-US")} دینار` : undefined}
+                      >
                         {formatCurrency(item.profit, item.profitCurrencyId || 1, item.profitCurrencySymbol || "$", item.profitCurrencyCode || "USD")}
                       </td>
                     )}

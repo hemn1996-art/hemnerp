@@ -749,8 +749,8 @@ function InvoiceReportContent() {
       const rounded = Math.round(amount).toLocaleString("en-US");
       return (
         <span className="inline-flex items-baseline gap-1" dir="ltr">
-          <span style={{ fontSize: '0.85em', opacity: 0.85 }}>دینار</span>
           <span>{rounded}</span>
+          <span style={{ fontSize: '0.85em', opacity: 0.85 }}>دینار</span>
         </span>
       );
     }
@@ -918,9 +918,11 @@ function InvoiceReportContent() {
       const customRate = v.customExchangeRate || versionData.customExchangeRate || acc?.customExchangeRate;
 
       // Only check incoming stock vouchers: purchase, warehouse_stock, or incoming inventory movements
-      const isIncoming = v.type === "purchase" || v.type === "warehouse_stock" || (v.inventoryTransactions || []).some((t: any) => t.qtyChange > 0);
+      const isIncoming = v.type === "purchase" || v.type === "warehouse_stock" || v.rawType === "purchase" || v.rawType === "warehouse_stock" || (v.inventoryTransactions || []).some((t: any) => t.qtyChange > 0);
+      const isWarehouseStockWithCustom = (v.type === "warehouse_stock" || v.rawType === "warehouse_stock" || v.type === "جەردی کۆگا") && customRate && (Number(customRate) === 135000 || Number(customRate) === 132000 || Number(customRate) < 145000);
+      const isFixed = rateType === "FIXED" || Boolean(isWarehouseStockWithCustom);
 
-      if (isIncoming && rateType === "FIXED" && customRate) {
+      if (isIncoming && isFixed && customRate) {
         const rateVal = Number(customRate) > 10000 ? Number(customRate) / 100 : Number(customRate);
         if (v.lines) {
           v.lines.forEach((l: any) => {
@@ -2751,14 +2753,24 @@ function InvoiceReportContent() {
                             </td>
                           )}
                           {visibleColumns.remaining && (
-                            <td className="px-4 py-3.5 text-center text-rose-700 font-bold">
+                            <td className="px-4 py-3.5 text-center font-bold">
                               {isDebtVoucherType ? (
                                 (() => {
                                   const runningBal = getVoucherRunningBalance(voucher);
-                                  return runningBal !== null ? formatCurrencyValueJSX(runningBal, voucher.currencyId || 1) : "-";
+                                  if (runningBal === null) return <span className="text-slate-400">-</span>;
+                                  if (Math.abs(runningBal) < 0.001) return <span className="text-emerald-600">0</span>;
+                                  return (
+                                    <span className={runningBal > 0 ? "text-rose-700" : "text-emerald-700"}>
+                                      {formatCurrencyValueJSX(runningBal, voucher.currencyId || 1)}
+                                    </span>
+                                  );
                                 })()
                               ) : (
-                                remainingVal > 0 ? formatCurrencyValue(remainingVal, displayCurrencyId) : "-"
+                                remainingVal > 0 ? (
+                                  <span className="text-rose-700">{formatCurrencyValue(remainingVal, displayCurrencyId)}</span>
+                                ) : (
+                                  <span className="text-emerald-600">0</span>
+                                )
                               )}
                             </td>
                           )}
@@ -2792,7 +2804,15 @@ function InvoiceReportContent() {
                           )}
                           {visibleColumns.notes && (
                             <td className="px-4 py-3.5 text-center text-xs font-medium align-middle max-w-[200px] break-words whitespace-normal allow-wrap">
-                              {voucher.internalNote || "-"}
+                              {(() => {
+                                const lineNotes = voucher.lines && voucher.lines.length > 0
+                                  ? voucher.lines.map((l: any) => l.note?.trim()).filter(Boolean).join(" ، ")
+                                  : "";
+                                if (voucher.internalNote && lineNotes && voucher.internalNote !== lineNotes) {
+                                  return `${voucher.internalNote} (${lineNotes})`;
+                                }
+                                return voucher.internalNote || lineNotes || "-";
+                              })()}
                             </td>
                           )}
                           {visibleColumns.date && (
@@ -2936,7 +2956,19 @@ function InvoiceReportContent() {
                                                 </td>
                                                 <td className="py-2.5 text-center text-slate-500 font-mono text-[11px]">{line.product?.code || "-"}</td>
                                                 <td className="py-2.5 text-center font-extrabold text-slate-800">{line.qty}</td>
-                                                <td className="py-2.5 text-center">{formatCurrencyValue(line.unitPrice, lineCurId)}</td>
+                                                <td className="py-2.5 text-center">
+                                                  {isFixedProduct ? (
+                                                    <span
+                                                      className="inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-black shadow-xs cursor-help"
+                                                      style={{ backgroundColor: "#f3e8ff", borderColor: "#c084fc", color: "#6b21a8" }}
+                                                      title={`📌 دۆلاری جێگیر: 100$ = ${Number(Number(fixedRate) > 10000 ? fixedRate : Number(fixedRate) * 100).toLocaleString("en-US")} دینار`}
+                                                    >
+                                                      {formatCurrencyValue(line.unitPrice, lineCurId)}
+                                                    </span>
+                                                  ) : (
+                                                    formatCurrencyValue(line.unitPrice, lineCurId)
+                                                  )}
+                                                </td>
                                                 <td className="py-2.5 text-center text-rose-500">{line.discountAmount > 0 ? formatCurrencyValue(line.discountAmount, lineCurId) : "-"}</td>
                                                 <td className="py-2.5 text-center font-black text-slate-900">{formatCurrencyValue(line.lineTotal, voucher.currencyId || 1)}</td>
                                               </tr>

@@ -66,9 +66,6 @@ export async function GET(request: Request) {
     }
 
     const rateType = searchParams.get("rateType");
-    if (rateType && rateType !== "all") {
-      where.voucher.account = { ...where.voucher.account, exchangeRateType: rateType };
-    }
 
     if (voucherType && voucherType !== "all") {
       const parsed = parseStringArray(voucherType);
@@ -141,7 +138,9 @@ export async function GET(request: Request) {
             date: true,
             employeeName: true,
             currencyId: true,
-            account: { select: { name: true, exchangeRateType: true } },
+            exchangeRate: true,
+            account: { select: { name: true, exchangeRateType: true, customExchangeRate: true } },
+            versions: { select: { version: true, data: true } },
             inventoryTransactions: {
               select: {
                 productId: true,
@@ -155,10 +154,22 @@ export async function GET(request: Request) {
       orderBy: { voucher: { date: "desc" } }
     });
 
-    const items = lines.map(line => {
+    let items = lines.map(line => {
       const matchTx = line.voucher.inventoryTransactions.find(t => t.productId === line.productId);
       const unitPrice = line.unitPrice || 0;
       const lineTotal = line.lineTotal || 0;
+
+      let versionData: any = {};
+      if (line.voucher?.versions && line.voucher.versions.length > 0) {
+        const sortedV = [...line.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
+        const latestV = sortedV[sortedV.length - 1];
+        try { versionData = JSON.parse(latestV.data); } catch(e){}
+      }
+      const sellerAcc = line.voucher.account;
+      const rateType = (line.voucher as any)?.exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType;
+      const customRate = (line.voucher as any)?.customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate;
+      const isWarehouseStockWithCustom = line.voucher.type === "warehouse_stock" && customRate && (customRate === 135000 || customRate === 132000 || customRate < 145000);
+      const isFixed = rateType === "FIXED" || Boolean(isWarehouseStockWithCustom);
 
       const effectiveCurrencyId = line.currencyId || line.voucher.currencyId || 1;
 
@@ -177,12 +188,18 @@ export async function GET(request: Request) {
         unitPrice: unitPrice,
         lineTotal: lineTotal,
         currencyId: effectiveCurrencyId,
-        accountName: line.voucher.account?.name || "نەزانراو",
-        exchangeRateType: line.voucher.account?.exchangeRateType || "DAILY_MARKET",
+        accountName: line.voucher.account?.name || (line.voucher.type === "warehouse_stock" ? "دەستپێک" : "نەزانراو"),
+        isFixedRate: Boolean(isFixed),
+        customExchangeRate: isFixed ? (customRate > 10000 ? customRate : customRate * 100) : null,
+        exchangeRateType: isFixed ? "FIXED" : "DAILY_MARKET",
         date: line.voucher.date,
         employeeName: line.voucher.employeeName || "-",
       };
     });
+
+    if (rateType && rateType !== "all") {
+      items = items.filter(i => i.exchangeRateType === rateType);
+    }
 
     return NextResponse.json(items);
   } catch (error) {

@@ -197,7 +197,10 @@ export async function GET(request: Request) {
           } catch(e) {}
         }
 
-        if (rateType === "FIXED" && customRate) {
+        const isWarehouseStockWithCustom = (t.voucher as any)?.type === "warehouse_stock" && customRate && (customRate === 135000 || customRate === 132000 || customRate < 145000);
+        const isFixed = rateType === "FIXED" || Boolean(isWarehouseStockWithCustom);
+
+        if (isFixed && customRate) {
           productFixedRates[t.productId] = customRate > 10000 ? customRate / 100 : customRate;
         }
       }

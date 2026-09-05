@@ -150,7 +150,7 @@ export async function GET(request: Request) {
       orderBy: { voucher: { date: "desc" } }
     });
 
-    // Query purchase transactions to detect products bought from FIXED rate suppliers
+    // Query purchase and warehouse stock transactions to detect products bought from FIXED rate suppliers/vouchers
     const purchaseTxs = await prisma.inventoryTransaction.findMany({
       where: { qtyChange: { gt: 0 }, voucher: { isDeleted: false } },
       select: {
@@ -158,6 +158,7 @@ export async function GET(request: Request) {
         unitCost: true,
         voucher: {
           select: {
+            type: true,
             currencyId: true,
             exchangeRate: true,
             account: { select: { exchangeRateType: true, customExchangeRate: true } },
@@ -182,11 +183,22 @@ export async function GET(request: Request) {
       const pLine = pt.voucher?.lines?.find((l: any) => l.productId === pt.productId);
       const lineCostCur = pLine?.currencyId || pt.voucher?.currencyId || 1;
 
-      productFixedRates[pt.productId] = {
-        isFixed: rateType === "FIXED" && !!customRate,
-        customRate: customRate ? (customRate > 10000 ? customRate / 100 : customRate) : 1320,
-        costCurrencyId: lineCostCur
-      };
+      const isWarehouseStockWithCustom = pt.voucher?.type === "warehouse_stock" && customRate && (customRate === 135000 || customRate === 132000 || customRate < 145000);
+      const isFixed = rateType === "FIXED" || Boolean(isWarehouseStockWithCustom);
+
+      if (isFixed && customRate) {
+        productFixedRates[pt.productId] = {
+          isFixed: true,
+          customRate: customRate > 10000 ? customRate / 100 : customRate,
+          costCurrencyId: lineCostCur
+        };
+      } else if (!productFixedRates[pt.productId]) {
+        productFixedRates[pt.productId] = {
+          isFixed: false,
+          customRate: 1500,
+          costCurrencyId: lineCostCur
+        };
+      }
     });
 
     const allCurrencies = await prisma.currency.findMany();
@@ -221,31 +233,41 @@ export async function GET(request: Request) {
       const rawRate = line.voucher.exchangeRate || 1500;
       const rate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1500);
 
-      // Convert cost and price to USD for uniform profit calculation
+      // Convert cost and price to USD and IQD for uniform profit calculation
       let costInUSD = 0;
+      let costInIQD = 0;
       if (isCostIQD) {
-        costInUSD = (unitCost * qty) / rate;
+        costInIQD = unitCost * qty;
+        costInUSD = costInIQD / rate;
       } else {
         if (fixedInfo && fixedInfo.isFixed && unitCost > 0) {
           const customRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate / 100 : fixedInfo.customRate;
-          costInUSD = (unitCost * customRate / rate) * qty;
+          costInIQD = (unitCost * customRate) * qty;
+          costInUSD = costInIQD / rate;
         } else {
           costInUSD = unitCost * qty;
+          costInIQD = costInUSD * rate;
         }
       }
 
       let priceInUSD = 0;
+      let priceInIQD = 0;
       if (isPriceIQD) {
+        priceInIQD = lineTotalInPriceCur;
         priceInUSD = lineTotalInPriceCur / rate;
       } else {
         priceInUSD = lineTotalInPriceCur;
+        priceInIQD = lineTotalInPriceCur * rate;
       }
 
       let profit = 0;
+      let profitIQD = 0;
       if (line.voucher.type === 'sales') {
         profit = priceInUSD - costInUSD;
+        profitIQD = priceInIQD - costInIQD;
       } else if (line.voucher.type === 'sales_return') {
         profit = -(priceInUSD - costInUSD);
+        profitIQD = -(priceInIQD - costInIQD);
       }
 
       return {
@@ -265,6 +287,8 @@ export async function GET(request: Request) {
         costCurrencyId,
         costCurrencySymbol,
         costCurrencyCode,
+        isFixedRate: Boolean(fixedInfo?.isFixed),
+        customExchangeRate: fixedInfo?.isFixed ? (fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100) : null,
         price: unitPrice,
         priceCurrencyId,
         priceCurrencySymbol,
@@ -276,6 +300,7 @@ export async function GET(request: Request) {
         lineTotalCurrencySymbol: priceCurrencySymbol,
         lineTotalCurrencyCode: priceCurrencyCode,
         profit: profit,
+        profitIQD: profitIQD,
         profitCurrencyId: 1,
         profitCurrencySymbol: "$",
         profitCurrencyCode: "USD",
