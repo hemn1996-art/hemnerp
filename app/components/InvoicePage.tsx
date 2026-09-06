@@ -344,6 +344,41 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       .catch((err) => console.error("Error loading invoice templates:", err));
   }, []);
 
+  // Synchronize rows with live product cost and currency when products store updates
+  useEffect(() => {
+    if (products.length > 0 && rows.length > 0) {
+      setRows((prevRows) => {
+        let changed = false;
+        const newRows = prevRows.map((r) => {
+          const p = products.find((item: any) => item.id === r.productId);
+          if (p && typeof p.costPrice === "number" && p.costPrice > 0) {
+            const newCost = p.costPrice;
+            const newCurId = p.costCurrencyId || r.costCurrencyId;
+            const newRateType = p.exchangeRateType || r.exchangeRateType;
+            const newCustomRate = p.customExchangeRate !== undefined ? p.customExchangeRate : r.customExchangeRate;
+            if (
+              r.costPrice !== newCost ||
+              r.costCurrencyId !== newCurId ||
+              r.exchangeRateType !== newRateType ||
+              r.customExchangeRate !== newCustomRate
+            ) {
+              changed = true;
+              return {
+                ...r,
+                costPrice: newCost,
+                costCurrencyId: newCurId,
+                exchangeRateType: newRateType,
+                customExchangeRate: newCustomRate,
+              };
+            }
+          }
+          return r;
+        });
+        return changed ? newRows : prevRows;
+      });
+    }
+  }, [products]);
+
   useEffect(() => {
     if (!editId && defaultCurrency?.id) {
       setInvoiceDiscountCurrencyId(defaultCurrency.id);
@@ -619,19 +654,35 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 currencyId: line.currencyId || voucher.currencyId || 1,
                 availableQty: (line.product?.stock || 0) + line.qty,
                 costPrice: (() => {
+                  const prod = products.find((p: any) => p.id === line.productId);
+                  if (prod && typeof prod.costPrice === "number" && prod.costPrice > 0) {
+                    return prod.costPrice;
+                  }
+                  if (line.product?.costPrice && line.product.costPrice > 0) {
+                    return line.product.costPrice;
+                  }
                   const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
-                  return tx ? tx.unitCost : (line.product?.costPrice || 0);
+                  return tx ? tx.unitCost : 0;
                 })(),
                 costCurrencyId: (() => {
                   const prod = products.find((p: any) => p.id === line.productId);
                   if (prod?.costCurrencyId) return prod.costCurrencyId;
+                  if (line.product?.costCurrencyId) return line.product.costCurrencyId;
                   const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
                   if (tx?.unitCost && tx.unitCost > 1000) return 2;
                   if (tx?.unitCost && tx.unitCost <= 1000) return 1;
-                  return (line.product?.costPrice && line.product.costPrice > 1000) ? 2 : 1;
+                  return 1;
                 })(),
-                exchangeRateType: (line.product as any)?.exchangeRateType || "DAILY_MARKET",
-                customExchangeRate: (line.product as any)?.customExchangeRate || undefined,
+                exchangeRateType: (() => {
+                  const prod = products.find((p: any) => p.id === line.productId);
+                  if (prod?.exchangeRateType) return prod.exchangeRateType;
+                  return (line.product as any)?.exchangeRateType || "DAILY_MARKET";
+                })(),
+                customExchangeRate: (() => {
+                  const prod = products.find((p: any) => p.id === line.productId);
+                  if (prod?.customExchangeRate !== undefined) return prod.customExchangeRate;
+                  return (line.product as any)?.customExchangeRate || undefined;
+                })(),
                 showCost: false,
                 previousPrice: getPreviousPrice(line.productId),
               }));
@@ -3510,6 +3561,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                                (row.costPrice && row.costPrice > 1000 ? 2 : 1));
 
                                           const costSymbol = getCurrencySymbol(effectiveCostCurrencyId);
+                                          const effectiveCostPrice = (prod && typeof prod.costPrice === "number" && prod.costPrice > 0)
+                                            ? prod.costPrice
+                                            : (row.costPrice || 0);
 
                                           if (isFixedRate && fixedRateDisplay) {
                                             return (
@@ -3528,7 +3582,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                                 title={`کۆستی دۆلاری جێگیر: 100$ = ${fixedRateDisplay} دینار`}
                                               >
                                                 <span>
-                                                  {formatMoney(row.costPrice || 0, costSymbol)}
+                                                  {formatMoney(effectiveCostPrice, costSymbol)}
                                                 </span>
                                                 <span
                                                   style={{
@@ -3549,7 +3603,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
                                           return (
                                             <div style={compactReadonlyBox}>
-                                              {formatMoney(row.costPrice || 0, costSymbol)}
+                                              {formatMoney(effectiveCostPrice, costSymbol)}
                                             </div>
                                           );
                                         })()
