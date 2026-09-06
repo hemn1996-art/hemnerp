@@ -30,7 +30,10 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/attributes?type=${type}`);
+      const res = await fetch(`/api/attributes?type=${type}&_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
       if (res.ok) {
         const data = await res.json();
         setItems(data);
@@ -123,8 +126,11 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
           body: JSON.stringify({ id: editId, name, isActive: form.isActive }),
         });
         if (res.ok) {
+          const updated = await res.json();
+          setItems((prev) => prev.map((i) => (i.id === editId ? updated : i)));
           showToast("نوێکرایەوە ✅");
           fetchItems();
+          useStore.getState().fetchProducts();
         } else {
           const errData = await res.json().catch(() => null);
           showToast(errData?.error || "سەرکەوتوو نەبوو ❌");
@@ -136,8 +142,11 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
           body: JSON.stringify({ name, isActive: form.isActive }),
         });
         if (res.ok) {
+          const created = await res.json();
+          setItems((prev) => [...prev, created]);
           showToast("زیادکرا ✅");
           fetchItems();
+          useStore.getState().fetchProducts();
         } else {
           const errData = await res.json().catch(() => null);
           showToast(errData?.error || "سەرکەوتوو نەبوو ❌");
@@ -162,8 +171,10 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
             method: "DELETE",
           });
           if (res.ok) {
+            setItems((prev) => prev.filter((i) => i.id !== item.id));
             showToast("سڕایەوە ✅");
             fetchItems();
+            useStore.getState().fetchProducts();
           } else {
             const errData = await res.json().catch(() => null);
             showToast(errData?.error || "سەرکەوتوو نەبوو ❌");
