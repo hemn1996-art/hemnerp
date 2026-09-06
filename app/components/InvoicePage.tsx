@@ -631,7 +631,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   return (line.product?.costPrice && line.product.costPrice > 1000) ? 2 : 1;
                 })(),
                 exchangeRateType: (line.product as any)?.exchangeRateType || "DAILY_MARKET",
-                customExchangeRate: (line.product as any)?.customExchangeRate || 132000,
+                customExchangeRate: (line.product as any)?.customExchangeRate || undefined,
                 showCost: false,
                 previousPrice: getPreviousPrice(line.productId),
               }));
@@ -1793,7 +1793,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       costPrice: isServiceOrExpense ? 0 : (product.costPrice || 0),
       costCurrencyId: product.costCurrencyId || (product.costPrice && product.costPrice > 1000 ? 2 : 1),
       exchangeRateType: product.exchangeRateType || "DAILY_MARKET",
-      customExchangeRate: product.customExchangeRate || 132000,
+      customExchangeRate: product.customExchangeRate || undefined,
       showCost: false,
       isExpense: Boolean(product.isExpense),
       isService: isServiceOrExpense,
@@ -3496,10 +3496,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                       {row.showCost ? (
                                         (() => {
                                           const prod = products.find((p: any) => p.id === row.productId);
-                                          const isFixedRate = (row as any).exchangeRateType === "FIXED" || prod?.exchangeRateType === "FIXED";
-                                          const fixedRate = (row as any).customExchangeRate || prod?.customExchangeRate || 135000;
-                                          const fixedRate100 = fixedRate > 10000 ? fixedRate : fixedRate * 100;
-                                          const fixedRateDisplay = fixedRate100.toLocaleString("en-US");
+                                          // NEVER show fixed leaf rate in sales invoices:
+                                          const isSales = invoiceType === "sales" || invoiceType === "فرۆشتن" || invoiceType === "sales_return" || invoiceType === "گەڕانەوەی فرۆشتن";
+                                          const isFixedRate = !isSales && ((row as any).exchangeRateType === "FIXED" || prod?.exchangeRateType === "FIXED");
+                                          const fixedRate = (row as any).customExchangeRate || prod?.customExchangeRate;
+                                          const fixedRate100 = fixedRate ? (fixedRate > 10000 ? fixedRate : fixedRate * 100) : null;
+                                          const fixedRateDisplay = fixedRate100 ? fixedRate100.toLocaleString("en-US") : null;
 
                                           const effectiveCostCurrencyId = isFixedRate
                                             ? 1
@@ -3509,7 +3511,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
                                           const costSymbol = getCurrencySymbol(effectiveCostCurrencyId);
 
-                                          if (isFixedRate) {
+                                          if (isFixedRate && fixedRateDisplay) {
                                             return (
                                               <div
                                                 style={{

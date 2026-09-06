@@ -83,7 +83,7 @@ export async function GET(request: Request) {
       let runningOnHand = 0;
       let runningCost = 0;
       let exchangeRateType = "DAILY_MARKET";
-      let customExchangeRate = 132000;
+      let customExchangeRate: number | null = null;
       let lastCostCurrencyId = 1;
 
       // Sort transactions chronologically
@@ -103,13 +103,31 @@ export async function GET(request: Request) {
         const rateType = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || acc?.exchangeRateType;
         const customRate = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || acc?.customExchangeRate;
 
-        if (rateType === "FIXED" && customRate) {
-          exchangeRateType = "FIXED";
-          customExchangeRate = customRate;
-        }
-
         if (t.qtyChange > 0 && t.unitCost > 0) {
           lastCostCurrencyId = t.currencyId || (t.unitCost > 1000 ? 2 : 1);
+
+          // Update rate type based on this incoming batch (purchase or warehouse_stock)
+          if (t.voucher?.type === "warehouse_stock") {
+            const vRateType = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType;
+            const vCustomRate = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate;
+            if (vRateType === "FIXED" || (vCustomRate && (vCustomRate === 135000 || vCustomRate < 145000))) {
+              exchangeRateType = "FIXED";
+              customExchangeRate = vCustomRate > 10000 ? vCustomRate : (vCustomRate ? vCustomRate * 100 : 135000);
+            } else {
+              exchangeRateType = "DAILY_MARKET";
+              customExchangeRate = null;
+            }
+          } else if (t.voucher?.type === "purchase") {
+            const isFixed = rateType === "FIXED";
+            if (isFixed && customRate) {
+              exchangeRateType = "FIXED";
+              customExchangeRate = customRate > 10000 ? customRate : (customRate ? customRate * 100 : 132000);
+            } else {
+              exchangeRateType = "DAILY_MARKET";
+              customExchangeRate = null;
+            }
+          }
+
           if (p.isMultiBatch) {
             runningCost = t.unitCost;
             runningOnHand += t.qtyChange;

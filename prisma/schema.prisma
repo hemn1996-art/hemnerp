@@ -78,7 +78,7 @@ model Account {
   guarantorName String?
   notes         String?
   exchangeRateType String     @default("DAILY_MARKET") // "DAILY_MARKET" or "FIXED"
-  customExchangeRate Float    @default(132000)
+  customExchangeRate Float?
   accountType   AccountType   @relation(fields: [accountTypeId], references: [id])
   city          City?         @relation(fields: [cityId], references: [id])
   country       Country?      @relation(fields: [countryId], references: [id])
