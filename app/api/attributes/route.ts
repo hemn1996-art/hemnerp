@@ -72,9 +72,12 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(newItem, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating attribute:", error);
-    return NextResponse.json({ error: "Failed to create attribute" }, { status: 500 });
+    if (error?.code === "P2002") {
+      return NextResponse.json({ error: "ئەم ناوە پێشتر تۆمار کراوە" }, { status: 400 });
+    }
+    return NextResponse.json({ error: error?.message || "Failed to create attribute" }, { status: 500 });
   }
 }
 
@@ -107,9 +110,12 @@ export async function PUT(request: Request) {
     });
 
     return NextResponse.json(updatedItem);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating attribute:", error);
-    return NextResponse.json({ error: "Failed to update attribute" }, { status: 500 });
+    if (error?.code === "P2002") {
+      return NextResponse.json({ error: "ئەم ناوە پێشتر تۆمار کراوە" }, { status: 400 });
+    }
+    return NextResponse.json({ error: error?.message || "Failed to update attribute" }, { status: 500 });
   }
 }
 
@@ -134,8 +140,8 @@ export async function DELETE(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting attribute:", error);
-    return NextResponse.json({ error: "Failed to delete attribute" }, { status: 500 });
+    return NextResponse.json({ error: error?.message || "Failed to delete attribute" }, { status: 500 });
   }
 }

@@ -126,7 +126,8 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
           showToast("نوێکرایەوە ✅");
           fetchItems();
         } else {
-          showToast("سەرکەوتوو نەبوو ❌");
+          const errData = await res.json().catch(() => null);
+          showToast(errData?.error || "سەرکەوتوو نەبوو ❌");
         }
       } else {
         const res = await fetch(`/api/attributes?type=${type}`, {
@@ -138,7 +139,8 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
           showToast("زیادکرا ✅");
           fetchItems();
         } else {
-          showToast("سەرکەوتوو نەبوو ❌");
+          const errData = await res.json().catch(() => null);
+          showToast(errData?.error || "سەرکەوتوو نەبوو ❌");
         }
       }
       setShowModal(false);
@@ -163,7 +165,8 @@ export default function ProductAttributePage({ type }: { type: AttributeType }) 
             showToast("سڕایەوە ✅");
             fetchItems();
           } else {
-            showToast("سەرکەوتوو نەبوو ❌");
+            const errData = await res.json().catch(() => null);
+            showToast(errData?.error || "سەرکەوتوو نەبوو ❌");
           }
         } catch (err) {
           console.error(err);
