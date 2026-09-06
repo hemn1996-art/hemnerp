@@ -622,6 +622,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
                   return tx ? tx.unitCost : (line.product?.costPrice || 0);
                 })(),
+                costCurrencyId: (() => {
+                  const prod = products.find((p: any) => p.id === line.productId);
+                  if (prod?.costCurrencyId) return prod.costCurrencyId;
+                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
+                  if (tx?.unitCost && tx.unitCost > 1000) return 2;
+                  if (tx?.unitCost && tx.unitCost <= 1000) return 1;
+                  return (line.product?.costPrice && line.product.costPrice > 1000) ? 2 : 1;
+                })(),
                 exchangeRateType: (line.product as any)?.exchangeRateType || "DAILY_MARKET",
                 customExchangeRate: (line.product as any)?.customExchangeRate || 132000,
                 showCost: false,
@@ -1511,8 +1519,10 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   function formatMoney(value: number, symbol = invoiceSymbol) {
     const isIqd = symbol === "IQD" || symbol === "دینار";
-    const displaySymbol = isIqd ? "دینار" : symbol;
-    return `${displaySymbol} ${Number(value || 0).toLocaleString("en-US")}`;
+    const formattedVal = Number(value || 0).toLocaleString("en-US", {
+      maximumFractionDigits: isIqd ? 0 : 3
+    });
+    return isIqd ? `${formattedVal} دینار` : `${symbol || "$"} ${formattedVal}`;
   }
 
   function formatMoneyJSX(value: number, symbol = invoiceSymbol) {
@@ -3491,6 +3501,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                           const fixedRate100 = fixedRate > 10000 ? fixedRate : fixedRate * 100;
                                           const fixedRateDisplay = fixedRate100.toLocaleString("en-US");
 
+                                          const effectiveCostCurrencyId = isFixedRate
+                                            ? 1
+                                            : (prod?.costCurrencyId ||
+                                               row.costCurrencyId ||
+                                               (row.costPrice && row.costPrice > 1000 ? 2 : 1));
+
+                                          const costSymbol = getCurrencySymbol(effectiveCostCurrencyId);
+
                                           if (isFixedRate) {
                                             return (
                                               <div
@@ -3508,15 +3526,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                                 title={`کۆستی دۆلاری جێگیر: 100$ = ${fixedRateDisplay} دینار`}
                                               >
                                                 <span>
-                                                  {formatMoney(
-                                                    row.costPrice || 0,
-                                                    getCurrencySymbol(
-                                                      row.costCurrencyId ||
-                                                        (row.costPrice && row.costPrice > 1000
-                                                          ? 2
-                                                          : row.currencyId)
-                                                    )
-                                                  )}
+                                                  {formatMoney(row.costPrice || 0, costSymbol)}
                                                 </span>
                                                 <span
                                                   style={{
@@ -3537,15 +3547,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
                                           return (
                                             <div style={compactReadonlyBox}>
-                                              {formatMoney(
-                                                row.costPrice || 0,
-                                                getCurrencySymbol(
-                                                  row.costCurrencyId ||
-                                                    (row.costPrice && row.costPrice > 1000
-                                                      ? 2
-                                                      : row.currencyId)
-                                                )
-                                              )}
+                                              {formatMoney(row.costPrice || 0, costSymbol)}
                                             </div>
                                           );
                                         })()

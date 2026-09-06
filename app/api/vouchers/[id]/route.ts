@@ -446,24 +446,65 @@ export async function PUT(
             // For sales / money_in / exchange: increment cashbox balance
             // For purchase / money_out / expense: decrement cashbox balance
             const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange", "purchase_return"].includes(updated.type);
-            const amountChange = isIncoming ? Number(pa.amount) : -Number(pa.amount);
 
-            await tx.cashboxBalance.upsert({
-              where: {
-                cashboxId_currencyId: {
+            // If the existing voucher had no cashboxId in the DB (e.g. historical record or created with null box),
+            // its previous payments were already settled in physical reality in the past.
+            // Therefore, only the delta (new amount - old amount) should adjust the live cashbox balance.
+            let effectiveAmount = Number(pa.amount);
+            if (!existingVoucher.cashboxId) {
+              const oldPa = existingVoucher.paidAmounts.find(p => p.currencyId === Number(pa.currencyId));
+              const oldAmt = oldPa ? Number(oldPa.amount) : 0;
+              effectiveAmount = effectiveAmount - oldAmt;
+            }
+
+            if (effectiveAmount !== 0) {
+              const amountChange = isIncoming ? effectiveAmount : -effectiveAmount;
+
+              await tx.cashboxBalance.upsert({
+                where: {
+                  cashboxId_currencyId: {
+                    cashboxId: updated.cashboxId,
+                    currencyId: Number(pa.currencyId),
+                  },
+                },
+                update: {
+                  amount: { increment: amountChange },
+                },
+                create: {
                   cashboxId: updated.cashboxId,
                   currencyId: Number(pa.currencyId),
+                  amount: amountChange,
                 },
-              },
-              update: {
-                amount: { increment: amountChange },
-              },
-              create: {
-                cashboxId: updated.cashboxId,
-                currencyId: Number(pa.currencyId),
-                amount: amountChange,
-              },
-            });
+              });
+            }
+          }
+        }
+
+        // If existing voucher had no cashboxId and a previously paid currency was completely removed in this edit:
+        if (!existingVoucher.cashboxId && updated.cashboxId && updated.type !== "quotation") {
+          const newCurIds = new Set(data.paidAmounts.map((p: any) => Number(p.currencyId)));
+          const isIncoming = ["sales", "money_in", "shareholder_deposit", "cashbox_exchange", "purchase_return"].includes(updated.type);
+          for (const oldPa of existingVoucher.paidAmounts) {
+            if (!newCurIds.has(oldPa.currencyId) && oldPa.amount !== 0) {
+              const effectiveAmount = -Number(oldPa.amount);
+              const amountChange = isIncoming ? effectiveAmount : -effectiveAmount;
+              await tx.cashboxBalance.upsert({
+                where: {
+                  cashboxId_currencyId: {
+                    cashboxId: updated.cashboxId,
+                    currencyId: oldPa.currencyId,
+                  },
+                },
+                update: {
+                  amount: { increment: amountChange },
+                },
+                create: {
+                  cashboxId: updated.cashboxId,
+                  currencyId: oldPa.currencyId,
+                  amount: amountChange,
+                },
+              });
+            }
           }
         }
       }

@@ -56,8 +56,6 @@ export async function GET(request: Request) {
         deliveryAddress: true,
         deliveryFee: true,
         extraPaymentHandling: true,
-        isArrived: true,
-        arrivalDate: true,
         account: { select: { id: true, name: true, accountTypeId: true, exchangeRateType: true, customExchangeRate: true, city: { select: { name: true } }, district: { select: { name: true } } } },
         cashbox: { select: { id: true, name: true } },
         fromCashbox: { select: { id: true, name: true } },
@@ -272,6 +270,18 @@ export async function POST(request: Request) {
       ? data.employeeName.trim()
       : (currentUser.name || currentUser.username || "کۆسار");
 
+    // Ensure that any voucher with paid amounts has a valid cashboxId
+    const hasPaidAmount = data.paidAmounts && Array.isArray(data.paidAmounts) && data.paidAmounts.some((p: any) => Number(p.amount) !== 0);
+    if (hasPaidAmount && !data.cashboxId && data.type !== "quotation" && data.type !== "cashbox_transfer") {
+      const defaultCashbox = await prisma.cashbox.findFirst({
+        where: { isActive: true },
+        orderBy: { id: "asc" },
+      });
+      if (defaultCashbox) {
+        data.cashboxId = defaultCashbox.id;
+      }
+    }
+
     const voucher = await prisma.$transaction(async (tx) => {
       const createdVoucher = await tx.voucher.create({
         data: {
@@ -298,8 +308,6 @@ export async function POST(request: Request) {
           deliveryAddress: data.deliveryAddress,
           deliveryFee: data.deliveryFee ? Number(data.deliveryFee) : null,
           extraPaymentHandling: data.extraPaymentHandling || null,
-          isArrived: data.isArrived !== undefined ? Boolean(data.isArrived) : true,
-          arrivalDate: data.arrivalDate ? new Date(data.arrivalDate) : (data.isArrived === false ? null : (data.date ? new Date(data.date) : new Date())),
         },
       });
 
@@ -331,9 +339,7 @@ export async function POST(request: Request) {
             (product?.name && (product.name.includes("گەیاندن") || product.name.includes("خزمەتگوزاری")))
           );
 
-          const shouldCreateInventory = !isServiceOrExpense && (createdVoucher.type !== "purchase" || createdVoucher.isArrived !== false);
-
-          if (shouldCreateInventory && ["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
+          if (!isServiceOrExpense && ["sales", "sales_return", "purchase", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "warehouse_stock", "جەردی کۆگا", "product_transfer", "گواستنەوەی کاڵا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
             let qtyChange = Number(line.qty);
             if (["sales", "purchase_return", "warehouse_damage", "خەسارەی کۆگا", "material_issue", "سەرفی مواد"].includes(createdVoucher.type)) {
               qtyChange = -qtyChange;
@@ -346,11 +352,13 @@ export async function POST(request: Request) {
                   warehouseId: Number(line.warehouseId),
                   qtyChange,
                   unitCost: Number(line.unitCost || line.unitPrice || 0),
-                  // IMPORTANT: line.currencyId is the authoritative source for the item's currency.
-                  // Fall back to the voucher's currencyId if line doesn't have one.
-                  // Never fall back to hardcoded 1 (USD) because that causes IQD items to get tagged as USD.
-                  currencyId: Number(line.currencyId ?? data.currencyId),
-                  date: createdVoucher.arrivalDate || createdVoucher.date,
+                  // For inventory additions (purchase, stock), currencyId is the voucher/line currency.
+                  // For inventory reductions (sales, damage), unitCost is the purchase cost of the goods.
+                  // Tag it with its real cost currency: IQD if > 1000, otherwise USD (1).
+                  currencyId: qtyChange > 0
+                    ? Number(line.currencyId ?? data.currencyId)
+                    : (Number(line.unitCost || 0) > 1000 ? 2 : 1),
+                  date: createdVoucher.date,
                 },
               });
 
