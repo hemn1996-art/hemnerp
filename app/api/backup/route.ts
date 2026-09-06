@@ -156,15 +156,29 @@ export async function POST() {
     let fileSize = "0 KB";
     let savedOnServer = false;
 
+    // Helper to write to directory and clean up any older same-day fragmented files
+    const saveToDir = (targetDir: string) => {
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      try {
+        const existing = fs.readdirSync(targetDir);
+        for (const f of existing) {
+          if (f.startsWith(`backup-${dateStr}_`) && f.endsWith(".json")) {
+            try { fs.unlinkSync(path.join(targetDir, f)); } catch {}
+          }
+        }
+      } catch {}
+
+      const targetPath = path.join(targetDir, fileName);
+      fs.writeFileSync(targetPath, JSON.stringify(backupData, null, 2), "utf-8");
+      return targetPath;
+    };
+
     // 1. Try process.cwd() / backups
     let backupDir = path.join(process.cwd(), "backups");
     try {
-      if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true });
-      }
-      filePath = path.join(backupDir, fileName);
-      fs.writeFileSync(filePath, JSON.stringify(backupData, null, 2), "utf-8");
-      
+      filePath = saveToDir(backupDir);
       const fileStat = fs.statSync(filePath);
       fileSize = `${(fileStat.size / 1024).toFixed(1)} KB`;
       savedOnServer = true;
@@ -173,18 +187,12 @@ export async function POST() {
       // 2. Fallback to /tmp / backups
       try {
         backupDir = path.join("/tmp", "backups");
-        if (!fs.existsSync(backupDir)) {
-          fs.mkdirSync(backupDir, { recursive: true });
-        }
-        filePath = path.join(backupDir, fileName);
-        fs.writeFileSync(filePath, JSON.stringify(backupData, null, 2), "utf-8");
-        
+        filePath = saveToDir(backupDir);
         const fileStat = fs.statSync(filePath);
         fileSize = `${(fileStat.size / 1024).toFixed(1)} KB`;
         savedOnServer = true;
       } catch (tmpErr) {
         console.error("Failed to save backup to /tmp as well:", tmpErr);
-        // Do not fail the whole request, return success: true but savedOnServer: false
       }
     }
 

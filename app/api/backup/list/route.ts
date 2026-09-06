@@ -21,7 +21,7 @@ export async function GET() {
       if (fs.existsSync(dir)) {
         try {
           fs.readdirSync(dir)
-            .filter(f => f.startsWith("backup-") && f.endsWith(".json"))
+            .filter(f => f.startsWith("backup-") && f.endsWith(".json") && f !== "backup-latest.json")
             .forEach(fileName => {
               const filePath = path.join(dir, fileName);
               try {
@@ -29,13 +29,17 @@ export async function GET() {
                 const sizeKB = (stat.size / 1024).toFixed(1);
                 const dateMatch = fileName.match(/backup-(\d{4}-\d{2}-\d{2})/);
                 const date = dateMatch ? dateMatch[1] : "";
+                if (!date) return;
                 
-                filesMap.set(fileName, {
-                  fileName,
-                  date,
-                  fileSize: `${sizeKB} KB`,
-                  createdAt: stat.mtime.toISOString(),
-                });
+                const existing = filesMap.get(date);
+                if (!existing || new Date(stat.mtime).getTime() > new Date(existing.createdAt).getTime()) {
+                  filesMap.set(date, {
+                    fileName,
+                    date,
+                    fileSize: `${sizeKB} KB`,
+                    createdAt: stat.mtime.toISOString(),
+                  });
+                }
               } catch (e) {
                 // Ignore individual file errors
               }
