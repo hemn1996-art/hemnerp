@@ -345,11 +345,16 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, []);
 
   // Synchronize rows with live product cost and currency when products store updates
+  // For existing vouchers (editId), preserve the historical costPrice if already set (> 0)
   useEffect(() => {
     if (products.length > 0 && rows.length > 0) {
       setRows((prevRows) => {
         let changed = false;
         const newRows = prevRows.map((r) => {
+          // If editing an existing voucher and row has a historical cost, protect it from future cost changes!
+          if (editId && r.costPrice && r.costPrice > 0) {
+            return r;
+          }
           const p = products.find((item: any) => item.id === r.productId);
           if (p && typeof p.costPrice === "number" && p.costPrice > 0) {
             const newCost = p.costPrice;
@@ -377,7 +382,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         return changed ? newRows : prevRows;
       });
     }
-  }, [products]);
+  }, [products, editId]);
 
   useEffect(() => {
     if (!editId && defaultCurrency?.id) {
@@ -654,6 +659,10 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 currencyId: line.currencyId || voucher.currencyId || 1,
                 availableQty: (line.product?.stock || 0) + line.qty,
                 costPrice: (() => {
+                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
+                  if (tx && typeof tx.unitCost === "number" && tx.unitCost > 0) {
+                    return tx.unitCost;
+                  }
                   const prod = products.find((p: any) => p.id === line.productId);
                   if (prod && typeof prod.costPrice === "number" && prod.costPrice > 0) {
                     return prod.costPrice;
@@ -661,16 +670,16 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   if (line.product?.costPrice && line.product.costPrice > 0) {
                     return line.product.costPrice;
                   }
-                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
-                  return tx ? tx.unitCost : 0;
+                  return 0;
                 })(),
                 costCurrencyId: (() => {
+                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
+                  if (tx?.currencyId) return tx.currencyId;
+                  if (tx?.unitCost && tx.unitCost > 1000) return 2;
+                  if (tx?.unitCost && tx.unitCost <= 1000) return 1;
                   const prod = products.find((p: any) => p.id === line.productId);
                   if (prod?.costCurrencyId) return prod.costCurrencyId;
                   if (line.product?.costCurrencyId) return line.product.costCurrencyId;
-                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
-                  if (tx?.unitCost && tx.unitCost > 1000) return 2;
-                  if (tx?.unitCost && tx.unitCost <= 1000) return 1;
                   return 1;
                 })(),
                 exchangeRateType: (() => {
@@ -3561,9 +3570,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                                (row.costPrice && row.costPrice > 1000 ? 2 : 1));
 
                                           const costSymbol = getCurrencySymbol(effectiveCostCurrencyId);
-                                          const effectiveCostPrice = (prod && typeof prod.costPrice === "number" && prod.costPrice > 0)
-                                            ? prod.costPrice
-                                            : (row.costPrice || 0);
+                                          const effectiveCostPrice = (row.costPrice && row.costPrice > 0)
+                                            ? row.costPrice
+                                            : (prod && typeof prod.costPrice === "number" && prod.costPrice > 0 ? prod.costPrice : 0);
 
                                           if (isFixedRate && fixedRateDisplay) {
                                             return (

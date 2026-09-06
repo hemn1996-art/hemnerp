@@ -312,23 +312,24 @@ export async function GET(request: Request) {
       const amount = convertVoucherToTarget(v.netAmount, v.currencyId || usdId, v.exchangeRate);
 
       const getItemCostUsdForVoucher = (productId: number, rawCost?: number, rawCurId?: number) => {
-        // Check if product has fixed-rate IQD cost
+        // 1. If transaction has a recorded unitCost (COGS at the time of sale), strictly preserve it!
+        if (rawCost && rawCost > 0) {
+          const isIQD = rawCurId === 2 || rawCurId === 12 || rawCost > 500;
+          const vRate = (v.exchangeRate && v.exchangeRate > 100)
+            ? (v.exchangeRate > 10000 ? v.exchangeRate / 100 : v.exchangeRate)
+            : marketRatePerDollar;
+          return isIQD ? (rawCost / vRate) : rawCost;
+        }
+
+        // 2. Check if product has fixed-rate IQD cost
         const fixedIQD = fixedCostIQD[productId];
         if (fixedIQD !== undefined && fixedIQD > 0) {
           // Convert IQD cost to USD at market rate
           return fixedIQD / marketRatePerDollar;
         }
 
+        // 3. Fallback to product costs calculated from purchases
         let cost = productCosts[productId];
-        if (cost === undefined || cost === null || cost === 0) {
-          if (rawCost && rawCost > 0) {
-            const isIQD = rawCost > 500;
-            const vRate = (v.exchangeRate && v.exchangeRate > 100)
-              ? (v.exchangeRate > 10000 ? v.exchangeRate / 100 : v.exchangeRate)
-              : marketRatePerDollar;
-            cost = isIQD ? (rawCost / vRate) : rawCost;
-          }
-        }
         return cost || 0;
       };
 
