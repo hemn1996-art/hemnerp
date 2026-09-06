@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { calculateWeightedProductCost } from "./inventoryCost";
 
 export async function getCalculatedWarehouseValueInUsd(dateFilter?: Date): Promise<number> {
   const where: any = { voucher: { isDeleted: false } };
@@ -19,6 +20,7 @@ export async function getCalculatedWarehouseValueInUsd(dateFilter?: Date): Promi
         voucher: {
           select: {
             type: true,
+            exchangeRate: true,
             account: { select: { id: true, name: true, exchangeRateType: true, customExchangeRate: true } },
             versions: { select: { version: true, data: true } },
             lines: {
@@ -40,80 +42,35 @@ export async function getCalculatedWarehouseValueInUsd(dateFilter?: Date): Promi
   const rawRate = iqdCur?.rate || 1520;
   const marketRatePerDollar = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
 
-  const stockMap: Record<string, {
-    productId: number;
-    qty: number;
-    totalPurchaseValueUsd: number;
-    totalPurchaseQty: number;
-    fallbackCostUsd: number;
-  }> = {};
+  const productCostMap = new Map<number, any>();
+  const txsByProduct = new Map<number, any[]>();
+  const stockByProduct = new Map<number, number>();
 
   transactions.forEach(t => {
-    const key = `${t.productId}-${t.warehouseId}`;
-    if (!stockMap[key]) {
-      stockMap[key] = {
-        productId: t.productId,
-        qty: 0,
-        totalPurchaseValueUsd: 0,
-        totalPurchaseQty: 0,
-        fallbackCostUsd: 0,
-      };
-    }
-
-    stockMap[key].qty += t.qtyChange;
-
-    const line = t.voucher?.lines?.find((l: any) => l.productId === t.productId);
-    let rawPrice = (line && line.unitPrice > 0) ? line.unitPrice : (t.unitCost || 0);
-    let voucherCurId = (line as any)?.currencyId || (t.voucher as any)?.currencyId || 1;
-
-    // Determine currency from the stored currencyId (backfilled from voucher)
-    const txCurId = (t as any).currencyId ?? voucherCurId;
-    const isIQD = txCurId === iqdCur?.id;
-    const vRate = (t.voucher as any)?.exchangeRate && (t.voucher as any).exchangeRate > 100
-      ? ((t.voucher as any).exchangeRate > 10000 ? (t.voucher as any).exchangeRate / 100 : (t.voucher as any).exchangeRate)
-      : marketRatePerDollar;
-    let originalPriceUsd = isIQD ? (rawPrice / vRate) : rawPrice;
-
-    let versionData: any = {};
-    if (t.voucher?.versions && t.voucher.versions.length > 0) {
-      const sortedV = [...t.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
-      const latestV = sortedV[sortedV.length - 1];
-      try { versionData = JSON.parse(latestV.data); } catch(e){}
-    }
-
-    if (t.qtyChange > 0 && rawPrice > 0) {
-      let effectiveUnitCostUsd = originalPriceUsd;
-
-      stockMap[key].totalPurchaseValueUsd += (t.qtyChange * effectiveUnitCostUsd);
-      stockMap[key].totalPurchaseQty += t.qtyChange;
-      if (stockMap[key].fallbackCostUsd === 0) {
-        stockMap[key].fallbackCostUsd = effectiveUnitCostUsd;
-      }
-    }
+    if (!txsByProduct.has(t.productId)) txsByProduct.set(t.productId, []);
+    txsByProduct.get(t.productId)!.push(t);
+    stockByProduct.set(t.productId, (stockByProduct.get(t.productId) || 0) + t.qtyChange);
   });
 
-  // Secondary fallback for zero costs
-  Object.values(stockMap).forEach((item) => {
-    if (item.totalPurchaseQty === 0 && item.fallbackCostUsd === 0) {
-      const txWithCost = transactions.find(
-        (t: any) => t.productId === item.productId && t.unitCost && t.unitCost > 0
-      );
-      if (txWithCost) {
-        const rawPrice = txWithCost.unitCost;
-        const isIQD = (txWithCost as any).currencyId === iqdCur?.id;
-        item.fallbackCostUsd = isIQD ? (rawPrice / marketRatePerDollar) : rawPrice;
-      }
-    }
+  txsByProduct.forEach((txs, pId) => {
+    const isMultiBatch = txs[0]?.product?.isMultiBatch || false;
+    productCostMap.set(pId, calculateWeightedProductCost(txs as any, isMultiBatch, marketRatePerDollar));
   });
 
   let totalWarehouseValueInUsd = 0;
-  Object.values(stockMap).forEach(item => {
-    if (item.qty > 0) {
-      const costUsd = item.totalPurchaseQty > 0
-        ? (item.totalPurchaseValueUsd / item.totalPurchaseQty)
-        : item.fallbackCostUsd;
-      
-      totalWarehouseValueInUsd += item.qty * costUsd;
+  stockByProduct.forEach((qty, pId) => {
+    if (qty > 0) {
+      const costInfo = productCostMap.get(pId);
+      if (costInfo && costInfo.costPrice > 0) {
+        let unitCostUsd = costInfo.costPrice;
+        if (costInfo.costCurrencyId === 2) {
+          unitCostUsd = costInfo.costPrice / marketRatePerDollar;
+        } else if (costInfo.exchangeRateType === "FIXED" && costInfo.customExchangeRate) {
+          const fixedRatePerDollar = costInfo.customExchangeRate / 100;
+          unitCostUsd = (costInfo.costPrice * fixedRatePerDollar) / marketRatePerDollar;
+        }
+        totalWarehouseValueInUsd += qty * unitCostUsd;
+      }
     }
   });
 

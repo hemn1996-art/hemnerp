@@ -1,8 +1,4 @@
-/**
- * Centralized Profit & COGS Calculator
- * Prevents root currency mismatch bugs and ensures 100% consistency across all reports.
- * Supports fixed-rate supplier products (where dollar cost has a custom IQD exchange rate).
- */
+import { calculateWeightedProductCost } from "./inventoryCost";
 
 export interface ProductCostRecord {
   productId: number;
@@ -18,103 +14,46 @@ export interface ProductCostResult {
 
 /**
  * Calculates weighted average purchase unit cost for all products from purchase transactions.
- * Regular products: cost stored in USD.
- * Fixed-rate products: cost stored in IQD (unitCost$ × fixedRate).
+ * Uses standard inventory costing: converts fixed-rate dollar stock to Dinars and then to market dollars
+ * when new market purchases arrive, setting cost currency to the latest incoming voucher.
  */
 export function calculateProductCostsMap(
   inventoryTransactions: any[],
   productsMap: Map<number, any>,
   marketRatePerDollar: number,
-  productFixedRateMap?: Record<number, number>
+  _productFixedRateMap?: Record<number, number>
 ): ProductCostResult {
-  const stats: Record<number, { runningCostUSD: number; runningOnHandQty: number; latestCostUSD: number; isMultiBatch: boolean }> = {};
-  const fixedStats: Record<number, { runningCostIQD: number; runningOnHandQty: number; latestCostIQD: number; isMultiBatch: boolean }> = {};
-
+  const txsByProduct = new Map<number, any[]>();
   inventoryTransactions.forEach((tx: any) => {
     const pId = tx.productId;
-    const dbProd = productsMap.get(pId);
-    const isMultiBatch = dbProd?.isMultiBatch || false;
-
-    // Determine transaction exchange rate
-    const vRate = tx.voucher?.exchangeRate && tx.voucher.exchangeRate > 100
-      ? (tx.voucher.exchangeRate > 10000 ? tx.voucher.exchangeRate / 100 : tx.voucher.exchangeRate)
-      : marketRatePerDollar;
-
-    // Determine if cost is in IQD (IQD costs are in thousands > 500, USD costs are <= 500)
-    const isCostIQD = tx.unitCost > 500;
-    const fixedRate = productFixedRateMap?.[pId];
-
-    if (tx.qtyChange > 0 && tx.unitCost > 0) {
-      const qtyIn = tx.qtyChange;
-
-      // Fixed-rate product (cost in USD but with fixed IQD rate)
-      if (fixedRate && !isCostIQD) {
-        if (!fixedStats[pId]) {
-          fixedStats[pId] = { runningCostIQD: 0, runningOnHandQty: 0, latestCostIQD: 0, isMultiBatch };
-        }
-        const costIQD = tx.unitCost * fixedRate;
-        fixedStats[pId].latestCostIQD = costIQD;
-
-        if (isMultiBatch) {
-          fixedStats[pId].runningCostIQD = costIQD;
-          fixedStats[pId].runningOnHandQty += qtyIn;
-        } else {
-          const currentOnHand = fixedStats[pId].runningOnHandQty || 0;
-          if (currentOnHand <= 0) {
-            fixedStats[pId].runningCostIQD = costIQD;
-            fixedStats[pId].runningOnHandQty = qtyIn;
-          } else {
-            const totalVal = (currentOnHand * fixedStats[pId].runningCostIQD) + (qtyIn * costIQD);
-            const newOnHand = currentOnHand + qtyIn;
-            fixedStats[pId].runningOnHandQty = newOnHand;
-            fixedStats[pId].runningCostIQD = totalVal / newOnHand;
-          }
-        }
-      } else {
-        // Regular product
-        if (!stats[pId]) {
-          stats[pId] = { runningCostUSD: 0, runningOnHandQty: 0, latestCostUSD: 0, isMultiBatch };
-        }
-        const effectiveCostUSD = isCostIQD ? (tx.unitCost / (vRate || 1520)) : tx.unitCost;
-        stats[pId].latestCostUSD = effectiveCostUSD;
-
-        if (isMultiBatch) {
-          stats[pId].runningCostUSD = effectiveCostUSD;
-          stats[pId].runningOnHandQty += qtyIn;
-        } else {
-          const currentOnHand = stats[pId].runningOnHandQty || 0;
-          if (currentOnHand <= 0) {
-            stats[pId].runningCostUSD = effectiveCostUSD;
-            stats[pId].runningOnHandQty = qtyIn;
-          } else {
-            const totalVal = (currentOnHand * stats[pId].runningCostUSD) + (qtyIn * effectiveCostUSD);
-            const newOnHand = currentOnHand + qtyIn;
-            stats[pId].runningOnHandQty = newOnHand;
-            stats[pId].runningCostUSD = totalVal / newOnHand;
-          }
-        }
-      }
-    } else if (tx.qtyChange < 0) {
-      if (fixedStats[pId]) {
-        fixedStats[pId].runningOnHandQty += tx.qtyChange;
-      }
-      if (stats[pId]) {
-        stats[pId].runningOnHandQty += tx.qtyChange;
-      }
+    if (!txsByProduct.has(pId)) {
+      txsByProduct.set(pId, []);
     }
+    txsByProduct.get(pId)!.push(tx);
   });
 
   const productCostsUSD: Record<number, number> = {};
-  for (const [pIdStr, s] of Object.entries(stats)) {
-    const pId = Number(pIdStr);
-    productCostsUSD[pId] = s.isMultiBatch ? s.latestCostUSD : s.runningCostUSD;
-  }
-
   const fixedCostIQDMap: Record<number, number> = {};
-  for (const [pIdStr, s] of Object.entries(fixedStats)) {
-    const pId = Number(pIdStr);
-    fixedCostIQDMap[pId] = s.isMultiBatch ? s.latestCostIQD : s.runningCostIQD;
-  }
+
+  txsByProduct.forEach((txs, pId) => {
+    const dbProd = productsMap.get(pId);
+    const isMultiBatch = dbProd?.isMultiBatch || false;
+    const costInfo = calculateWeightedProductCost(txs, isMultiBatch, marketRatePerDollar);
+
+    if (costInfo.costCurrencyId === 2) {
+      // Cost is in IQD
+      fixedCostIQDMap[pId] = costInfo.costPrice;
+    } else {
+      // Cost is in USD
+      if (costInfo.exchangeRateType === "FIXED" && costInfo.customExchangeRate) {
+        // Still fixed rate USD -> convert to IQD using fixed rate so reports handle it accurately
+        const fixedRatePerDollar = costInfo.customExchangeRate / 100;
+        fixedCostIQDMap[pId] = costInfo.costPrice * fixedRatePerDollar;
+      } else {
+        productCostsUSD[pId] = costInfo.costPrice;
+      }
+    }
+  });
 
   // Fallback for products with no purchase transactions
   productsMap.forEach((p, pId) => {

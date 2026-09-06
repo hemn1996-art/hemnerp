@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { getCurrentUser } from "../../../lib/auth";
+import { calculateWeightedProductCost } from "../../../../lib/inventoryCost";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export async function GET(request: Request) {
             select: {
               type: true,
               date: true,
+              exchangeRate: true,
               account: { select: { id: true, name: true, exchangeRateType: true, customExchangeRate: true } },
               versions: { select: { version: true, data: true } },
               lines: {
@@ -189,43 +191,41 @@ export async function GET(request: Request) {
       }
     });
 
-    // Secondary fallback: if cost is still 0, check if any transaction for this product had unitCost > 0
+    // Calculate standardized perpetual weighted average cost and rate type per product
+    const productCostMap = new Map<number, any>();
+    const txsByProduct = new Map<number, any[]>();
+    transactions.forEach(t => {
+      if (!txsByProduct.has(t.productId)) txsByProduct.set(t.productId, []);
+      txsByProduct.get(t.productId)!.push(t);
+    });
+    txsByProduct.forEach((txs, pId) => {
+      const isMultiBatch = txs[0]?.product?.isMultiBatch || false;
+      productCostMap.set(pId, calculateWeightedProductCost(txs as any, isMultiBatch, marketRatePerDollar));
+    });
+
     Object.values(stockMap).forEach((item: any) => {
-      if (!item.cost || item.cost === 0) {
+      const costInfo = productCostMap.get(item.productId);
+      if (costInfo && costInfo.costPrice > 0) {
+        const isCostIQD = costInfo.costCurrencyId === 2;
+        item.cost = costInfo.costPrice;
+        item.purchasePrice = costInfo.costPrice;
+        item.rawCost = costInfo.costPrice;
+        item.rawPurchasePrice = costInfo.costPrice;
+        item.isIQD = isCostIQD;
+        item.currencyCode = isCostIQD ? "IQD" : "USD";
+        item.currencySymbol = isCostIQD ? "دینار" : "$";
+        item.exchangeRateType = costInfo.exchangeRateType;
+        item.customExchangeRate = costInfo.customExchangeRate;
+      } else if (!item.cost || item.cost === 0) {
         const txWithCost = transactions.find(
           (t: any) => t.productId === item.productId && t.unitCost && t.unitCost > 0
         );
         if (txWithCost) {
           item.purchasePrice = txWithCost.unitCost;
           item.cost = txWithCost.unitCost;
-          item.costUsd = item.isIQD ? (txWithCost.unitCost / marketRatePerDollar) : txWithCost.unitCost;
-          item.purchasePriceUsd = item.costUsd;
           item.rawCost = txWithCost.unitCost;
           item.rawPurchasePrice = txWithCost.unitCost;
         }
-      }
-
-      // If any transaction on this product came from a FIXED rate voucher, propagate FIXED rate to item
-      const txFixed = transactions.find((t: any) => {
-        if (t.productId !== item.productId) return false;
-        let vData: any = {};
-        if (t.voucher?.versions && t.voucher.versions.length > 0) {
-          const sortedV = [...t.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
-          const latestV = sortedV[sortedV.length - 1];
-          try { vData = JSON.parse(latestV.data); } catch(e){}
-        }
-        return (t.voucher as any)?.exchangeRateType === "FIXED" || vData.exchangeRateType === "FIXED" || t.voucher?.account?.exchangeRateType === "FIXED";
-      });
-
-      if (txFixed) {
-        let vData: any = {};
-        if (txFixed.voucher?.versions && txFixed.voucher.versions.length > 0) {
-          const sortedV = [...txFixed.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
-          const latestV = sortedV[sortedV.length - 1];
-          try { vData = JSON.parse(latestV.data); } catch(e){}
-        }
-        item.exchangeRateType = "FIXED";
-        item.customExchangeRate = (txFixed.voucher as any)?.customExchangeRate || vData.customExchangeRate || txFixed.voucher?.account?.customExchangeRate || 132000;
       }
     });
 

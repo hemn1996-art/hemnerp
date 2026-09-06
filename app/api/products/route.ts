@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { getCurrentUser } from "../../lib/auth";
 import { convertDigits } from "../../utils/digits";
+import { calculateWeightedProductCost } from "../../../lib/inventoryCost";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,11 @@ export async function GET(request: Request) {
       orderBy: { id: "desc" },
     });
 
+    const iqdCur = await prisma.currency.findFirst({ where: { OR: [{ id: 2 }, { code: "IQD" }] } });
+    const defaultMarketRate = iqdCur?.rate && iqdCur.rate > 100
+      ? (iqdCur.rate > 10000 ? iqdCur.rate / 100 : iqdCur.rate)
+      : 1550;
+
     const productsWithStock = products.map((p) => {
       const stock = p.inventoryTransactions.reduce(
         (sum, t) => sum + t.qtyChange,
@@ -80,71 +86,11 @@ export async function GET(request: Request) {
         warehouseStocks[wId] = (warehouseStocks[wId] || 0) + t.qtyChange;
       });
 
-      let runningOnHand = 0;
-      let runningCost = 0;
-      let exchangeRateType = "DAILY_MARKET";
-      let customExchangeRate: number | null = null;
-      let lastCostCurrencyId = 1;
-
-      // Sort transactions chronologically
-      const sortedTxs = [...p.inventoryTransactions].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id
+      const costInfo = calculateWeightedProductCost(
+        p.inventoryTransactions as any,
+        p.isMultiBatch,
+        defaultMarketRate
       );
-
-      sortedTxs.forEach((t) => {
-        let versionData: any = {};
-        if (t.voucher?.versions && t.voucher.versions.length > 0) {
-          const sortedV = [...t.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
-          const latestV = sortedV[sortedV.length - 1];
-          try { versionData = JSON.parse(latestV.data); } catch (e) {}
-        }
-
-        const acc = t.voucher?.account;
-        const rateType = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || acc?.exchangeRateType;
-        const customRate = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || acc?.customExchangeRate;
-
-        if (t.qtyChange > 0 && t.unitCost > 0) {
-          lastCostCurrencyId = t.currencyId || (t.unitCost > 1000 ? 2 : 1);
-
-          // Update rate type based on this incoming batch (purchase or warehouse_stock)
-          if (t.voucher?.type === "warehouse_stock") {
-            const vRateType = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType;
-            const vCustomRate = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate;
-            if (vRateType === "FIXED" || (vCustomRate && (vCustomRate === 135000 || vCustomRate < 145000))) {
-              exchangeRateType = "FIXED";
-              customExchangeRate = vCustomRate > 10000 ? vCustomRate : (vCustomRate ? vCustomRate * 100 : 135000);
-            } else {
-              exchangeRateType = "DAILY_MARKET";
-              customExchangeRate = null;
-            }
-          } else if (t.voucher?.type === "purchase") {
-            const isFixed = rateType === "FIXED";
-            if (isFixed && customRate) {
-              exchangeRateType = "FIXED";
-              customExchangeRate = customRate > 10000 ? customRate : (customRate ? customRate * 100 : 132000);
-            } else {
-              exchangeRateType = "DAILY_MARKET";
-              customExchangeRate = null;
-            }
-          }
-
-          if (p.isMultiBatch) {
-            runningCost = t.unitCost;
-            runningOnHand += t.qtyChange;
-          } else {
-            if (runningOnHand <= 0) {
-              runningCost = t.unitCost;
-              runningOnHand = t.qtyChange;
-            } else {
-              const totalVal = (runningOnHand * runningCost) + (t.qtyChange * t.unitCost);
-              runningOnHand += t.qtyChange;
-              runningCost = totalVal / runningOnHand;
-            }
-          }
-        } else if (t.qtyChange < 0) {
-          runningOnHand += t.qtyChange;
-        }
-      });
 
       const hasTransactions = (p._count?.inventoryTransactions || 0) > 0 || (p._count?.voucherLines || 0) > 0;
       return {
@@ -160,10 +106,10 @@ export async function GET(request: Request) {
         isActive: p.isActive,
         createdAt: p.createdAt,
         stock: stock,
-        costPrice: runningCost,
-        costCurrencyId: lastCostCurrencyId,
-        exchangeRateType,
-        customExchangeRate,
+        costPrice: costInfo.costPrice,
+        costCurrencyId: costInfo.costCurrencyId,
+        exchangeRateType: costInfo.exchangeRateType,
+        customExchangeRate: costInfo.customExchangeRate,
         isDeletable: !hasTransactions,
         salePrices: p.salePrices ? JSON.parse(p.salePrices) : [],
         warehouseStocks,
