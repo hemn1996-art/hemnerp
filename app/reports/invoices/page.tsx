@@ -2937,7 +2937,7 @@ function InvoiceReportContent() {
                                           {voucher.lines.map((line, idx) => {
                                             const lineCurId = line.currencyId || voucher.currencyId || 1;
                                             const fixedRate = productFixedRateMap[line.productId];
-                                            const isFixedProduct = fixedRate !== undefined && fixedRate > 0;
+                                            const isFixedProduct = !['sales', 'sales_return'].includes(voucher.type) && isFixedRateVoucher && fixedRate !== undefined && fixedRate > 0;
                                             return (
                                               <tr key={line.id} className={`hover:bg-slate-50/80 transition-colors ${isFixedProduct ? "bg-purple-50/30" : ""}`}>
                                                 <td className="py-2.5 text-center font-bold text-slate-400">{idx + 1}</td>

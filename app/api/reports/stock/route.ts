@@ -151,11 +151,6 @@ export async function GET(request: Request) {
       let rateTypeForProduct = (t.voucher as any)?.exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType || "DAILY_MARKET";
       let customRateForProduct = (t.voucher as any)?.customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate || 132000;
 
-      if (rateTypeForProduct === "FIXED") {
-        stockMap[key].exchangeRateType = "FIXED";
-        stockMap[key].customExchangeRate = customRateForProduct;
-      }
-
       if (t.qtyChange > 0 && rawPrice > 0) {
         let effectiveUnitCostUsd = originalPriceUsd;
 
