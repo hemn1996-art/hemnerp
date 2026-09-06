@@ -2,7 +2,10 @@ import { prisma } from "./prisma";
 import { calculateWeightedProductCost } from "./inventoryCost";
 
 export async function getCalculatedWarehouseValueInUsd(dateFilter?: Date): Promise<number> {
-  const where: any = { voucher: { isDeleted: false } };
+  const where: any = { 
+    voucher: { isDeleted: false },
+    product: { isExpense: false }
+  };
   if (dateFilter) {
     where.date = { lte: dateFilter };
   }
@@ -16,7 +19,7 @@ export async function getCalculatedWarehouseValueInUsd(dateFilter?: Date): Promi
         qtyChange: true,
         unitCost: true,
         currencyId: true,
-        product: { select: { isMultiBatch: true } },
+        product: { select: { isMultiBatch: true, isExpense: true } },
         voucher: {
           select: {
             type: true,
@@ -63,13 +66,21 @@ export async function getCalculatedWarehouseValueInUsd(dateFilter?: Date): Promi
       const costInfo = productCostMap.get(pId);
       if (costInfo && costInfo.costPrice > 0) {
         let unitCostUsd = costInfo.costPrice;
+        // If cost currency is IQD, convert to USD at current market rate
         if (costInfo.costCurrencyId === 2) {
           unitCostUsd = costInfo.costPrice / marketRatePerDollar;
-        } else if (costInfo.exchangeRateType === "FIXED" && costInfo.customExchangeRate) {
-          const fixedRatePerDollar = costInfo.customExchangeRate / 100;
-          unitCostUsd = (costInfo.costPrice * fixedRatePerDollar) / marketRatePerDollar;
         }
+        // If cost currency is USD, it is already in USD (no conversion needed)
         totalWarehouseValueInUsd += qty * unitCostUsd;
+      } else {
+        // Fallback to recorded transaction unitCost if costInfo is 0
+        const txs = txsByProduct.get(pId);
+        const txWithCost = txs?.find((t: any) => t.unitCost && t.unitCost > 0);
+        if (txWithCost) {
+          const isIQD = txWithCost.currencyId === 2 || txWithCost.unitCost > 1000;
+          const unitCostUsd = isIQD ? (txWithCost.unitCost / marketRatePerDollar) : txWithCost.unitCost;
+          totalWarehouseValueInUsd += qty * unitCostUsd;
+        }
       }
     }
   });
