@@ -36,13 +36,12 @@ export default function LoginPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setLoginSuccess(true);
-        document.cookie = "auth_token=authenticated_session; path=/; max-age=604800; SameSite=Lax";
-        if (data.user) {
-          document.cookie = `user_session=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=604800; SameSite=Lax`;
+        if (data.user && typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem("user_session_cache", JSON.stringify(data.user));
         }
         setTimeout(() => {
           window.location.href = "/dashboard";
-        }, 800);
+        }, 600);
       } else {
         setError(data.error || "یوزەرنەیم یان پاسوۆرد هەڵەیە");
       }

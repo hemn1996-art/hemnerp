@@ -79,10 +79,26 @@ interface StoreState {
   updateVoucher: (id: number, voucherData: any) => Promise<any>;
 }
 
-// Fallback: read user data from the user_session cookie (set at login)
+// Fallback: read user data from sessionStorage or user_session cookie
 // Used when /api/users/me fails due to server errors (not auth errors)
 function _readUserFromCookie(): CurrentUser | null {
   try {
+    if (typeof sessionStorage !== "undefined") {
+      const cached = sessionStorage.getItem("user_session_cache");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.id) {
+          return {
+            id: parsed.id,
+            username: parsed.username,
+            name: parsed.name,
+            role: parsed.role,
+            isActive: true,
+            permissions: [],
+          };
+        }
+      }
+    }
     const cookies = document.cookie.split(";").map((c) => c.trim());
     const sessionCookie = cookies.find((c) => c.startsWith("user_session="));
     if (!sessionCookie) return null;

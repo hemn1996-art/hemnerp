@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
-    const cronSecret = process.env.CRON_SECRET || process.env.SESSION_SECRET || "orient-iraq-cron-2026";
+    const cronSecret = process.env.CRON_SECRET || process.env.SESSION_SECRET || "hemnerp-cron-2026";
     
     // Verify bearer secret for automated cron jobs
     if (authHeader !== `Bearer ${cronSecret}` && request.headers.get("x-cron-secret") !== cronSecret) {

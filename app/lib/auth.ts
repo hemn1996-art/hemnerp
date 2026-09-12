@@ -33,7 +33,7 @@ export interface SessionUser {
 
 import crypto from "crypto";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "orient-iraq-client-2-secure-session-key-2026";
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "hemnerp-secure-session-key-2026";
 
 /**
  * Sign session payload with HMAC-SHA256
