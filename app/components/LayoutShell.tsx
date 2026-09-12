@@ -237,6 +237,54 @@ export default function LayoutShell({ children }: LayoutShellProps) {
     return () => clearInterval(interval);
   }, [currentUser, isLoginPage]);
 
+  // Automated background backup (runs every 1 hour continuously across the whole system)
+  useEffect(() => {
+    if (isLoginPage || !currentUser) return;
+
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
+
+    const runAutoBackupCheck = async () => {
+      try {
+        const autoEnabled = localStorage.getItem("auto_backup_enabled");
+        if (autoEnabled === "false") return;
+
+        const lastRunStr = localStorage.getItem("last_auto_backup_timestamp");
+        const now = Date.now();
+
+        if (lastRunStr) {
+          const lastRun = Number(lastRunStr);
+          if (!isNaN(lastRun) && (now - lastRun) < ONE_HOUR_MS) {
+            return; // Less than 1 hour has passed
+          }
+        }
+
+        const { performBackupFlow } = await import("../lib/backupClient");
+        const res = await performBackupFlow();
+        if (res.success) {
+          localStorage.setItem("last_auto_backup_timestamp", String(now));
+          const formatted = new Date().toLocaleString("ku", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          });
+          localStorage.setItem("last_backup_time", formatted);
+          console.log("[Auto-Backup] Hourly automated backup completed successfully:", formatted);
+        }
+      } catch (err) {
+        console.error("[Auto-Backup] Hourly automated backup error:", err);
+      }
+    };
+
+    // Initial check 15 seconds after login/load
+    const initialTimer = setTimeout(runAutoBackupCheck, 15000);
+    const intervalTimer = setInterval(runAutoBackupCheck, CHECK_INTERVAL_MS);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalTimer);
+    };
+  }, [currentUser, isLoginPage]);
+
   // Real-time updates via SSE — DISABLED temporarily
   // SSE was causing DB connection pool exhaustion on Supabase free tier,
   // because each SSE connection holds a DB connection open and auto-reconnects on failure.

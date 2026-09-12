@@ -5,6 +5,7 @@ export type CurrencyLike = {
   name: string;
   code: string;
   symbol: string;
+  rate?: number;
   isActive?: boolean;
 };
 

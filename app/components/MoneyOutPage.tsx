@@ -1019,6 +1019,11 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
       return false;
     }
 
+    if (!cashboxId) {
+      showToast("تکایە قاسە دیاری بکە.");
+      return false;
+    }
+
     if (selectedCashbox) {
       for (const paid of getPaidCurrencies()) {
         const bal = selectedCashbox.balances?.find((b: any) => b.currencyId === paid.currencyId);

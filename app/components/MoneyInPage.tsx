@@ -120,7 +120,9 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
           minute: "2-digit",
         })
       );
-      setReceiptDate(new Date().toISOString().slice(0, 10));
+      const d = new Date();
+      const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      setReceiptDate(localDate);
     }
 
     if (currencies.length === 0) fetchCurrencies();
@@ -977,6 +979,11 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       return false;
     }
 
+    if (!cashboxId) {
+      showToast("تکایە قاسە دیاری بکە.");
+      return false;
+    }
+
     return true;
   }
 
@@ -1070,7 +1077,8 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
         minute: "2-digit",
       })
     );
-    setReceiptDate(new Date().toISOString().slice(0, 10));
+    const d = new Date();
+    setReceiptDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
     setAccountId(undefined);
     setAccountSearch("");
     setShowAccountInfo(false);

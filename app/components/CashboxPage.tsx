@@ -93,6 +93,47 @@ export default function CashboxPage() {
     });
   }, [cashboxesState, search]);
 
+  const usdCurrency = useMemo(() => {
+    return allCurrencies.find((c: any) => c.code === "USD") || { id: 1, code: "USD", symbol: "$", rate: 1 };
+  }, [allCurrencies]);
+
+  const iqdCurrency = useMemo(() => {
+    return allCurrencies.find((c: any) => c.code === "IQD") || { id: 2, code: "IQD", symbol: "دینار", rate: 1540 };
+  }, [allCurrencies]);
+
+  const dailyRate100 = useMemo(() => {
+    const r = Number(iqdCurrency.rate || 1540);
+    return r > 10000 ? r : r * 100;
+  }, [iqdCurrency]);
+
+  const ratePer1Usd = dailyRate100 / 100;
+
+  const { totalIqd, totalUsd, netTotalUsd } = useMemo(() => {
+    let iqdSum = 0;
+    let usdSum = 0;
+
+    cashboxesState.forEach((cb: any) => {
+      if (cb.isActive === false) return;
+      (cb.balances || []).forEach((b: any) => {
+        const amt = Number(b.amount || 0);
+        if (Number(b.currencyId) === Number(iqdCurrency.id) || b.currency?.code === "IQD") {
+          iqdSum += amt;
+        } else if (Number(b.currencyId) === Number(usdCurrency.id) || b.currency?.code === "USD") {
+          usdSum += amt;
+        }
+      });
+    });
+
+    const convertedIqdToUsd = ratePer1Usd > 0 ? iqdSum / ratePer1Usd : 0;
+    const netUsd = usdSum + convertedIqdToUsd;
+
+    return {
+      totalIqd: iqdSum,
+      totalUsd: usdSum,
+      netTotalUsd: netUsd,
+    };
+  }, [cashboxesState, iqdCurrency.id, usdCurrency.id, ratePer1Usd]);
+
   function makeEmptyBalanceMap(currencyList: CurrencyLike[]) {
     const map: Record<number, string> = {};
     currencyList.forEach((currency: any) => {
@@ -136,9 +177,9 @@ export default function CashboxPage() {
     const symbol = currency?.symbol || "";
 
     if (currency?.code === "IQD") {
-      return `${Number(amount || 0).toLocaleString("en-US")} دینار`;
+      return `${Math.round(Number(amount || 0)).toLocaleString("en-US")} دینار`;
     }
-    return `${Number(amount || 0).toLocaleString("en-US")} ${symbol}`;
+    return `${Math.round(Number(amount || 0)).toLocaleString("en-US")} ${symbol}`;
   }
 
   function formatAllBalances(cashbox: CashboxLike) {
@@ -404,6 +445,75 @@ export default function CashboxPage() {
         >
           <span className="text-xl">+</span> زیادکردن
         </button>
+      </div>
+
+      {/* Cash Summary Dashboard Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+        {/* Card 1: Total IQD */}
+        <div className="bg-gradient-to-br from-white to-blue-50/40 border border-blue-100/80 rounded-2xl p-5 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-black text-blue-900/70">کۆی کاشی دینار (هەموو قاسەکان)</span>
+            <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="20" height="12" x="2" y="6" rx="2"/>
+                <circle cx="12" cy="12" r="2"/>
+                <path d="M6 12h.01M18 12h.01"/>
+              </svg>
+            </div>
+          </div>
+          <div className="text-2xl font-black text-slate-900 tracking-tight" dir="ltr">
+            <span>{Math.round(totalIqd).toLocaleString("en-US")}</span>{" "}
+            <span className="text-base font-bold text-blue-700">دینار</span>
+          </div>
+          <div className="mt-2 text-xs text-slate-500 font-medium flex items-center gap-1">
+            <span>کۆی گشتی دیناری بەردەست لە هەموو قاسە و بانکەکان</span>
+          </div>
+        </div>
+
+        {/* Card 2: Total USD */}
+        <div className="bg-gradient-to-br from-white to-emerald-50/40 border border-emerald-100/80 rounded-2xl p-5 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-black text-emerald-900/70">کۆی کاشی دۆلار (هەموو قاسەکان)</span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-600/10 text-emerald-600 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" x2="12" y1="2" y2="22"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+          </div>
+          <div className="text-2xl font-black text-emerald-700 tracking-tight" dir="ltr">
+            <span className="text-base font-bold text-emerald-600 mr-1">$</span>
+            <span>{Math.round(totalUsd).toLocaleString("en-US")}</span>
+          </div>
+          <div className="mt-2 text-xs text-slate-500 font-medium flex items-center gap-1">
+            <span>کۆی گشتی دۆلاری نەقدی بەردەست</span>
+          </div>
+        </div>
+
+        {/* Card 3: Net Cash Converted to USD Leaves (کۆی کاش بە گەڵای ڕۆژ) */}
+        <div className="bg-gradient-to-br from-[#0b1b3d] to-[#040e24] text-white rounded-2xl p-5 shadow-lg relative overflow-hidden border border-blue-900/40">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-black text-blue-200">کۆی کاش بە گەڵای ڕۆژ (صافی کاش)</span>
+            <div className="w-9 h-9 rounded-xl bg-white/10 text-emerald-400 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"/>
+                <path d="M7 3.34V5a3 3 0 0 0 3 3v0a2 2 0 0 1 2 2v0c0 1.1.9 2 2 2v0a2 2 0 0 0 2-2v0c0-1.1.9-2 2-2h3.17"/>
+                <path d="M11 21.95V18a2 2 0 0 0-2-2v0a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"/>
+                <circle cx="12" cy="12" r="10"/>
+              </svg>
+            </div>
+          </div>
+          <div className="text-3xl font-black text-emerald-400 tracking-tight flex items-baseline gap-1" dir="ltr">
+            <span className="text-lg font-bold text-emerald-300">$</span>
+            <span>{Math.round(netTotalUsd).toLocaleString("en-US")}</span>
+          </div>
+          <div className="mt-2 text-xs text-blue-200/90 font-medium flex items-center justify-between border-t border-white/10 pt-2">
+            <span>نرخی گەڵای ڕۆژ: 100$ = {Math.round(dailyRate100).toLocaleString("en-US")} دینار</span>
+            <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md text-[11px] font-black">
+              ≈ {Math.round(netTotalUsd / 100).toLocaleString("en-US")} گەڵا
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-6 flex flex-wrap justify-between items-center gap-4 shadow-sm">

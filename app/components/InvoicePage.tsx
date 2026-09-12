@@ -843,7 +843,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
     }
     if (Object.keys(map).length === 0 && typeof account.balance === "number") {
-      const balanceCurrencyId = account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency.id || 1;
+      const balanceCurrencyId = account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency?.id || 1;
       map[String(balanceCurrencyId)] = Number(account.balance || 0);
     }
     return map;
@@ -851,13 +851,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   function getSingleAccountBalanceCurrencyId(account?: AccountLike): number {
     if (!account?.balanceByCurrency) {
-      return account?.balanceCurrencyId || account?.creditLimitCurrencyId || defaultCurrency.id || 1;
+      return account?.balanceCurrencyId || account?.creditLimitCurrencyId || defaultCurrency?.id || 1;
     }
     const activeCurrencies = Object.entries(account.balanceByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
       .map(([currencyIdText]) => Number(currencyIdText));
     if (activeCurrencies.length === 1) return activeCurrencies[0];
-    return account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency.id || 1;
+    return account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency?.id || 1;
   }
 
   function formatCurrencyAmount(value: number, currencyId: number) {

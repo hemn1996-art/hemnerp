@@ -250,7 +250,13 @@ export async function GET(request: Request) {
         amount: v.netAmount || v.totalAmount || 0,
         totalDiscount: v.totalDiscount || 0,
         employeeName: v.employeeName || "-",
-        note: v.internalNote || v.printNote || "-",
+        note: (() => {
+          const lineNotes = v.lines && v.lines.length > 0 ? v.lines.map(l => l.note?.trim()).filter(Boolean).join(" ، ") : "";
+          if (v.internalNote && lineNotes && v.internalNote !== lineNotes) {
+            return `${v.internalNote} (${lineNotes})`;
+          }
+          return v.internalNote || lineNotes || v.printNote || "-";
+        })(),
         itemNames,
         itemSummaries,
         mainItemName,

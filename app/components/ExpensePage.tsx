@@ -744,6 +744,9 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
       }
     }, 0);
 
+    const lineNotesSummary = rows.map((r: any) => (r.note || "").trim()).filter(Boolean).join(" ، ");
+    const finalInternalNote = receiptNote.trim() || lineNotesSummary;
+
     const payload = {
       type: "expense",
       referenceNo: String(receiptNumber),
@@ -755,7 +758,7 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
       totalAmount: finalTotalAmount,
       totalDiscount: 0,
       netAmount: finalTotalAmount,
-      internalNote: receiptNote,
+      internalNote: finalInternalNote,
       printNote: printNote,
       employeeName: employeeNameFromLogin,
       lines: rows.map((row: any) => ({

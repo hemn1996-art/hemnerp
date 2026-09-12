@@ -83,7 +83,10 @@ export default function BackupSettingsPage() {
   // Load settings from localStorage
   useEffect(() => {
     const savedAutoBackup = localStorage.getItem("auto_backup_enabled");
-    if (savedAutoBackup === "true") setAutoBackup(true);
+    if (savedAutoBackup === "true" || savedAutoBackup === null) {
+      setAutoBackup(true);
+      if (savedAutoBackup === null) localStorage.setItem("auto_backup_enabled", "true");
+    }
     const savedLastBackup = localStorage.getItem("last_backup_time");
     if (savedLastBackup) setLastBackupTime(savedLastBackup);
     const savedBackupOnClose = localStorage.getItem("backup_on_close");

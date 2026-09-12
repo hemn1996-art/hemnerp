@@ -532,7 +532,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       }
     }
     if (Object.keys(map).length === 0 && typeof account.balance === "number") {
-      const balanceCurrencyId = defaultCurrency.id || 1;
+      const balanceCurrencyId = defaultCurrency?.id || 1;
       map[String(balanceCurrencyId)] = Number(account.balance || 0);
     }
     return map;
@@ -540,13 +540,13 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   function getSingleAccountBalanceCurrencyId(account?: AccountLike): number {
     if (!account?.balanceByCurrency) {
-      return defaultCurrency.id || 1;
+      return defaultCurrency?.id || 1;
     }
     const activeCurrencies = Object.entries(account.balanceByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
       .map(([currencyIdText]) => Number(currencyIdText));
     if (activeCurrencies.length === 1) return activeCurrencies[0];
-    return defaultCurrency.id || 1;
+    return defaultCurrency?.id || 1;
   }
 
   function formatCurrencyAmount(value: number, currencyId: number) {
@@ -554,7 +554,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+      return `${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} دینار`;
     }
     return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
@@ -1653,8 +1653,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setExpenses([]);
     setPaidAmounts({});
     setPaymentTypeMode("debt");
-    setPurchaseCurrencyId(defaultCurrency.id);
-    setPaidCurrencyId(defaultCurrency.id);
+    setPurchaseCurrencyId(defaultCurrency?.id || 1);
+    setPaidCurrencyId(defaultCurrency?.id || 1);
     const iqd = currencies.find((c: any) => c.code === "IQD");
     if (iqd && iqd.rate) {
       setExchangeRate(String(iqd.rate * 100));
@@ -1671,7 +1671,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setIsLocked(false);
     setOriginalVoucher(null);
     setExpenseAllocationMode("quantity");
-    setExpenseTotalCurrencyId(defaultCurrency.id);
+    setExpenseTotalCurrencyId(defaultCurrency?.id || 1);
     setIsArrived(true);
     setArrivalDate("");
     setCashboxId(getDefaultCashbox(cashboxes)?.id);
