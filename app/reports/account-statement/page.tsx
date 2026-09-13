@@ -5,6 +5,7 @@ import { useStore } from "../../store/store";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
+import BackButton from "../../components/BackButton";
 
 interface Product { id: number; name: string; code: string | null; costPrice: number | null; }
 interface VoucherLine { id: number; productId: number; qty: number; unitPrice: number; discountAmount: number; lineTotal: number; note: string | null; product: Product; }
@@ -598,6 +599,7 @@ function AccountStatementContent() {
           </button>
           <span className="font-bold text-gray-800 text-lg">کەشف حساب</span>
         </div>
+        <BackButton />
       </div>
 
 

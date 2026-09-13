@@ -14,6 +14,8 @@ import {
 import { store, useStore } from "../store/store";
 import { saveInvoice } from "../utils/invoiceLogic";
 import { currencies as mockCurrencies } from "../data/mockData";
+import { useRouter } from "next/navigation";
+import { saveVoucherDraft, getVoucherDraft, clearVoucherDraft } from "../lib/voucherDraftStorage";
 
 type ToastType = "error" | "success" | "info";
 
@@ -101,6 +103,7 @@ type Props = {
 };
 
 export default function MaterialIssuePage({ headerSelector, editId }: Props) {
+  const router = useRouter();
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
   const addVoucher = useStore((s) => s.addVoucher);
   const updateVoucher = useStore((s) => s.updateVoucher);
@@ -110,6 +113,13 @@ export default function MaterialIssuePage({ headerSelector, editId }: Props) {
     setIsEditLoading(!!editId);
     if (editId) {
       setSavedSnapshot("");
+    } else {
+      const savedDraft = getVoucherDraft("material_issue");
+      if (savedDraft) {
+        restoreMaterialIssueDraft(savedDraft);
+        return;
+      }
+      resetReceipt();
     }
   }, [editId]);
 
@@ -373,6 +383,34 @@ export default function MaterialIssuePage({ headerSelector, editId }: Props) {
       }
     };
   }, [isSaved, isLocked, editId, currentSnapshot]);
+
+  const currentMaterialIssueDraft = useMemo(() => {
+    if (editId || isLocked || isSaved) return null;
+    if (!accountId && rows.length === 0 && !receiptNote && !printNote) return null;
+    return {
+      accountId,
+      accountSearch,
+      rows,
+      receiptNumber,
+      receiptDate,
+      createdTime,
+      warehouseId,
+      receiptNote,
+      printNote,
+    };
+  }, [
+    editId, isLocked, isSaved, accountId, accountSearch,
+    rows, receiptNumber, receiptDate, createdTime,
+    warehouseId, receiptNote, printNote
+  ]);
+
+  useEffect(() => {
+    if (!editId && !isLocked && !isSaved) {
+      if (currentMaterialIssueDraft) {
+        saveVoucherDraft("material_issue", currentMaterialIssueDraft);
+      }
+    }
+  }, [currentMaterialIssueDraft, editId, isLocked, isSaved]);
 
   function showToast(message: string, type: ToastType = "error") {
     setToastMessage(message);
@@ -658,6 +696,7 @@ export default function MaterialIssuePage({ headerSelector, editId }: Props) {
   }
 
   function resetReceipt() {
+    clearVoucherDraft("material_issue");
     setReceiptNumber("");
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
@@ -683,6 +722,21 @@ export default function MaterialIssuePage({ headerSelector, editId }: Props) {
 
     setSavedSnapshot("");
     setIsLocked(false);
+  }
+
+  function restoreMaterialIssueDraft(draft: any) {
+    if (!draft) return;
+    if (draft.accountId) setAccountId(draft.accountId);
+    if (draft.accountSearch) setAccountSearch(draft.accountSearch);
+    if (draft.rows) setRows(draft.rows);
+    if (draft.receiptNumber) setReceiptNumber(draft.receiptNumber);
+    if (draft.receiptDate) setReceiptDate(draft.receiptDate);
+    if (draft.createdTime) setCreatedTime(draft.createdTime);
+    if (draft.warehouseId) setWarehouseId(draft.warehouseId);
+    if (draft.receiptNote) setReceiptNote(draft.receiptNote);
+    if (draft.printNote) setPrintNote(draft.printNote);
+    if (draft.receiptNote || draft.printNote) setShowNotes(true);
+    if (draft.accountId) setShowAccountInfo(true);
   }
 
   function hasUnsavedData() {
@@ -785,6 +839,7 @@ export default function MaterialIssuePage({ headerSelector, editId }: Props) {
 
     savePromise.then((res: any) => {
       if (res) {
+        clearVoucherDraft("material_issue");
         setSavedSnapshot(currentSnapshot);
         if (editId) {
           showToast("پسوڵەی سەرفی مواد نوێکرایەوە ✅", "success");
@@ -880,40 +935,100 @@ export default function MaterialIssuePage({ headerSelector, editId }: Props) {
       <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
           <div style={{ position: "relative", marginBottom: 14 }}>
-            <label style={labelStyle}>هەژمار</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <label style={labelStyle}>هەژمار</label>
+            </div>
 
             <div style={accountInputWrap}>
-              <input
-                value={accountSearch}
-                disabled={isLocked}
-                onFocus={() => {
-                  if (!isLocked) setShowAccountList(true);
-                }}
-                onChange={(event) => {
-                  if (blockIfLocked()) return;
-                  setAccountSearch(event.target.value);
-                  setAccountId(undefined);
-                  setShowAccountList(true);
-                  setShowAccountInfo(false);
-                }}
-                placeholder="هەژمار..."
-                style={{
-                  ...input,
-                  ...lockedFieldStyle,
-                  paddingLeft: accountId && !isLocked ? 44 : 14,
-                }}
-              />
+              {accountId ? (
+                <div
+                  style={{
+                    ...input,
+                    ...lockedFieldStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    background: isLocked ? "#f3f4f6" : "#ffffff",
+                    cursor: "pointer",
+                    borderColor: "#93c5fd",
+                  }}
+                >
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!accountId) return;
+                      if (currentMaterialIssueDraft) {
+                        saveVoucherDraft("material_issue", currentMaterialIssueDraft);
+                      }
+                      router.push(`/reports/account-statement?accountId=${accountId}`);
+                    }}
+                    onAuxClick={(e) => {
+                      if (e.button === 1 && accountId) {
+                        e.preventDefault();
+                        window.open(`/reports/account-statement?accountId=${accountId}`, "_blank");
+                      }
+                    }}
+                    style={{
+                      color: "#1d4ed8",
+                      fontWeight: 800,
+                      fontSize: "14px",
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                      flex: 1,
+                      height: "100%",
+                    }}
+                    className="hover:underline"
+                    title="کلیک بکە بۆ بینینی کەشفی حسابی ئەم هەژمارە (داتاکەت پارێزراوە)"
+                  >
+                    <span>{selectedAccount?.name || accountSearch}</span>
+                  </span>
+                </div>
+              ) : (
+                <input
+                  value={accountSearch}
+                  disabled={isLocked}
+                  onFocus={() => {
+                    if (!isLocked) setShowAccountList(true);
+                  }}
+                  onChange={(event) => {
+                    if (blockIfLocked()) return;
+                    setAccountSearch(event.target.value);
+                    setAccountId(undefined);
+                    setShowAccountList(true);
+                    setShowAccountInfo(false);
+                  }}
+                  placeholder="هەژمار..."
+                  style={{
+                    ...input,
+                    ...lockedFieldStyle,
+                  }}
+                />
+              )}
 
               {accountId && !isLocked && (
                 <button
                   type="button"
-                  style={accountClearBtn}
+                  style={{
+                    position: "absolute",
+                    left: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    ...accountClearBtn,
+                    zIndex: 5,
+                  }}
                   onClick={() => {
+                    if (typeof blockIfLocked === "function" && blockIfLocked()) return;
                     setAccountId(undefined);
                     setAccountSearch("");
                     setShowAccountInfo(false);
-                    setShowAccountList(false);
+                    if (typeof setShowAccountList === "function") setShowAccountList(false);
                   }}
+                  title="لابردنی هەژمار"
                 >
                   ×
                 </button>

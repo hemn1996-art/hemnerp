@@ -8,6 +8,7 @@ import { Product } from "../types";
 import AlertModal from "./AlertModal";
 import SingleSelectDropdown from "./SingleSelectDropdown";
 import { convertDigits } from "../utils/digits";
+import ProductQuickModal from "./ProductQuickModal";
 
 type ItemKind = "inventory" | "service" | "expense";
 
@@ -73,6 +74,8 @@ function ItemsList({
   const products = useStore((state) => state.products) || [];
   const fetchProducts = useStore((state) => state.fetchProducts);
   const deleteProduct = useStore((state) => state.deleteProduct);
+
+  const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
 
   const [alertConfig, setAlertConfig] = useState<{
     isOpen: boolean;
@@ -204,7 +207,14 @@ function ItemsList({
             ) : (
               filteredProducts.map((item: Product) => (
                 <tr key={item.id}>
-                  <td style={td}>{item.name}</td>
+                  <td 
+                    style={{ ...td, cursor: "pointer", color: "#2563eb", fontWeight: "bold" }}
+                    onClick={() => setQuickProduct({ id: item.id, name: item.name, code: item.code })}
+                    className="hover:underline cursor-pointer select-none text-[#2563eb]"
+                    title="کلیک بکە بۆ کردارە خێراکان"
+                  >
+                    {item.name}
+                  </td>
                   <td style={td}>{item.code || "-"}</td>
 
                   <td style={td}>
@@ -273,6 +283,15 @@ function ItemsList({
         </table>
       </div>
       <AlertModal {...alertConfig} onClose={closeAlert} />
+      <ProductQuickModal
+        isOpen={Boolean(quickProduct)}
+        onClose={() => setQuickProduct(null)}
+        product={quickProduct}
+        onViewDetails={(productId) => {
+          const target = products.find((p: any) => p.id === productId);
+          if (target) onEdit(target);
+        }}
+      />
     </div>
   );
 }

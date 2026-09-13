@@ -18,6 +18,7 @@ import { store, useStore } from "../store/store";
 import { calculateLedgerEntries } from "../utils/ledgerHelper";
 import { getDefaultCashbox } from "../utils/accounting";
 import { accountTypes, currencies as mockCurrencies } from "../data/mockData";
+import { saveVoucherDraft, getVoucherDraft, clearVoucherDraft } from "../lib/voucherDraftStorage";
 
 type Props = {
   headerSelector?: ReactNode;
@@ -174,6 +175,11 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setIsEditLoading(!!editId);
     if (editId) {
       setSavedSnapshot("");
+    } else {
+      const savedDraft = getVoucherDraft("purchase");
+      if (savedDraft && (savedDraft.supplierId || (savedDraft.rows && savedDraft.rows.length > 0))) {
+        restorePurchaseDraft(savedDraft);
+      }
     }
   }, [editId]);
 
@@ -1630,7 +1636,64 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     account.balance = Number(account.balance || 0) + supplierRemainingInBase;
   }
 
+  function restorePurchaseDraft(draft: any) {
+    if (!draft) return;
+    try {
+      if (draft.supplierId) setSupplierId(draft.supplierId);
+      if (draft.supplierSearch) setSupplierSearch(draft.supplierSearch);
+      if (draft.rows && Array.isArray(draft.rows)) setRows(draft.rows);
+      if (draft.expenses && Array.isArray(draft.expenses)) setExpenses(draft.expenses);
+      if (draft.paidAmounts) setPaidAmounts(draft.paidAmounts);
+      if (draft.purchaseCurrencyId) setPurchaseCurrencyId(draft.purchaseCurrencyId);
+      if (draft.paidCurrencyId) setPaidCurrencyId(draft.paidCurrencyId);
+      if (draft.exchangeRate) setExchangeRate(draft.exchangeRate);
+      if (draft.paymentTypeMode) setPaymentTypeMode(draft.paymentTypeMode);
+      if (draft.internalNote) setInternalNote(draft.internalNote);
+      if (draft.printNote) setPrintNote(draft.printNote);
+      if (draft.cashboxId) setCashboxId(draft.cashboxId);
+      if (draft.isArrived !== undefined) setIsArrived(Boolean(draft.isArrived));
+      if (draft.arrivalDate) setArrivalDate(draft.arrivalDate);
+      setShowSupplierInfo(Boolean(draft.supplierId));
+    } catch (e) {
+      console.warn("Failed to restore purchase draft:", e);
+    }
+  }
+
+  const currentPurchaseDraft = useMemo(() => {
+    if (editId || isLocked || isSaved) return null;
+    if (!hasUnsavedData()) return null;
+    return {
+      supplierId,
+      supplierSearch,
+      rows,
+      expenses,
+      paidAmounts,
+      purchaseCurrencyId,
+      paidCurrencyId,
+      exchangeRate,
+      paymentTypeMode,
+      internalNote,
+      printNote,
+      cashboxId,
+      isArrived,
+      arrivalDate,
+    };
+  }, [
+    editId, isLocked, isSaved, supplierId, supplierSearch, rows, expenses,
+    paidAmounts, purchaseCurrencyId, paidCurrencyId, exchangeRate,
+    paymentTypeMode, internalNote, printNote, cashboxId, isArrived, arrivalDate
+  ]);
+
+  useEffect(() => {
+    if (!editId && !isLocked && !isSaved) {
+      if (currentPurchaseDraft) {
+        saveVoucherDraft("purchase", currentPurchaseDraft);
+      }
+    }
+  }, [currentPurchaseDraft, editId, isLocked, isSaved]);
+
   function resetInvoice() {
+    clearVoucherDraft("purchase");
     // Clear editId from URL so the component exits edit mode
     if (editId) {
       router.push("/invoices?type=purchase");
@@ -1827,6 +1890,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     savePromise.then((res) => {
       setIsSaving(false);
       if (res) {
+        clearVoucherDraft("purchase");
         fetchProducts(); // refresh products stock
         setSavedSnapshot(currentSnapshot);
         if (editId) {
@@ -2094,31 +2158,87 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             <label style={labelStyle}>دابینکەر</label>
 
             <div style={supplierInputWrap}>
-              <input
-                value={supplierSearch}
-                disabled={isLocked}
-                onFocus={() => {
-                  if (!isLocked) setShowSupplierList(true);
-                }}
-                onChange={(e) => {
-                  if (blockIfLocked()) return;
-                  setSupplierSearch(e.target.value);
-                  setSupplierId(undefined);
-                  setShowSupplierList(true);
-                  setShowSupplierInfo(false);
-                }}
-                placeholder="هەژمار / دابینکەر"
-                style={{
-                  ...input,
-                  ...lockedFieldStyle,
-                  paddingLeft: supplierId && !isLocked ? 44 : 14,
-                }}
-              />
+              {supplierId ? (
+                <div
+                  style={{
+                    ...input,
+                    ...lockedFieldStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    background: isLocked ? "#f3f4f6" : "#ffffff",
+                    cursor: "pointer",
+                    borderColor: "#93c5fd",
+                  }}
+                >
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!supplierId) return;
+                      if (currentPurchaseDraft) {
+                        saveVoucherDraft("purchase", currentPurchaseDraft);
+                      }
+                      router.push(`/reports/account-statement?accountId=${supplierId}`);
+                    }}
+                    onAuxClick={(e) => {
+                      if (e.button === 1 && supplierId) {
+                        e.preventDefault();
+                        window.open(`/reports/account-statement?accountId=${supplierId}`, "_blank");
+                      }
+                    }}
+                    style={{
+                      color: "#1d4ed8",
+                      fontWeight: 800,
+                      fontSize: "14px",
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                      flex: 1,
+                      height: "100%",
+                    }}
+                    className="hover:underline"
+                    title="کلیک بکە بۆ بینینی کەشفی حسابی ئەم هەژمارە (کەرەستە و پسووڵەکەت پارێزراوە)"
+                  >
+                    <span>{supplier?.name || supplierSearch}</span>
+                  </span>
+                </div>
+              ) : (
+                <input
+                  value={supplierSearch}
+                  disabled={isLocked}
+                  onFocus={() => {
+                    if (!isLocked) setShowSupplierList(true);
+                  }}
+                  onChange={(e) => {
+                    if (blockIfLocked()) return;
+                    setSupplierSearch(e.target.value);
+                    setSupplierId(undefined);
+                    setShowSupplierList(true);
+                    setShowSupplierInfo(false);
+                  }}
+                  placeholder="هەژمار / دابینکەر"
+                  style={{
+                    ...input,
+                    ...lockedFieldStyle,
+                  }}
+                />
+              )}
 
               {supplierId && !isLocked && (
                 <button
                   type="button"
-                  style={supplierClearBtn}
+                  style={{
+                    position: "absolute",
+                    left: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    ...supplierClearBtn,
+                    zIndex: 5,
+                  }}
                   onClick={() => {
                     setSupplierId(undefined);
                     setSupplierSearch("");

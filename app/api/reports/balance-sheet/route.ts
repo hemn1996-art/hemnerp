@@ -113,23 +113,14 @@ export async function GET(request: Request) {
       }
     }
 
-    // Find the last voucher rate for IQD on or before the dateFilter to return as the default rate
-    const lastVoucher = await prisma.voucher.findFirst({
-      where: {
-        date: { lte: dateFilter },
-        exchangeRate: { gt: 1 },
-        isDeleted: false,
-      },
-      orderBy: { date: 'desc' },
-      select: { exchangeRate: true },
-    });
-    
-    const dbIQD = currencies.find((c: any) => c.code === "IQD");
-    const fallbackRate = dbIQD ? dbIQD.rate : 1535;
-    const defaultRate = lastVoucher ? lastVoucher.exchangeRate : fallbackRate;
-    let normalizedDefaultRate = defaultRate;
-    if (normalizedDefaultRate > 10000) normalizedDefaultRate = normalizedDefaultRate / 100;
-    if (normalizedDefaultRate < 10) normalizedDefaultRate = normalizedDefaultRate * 100;
+    // Default rate is taken directly from the Currencies section (بەشی دراوەکان)
+    const dbIQD = currencies.find((c: any) => c.code === "IQD" || c.id === 2);
+    let currencyRate = dbIQD ? dbIQD.rate : 1550;
+    if (currencyRate > 10000) currencyRate = currencyRate / 100;
+    if (currencyRate < 10) currencyRate = currencyRate * 100;
+
+    const defaultRate = currencyRate;
+    const normalizedDefaultRate = defaultRate;
 
     // Define target currency for the report
     let targetCurrency = currencies.find((c: any) => c.code === "USD"); // Default to USD for consolidated view
@@ -148,9 +139,11 @@ export async function GET(request: Request) {
     const convertToTarget = (amount: number, fromCurrencyId: number) => {
       const fromCur = currencies.find((c: any) => c.id === fromCurrencyId);
       let fromRate = fromCur ? fromCur.rate : 1.0;
-      if (fromCur && fromCur.code === "IQD" && customIQDRate !== null) {
-        fromRate = customIQDRate;
+      if (fromCur && (fromCur.code === "IQD" || fromCur.id === 2)) {
+        fromRate = customIQDRate !== null ? customIQDRate : currencyRate;
       }
+      if (fromRate > 10000) fromRate = fromRate / 100;
+      if (fromRate < 10 && fromCur && (fromCur.code === "IQD" || fromCur.id === 2)) fromRate = fromRate * 100;
       const usdAmount = amount / fromRate;
       return usdAmount * targetRate;
     };
@@ -159,8 +152,8 @@ export async function GET(request: Request) {
       if (voucherCurId === usdId) return amount * targetRate;
       const fromCur = currencies.find((c: any) => c.id === voucherCurId);
       let rate = exchangeRate || 1500;
-      if (fromCur && fromCur.code === "IQD" && customIQDRate !== null) {
-        rate = exchangeRate || customIQDRate;
+      if (fromCur && (fromCur.code === "IQD" || fromCur.id === 2)) {
+        rate = customIQDRate !== null ? customIQDRate : currencyRate;
       }
       if (rate > 10000) rate = rate / 100; // 155000 -> 1550
       if (rate < 10) rate = rate * 100;    // 15.5 -> 1550
@@ -253,7 +246,7 @@ export async function GET(request: Request) {
     });
 
     const iqdId = dbIQD ? dbIQD.id : 2;
-    const marketRatePerDollar = customIQDRate || (fallbackRate > 10000 ? fallbackRate / 100 : fallbackRate);
+    const marketRatePerDollar = customIQDRate || currencyRate;
 
     let accountsReceivable = 0;
     let accountsPayable = 0;

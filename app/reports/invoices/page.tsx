@@ -8,6 +8,7 @@ import DateInput from "../../components/DateInput";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import { normalizeKurdishSearchText } from "../../utils/digits";
+import BackButton from "../../components/BackButton";
 
 // TypeScript Interfaces for DB Vouchers & Relations
 interface Product {
@@ -326,11 +327,19 @@ function InvoiceReportContent() {
     const paramType = searchParams.get("type");
     const paramStart = searchParams.get("startDate");
     const paramEnd = searchParams.get("endDate");
+    const paramAccountId = searchParams.get("accountId");
+
+    if (paramAccountId) {
+      setFilterAccountIds([Number(paramAccountId)]);
+    }
 
     if (paramType) {
       setFilterInvoiceTypes(paramType.split(","));
-      if (paramStart) setStartDate(paramStart);
-      if (paramEnd) setEndDate(paramEnd);
+    }
+    if (paramStart) setStartDate(paramStart);
+    if (paramEnd) setEndDate(paramEnd);
+
+    if (paramType || paramStart || paramEnd || paramAccountId) {
       setFiltersLoaded(true);
       return;
     }
@@ -345,7 +354,7 @@ function InvoiceReportContent() {
         if (data.filterPaymentStatus) setFilterPaymentStatus(data.filterPaymentStatus);
         if (data.filterStatus) setFilterStatus(data.filterStatus);
         if (data.filterAccountTypeIds) setFilterAccountTypeIds(data.filterAccountTypeIds);
-        if (data.filterAccountIds) setFilterAccountIds(data.filterAccountIds);
+        if (!paramAccountId && data.filterAccountIds) setFilterAccountIds(data.filterAccountIds);
         if (data.filterCashboxIds) setFilterCashboxIds(data.filterCashboxIds);
         if (data.filterWarehouseIds) setFilterWarehouseIds(data.filterWarehouseIds);
         if (data.filterInvoiceNo) setFilterInvoiceNo(data.filterInvoiceNo);
@@ -2263,6 +2272,7 @@ function InvoiceReportContent() {
             <span className="text-3xl">📈</span>
             <h1 className="text-2xl font-black text-slate-900 m-0">ڕاپۆرتی پسوڵە</h1>
           </div>
+          <BackButton />
         </div>
 
         {/* Filters and Action Buttons Row */}

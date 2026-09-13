@@ -1,12 +1,13 @@
 "use client";
 
 import MultiSelectDropdown from "../../components/MultiSelectDropdown";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, Suspense } from "react";
 import { useStore } from "../../store/store";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
+import BackButton from "../../components/BackButton";
 
 import { normalizeKurdishSearchText } from "../../utils/digits";
 
@@ -15,10 +16,11 @@ interface DropdownOption {
   label: string;
 }
 
-
-
-export default function ItemsReportPage() {
+function ItemsReportContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const paramProductId = searchParams.get("productId") || searchParams.get("id");
+  const paramAccountId = searchParams.get("accountId");
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,16 +48,21 @@ export default function ItemsReportPage() {
 
   // Filters
   const [filterVoucherTypes, setFilterVoucherTypes] = useState<string[]>([]);
-  const [filterProductIds, setFilterProductIds] = useState<number[]>([]);
+  const [filterProductIds, setFilterProductIds] = useState<number[]>(() => {
+    return paramProductId ? [Number(paramProductId)] : [];
+  });
   const [filterCategories, setFilterCategories] = useState<string[]>([]);
   const [filterBrands, setFilterBrands] = useState<string[]>([]);
   const [itemCode, setItemCode] = useState("");
   const [batchCode, setBatchCode] = useState("");
-  // Pagination State
+  const [filterPaymentMethods, setFilterPaymentMethods] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
-  const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
+  const [filterAccountIds, setFilterAccountIds] = useState<number[]>(() => {
+    return paramAccountId ? [Number(paramAccountId)] : [];
+  });
   const [filterAccountTypeIds, setFilterAccountTypeIds] = useState<number[]>([]);
   const [currencyId, setCurrencyId] = useState("all");
   const [filterWarehouseIds, setFilterWarehouseIds] = useState<number[]>([]);
@@ -191,8 +198,17 @@ export default function ItemsReportPage() {
 
 
   useEffect(() => {
+    if (paramProductId) {
+      setFilterProductIds([Number(paramProductId)]);
+    }
+    if (paramAccountId) {
+      setFilterAccountIds([Number(paramAccountId)]);
+    }
+  }, [paramProductId, paramAccountId]);
+
+  useEffect(() => {
     fetchItems();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, filterProductIds, filterAccountIds]);
 
   const fetchItems = async () => {
     try {
@@ -971,5 +987,13 @@ export default function ItemsReportPage() {
       )}
 
     </div>
+  );
+}
+
+export default function ItemsReportPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500 font-bold">باردەکرێت...</div>}>
+      <ItemsReportContent />
+    </Suspense>
   );
 }

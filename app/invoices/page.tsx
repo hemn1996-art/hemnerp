@@ -21,6 +21,7 @@ import ProductTransferPage from "../components/ProductTransferPage";
 import MaterialIssuePage from "../components/MaterialIssuePage";
 import WarehouseDamagePage from "../components/WarehouseDamagePage";
 import WarehouseStockPage from "../components/WarehouseStockPage";
+import BackButton from "../components/BackButton";
 
 const menuItems = [
   { label: "فرۆشتن",               value: "sales" },
@@ -254,6 +255,21 @@ function InvoicesRouteContent() {
           <span className="text-xs text-gray-400 font-normal">{isOpen ? "▲" : "▼"}</span>
         </button>
 
+        {/* Open in new tab button */}
+        <a
+          href={`/invoices?type=${activeTab}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-600 transition-all flex items-center justify-center no-underline cursor-pointer shadow-xs mr-1"
+          title="کردنەوەی ئەم پسووڵەیە لە تابی نوێدا ↗"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+        </a>
+
         {/* ── Top bar explanation banner for all 4 debt vouchers ── */}
         {activeTab === "people_debt" && (
           <div className="mr-2 bg-sky-50 border border-sky-200 text-sky-800 text-xs md:text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs select-none">
@@ -275,6 +291,11 @@ function InvoicesRouteContent() {
             <span>💡 داشکاندن لە قەرزی ئێمە کە قەرزداری کەسێکین (قازانجی ئێمەیە).</span>
           </div>
         )}
+
+        {/* Back Button positioned at the level of [ پسووڵە فرۆشتن ----- ؟ ] at that exact level */}
+        <div style={{ marginInlineStart: "auto" }} className="flex items-center no-print">
+          <BackButton />
+        </div>
 
         {/* Dropdown — tall 2-column grid, no scroll */}
         {isOpen && (

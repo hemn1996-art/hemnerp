@@ -69,7 +69,7 @@ export default function ProfitDistributionPage() {
     try {
       setLoading(true);
       const dateToUse = targetDate || asOfDate;
-      const rateToUse = targetRate || dollarRate;
+      const rateToUse = targetRate !== undefined ? targetRate : (userEditedRate ? dollarRate : "");
 
       let url = `/api/reports/balance-sheet?asOfDate=${dateToUse}`;
       if (rateToUse) {
@@ -289,16 +289,34 @@ export default function ProfitDistributionPage() {
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
+                        setUserEditedRate(true);
                         fetchData(asOfDate, dollarRate);
                       }
                     }}
                   />
                   <button 
-                    onClick={() => fetchData(asOfDate, dollarRate)}
+                    onClick={() => {
+                      setUserEditedRate(true);
+                      fetchData(asOfDate, dollarRate);
+                    }}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 text-sm transition cursor-pointer border-none h-full"
                   >
                     بەکارهێنان
                   </button>
+                  {userEditedRate && (
+                    <button
+                      type="button"
+                      title="گەڕانەوە بۆ ڕەیتی بەشی دراوەکان"
+                      onClick={() => {
+                        setUserEditedRate(false);
+                        fetchData(asOfDate, "");
+                      }}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-2 text-xs transition cursor-pointer border-r border-gray-300 h-full flex items-center gap-1"
+                    >
+                      <span>↺</span>
+                      <span>دراوەکان</span>
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="text-right text-xs text-slate-400 font-bold">

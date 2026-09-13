@@ -17,6 +17,7 @@ import { store, useStore } from "../store/store";
 import { calculateLedgerEntries } from "../utils/ledgerHelper";
 import { getDefaultCashbox } from "../utils/accounting";
 import { currencies as mockCurrencies } from "../data/mockData";
+import { saveVoucherDraft, getVoucherDraft, clearVoucherDraft } from "../lib/voucherDraftStorage";
 
 type ToastType = "error" | "success" | "info";
 type PaidAmounts = Record<number, string>;
@@ -172,6 +173,11 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
 
   useEffect(() => {
     if (!editId) {
+      const savedDraft = getVoucherDraft("purchase_return");
+      if (savedDraft) {
+        restorePurchaseReturnDraft(savedDraft);
+        return;
+      }
       resetInvoice();
     }
   }, [editId]);
@@ -241,11 +247,31 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
             }
 
             setIsLocked(false);
+            setOriginalVoucher(null);
           }
         })
-        .catch((err) => console.error("Error loading voucher:", err)).finally(() => setIsEditLoading(false));
+        .catch((err) => console.error("Error loading voucher:", err))
+        .finally(() => setIsEditLoading(false));
     }
   }, [editId]);
+
+  function restorePurchaseReturnDraft(draft: any) {
+    if (!draft) return;
+    if (draft.supplierId) setSupplierId(draft.supplierId);
+    if (draft.supplierSearch) setSupplierSearch(draft.supplierSearch);
+    if (draft.rows) setRows(draft.rows);
+    if (draft.invoiceNumber) setInvoiceNumber(draft.invoiceNumber);
+    if (draft.invoiceDate) setInvoiceDate(draft.invoiceDate);
+    if (draft.createdTime) setCreatedTime(draft.createdTime);
+    if (draft.paidAmounts) setPaidAmounts(draft.paidAmounts);
+    if (draft.paidCurrencyId) setPaidCurrencyId(draft.paidCurrencyId);
+    if (draft.exchangeRate) setExchangeRate(draft.exchangeRate);
+    if (draft.internalNote) setInternalNote(draft.internalNote);
+    if (draft.printNote) setPrintNote(draft.printNote);
+    if (draft.cashboxId) setCashboxId(draft.cashboxId);
+    if (draft.internalNote || draft.printNote) setShowInvoiceNotes(true);
+    if (draft.supplierId) setShowSupplierInfo(true);
+  }
 
   useEffect(() => {
     if (!editId && currencies && currencies.length > 0) {
@@ -532,6 +558,38 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
       }
     };
   }, [isSaved, isLocked, editId, currentSnapshot]);
+
+  const currentPurchaseReturnDraft = useMemo(() => {
+    if (editId || isLocked || isSaved) return null;
+    if (!supplierId && rows.length === 0 && Object.keys(paidAmounts).length === 0 && !internalNote && !printNote) return null;
+    return {
+      supplierId,
+      supplierSearch,
+      rows,
+      invoiceNumber,
+      invoiceDate,
+      createdTime,
+      paidAmounts,
+      paidCurrencyId,
+      exchangeRate,
+      internalNote,
+      printNote,
+      cashboxId,
+    };
+  }, [
+    editId, isLocked, isSaved, supplierId, supplierSearch,
+    rows, invoiceNumber, invoiceDate, createdTime,
+    paidAmounts, paidCurrencyId, exchangeRate,
+    internalNote, printNote, cashboxId
+  ]);
+
+  useEffect(() => {
+    if (!editId && !isLocked && !isSaved) {
+      if (currentPurchaseReturnDraft) {
+        saveVoucherDraft("purchase_return", currentPurchaseReturnDraft);
+      }
+    }
+  }, [currentPurchaseReturnDraft, editId, isLocked, isSaved]);
 
   function showToast(message: string, type: ToastType = "error") {
     setToastMessage(message);
@@ -1142,6 +1200,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   }
 
   function resetInvoice() {
+    clearVoucherDraft("purchase_return");
     if (editId) {
       router.push("/invoices?type=purchase_return");
       return;
@@ -1298,6 +1357,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
 
     savePromise.then((res) => {
       if (res) {
+        clearVoucherDraft("purchase_return");
         fetchProducts();
         setSavedSnapshot(currentSnapshot);
         if (editId) {
@@ -1455,39 +1515,98 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
       <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
           <div style={{ position: "relative", marginBottom: 12 }}>
-            <label style={labelStyle}>دابینکەر</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <label style={labelStyle}>دابینکەر</label>
+            </div>
 
             <div style={supplierInputWrap}>
-              <input
-                value={supplierSearch}
-                disabled={isLocked}
-                onFocus={() => {
-                  if (!isLocked) setShowSupplierList(true);
-                }}
-                onChange={(e) => {
-                  if (blockIfLocked()) return;
-                  setSupplierSearch(e.target.value);
-                  setSupplierId(undefined);
-                  setShowSupplierList(true);
-                  setShowSupplierInfo(false);
-                }}
-                placeholder="هەژمار / دابینکەر"
-                style={{
-                  ...input,
-                  ...lockedFieldStyle,
-                  paddingLeft: supplierId && !isLocked ? 44 : 14,
-                }}
-              />
+              {supplierId ? (
+                <div
+                  style={{
+                    ...input,
+                    ...lockedFieldStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    background: isLocked ? "#f3f4f6" : "#ffffff",
+                    cursor: "pointer",
+                    borderColor: "#93c5fd",
+                  }}
+                >
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!supplierId) return;
+                      if (currentPurchaseReturnDraft) {
+                        saveVoucherDraft("purchase_return", currentPurchaseReturnDraft);
+                      }
+                      router.push(`/reports/account-statement?accountId=${supplierId}`);
+                    }}
+                    onAuxClick={(e) => {
+                      if (e.button === 1 && supplierId) {
+                        e.preventDefault();
+                        window.open(`/reports/account-statement?accountId=${supplierId}`, "_blank");
+                      }
+                    }}
+                    style={{
+                      color: "#1d4ed8",
+                      fontWeight: 800,
+                      fontSize: "14px",
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                      flex: 1,
+                      height: "100%",
+                    }}
+                    className="hover:underline"
+                    title="کلیک بکە بۆ بینینی کەشفی حسابی ئەم هەژمارە (داتاکەت پارێزراوە)"
+                  >
+                    <span>{supplier?.name || supplierSearch}</span>
+                  </span>
+                </div>
+              ) : (
+                <input
+                  value={supplierSearch}
+                  disabled={isLocked}
+                  onFocus={() => {
+                    if (!isLocked) setShowSupplierList(true);
+                  }}
+                  onChange={(e) => {
+                    if (blockIfLocked()) return;
+                    setSupplierSearch(e.target.value);
+                    setSupplierId(undefined);
+                    setShowSupplierList(true);
+                    setShowSupplierInfo(false);
+                  }}
+                  placeholder="هەژمار / دابینکەر"
+                  style={{
+                    ...input,
+                    ...lockedFieldStyle,
+                  }}
+                />
+              )}
 
               {supplierId && !isLocked && (
                 <button
                   type="button"
-                  style={supplierClearBtn}
+                  style={{
+                    position: "absolute",
+                    left: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    ...supplierClearBtn,
+                    zIndex: 5,
+                  }}
                   onClick={() => {
+                    if (typeof blockIfLocked === "function" && blockIfLocked()) return;
                     setSupplierId(undefined);
                     setSupplierSearch("");
                     setShowSupplierInfo(false);
-                    setShowSupplierList(false);
+                    if (typeof setShowSupplierList === "function") setShowSupplierList(false);
                   }}
                   title="لابردنی دابینکەر"
                 >
@@ -1710,7 +1829,10 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
           </div>
 
           <div style={sideActions}>
-            <button style={outlineBlueBtn} onClick={handleNewInvoice}>
+            <button
+              style={outlineBlueBtn}
+              onClick={handleNewInvoice}
+            >
               پسوڵەی نوێ
             </button>
 

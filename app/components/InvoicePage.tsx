@@ -21,6 +21,7 @@ import { calculateLedgerEntries } from "../utils/ledgerHelper";
 import { normalizeKurdishSearchText } from "../utils/digits";
 import { getDefaultCashbox } from "../utils/accounting";
 import { accountTypes, currencies as mockCurrencies } from "../data/mockData";
+import { saveVoucherDraft, getVoucherDraft, clearVoucherDraft } from "../lib/voucherDraftStorage";
 
 type Props = {
   headerSelector?: ReactNode;
@@ -219,7 +220,12 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (editId) {
       setSavedInvoiceSnapshot("");
     } else {
-      resetInvoice();
+      const savedDraft = getVoucherDraft("sales");
+      if (savedDraft && (savedDraft.accountId || (savedDraft.rows && savedDraft.rows.length > 0))) {
+        restoreInvoiceDraft(savedDraft);
+      } else {
+        resetInvoice();
+      }
     }
   }, [editId]);
 
@@ -390,8 +396,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }
     if (!editId && storeCurrencies && storeCurrencies.length > 0) {
       const iqd = storeCurrencies.find((c: any) => c.code === "IQD" || c.id === 2 || c.symbol === "دینار" || c.symbol === "د.ع");
-      if (iqd && iqd.exchangeRate) {
-        const rateVal = iqd.exchangeRate > 1000 ? iqd.exchangeRate : iqd.exchangeRate * 100;
+      if (iqd) {
+        const rawRate = iqd.rate || iqd.exchangeRate || 1550;
+        const rateVal = rawRate > 1000 ? rawRate : rawRate * 100;
         setExchangeRate(String(rateVal));
       }
     }
@@ -445,7 +452,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const lastLoadedEditIdRef = useRef<string | null>(null);
 
-  const [exchangeRate, setExchangeRate] = useState("150000");
+  const [exchangeRate, setExchangeRate] = useState("155000");
 
   const [productSearch, setProductSearch] = useState("");
   const [showProductList, setShowProductList] = useState(false);
@@ -499,6 +506,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [invoiceDiscountMode, setInvoiceDiscountMode] = useState<DiscountMode>("amount");
   const [invoiceDiscountValue, setInvoiceDiscountValue] = useState("");
   const [invoiceDiscountCurrencyId, setInvoiceDiscountCurrencyId] = useState<number>(1);
+  const userManuallySetDiscountRef = useRef<boolean>(false);
+  const [autoFractionDiscountNotice, setAutoFractionDiscountNotice] = useState<string>("");
+  const productSearchInputRef = useRef<HTMLInputElement>(null);
 
   const [hasDelivery, setHasDelivery] = useState(false);
   const [deliveryName, setDeliveryName] = useState("");
@@ -766,6 +776,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               setInvoiceDiscountValue(String(voucher.totalDiscount));
               setInvoiceDiscountMode("amount");
               setShowInvoiceDiscount(true);
+              userManuallySetDiscountRef.current = true;
 
               let loadedDiscountCurId = voucher.currencyId || 1;
               if (voucher.versions && Array.isArray(voucher.versions)) {
@@ -780,6 +791,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 }
               }
               setInvoiceDiscountCurrencyId(loadedDiscountCurId);
+            } else {
+              userManuallySetDiscountRef.current = false;
             }
             if (voucher.employeeName) {
               setEmployeeName(voucher.employeeName);
@@ -804,6 +817,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
     }
   }, [currencies, editId]);
+
 
   const [printOptions, setPrintOptions] = useState<PrintOptions>(() => {
     if (typeof window !== "undefined") {
@@ -843,7 +857,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
     }
     if (Object.keys(map).length === 0 && typeof account.balance === "number") {
-      const balanceCurrencyId = account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency?.id || 1;
+      const balanceCurrencyId = account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency.id || 1;
       map[String(balanceCurrencyId)] = Number(account.balance || 0);
     }
     return map;
@@ -851,13 +865,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   function getSingleAccountBalanceCurrencyId(account?: AccountLike): number {
     if (!account?.balanceByCurrency) {
-      return account?.balanceCurrencyId || account?.creditLimitCurrencyId || defaultCurrency?.id || 1;
+      return account?.balanceCurrencyId || account?.creditLimitCurrencyId || defaultCurrency.id || 1;
     }
     const activeCurrencies = Object.entries(account.balanceByCurrency)
       .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
       .map(([currencyIdText]) => Number(currencyIdText));
     if (activeCurrencies.length === 1) return activeCurrencies[0];
-    return account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency?.id || 1;
+    return account.balanceCurrencyId || account.creditLimitCurrencyId || defaultCurrency.id || 1;
   }
 
   function formatCurrencyAmount(value: number, currencyId: number) {
@@ -1058,6 +1072,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const itemCount = rows.reduce((sum, row) => sum + toNumber(row.qty), 0);
   const itemsSubtotal = rows.reduce((sum, row) => sum + getRowTotal(row), 0);
 
+  const invoiceCurrency = currencies.find((c: any) => c.id === invoiceCurrencyId);
+  const invoiceSymbol = invoiceCurrency?.symbol || "$";
   const iqdCurrencyId = currencies.find((c: any) => c.code === "IQD")?.id || 12;
 
   const invoiceDiscountAmount = useMemo(() => {
@@ -1091,6 +1107,27 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const total =
     Math.max(itemsSubtotal - invoiceDiscountAmount, 0) + deliveryFeeAmount;
+
+  // Feature 2: Auto-convert fraction in grand total to discount during invoice updating if no manual discount was specified
+  useEffect(() => {
+    if (editId && !isEditLoading && rows.length > 0) {
+      if (!userManuallySetDiscountRef.current) {
+        const rawTotalBeforeDiscount = itemsSubtotal + deliveryFeeAmount;
+        const rawFraction = rawTotalBeforeDiscount - Math.floor(rawTotalBeforeDiscount);
+        const fraction = Math.round(rawFraction * 100) / 100;
+        if (fraction >= 0.01 && fraction <= 0.99) {
+          setInvoiceDiscountValue(String(fraction));
+          setInvoiceDiscountMode("amount");
+          setInvoiceDiscountCurrencyId(invoiceCurrencyId);
+          setShowInvoiceDiscount(true);
+          setAutoFractionDiscountNotice(`کەسری بڕەکە (${fraction} ${invoiceSymbol}) خۆکارانە کرا بە داشکاندن`);
+        } else if (fraction < 0.01 && autoFractionDiscountNotice) {
+          setInvoiceDiscountValue("");
+          setAutoFractionDiscountNotice("");
+        }
+      }
+    }
+  }, [editId, isEditLoading, rows, itemsSubtotal, deliveryFeeAmount, invoiceCurrencyId, invoiceSymbol, autoFractionDiscountNotice]);
 
   const getFullPaidAmountForCurrency = useCallback((currId: number, invTotal: number) => {
     if (currId === invoiceCurrencyId) return invTotal;
@@ -1184,8 +1221,6 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     return result.balanceAfterByCurrency;
   }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, screenAccountBalanceBeforeByCurrency, total, invoiceCurrencyId, invoiceType]);
   const selectedCashbox = cashboxes.find((c: any) => c.id === cashboxId);
-  const invoiceCurrency = currencies.find((c: any) => c.id === invoiceCurrencyId);
-  const invoiceSymbol = invoiceCurrency?.symbol || "$";
 
   const visibleColumnCount =
     1 + Object.values(tableColumns).filter(Boolean).length;
@@ -2063,12 +2098,95 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     );
   }
 
+  function restoreInvoiceDraft(draft: any) {
+    if (!draft) return;
+    try {
+      if (draft.accountId) setAccountId(draft.accountId);
+      if (draft.accountSearch) setAccountSearch(draft.accountSearch);
+      if (draft.rows && Array.isArray(draft.rows)) setRows(draft.rows);
+      if (draft.invoiceCurrencyId) setInvoiceCurrencyId(draft.invoiceCurrencyId);
+      if (draft.targetCurrencyId) setTargetCurrencyId(draft.targetCurrencyId);
+      if (draft.exchangeRate) setExchangeRate(draft.exchangeRate);
+      if (draft.paidAmounts) setPaidAmounts(draft.paidAmounts);
+      if (draft.paymentTypeMode) setPaymentTypeMode(draft.paymentTypeMode);
+      if (draft.invoiceDiscountValue) setInvoiceDiscountValue(draft.invoiceDiscountValue);
+      if (draft.invoiceDiscountMode) setInvoiceDiscountMode(draft.invoiceDiscountMode);
+      if (draft.internalNote) setInternalNote(draft.internalNote);
+      if (draft.printNote) setPrintNote(draft.printNote);
+      if (draft.hasDelivery !== undefined) setHasDelivery(draft.hasDelivery);
+      if (draft.deliveryName) setDeliveryName(draft.deliveryName);
+      if (draft.deliveryPhone) setDeliveryPhone(draft.deliveryPhone);
+      if (draft.deliveryCity) setDeliveryCity(draft.deliveryCity);
+      if (draft.deliveryAddress) setDeliveryAddress(draft.deliveryAddress);
+      if (draft.deliveryFee) setDeliveryFee(draft.deliveryFee);
+      if (draft.deliveryNote) setDeliveryNote(draft.deliveryNote);
+      if (draft.isTemporaryCustomer !== undefined) setIsTemporaryCustomer(draft.isTemporaryCustomer);
+      if (draft.tempCustomerName) setTempCustomerName(draft.tempCustomerName);
+      if (draft.tempCustomerPhone) setTempCustomerPhone(draft.tempCustomerPhone);
+      if (draft.tempCustomerAddress) setTempCustomerAddress(draft.tempCustomerAddress);
+      if (draft.cashboxId) setCashboxId(draft.cashboxId);
+      setShowAccountInfo(Boolean(draft.accountId && !draft.isTemporaryCustomer));
+    } catch (e) {
+      console.warn("Failed to restore invoice draft:", e);
+    }
+  }
+
+  const currentInvoiceDraft = useMemo(() => {
+    if (editId || isInvoiceLocked || isInvoiceSaved) return null;
+    const hasData = rows.length > 0 || accountId || hasUnsavedInvoiceData();
+    if (!hasData) return null;
+    return {
+      accountId,
+      accountSearch,
+      rows,
+      invoiceCurrencyId,
+      targetCurrencyId,
+      exchangeRate,
+      paidAmounts,
+      paymentTypeMode,
+      invoiceDiscountValue,
+      invoiceDiscountMode,
+      internalNote,
+      printNote,
+      hasDelivery,
+      deliveryName,
+      deliveryPhone,
+      deliveryCity,
+      deliveryAddress,
+      deliveryFee,
+      deliveryNote,
+      isTemporaryCustomer,
+      tempCustomerName,
+      tempCustomerPhone,
+      tempCustomerAddress,
+      cashboxId,
+    };
+  }, [
+    editId, isInvoiceLocked, isInvoiceSaved, rows, accountId, accountSearch,
+    invoiceCurrencyId, targetCurrencyId, exchangeRate, paidAmounts,
+    paymentTypeMode, invoiceDiscountValue, invoiceDiscountMode,
+    internalNote, printNote, hasDelivery, deliveryName, deliveryPhone,
+    deliveryCity, deliveryAddress, deliveryFee, deliveryNote,
+    isTemporaryCustomer, tempCustomerName, tempCustomerPhone, tempCustomerAddress, cashboxId
+  ]);
+
+  useEffect(() => {
+    if (!editId && !isInvoiceLocked && !isInvoiceSaved) {
+      if (currentInvoiceDraft) {
+        saveVoucherDraft("sales", currentInvoiceDraft);
+      }
+    }
+  }, [currentInvoiceDraft, editId, isInvoiceLocked, isInvoiceSaved]);
+
   function resetInvoice() {
+    clearVoucherDraft("sales");
     // Clear editId from URL so the component exits edit mode
     if (editId) {
       router.push("/invoices?type=sales");
       return; // The route change will remount the component with editId=undefined
     }
+    userManuallySetDiscountRef.current = false;
+    setAutoFractionDiscountNotice("");
     setInvoiceNumber("");
     setCreatedTime(
       new Date().toLocaleTimeString("en-US", {
@@ -2086,10 +2204,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setPaymentTypeMode("cash");
     setPaidCurrencyId(defaultCurrency.id);
     const iqd = currencies.find((c: any) => c.code === "IQD");
-    if (iqd && iqd.rate) {
-      setExchangeRate(String(iqd.rate * 100));
+    if (iqd && (iqd.rate || iqd.exchangeRate)) {
+      const rawRate = iqd.rate || iqd.exchangeRate;
+      setExchangeRate(String(rawRate > 1000 ? rawRate : rawRate * 100));
     } else {
-      setExchangeRate("150000");
+      setExchangeRate("155000");
     }
     setInternalNote("");
     setPrintNote("");
@@ -2258,6 +2377,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     savePromise.then((res) => {
       setIsSaving(false);
       if (res && !res.error) {
+        clearVoucherDraft("sales");
         fetchAccounts();
         setSavedInvoiceSnapshot(currentInvoiceSnapshot);
         if (editId) {
@@ -2315,6 +2435,19 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           "نابێت بڕی پارەی دراو لە کۆی گشتی پسووڵەکە زیاتر بێت بۆ کڕیاری کاتی."
         );
         return;
+      }
+    }
+
+    // Feature 2: Auto-convert fraction to discount on invoice update if user hasn't specified manual discount
+    if (editId && !userManuallySetDiscountRef.current) {
+      const rawTotalBeforeDiscount = itemsSubtotal + deliveryFeeAmount;
+      const rawFraction = rawTotalBeforeDiscount - Math.floor(rawTotalBeforeDiscount);
+      const fraction = Math.round(rawFraction * 100) / 100;
+      if (fraction >= 0.01 && fraction <= 0.99) {
+        setInvoiceDiscountValue(String(fraction));
+        setInvoiceDiscountMode("amount");
+        setInvoiceDiscountCurrencyId(invoiceCurrencyId);
+        setShowInvoiceDiscount(true);
       }
     }
 
@@ -2611,34 +2744,84 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             </label>
 
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>هەژمار</label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <label style={labelStyle}>هەژمار</label>
+              </div>
 
               <div className="account-search-container" style={{ position: "relative", width: "100%" }}>
-                <input
-                  value={accountSearch}
-                  disabled={isTemporaryCustomer || isInvoiceLocked}
-                  onFocus={() => {
-                    if (!isInvoiceLocked) setShowAccountList(true);
-                  }}
-                  onChange={(e) => {
-                    if (blockIfLocked()) return;
+                {accountId && !isTemporaryCustomer ? (
+                  <div
+                    style={{
+                      ...input,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingLeft: 40,
+                      paddingRight: 14,
+                      background: isInvoiceLocked ? "#f3f4f6" : "#ffffff",
+                      cursor: "pointer",
+                      borderColor: "#93c5fd",
+                    }}
+                  >
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!accountId) return;
+                        if (currentInvoiceDraft) {
+                          saveVoucherDraft("sales", currentInvoiceDraft);
+                        }
+                        router.push(`/reports/account-statement?accountId=${accountId}`);
+                      }}
+                      onAuxClick={(e) => {
+                        if (e.button === 1 && accountId) {
+                          e.preventDefault();
+                          window.open(`/reports/account-statement?accountId=${accountId}`, "_blank");
+                        }
+                      }}
+                      style={{
+                        color: "#1d4ed8",
+                        fontWeight: 800,
+                        fontSize: "14px",
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                        flex: 1,
+                        height: "100%",
+                      }}
+                      className="hover:underline"
+                      title="کلیک بکە بۆ بینینی کەشفی حسابی ئەم هەژمارە (کەرەستە و پسووڵەکەت پارێزراوە)"
+                    >
+                      <span>{selectedAccount?.name || accountSearch}</span>
+                    </span>
+                  </div>
+                ) : (
+                  <input
+                    value={accountSearch}
+                    disabled={isTemporaryCustomer || isInvoiceLocked}
+                    onFocus={() => {
+                      if (!isInvoiceLocked) setShowAccountList(true);
+                    }}
+                    onChange={(e) => {
+                      if (blockIfLocked()) return;
 
-                    setAccountSearch(e.target.value);
-                    setAccountId(undefined);
-                    setShowAccountList(true);
-                    setShowAccountInfo(false);
-                  }}
-                  placeholder="هەژمار"
-                  style={{
-                    ...input,
-                    paddingLeft: accountId ? 36 : 14,
-                    ...(isTemporaryCustomer || isInvoiceLocked
-                      ? { background: "#f3f4f6", cursor: "not-allowed" }
-                      : {}),
-                  }}
-                />
+                      setAccountSearch(e.target.value);
+                      setAccountId(undefined);
+                      setShowAccountList(true);
+                      setShowAccountInfo(false);
+                    }}
+                    placeholder="هەژمار"
+                    style={{
+                      ...input,
+                      ...(isTemporaryCustomer || isInvoiceLocked
+                        ? { background: "#f3f4f6", cursor: "not-allowed" }
+                        : {}),
+                    }}
+                  />
+                )}
 
-                {accountId && !isInvoiceLocked && !isTemporaryCustomer && (
+                {accountId && !isTemporaryCustomer && !isInvoiceLocked && (
                   <button
                     type="button"
                     style={{
@@ -2658,8 +2841,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      zIndex: 5,
                       padding: 0,
+                      zIndex: 5,
                     }}
                     onClick={() => {
                       if (blockIfLocked()) return;
@@ -2667,6 +2850,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       setAccountSearch("");
                       setShowAccountInfo(false);
                     }}
+                    title="لابردنی هەژمار"
                   >
                     ×
                   </button>
@@ -2813,7 +2997,30 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
           {selectedAccount && showAccountInfo && !isTemporaryCustomer && (
             <div style={accountCard}>
-              <div style={sectionTitle}>زانیاری هەژمار</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={sectionTitle}>زانیاری هەژمار</div>
+                <a
+                  href={`/reports/account-statement?accountId=${selectedAccount.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: 12,
+                    color: "#2563eb",
+                    fontWeight: "bold",
+                    textDecoration: "underline",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <span>کەشفی حساب</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </a>
+              </div>
 
               <InfoRow label="جۆری هەژمار">
                 {getAccountTypeName(selectedAccount.accountTypeId)}
@@ -2903,6 +3110,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       disabled={isInvoiceLocked}
                       onChange={(val) => {
                         if (blockIfLocked()) return;
+                        userManuallySetDiscountRef.current = true;
+                        setAutoFractionDiscountNotice("");
                         setInvoiceDiscountValue(val);
                       }}
                       placeholder="0"
@@ -2927,6 +3136,82 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       </select>
                     )}
                   </div>
+
+                  {autoFractionDiscountNotice && (
+                    <div style={{
+                      fontSize: 11,
+                      color: "#047857",
+                      background: "#ecfdf5",
+                      border: "1px solid #a7f3d0",
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      fontWeight: "bold",
+                      marginTop: 6,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between"
+                    }}>
+                      <span>✨ {autoFractionDiscountNotice}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          userManuallySetDiscountRef.current = true;
+                          setInvoiceDiscountValue("");
+                          setAutoFractionDiscountNotice("");
+                        }}
+                        style={{
+                          fontSize: 12,
+                          color: "#065f46",
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: "0 4px"
+                        }}
+                        title="لابردنی داشکاندنی کەسر"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
+                  {!autoFractionDiscountNotice && (() => {
+                    const raw = itemsSubtotal + deliveryFeeAmount;
+                    const frac = Math.round((raw - Math.floor(raw)) * 100) / 100;
+                    if (frac >= 0.01 && frac <= 0.99 && (!invoiceDiscountValue || Number(invoiceDiscountValue) === 0)) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            userManuallySetDiscountRef.current = true;
+                            setInvoiceDiscountMode("amount");
+                            setInvoiceDiscountCurrencyId(invoiceCurrencyId);
+                            setInvoiceDiscountValue(String(frac));
+                            setAutoFractionDiscountNotice(`کەسری بڕەکە (${frac} ${invoiceSymbol}) کرا بە داشکاندن`);
+                          }}
+                          style={{
+                            fontSize: 11,
+                            color: "#1d4ed8",
+                            background: "#eff6ff",
+                            border: "1px solid #bfdbfe",
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            fontWeight: "bold",
+                            marginTop: 6,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            cursor: "pointer",
+                            width: "100%",
+                            justifyContent: "center"
+                          }}
+                        >
+                          <span>⚡</span>
+                          <span>چارەسەری کەسر: {frac} {invoiceSymbol} بکە بە داشکاندن</span>
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </div>
@@ -3204,7 +3489,10 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           </div>
 
           <div style={sideActions}>
-            <button style={outlineBlueBtn} onClick={handleNewInvoice}>
+            <button
+              style={outlineBlueBtn}
+              onClick={handleNewInvoice}
+            >
               پسوڵەی نوێ
             </button>
 
@@ -3329,6 +3617,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           <div style={tableCard}>
             <div className="product-search-container" style={productSearchBox}>
               <input
+                ref={productSearchInputRef}
                 value={productSearch}
                 disabled={isInvoiceLocked}
                 onFocus={() => {
@@ -4007,6 +4296,31 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       {type}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div style={settingsSection}>
+                <h3 style={settingsTitle}>ڕەیتی دۆلار بەرامبەر دینار (١٠٠$)</h3>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    type="text"
+                    value={exchangeRate}
+                    onChange={(e) => setExchangeRate(e.target.value.replace(/[^\d]/g, ''))}
+                    placeholder="155000"
+                    style={{
+                      width: "100%",
+                      padding: "9px 12px",
+                      fontSize: "14px",
+                      fontWeight: "bold",
+                      color: "#1e293b",
+                      border: "1px solid #d1d5db",
+                      borderRadius: "8px",
+                      backgroundColor: "#ffffff",
+                      outline: "none",
+                      textAlign: "center"
+                    }}
+                  />
+                  <span style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", whiteSpace: "nowrap" }}>دینار بۆ ١٠٠$</span>
                 </div>
               </div>
 

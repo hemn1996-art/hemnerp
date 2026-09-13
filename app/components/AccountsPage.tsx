@@ -7,6 +7,8 @@ import { store, useStore } from "../store/store";
 import AlertModal from "./AlertModal";
 import { currencies as mockCurrencies } from "../data/mockData";
 import { normalizeKurdishSearchText } from "../utils/digits";
+import AccountQuickModal from "./AccountQuickModal";
+import BackButton from "./BackButton";
 
 type ToastType = "error" | "success" | "info";
 type BalanceSort = "none" | "desc" | "asc";
@@ -139,6 +141,7 @@ export default function AccountsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<ToastType>("error");
+  const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
 
   const defaultAccountCols = {
     index: true,
@@ -785,6 +788,7 @@ export default function AccountsPage() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <BackButton />
           <button style={primaryBtn} onClick={openAddModal}>
             زیادکردن
           </button>
@@ -987,7 +991,12 @@ export default function AccountsPage() {
                       {visibleColumns.index && <td style={tdCenter}>{index + 1}</td>}
 
                       {visibleColumns.name && (
-                        <td style={tdName}>
+                        <td 
+                          style={{ ...tdName, cursor: "pointer", color: "#2563eb" }}
+                          onClick={() => setQuickAccount({ id: account.id, name: account.name, code: (account as any).code || String(account.id) })}
+                          className="hover:underline cursor-pointer select-none text-[#2563eb]"
+                          title="کلیک بکە بۆ کردارە خێراکان"
+                        >
                           <strong>{account.name}</strong>
                         </td>
                       )}
@@ -1668,6 +1677,16 @@ export default function AccountsPage() {
           </div>
         </div>
       )}
+      {/* Account Quick Action Modal */}
+      <AccountQuickModal
+        isOpen={Boolean(quickAccount)}
+        onClose={() => setQuickAccount(null)}
+        account={quickAccount}
+        onViewDetails={(accId) => {
+          const acc = accountsState.find((a: any) => a.id === accId);
+          if (acc) openEditModal(acc);
+        }}
+      />
     </div>
   );
 }

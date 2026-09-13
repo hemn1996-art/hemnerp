@@ -17,6 +17,7 @@ import { store, useStore } from "../store/store";
 import { calculateLedgerEntries } from "../utils/ledgerHelper";
 import { getDefaultCashbox } from "../utils/accounting";
 import { currencies as mockCurrencies } from "../data/mockData";
+import { saveVoucherDraft, getVoucherDraft, clearVoucherDraft } from "../lib/voucherDraftStorage";
 
 type ToastType = "error" | "success" | "info";
 type PaidAmounts = Record<number, string>;
@@ -109,6 +110,13 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     setIsEditLoading(!!editId);
     if (editId) {
       setSavedSnapshot("");
+    } else {
+      const savedDraft = getVoucherDraft("sales_return");
+      if (savedDraft) {
+        restoreSalesReturnDraft(savedDraft);
+        return;
+      }
+      resetInvoice();
     }
   }, [editId]);
 
@@ -715,6 +723,38 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     };
   }, [isSaved, isLocked, editId, currentSnapshot]);
 
+  const currentSalesReturnDraft = useMemo(() => {
+    if (editId || isLocked || isSaved) return null;
+    if (!customerId && rows.length === 0 && Object.keys(paidAmounts).length === 0 && !internalNote && !printNote) return null;
+    return {
+      customerId,
+      customerSearch,
+      rows,
+      invoiceNumber,
+      invoiceDate,
+      createdTime,
+      paidAmounts,
+      paidCurrencyId,
+      exchangeRate,
+      internalNote,
+      printNote,
+      cashboxId,
+    };
+  }, [
+    editId, isLocked, isSaved, customerId, customerSearch,
+    rows, invoiceNumber, invoiceDate, createdTime,
+    paidAmounts, paidCurrencyId, exchangeRate,
+    internalNote, printNote, cashboxId
+  ]);
+
+  useEffect(() => {
+    if (!editId && !isLocked && !isSaved) {
+      if (currentSalesReturnDraft) {
+        saveVoucherDraft("sales_return", currentSalesReturnDraft);
+      }
+    }
+  }, [currentSalesReturnDraft, editId, isLocked, isSaved]);
+
   function showToast(message: string, type: ToastType = "error") {
     setToastMessage(message);
     setToastType(type);
@@ -1184,6 +1224,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
   }
 
   function resetInvoice() {
+    clearVoucherDraft("sales_return");
     if (editId) {
       router.push("/invoices?type=sales_return");
       return;
@@ -1216,6 +1257,24 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     setSavedSnapshot("");
     setIsLocked(false);
     setOriginalVoucher(null);
+  }
+
+  function restoreSalesReturnDraft(draft: any) {
+    if (!draft) return;
+    if (draft.customerId) setCustomerId(draft.customerId);
+    if (draft.customerSearch) setCustomerSearch(draft.customerSearch);
+    if (draft.rows) setRows(draft.rows);
+    if (draft.invoiceNumber) setInvoiceNumber(draft.invoiceNumber);
+    if (draft.invoiceDate) setInvoiceDate(draft.invoiceDate);
+    if (draft.createdTime) setCreatedTime(draft.createdTime);
+    if (draft.paidAmounts) setPaidAmounts(draft.paidAmounts);
+    if (draft.paidCurrencyId) setPaidCurrencyId(draft.paidCurrencyId);
+    if (draft.exchangeRate) setExchangeRate(draft.exchangeRate);
+    if (draft.internalNote) setInternalNote(draft.internalNote);
+    if (draft.printNote) setPrintNote(draft.printNote);
+    if (draft.cashboxId) setCashboxId(draft.cashboxId);
+    if (draft.internalNote || draft.printNote) setShowInvoiceNotes(true);
+    if (draft.customerId) setShowCustomerInfo(true);
   }
 
   function hasUnsavedData() {
@@ -1379,6 +1438,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
     savePromise.then((res) => {
       if (res) {
+        clearVoucherDraft("sales_return");
         fetchProducts();
         setSavedSnapshot(currentSnapshot);
         if (editId) {
@@ -1500,42 +1560,102 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
         <aside style={leftPanel}>
           <div style={{ flex: 1, position: "relative" }}>
             <div style={customerInputWrap}>
-              <label style={labelStyle}>کریار</label>
-              <input
-                value={customerSearch}
-                disabled={isLocked}
-                onFocus={() => {
-                  if (!isLocked) setShowCustomerList(true);
-                }}
-                onChange={(e) => {
-                  if (blockIfLocked()) return;
-                  setCustomerSearch(e.target.value);
-                  setCustomerId(undefined);
-                  setShowCustomerList(true);
-                  setShowCustomerInfo(false);
-                }}
-                placeholder="کریار"
-                style={{
-                  ...input,
-                  ...lockedFieldStyle,
-                  paddingLeft: customerId ? 36 : 14,
-                }}
-              />
-
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <label style={labelStyle}>کڕیار</label>
+              </div>
+              {customerId ? (
+                <div
+                  style={{
+                    ...input,
+                    ...lockedFieldStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    background: isLocked ? "#f3f4f6" : "#ffffff",
+                    cursor: "pointer",
+                    borderColor: "#93c5fd",
+                  }}
+                >
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!customerId) return;
+                      if (currentSalesReturnDraft) {
+                        saveVoucherDraft("sales_return", currentSalesReturnDraft);
+                      }
+                      router.push(`/reports/account-statement?accountId=${customerId}`);
+                    }}
+                    onAuxClick={(e) => {
+                      if (e.button === 1 && customerId) {
+                        e.preventDefault();
+                        window.open(`/reports/account-statement?accountId=${customerId}`, "_blank");
+                      }
+                    }}
+                    style={{
+                      color: "#1d4ed8",
+                      fontWeight: 800,
+                      fontSize: "14px",
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                      flex: 1,
+                      height: "100%",
+                    }}
+                    className="hover:underline"
+                    title="کلیک بکە بۆ بینینی کەشفی حسابی ئەم هەژمارە (داتاکەت پارێزراوە)"
+                  >
+                    <span>{customer?.name || customerSearch}</span>
+                  </span>
+                </div>
+              ) : (
+                <input
+                  value={customerSearch}
+                  disabled={isLocked}
+                  onFocus={() => {
+                    if (!isLocked) setShowCustomerList(true);
+                  }}
+                  onChange={(e) => {
+                    if (blockIfLocked()) return;
+                    setCustomerSearch(e.target.value);
+                    setCustomerId(undefined);
+                    setShowCustomerList(true);
+                    setShowCustomerInfo(false);
+                  }}
+                  placeholder="کریار"
+                  style={{
+                    ...input,
+                    ...lockedFieldStyle,
+                  }}
+                />
+              )}
               {customerId && !isLocked && (
                 <button
                   type="button"
-                  style={customerClearBtn}
+                  style={{
+                    position: "absolute",
+                    left: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    ...customerClearBtn,
+                    zIndex: 5,
+                  }}
                   onClick={() => {
-                    if (blockIfLocked()) return;
+                    if (typeof blockIfLocked === "function" && blockIfLocked()) return;
                     setCustomerId(undefined);
                     setCustomerSearch("");
                     setShowCustomerInfo(false);
+                    if (typeof setShowCustomerList === "function") setShowCustomerList(false);
                   }}
+                  title="لابردنی کڕیار"
                 >
                   ×
                 </button>
               )}
+            </div>
 
               {showCustomerList && !isLocked && (
                 <div style={dropdownLarge}>
@@ -1564,7 +1684,6 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                 </div>
               )}
             </div>
-          </div>
 
           {customer && (
             <div style={accountInfoToggleBox}>
@@ -1753,7 +1872,10 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
           </div>
 
           <div style={sideActions}>
-            <button style={outlineBlueBtn} onClick={handleNewInvoice}>
+            <button
+              style={outlineBlueBtn}
+              onClick={handleNewInvoice}
+            >
               پسوڵەی نوێ
             </button>
 
