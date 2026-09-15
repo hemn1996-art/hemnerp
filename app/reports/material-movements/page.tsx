@@ -7,13 +7,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
-import BackButton from "../../components/BackButton";
-import { normalizeKurdishSearchText } from "../../utils/digits";
 
 interface DropdownOption {
   value: string | number;
   label: string;
 }
+
+
 
 function ItemsReportContent() {
   const router = useRouter();
@@ -677,17 +677,24 @@ function ItemsReportContent() {
                     {visibleColumns.cost && (
                       <td className="p-2 border-r border-slate-200 text-center font-medium">
                         {item.isFixedRate ? (
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-black shadow-xs cursor-help"
-                            style={{
-                              backgroundColor: "#f3e8ff",
-                              borderColor: "#c084fc",
-                              color: "#6b21a8"
-                            }}
-                            title={`📌 دۆلاری جێگیر: 100$ = ${Number(item.customExchangeRate || 135000).toLocaleString("en-US")} دینار`}
-                          >
-                            {formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}
-                          </span>
+                          (() => {
+                            const cRate = Number(item.customExchangeRate || 135000);
+                            const leafRate = cRate > 10000 ? Math.round(cRate / 1000) : (cRate > 1000 ? Math.round(cRate / 10) : cRate);
+                            const rateDisplay = (leafRate * 1000).toLocaleString("en-US");
+                            return (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-black shadow-xs cursor-help"
+                                style={{
+                                  backgroundColor: "#f3e8ff",
+                                  borderColor: "#c084fc",
+                                  color: "#6b21a8"
+                                }}
+                                title={`ئەمە گەڵای نرخی دۆلارەکەی ${leafRate}یە (100$ = ${rateDisplay} دینار)`}
+                              >
+                                {formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}
+                              </span>
+                            );
+                          })()
                         ) : (
                           <span className="text-slate-600">
                             {formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}

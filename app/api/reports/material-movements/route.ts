@@ -220,7 +220,16 @@ export async function GET(request: Request) {
       const priceCurrencyCode = isPriceIQD ? "IQD" : (curObj?.code || "USD");
 
       // Determine cost currency strictly from purchase record / product
-      const fixedInfo = productFixedRates[line.productId];
+      let fixedInfo = productFixedRates[line.productId];
+      const isHisense = line.product.brand === "Hisense" || line.product.brand === "هایسنس" || line.product.name?.includes("هایسنس");
+      if ((!fixedInfo || !fixedInfo.isFixed) && isHisense) {
+        fixedInfo = {
+          isFixed: true,
+          customRate: 1350,
+          costCurrencyId: 1
+        };
+        productFixedRates[line.productId] = fixedInfo;
+      }
       const costCurrencyId = fixedInfo?.costCurrencyId || (line.voucher.type === 'purchase' ? priceCurrencyId : 1);
       const costCurObj = currencyMap.get(costCurrencyId);
       const isCostIQD = costCurrencyId === 2 || costCurrencyId === 12 || costCurObj?.code === "IQD" || costCurObj?.symbol === "دینار";
@@ -271,7 +280,7 @@ export async function GET(request: Request) {
         profitIQD = -(priceInIQD - costInIQD);
       }
 
-      // Determine if THIS SPECIFIC movement itself is a fixed-rate purchase or warehouse stock
+      // Determine if THIS SPECIFIC movement itself has a fixed-rate cost
       const vType = line.voucher.type;
       let isLineFixedRate = false;
       let lineCustomExchangeRate: number | null = null;
@@ -289,19 +298,32 @@ export async function GET(request: Request) {
         if (vRateType === "FIXED" || (vCustomRate && (vCustomRate === 135000 || vCustomRate === 132000 || vCustomRate < 145000))) {
           isLineFixedRate = true;
           lineCustomExchangeRate = vCustomRate > 10000 ? vCustomRate : (vCustomRate ? vCustomRate * 100 : 135000);
+        } else if (fixedInfo && fixedInfo.isFixed) {
+          isLineFixedRate = true;
+          lineCustomExchangeRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100;
         }
       } else if (vType === "purchase" || vType === "purchase_return") {
         const sellerAcc = line.voucher.account;
         const rateType = (line.voucher as any).exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType;
         const customRate = (line.voucher as any).customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate;
-        if (rateType === "FIXED") {
+        if (rateType === "FIXED" || (customRate && customRate < 145000)) {
           isLineFixedRate = true;
-          lineCustomExchangeRate = customRate > 10000 ? customRate : (customRate ? customRate * 100 : 132000);
+          lineCustomExchangeRate = customRate > 10000 ? customRate : (customRate ? customRate * 100 : 135000);
+        } else if (fixedInfo && fixedInfo.isFixed) {
+          isLineFixedRate = true;
+          lineCustomExchangeRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100;
+        }
+      } else if (vType === "sales" || vType === "sales_return") {
+        // Sales & sales return for fixed dollar rate items (e.g. Hisense) must show fixed rate cost
+        if (fixedInfo && fixedInfo.isFixed) {
+          isLineFixedRate = true;
+          lineCustomExchangeRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100;
         }
       } else {
-        // In sales (فرۆشتن) and other movements, there is NEVER a fixed leaf rate
-        isLineFixedRate = false;
-        lineCustomExchangeRate = null;
+        if (fixedInfo && fixedInfo.isFixed) {
+          isLineFixedRate = true;
+          lineCustomExchangeRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100;
+        }
       }
 
       return {

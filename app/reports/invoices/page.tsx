@@ -444,7 +444,6 @@ function InvoiceReportContent() {
     discount: true,
     paid: true,
     remaining: true,
-    deliveryFee: true,
     expenses: true,
     profit: false,
     cashbox: true,
@@ -462,7 +461,9 @@ function InvoiceReportContent() {
     try {
       const stored = localStorage.getItem("__erp_invoices_report_cols");
       if (stored) {
-        setVisibleColumns(prev => ({ ...prev, ...JSON.parse(stored) }));
+        const parsed = JSON.parse(stored);
+        delete parsed.deliveryFee;
+        setVisibleColumns(prev => ({ ...prev, ...parsed }));
       }
     } catch (e) {
       console.error(e);
@@ -1928,7 +1929,6 @@ function InvoiceReportContent() {
       totalDiscount: "discount",
       paid: "paid",
       remaining: "remaining",
-      deliveryFee: "deliveryFee",
       expenses: "expenses",
       profit: "profit",
       cashboxName: "cashbox",
@@ -2531,11 +2531,6 @@ function InvoiceReportContent() {
                       ماوە {sortField === "remaining" && (sortDirection === "asc" ? "▲" : "▼")}
                     </th>
                   )}
-                  {visibleColumns.deliveryFee && (
-                    <th onClick={() => handleSort("deliveryFee")} className="px-4 py-3.5 text-center text-xs font-bold cursor-pointer select-none">
-                      نرخی گەیاندن {sortField === "deliveryFee" && (sortDirection === "asc" ? "▲" : "▼")}
-                    </th>
-                  )}
                   {visibleColumns.expenses && (
                     <th onClick={() => handleSort("expenses")} className="px-4 py-3.5 text-center text-xs font-bold cursor-pointer select-none">
                       خەرجی {sortField === "expenses" && (sortDirection === "asc" ? "▲" : "▼")}
@@ -2782,13 +2777,6 @@ function InvoiceReportContent() {
                                   <span className="text-emerald-600">0</span>
                                 )
                               )}
-                            </td>
-                          )}
-                          {visibleColumns.deliveryFee && (
-                            <td className="px-4 py-3.5 text-center">
-                              {voucher.deliveryFee
-                                ? formatCurrencyValueJSX(deliveryFeeVal, displayCurrencyId)
-                                : "-"}
                             </td>
                           )}
                           {visibleColumns.expenses && (
@@ -3560,16 +3548,6 @@ function InvoiceReportContent() {
                   className="w-4 h-4 accent-blue-600 rounded"
                 />
                 ماوە
-              </label>
-
-              <label className="flex items-center gap-2.5 cursor-pointer py-1">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.deliveryFee}
-                  onChange={() => toggleColumn("deliveryFee")}
-                  className="w-4 h-4 accent-blue-600 rounded"
-                />
-                نرخی گەیاندن
               </label>
 
               <label className="flex items-center gap-2.5 cursor-pointer py-1">

@@ -207,8 +207,22 @@ export function isProductService(product?: any): boolean {
   return false;
 }
 
-// Alias for backward compatibility if imported elsewhere
 export const isProductServiceOrExpense = isProductService;
+
+const getTodayDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getCurrentTimeString = () => {
+  return new Date().toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 export default function InvoicePage({ headerSelector, invoiceType, editId }: Props) {
   const router = useRouter();
@@ -220,12 +234,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (editId) {
       setSavedInvoiceSnapshot("");
     } else {
-      const savedDraft = getVoucherDraft("sales");
-      if (savedDraft && (savedDraft.accountId || (savedDraft.rows && savedDraft.rows.length > 0))) {
-        restoreInvoiceDraft(savedDraft);
-      } else {
-        resetInvoice();
-      }
+      setInvoiceDate(getTodayDateString());
+      setCreatedTime(getCurrentTimeString());
+      resetInvoice();
     }
   }, [editId]);
 
@@ -282,8 +293,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [toastType, setToastType] = useState<ToastType>("error");
 
   const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [createdTime, setCreatedTime] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState("");
+  const [createdTime, setCreatedTime] = useState(getCurrentTimeString);
+  const [invoiceDate, setInvoiceDate] = useState(getTodayDateString);
   const [employeeName, setEmployeeName] = useState("");
   const [employeePhone, setEmployeePhone] = useState("");
 
@@ -309,13 +320,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       } catch (e) {}
     }
   }, [selectedTemplateId]);
-  const [priceTypesList, setPriceTypesList] = useState<string[]>(["جوملە", "تاک", "تایبەت"]);
+  const [priceTypesList, setPriceTypesList] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/attributes?type=priceType")
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           const names = data.filter((item: any) => item.isActive !== false).map((item: any) => item.name);
           if (names.length > 0) {
             setPriceTypesList(names);
@@ -397,7 +408,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (!editId && storeCurrencies && storeCurrencies.length > 0) {
       const iqd = storeCurrencies.find((c: any) => c.code === "IQD" || c.id === 2 || c.symbol === "دینار" || c.symbol === "د.ع");
       if (iqd) {
-        const rawRate = iqd.rate || iqd.exchangeRate || 1550;
+        const rawRate = iqd.rate || iqd.exchangeRate || 1500;
         const rateVal = rawRate > 1000 ? rawRate : rawRate * 100;
         setExchangeRate(String(rateVal));
       }
@@ -452,7 +463,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const lastLoadedEditIdRef = useRef<string | null>(null);
 
-  const [exchangeRate, setExchangeRate] = useState("155000");
+  const [exchangeRate, setExchangeRate] = useState("150000");
 
   const [productSearch, setProductSearch] = useState("");
   const [showProductList, setShowProductList] = useState(false);
@@ -526,19 +537,23 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, [fetchPriceTypes]);
 
   const activePriceTypeNames = useMemo(() => {
-    if (priceTypesFromStore.length > 0) {
-      return priceTypesFromStore.map((pt: any) => pt.name);
+    if (priceTypesList.length > 0) {
+      return priceTypesList;
     }
-    return ["نرخی تاک"];
-  }, [priceTypesFromStore]);
+    if (priceTypesFromStore.length > 0) {
+      const active = priceTypesFromStore.filter((pt: any) => pt.isActive !== false).map((pt: any) => pt.name);
+      if (active.length > 0) return active;
+    }
+    return ["نرخی تاک", "نرخی کۆ"];
+  }, [priceTypesList, priceTypesFromStore]);
 
   const [invoicePriceType, setInvoicePriceType] = useState<string>("نرخی تاک");
 
   useEffect(() => {
-    if (activePriceTypeNames.length > 0 && (invoicePriceType === "جوملە" || !invoicePriceType)) {
+    if (activePriceTypeNames.length > 0 && !activePriceTypeNames.includes(invoicePriceType)) {
       setInvoicePriceType(activePriceTypeNames[0]);
     }
-  }, [activePriceTypeNames]);
+  }, [activePriceTypeNames, invoicePriceType]);
 
   const [savedInvoiceSnapshot, setSavedInvoiceSnapshot] = useState("");
   const [originalVoucher, setOriginalVoucher] = useState<any>(null);
@@ -703,7 +718,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   return (line.product as any)?.customExchangeRate || undefined;
                 })(),
                 showCost: false,
-                previousPrice: getPreviousPrice(line.productId),
+                previousPrice: getPreviousPrice(line.productId, voucher.accountId)?.price,
               }));
               setRows(mappedRows);
             }
@@ -972,15 +987,16 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const isNegative = isNegativeParam !== undefined ? isNegativeParam : value < 0;
 
     return (
-      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 2 }} dir="ltr">
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
         {isNegative && <span>-</span>}
-        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
+        {!isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
         <span>
           <span>{whole}</span>
           {decimal !== undefined && decimal !== "0" && decimal !== "00" && (
             <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
+        {isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
       </span>
     );
   }
@@ -1109,25 +1125,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     Math.max(itemsSubtotal - invoiceDiscountAmount, 0) + deliveryFeeAmount;
 
   // Feature 2: Auto-convert fraction in grand total to discount during invoice updating if no manual discount was specified
-  useEffect(() => {
-    if (editId && !isEditLoading && rows.length > 0) {
-      if (!userManuallySetDiscountRef.current) {
-        const rawTotalBeforeDiscount = itemsSubtotal + deliveryFeeAmount;
-        const rawFraction = rawTotalBeforeDiscount - Math.floor(rawTotalBeforeDiscount);
-        const fraction = Math.round(rawFraction * 100) / 100;
-        if (fraction >= 0.01 && fraction <= 0.99) {
-          setInvoiceDiscountValue(String(fraction));
-          setInvoiceDiscountMode("amount");
-          setInvoiceDiscountCurrencyId(invoiceCurrencyId);
-          setShowInvoiceDiscount(true);
-          setAutoFractionDiscountNotice(`کەسری بڕەکە (${fraction} ${invoiceSymbol}) خۆکارانە کرا بە داشکاندن`);
-        } else if (fraction < 0.01 && autoFractionDiscountNotice) {
-          setInvoiceDiscountValue("");
-          setAutoFractionDiscountNotice("");
-        }
-      }
-    }
-  }, [editId, isEditLoading, rows, itemsSubtotal, deliveryFeeAmount, invoiceCurrencyId, invoiceSymbol, autoFractionDiscountNotice]);
+  // Automatic fraction discount disabled: discounts are strictly manual or via explicit user action
 
   const getFullPaidAmountForCurrency = useCallback((currId: number, invTotal: number) => {
     if (currId === invoiceCurrencyId) return invTotal;
@@ -1377,16 +1375,25 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     if (invoiceType === "فرۆشتن") {
       list = list.filter((product: any) => (product.stock || 0) > 0 || isProductService(product));
     }
-    if (!q) return list;
+    
+    let result = list;
+    if (q) {
+      result = list.filter((product: any) => {
+        return (
+          normalizeKurdishSearchText(product.name || "").includes(q) ||
+          normalizeKurdishSearchText(product.code || "").includes(q) ||
+          normalizeKurdishSearchText(product.barcode || "").includes(q) ||
+          normalizeKurdishSearchText(product.category || "").includes(q) ||
+          normalizeKurdishSearchText(product.brand || "").includes(q)
+        );
+      });
+    }
 
-    return list.filter((product: any) => {
-      return (
-        normalizeKurdishSearchText(product.name || "").includes(q) ||
-        normalizeKurdishSearchText(product.code || "").includes(q) ||
-        normalizeKurdishSearchText(product.barcode || "").includes(q) ||
-        normalizeKurdishSearchText(product.category || "").includes(q) ||
-        normalizeKurdishSearchText(product.brand || "").includes(q)
-      );
+    // Kurdish alphabetical sorting (ئەبجەدی کوردی)
+    return [...result].sort((a: any, b: any) => {
+      const nameA = (a.name || "").trim();
+      const nameB = (b.name || "").trim();
+      return nameA.localeCompare(nameB, "ckb", { sensitivity: "base" });
     });
   }, [productSearch, products, invoiceType]);
 
@@ -1634,16 +1641,19 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const decimal = parts[1];
     const isNegative = value < 0;
 
+    const isIQD = displaySymbol === "دینار" || displaySymbol.includes("دینار") || displaySymbol === "IQD";
+
     return (
-      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 2 }} dir="ltr">
+      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
         {isNegative && <span>-</span>}
-        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
+        {!isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
         <span>
           <span>{whole}</span>
           {decimal !== undefined && decimal !== "0" && decimal !== "00" && (
             <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
+        {isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
       </span>
     );
   }
@@ -1804,26 +1814,97 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     return [{ name: "دانە", quantity: 1 }];
   }
 
+  function normalizePriceTypeName(name?: string): string {
+    if (!name) return "";
+    const clean = name.trim().toLowerCase();
+    if (clean.includes("تاک") || clean.includes("مفرد") || clean === "retail") return "retail";
+    if (clean.includes("کۆ") || clean.includes("جوملە") || clean === "wholesale") return "wholesale";
+    return clean;
+  }
+
+  function isSamePriceType(t1?: string, t2?: string): boolean {
+    if (!t1 || !t2) return false;
+    if (t1.trim() === t2.trim()) return true;
+    const n1 = normalizePriceTypeName(t1);
+    const n2 = normalizePriceTypeName(t2);
+    return n1 === n2 && (n1 === "retail" || n1 === "wholesale");
+  }
+
+  function convertAmountBetweenCurrencies(
+    amount: number,
+    fromCurrencyId: number,
+    toCurrencyId: number,
+    ratePer100: string | number
+  ): number {
+    if (!amount || isNaN(amount) || fromCurrencyId === toCurrencyId) return amount;
+
+    const numRate100 = toNumber(ratePer100);
+    const ratePerDollar = (numRate100 > 5000 ? numRate100 / 100 : numRate100) || 1500;
+
+    const isFromIqd = fromCurrencyId === 2 || fromCurrencyId === 12;
+    const isToIqd = toCurrencyId === 2 || toCurrencyId === 12;
+    const isFromUsd = fromCurrencyId === 1 || fromCurrencyId === 11;
+    const isToUsd = toCurrencyId === 1 || toCurrencyId === 11;
+
+    if (isFromUsd && isToIqd) {
+      // Convert USD to IQD (e.g. 80 * 1500 = 120,000)
+      return Math.round(amount * ratePerDollar);
+    }
+    if (isFromIqd && isToUsd) {
+      // Convert IQD to USD (e.g. 120,000 / 1500 = 80)
+      return Math.round((amount / ratePerDollar) * 100) / 100;
+    }
+
+    return amount;
+  }
+
   function getProductPrices(product?: ProductLike) {
-    if (product?.salePrices && product.salePrices.length > 0) {
-      return product.salePrices;
+    if (!product) return [];
+    let priceList: any[] = [];
+    if (Array.isArray(product.salePrices)) {
+      priceList = product.salePrices;
+    } else if (typeof product.salePrices === "string" && (product.salePrices as string).trim()) {
+      try {
+        priceList = JSON.parse(product.salePrices as string);
+      } catch {
+        priceList = [];
+      }
+    }
+
+    if (priceList && priceList.length > 0) {
+      return priceList;
     }
 
     return [
       {
-        priceType: "جوملە",
+        priceType: "نرخی تاک",
         currencyId: invoiceCurrencyId,
         amount: product?.salePrice || 0,
       },
     ];
   }
 
-  function findPriceByType(product: ProductLike, priceType: string) {
+  function findPriceByType(product: ProductLike, targetPriceType: string) {
     const prices = getProductPrices(product);
-    return (
-      prices.find((p: any) => (p.priceType || p.name) === priceType) ||
-      prices[0]
-    );
+    if (!prices || prices.length === 0) {
+      return {
+        priceType: targetPriceType,
+        currencyId: invoiceCurrencyId,
+        amount: product?.salePrice || 0,
+      };
+    }
+
+    // 1. Exact match
+    const exact = prices.find((p: any) => (p.priceType || p.name) === targetPriceType);
+    if (exact) return exact;
+
+    // 2. Semantic match (e.g. 'نرخی کۆ' matches 'جوملە' or 'کۆ', 'نرخی تاک' matches 'تاک')
+    const semantic = prices.find((p: any) => isSamePriceType(p.priceType || p.name, targetPriceType));
+    if (semantic) return semantic;
+
+    // 3. Fallback to first price with amount > 0 or first price
+    const withAmount = prices.find((p: any) => Number(p.amount || p.price || 0) > 0);
+    return withAmount || prices[0];
   }
 
   function chooseProduct(product: ProductLike) {
@@ -1842,10 +1923,21 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const firstPackage = packages[0];
 
     const selectedPrice = findPriceByType(product, invoicePriceType);
-    const priceAmount =
+    const rawPriceAmount =
       Number(
-        (selectedPrice as any).amount || (selectedPrice as any).price || 0
+        (selectedPrice as any)?.amount || (selectedPrice as any)?.price || 0
       ) || 0;
+
+    const sourceCurrencyId = Number(selectedPrice?.currencyId || 1);
+    const rowCurrencyId = invoiceCurrencyId;
+
+    // Auto-convert if product price currency differs from invoice currency:
+    const finalPriceAmount = convertAmountBetweenCurrencies(
+      rawPriceAmount,
+      sourceCurrencyId,
+      rowCurrencyId,
+      exchangeRate
+    );
 
     const defaultWarehouseName = warehouses[0]?.name || "کۆگای سەرەکی";
     const availableQty = getRowAvailableQty(product.id, defaultWarehouseName);
@@ -1860,18 +1952,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       return;
     }
 
-    const targetCurrencyId = selectedPrice?.currencyId || invoiceCurrencyId;
-    if (targetCurrencyId && targetCurrencyId !== invoiceCurrencyId) {
-      setInvoiceCurrencyId(targetCurrencyId);
-    }
-
     const newRow: InvoiceRow = {
       id: Date.now() + Math.floor(Math.random() * 100000),
       productId: product.id,
       productName: product.name,
       code: product.code || "",
       qty: "1",
-      price: String(priceAmount),
+      price: String(finalPriceAmount),
       discountMode: "amount",
       discountValue: "",
       note: "",
@@ -1882,9 +1969,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         (selectedPrice as any)?.priceType ||
         (selectedPrice as any)?.name ||
         invoicePriceType,
-      currencyId: targetCurrencyId,
+      currencyId: rowCurrencyId,
       availableQty: 0,
-      previousPrice: getPreviousPrice(product.id),
+      previousPrice: getPreviousPrice(product.id)?.price,
       costPrice: isServiceOrExpense ? 0 : (product.costPrice || 0),
       costCurrencyId: product.costCurrencyId || (product.costPrice && product.costPrice > 1000 ? 2 : 1),
       exchangeRateType: product.exchangeRateType || "DAILY_MARKET",
@@ -1900,20 +1987,29 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setOpenedDetailRowId(null);
   }
 
-  function getPreviousPrice(productId: number) {
-    if (!accountId) return undefined;
+  function getPreviousPrice(productId: number, targetAccountId?: number) {
+    const accId = targetAccountId || accountId;
+    if (!accId) return undefined;
 
     const reversed = [...invoices].reverse();
 
     for (const invoice of reversed) {
-      if (invoice.type !== "فرۆشتن") continue;
-      if (invoice.accountId !== accountId) continue;
+      if (editId && Number(invoice.id) === Number(editId)) continue;
+      if (invoice.type !== "sales" && invoice.type !== "فرۆشتن") continue;
+      if (Number(invoice.accountId) !== Number(accId)) continue;
 
       const foundItem = invoice.lines?.find(
-        (item: any) => item.productId === productId
+        (item: any) => Number(item.productId) === Number(productId)
       );
 
-      if (foundItem) return Number(foundItem.unitPrice || 0);
+      if (foundItem && (foundItem.unitPrice !== undefined && foundItem.unitPrice !== null)) {
+        const itemPrice = Number(foundItem.unitPrice || 0);
+        const itemCurId = foundItem.currencyId || invoice.currencyId || (itemPrice > 1000 ? 2 : 1);
+        return {
+          price: itemPrice,
+          currencyId: itemCurId,
+        };
+      }
     }
 
     return undefined;
@@ -1951,48 +2047,96 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     });
   }
 
+  function handleInvoicePriceTypeChange(newType: string) {
+    setInvoicePriceType(newType);
+    // As requested: existing items in the invoice are NOT modified.
+    // Only newly added items will adopt the new price type.
+  }
+
+  function handleInvoiceCurrencyChange(newCurId: number) {
+    if (newCurId === invoiceCurrencyId) return;
+    const oldCurId = invoiceCurrencyId;
+    setInvoiceCurrencyId(newCurId);
+    setPaidCurrencyId(newCurId);
+    setInvoiceDiscountCurrencyId(newCurId);
+
+    setRows((prevRows) =>
+      prevRows.map((row) => {
+        const currentPriceNum = toNumber(row.price);
+        const converted = convertAmountBetweenCurrencies(
+          currentPriceNum,
+          row.currencyId || oldCurId,
+          newCurId,
+          exchangeRate
+        );
+
+        return {
+          ...row,
+          currencyId: newCurId,
+          price: String(converted),
+        };
+      })
+    );
+  }
+
   function changeRowPriceType(row: InvoiceRow, priceType: string) {
     if (blockIfLocked()) return;
 
     const product = products.find((p: any) => p.id === row.productId);
     if (!product) return;
 
-    const selectedPrice = getProductPrices(product).find((price: any) => {
-      const pType = price.priceType || price.name;
-      return pType === priceType && price.currencyId === row.currencyId;
-    });
+    const selectedPrice = findPriceByType(product, priceType);
+    const rawPriceAmount =
+      Number(
+        (selectedPrice as any)?.amount || (selectedPrice as any)?.price || 0
+      ) || 0;
+    const sourceCurrencyId = Number(selectedPrice?.currencyId || 1);
+
+    const finalPrice = convertAmountBetweenCurrencies(
+      rawPriceAmount,
+      sourceCurrencyId,
+      row.currencyId,
+      exchangeRate
+    );
 
     updateRow(row.id, {
       priceType,
-      price: selectedPrice
-        ? String(
-            (selectedPrice as any).amount || (selectedPrice as any).price || 0
-          )
-        : row.price,
+      price: String(finalPrice),
     });
   }
 
-  function changeRowCurrency(row: InvoiceRow, currencyId: number) {
+  function changeRowCurrency(row: InvoiceRow, newCurrencyId: number) {
     if (blockIfLocked()) return;
+    if (row.currencyId === newCurrencyId) return;
 
     const product = products.find((p: any) => p.id === row.productId);
-    if (!product) return;
+    let newPriceStr = "";
 
-    const selectedPrice = getProductPrices(product).find((price: any) => {
-      const pType = price.priceType || price.name;
-      return pType === row.priceType && price.currencyId === currencyId;
-    });
+    if (product) {
+      const explicitPrice = getProductPrices(product).find((price: any) => {
+        const pType = price.priceType || price.name;
+        return isSamePriceType(pType, row.priceType) && Number(price.currencyId) === Number(newCurrencyId) && Number(price.amount || price.price || 0) > 0;
+      });
+      if (explicitPrice) {
+        newPriceStr = String((explicitPrice as any).amount || (explicitPrice as any).price || 0);
+      }
+    }
+
+    if (!newPriceStr) {
+      const currentPriceNum = toNumber(row.price);
+      const converted = convertAmountBetweenCurrencies(
+        currentPriceNum,
+        row.currencyId,
+        newCurrencyId,
+        exchangeRate
+      );
+      newPriceStr = String(converted);
+    }
 
     updateRow(row.id, {
-      currencyId,
-      price: selectedPrice
-        ? String(
-            (selectedPrice as any).amount || (selectedPrice as any).price || 0
-          )
-        : row.price,
+      currencyId: newCurrencyId,
+      price: newPriceStr,
     });
-
-    setInvoiceCurrencyId(currencyId);
   }
 
   function changePaidCurrency(currencyId: number) {
@@ -2180,35 +2324,40 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   function resetInvoice() {
     clearVoucherDraft("sales");
+    try {
+      localStorage.removeItem("orient_invoice_draft_sales");
+      sessionStorage.removeItem("orient_invoice_draft_sales");
+    } catch (e) {}
+
     // Clear editId from URL so the component exits edit mode
     if (editId) {
       router.push("/invoices?type=sales");
       return; // The route change will remount the component with editId=undefined
     }
+
+    const todayStr = getTodayDateString();
+    const timeStr = getCurrentTimeString();
+    setInvoiceDate(todayStr);
+    setCreatedTime(timeStr);
+
     userManuallySetDiscountRef.current = false;
     setAutoFractionDiscountNotice("");
     setInvoiceNumber("");
-    setCreatedTime(
-      new Date().toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    );
     setRows([]);
     setInvoiceCurrencyId(defaultCurrency.id);
     setOpenedDetailRowId(null);
     setProductSearch("");
+    setShowProductList(false);
     setInvoiceDiscountValue("");
     setShowInvoiceDiscount(false);
     setPaidAmounts({});
     setPaymentTypeMode("cash");
     setPaidCurrencyId(defaultCurrency.id);
     const iqd = currencies.find((c: any) => c.code === "IQD");
-    if (iqd && (iqd.rate || iqd.exchangeRate)) {
-      const rawRate = iqd.rate || iqd.exchangeRate;
-      setExchangeRate(String(rawRate > 1000 ? rawRate : rawRate * 100));
+    if (iqd && iqd.rate) {
+      setExchangeRate(String(iqd.rate * 100));
     } else {
-      setExchangeRate("155000");
+      setExchangeRate("150000");
     }
     setInternalNote("");
     setPrintNote("");
@@ -2235,11 +2384,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function handleNewInvoice() {
-    if (!isInvoiceSaved && !isInvoiceLocked && (rows.length > 0 || hasUnsavedInvoiceData())) {
-      setShowUnsavedConfirmModal(true);
-      return;
-    }
-
+    clearVoucherDraft("sales");
+    try {
+      localStorage.removeItem("orient_invoice_draft_sales");
+      sessionStorage.removeItem("orient_invoice_draft_sales");
+    } catch (e) {}
     resetInvoice();
   }
 
@@ -2378,15 +2527,17 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       setIsSaving(false);
       if (res && !res.error) {
         clearVoucherDraft("sales");
+        try {
+          localStorage.removeItem("orient_invoice_draft_sales");
+          sessionStorage.removeItem("orient_invoice_draft_sales");
+        } catch (e) {}
         fetchAccounts();
-        setSavedInvoiceSnapshot(currentInvoiceSnapshot);
         if (editId) {
-          // In edit mode: don't lock, allow further edits
           showToast("پسوڵەکە نوێکرایەوە ✅", "success");
           router.push(`/reports/invoices?t=${Date.now()}`);
         } else {
-          setIsInvoiceLocked(true);
-          showToast("پسوڵەکە خەزن کرا ✅ ئەم پسوڵەیە ئیتر قوفڵ کرا.", "success");
+          showToast("پسوڵەکە بە سەرکەوتوویی خەزن کرا ✅", "success");
+          resetInvoice();
         }
       } else {
         const errorMsg = res?.error || "هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.";
@@ -2438,18 +2589,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
     }
 
-    // Feature 2: Auto-convert fraction to discount on invoice update if user hasn't specified manual discount
-    if (editId && !userManuallySetDiscountRef.current) {
-      const rawTotalBeforeDiscount = itemsSubtotal + deliveryFeeAmount;
-      const rawFraction = rawTotalBeforeDiscount - Math.floor(rawTotalBeforeDiscount);
-      const fraction = Math.round(rawFraction * 100) / 100;
-      if (fraction >= 0.01 && fraction <= 0.99) {
-        setInvoiceDiscountValue(String(fraction));
-        setInvoiceDiscountMode("amount");
-        setInvoiceDiscountCurrencyId(invoiceCurrencyId);
-        setShowInvoiceDiscount(true);
-      }
-    }
+
 
     let mappedType = "sales";
     if (invoiceType === "کڕین") mappedType = "purchase";
@@ -3611,7 +3751,6 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 {invoiceLabel.trim() ? invoiceLabel : (paymentTypeMode === "cash" ? "نەقد" : paymentTypeMode === "partial" ? "بەشێکی دراو" : "قەرز")}
               </span>
             </div>
-            <div style={currentPriceTypeBadge}>جۆری نرخ: {invoicePriceType}</div>
           </div>
 
           <div style={tableCard}>
@@ -3845,12 +3984,17 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                       {row.showCost ? (
                                         (() => {
                                           const prod = products.find((p: any) => p.id === row.productId);
-                                          // NEVER show fixed leaf rate in sales invoices:
-                                          const isSales = invoiceType === "sales" || invoiceType === "فرۆشتن" || invoiceType === "sales_return" || invoiceType === "گەڕانەوەی فرۆشتن";
-                                          const isFixedRate = !isSales && ((row as any).exchangeRateType === "FIXED" || prod?.exchangeRateType === "FIXED");
-                                          const fixedRate = (row as any).customExchangeRate || prod?.customExchangeRate;
-                                          const fixedRate100 = fixedRate ? (fixedRate > 10000 ? fixedRate : fixedRate * 100) : null;
-                                          const fixedRateDisplay = fixedRate100 ? fixedRate100.toLocaleString("en-US") : null;
+                                          const isFixedRate = (row as any).exchangeRateType === "FIXED" ||
+                                            prod?.exchangeRateType === "FIXED" ||
+                                            Boolean((row as any).customExchangeRate) ||
+                                            Boolean(prod?.customExchangeRate) ||
+                                            (prod?.brand === "Hisense" || prod?.brand === "هایسنس" || prod?.name?.includes("هایسنس"));
+                                          const rawFixed = (row as any).customExchangeRate || prod?.customExchangeRate || (isFixedRate ? 135000 : null);
+                                          const leafRate = rawFixed
+                                            ? (rawFixed > 10000 ? Math.round(rawFixed / 1000) : (rawFixed > 1000 ? Math.round(rawFixed / 10) : rawFixed))
+                                            : 135;
+                                          const fixedRate100 = leafRate * 1000;
+                                          const fixedRateDisplay = fixedRate100.toLocaleString("en-US");
 
                                           const effectiveCostCurrencyId = isFixedRate
                                             ? 1
@@ -3863,7 +4007,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                             ? row.costPrice
                                             : (prod && typeof prod.costPrice === "number" && prod.costPrice > 0 ? prod.costPrice : 0);
 
-                                          if (isFixedRate && fixedRateDisplay) {
+                                          if (isFixedRate) {
                                             return (
                                               <div
                                                 style={{
@@ -3877,7 +4021,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                                   justifyContent: "space-between",
                                                   gap: "6px"
                                                 }}
-                                                title={`کۆستی دۆلاری جێگیر: 100$ = ${fixedRateDisplay} دینار`}
+                                                title={`ئەمە گەڵای نرخی دۆلارەکەی ${leafRate}یە`}
                                               >
                                                 <span>
                                                   {formatMoney(effectiveCostPrice, costSymbol)}
@@ -3889,11 +4033,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                                     color: "#6d28d9",
                                                     padding: "1px 5px",
                                                     borderRadius: "4px",
-                                                    fontWeight: 600,
+                                                    fontWeight: 700,
                                                     whiteSpace: "nowrap"
                                                   }}
                                                 >
-                                                  جێگیر ({fixedRateDisplay})
+                                                  جێگیر ({leafRate})
                                                 </span>
                                               </div>
                                             );
@@ -3992,12 +4136,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
                                   <DetailField label="نرخی پێشوو">
                                     <div style={compactReadonlyBox}>
-                                      {row.previousPrice !== undefined
-                                        ? formatMoney(
-                                            row.previousPrice,
-                                            getCurrencySymbol(row.currencyId)
-                                          )
-                                        : "نییە"}
+                                      {(() => {
+                                        const prev = getPreviousPrice(row.productId, accountId);
+                                        if (prev && prev.price > 0) {
+                                          const isPrevIqd = prev.currencyId === 2 || prev.currencyId === 12 || prev.price > 1000;
+                                          const prevSymbol = isPrevIqd ? "دینار" : (getCurrencySymbol(prev.currencyId) || "$");
+                                          return formatMoney(prev.price, prevSymbol);
+                                        }
+                                        return "نییە";
+                                      })()}
                                     </div>
                                   </DetailField>
                                 </div>
@@ -4056,7 +4203,16 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
                         {tableColumns.price && (
                           <td style={tdCenter}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center" }}>
+                            <div
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 6,
+                                width: 172,
+                                margin: "0 auto",
+                              }}
+                            >
                               <FormattedNumberInput
                                 value={row.price}
                                 disabled={isInvoiceLocked}
@@ -4065,11 +4221,62 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                     price: val,
                                   })
                                 }
-                                style={{ ...smallInput, ...lockedFieldStyle }}
+                                style={{
+                                  width: 102,
+                                  height: 38,
+                                  padding: "6px 8px",
+                                  borderRadius: 8,
+                                  border: "1px solid #d1d5db",
+                                  textAlign: "center",
+                                  outline: "none",
+                                  fontFamily: appFont,
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                  boxSizing: "border-box",
+                                  ...lockedFieldStyle,
+                                }}
                               />
-                              <span style={{ fontSize: 15, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
-                                {getCurrencySymbol(row.currencyId)}
-                              </span>
+                              <select
+                                value={row.currencyId}
+                                disabled={isInvoiceLocked}
+                                onChange={(e) =>
+                                  changeRowCurrency(row, Number(e.target.value))
+                                }
+                                style={{
+                                  width: 64,
+                                  height: 38,
+                                  padding: "4px 4px",
+                                  borderRadius: 8,
+                                  border:
+                                    row.currencyId === 2
+                                      ? "1.5px solid #86efac"
+                                      : "1.5px solid #93c5fd",
+                                  backgroundColor:
+                                    row.currencyId === 2 ? "#f0fdf4" : "#eff6ff",
+                                  color:
+                                    row.currencyId === 2 ? "#166534" : "#1d4ed8",
+                                  fontWeight: 800,
+                                  fontSize: 13,
+                                  cursor: isInvoiceLocked
+                                    ? "not-allowed"
+                                    : "pointer",
+                                  textAlign: "center",
+                                  outline: "none",
+                                  fontFamily: appFont,
+                                  boxSizing: "border-box",
+                                  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                                  ...lockedFieldStyle,
+                                }}
+                                title="گۆڕینی دراو (دۆلار / دینار)"
+                              >
+                                {currencies.map((curr: any) => (
+                                  <option key={curr.id} value={curr.id}>
+                                    {curr.code === "IQD"
+                                      ? "دینار"
+                                      : curr.symbol || "$"}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                           </td>
                         )}
@@ -4281,11 +4488,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 <h3 style={settingsTitle}>جۆری نرخی ئەم پسوڵەیە</h3>
 
                 <div style={priceTypeBox}>
-                  {priceTypesList.map((type: any) => (
+                  {activePriceTypeNames.map((type: any) => (
                     <button
                       key={type}
                       type="button"
-                      onClick={() => setInvoicePriceType(type)}
+                      onClick={() => handleInvoicePriceTypeChange(type)}
                       style={{
                         ...priceTypeBtn,
                         ...(invoicePriceType === type
@@ -4300,27 +4507,24 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               </div>
 
               <div style={settingsSection}>
-                <h3 style={settingsTitle}>ڕەیتی دۆلار بەرامبەر دینار (١٠٠$)</h3>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <input
-                    type="text"
-                    value={exchangeRate}
-                    onChange={(e) => setExchangeRate(e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="155000"
-                    style={{
-                      width: "100%",
-                      padding: "9px 12px",
-                      fontSize: "14px",
-                      fontWeight: "bold",
-                      color: "#1e293b",
-                      border: "1px solid #d1d5db",
-                      borderRadius: "8px",
-                      backgroundColor: "#ffffff",
-                      outline: "none",
-                      textAlign: "center"
-                    }}
-                  />
-                  <span style={{ fontSize: "12px", fontWeight: "bold", color: "#64748b", whiteSpace: "nowrap" }}>دینار بۆ ١٠٠$</span>
+                <h3 style={settingsTitle}>دراوی سەرەکی پسوڵە</h3>
+
+                <div style={priceTypeBox}>
+                  {currencies.map((curr: any) => (
+                    <button
+                      key={curr.id}
+                      type="button"
+                      onClick={() => handleInvoiceCurrencyChange(curr.id)}
+                      style={{
+                        ...priceTypeBtn,
+                        ...(invoiceCurrencyId === curr.id
+                          ? priceTypeBtnActive
+                          : {}),
+                      }}
+                    >
+                      {curr.name} ({curr.symbol})
+                    </button>
+                  ))}
                 </div>
               </div>
 
