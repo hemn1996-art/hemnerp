@@ -672,12 +672,26 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
   }
 
   function convertCurrency(amount: number, fromId: number, toId: number) {
-    if (fromId === toId) return amount;
+    if (Number(fromId) === Number(toId)) return amount;
+
+    const from = currencies.find((c: any) => Number(c.id) === Number(fromId));
+    const to = currencies.find((c: any) => Number(c.id) === Number(toId));
+    if (from && to && from.code === to.code) return amount;
 
     const rate = (toNumber(exchangeRate) / 100) || 1500;
 
-    if (isIqd(fromId) && isUsd(toId)) return amount / rate;
-    if (isUsd(fromId) && isIqd(toId)) return amount * rate;
+    if (!from || !to) {
+      const isFromIqd = Number(fromId) === 2 || Number(fromId) === 12;
+      const isToIqd = Number(toId) === 2 || Number(toId) === 12;
+      const isFromUsd = Number(fromId) === 1 || Number(fromId) === 11;
+      const isToUsd = Number(toId) === 1 || Number(toId) === 11;
+      if (isFromIqd && isToUsd) return amount / rate;
+      if (isFromUsd && isToIqd) return amount * rate;
+      return amount;
+    }
+
+    if (from.code === "IQD" && to.code === "USD") return amount / rate;
+    if (from.code === "USD" && to.code === "IQD") return amount * rate;
 
     return amount;
   }
@@ -728,13 +742,12 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
         {activeEntries.map(([curIdText, val]) => {
-          const isNegative = val < -0.01;
-          const color = isNegative ? "#dc2626" : "#16a34a";
+          const color = val > 0.01 ? "#dc2626" : "#16a34a";
           const curId = Number(curIdText);
 
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
-              {formatCurrencyAmountJSX(val, curId, isNegative)}
+              {formatCurrencyAmountJSX(val, curId)}
             </span>
           );
         })}
@@ -927,6 +940,84 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     for (const currencyId of currencyIds) {
       const key = getCurrencyKey(currencyId);
       result[key] = Number(totals[key] || 0) - Number(paid[key] || 0);
+    }
+
+    return result;
+  }
+
+  function getReturnRemainingByCurrency() {
+    const totals = { ...getReturnTotalsByCurrency() };
+    const paid = { ...getPaidAmountsByCurrency() };
+    const retCurKey = getCurrencyKey(returnCurrencyId);
+
+    const diffs: Record<string, number> = {};
+    const allKeys = Array.from(new Set([...Object.keys(totals), ...Object.keys(paid), retCurKey]));
+
+    for (const key of allKeys) {
+      diffs[key] = (totals[key] || 0) - (paid[key] || 0);
+    }
+
+    let excessInRetCur = 0;
+    const owedCurrencies: string[] = [];
+
+    for (const key of allKeys) {
+      const curId = Number(key);
+      const val = diffs[key] || 0;
+      if (val < -0.001) {
+        const excessInThisCur = Math.abs(val);
+        const excessConverted = convertCurrency(excessInThisCur, curId, returnCurrencyId);
+        excessInRetCur += excessConverted;
+        diffs[key] = 0;
+      } else if (val > 0.001) {
+        owedCurrencies.push(key);
+      }
+    }
+
+    if (excessInRetCur > 0.001) {
+      if (diffs[retCurKey] && diffs[retCurKey] > 0.001) {
+        const canOffset = Math.min(diffs[retCurKey], excessInRetCur);
+        diffs[retCurKey] -= canOffset;
+        excessInRetCur -= canOffset;
+      }
+
+      for (const key of owedCurrencies) {
+        if (key === retCurKey) continue;
+        if (excessInRetCur <= 0.001) break;
+        const curId = Number(key);
+        const owedInThisCur = diffs[key] || 0;
+        if (owedInThisCur > 0.001) {
+          const owedConverted = convertCurrency(owedInThisCur, curId, returnCurrencyId);
+          if (excessInRetCur >= owedConverted) {
+            excessInRetCur -= owedConverted;
+            diffs[key] = 0;
+          } else {
+            const partialOffsetThisCur = convertCurrency(excessInRetCur, returnCurrencyId, curId);
+            diffs[key] = Math.max(0, diffs[key] - partialOffsetThisCur);
+            excessInRetCur = 0;
+          }
+        }
+      }
+
+      if (excessInRetCur > 0.001) {
+        diffs[retCurKey] = -excessInRetCur;
+      }
+    }
+
+    const result: Record<string, number> = {};
+    for (const [key, val] of Object.entries(diffs)) {
+      const curId = Number(key);
+      const cur = currencies.find((c: any) => Number(c.id) === curId);
+      const isIQD = cur?.code === "IQD" || curId === 2 || curId === 12;
+      if (isIQD) {
+        const rounded = Math.round(val);
+        if (Math.abs(rounded) >= 1) result[key] = rounded;
+      } else {
+        if (Math.abs(val) > 0.005) result[key] = Number(val.toFixed(2));
+      }
+    }
+
+    if (Object.keys(result).length === 0) {
+      result[retCurKey] = 0;
     }
 
     return result;
@@ -1685,7 +1776,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
               />
               <StatBox
                 title="کۆی ماوەی ئەم پسووڵە"
-                value={formatCurrencyMap(supplierBalanceReductionByCurrency)}
+                value={formatCurrencyMapWithColors(getReturnRemainingByCurrency())}
                 color="#dc2626"
               />
             </div>
@@ -1765,17 +1856,23 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
               </div>
             )}
 
-            {(showRate && printOptions.showExchangeRate !== false) && (
-              <Field label="ڕەیتی 100 دۆلار بۆ پارەی دراو">
-                <FormattedNumberInput
-                  value={exchangeRate}
-                  disabled={isLocked}
-                  onChange={(val) => {
-                    if (blockIfLocked()) return;
-                    setExchangeRate(val);
-                  }}
-                  style={{ ...input, ...lockedFieldStyle }}
-                />
+            {/* --- نرخی دۆلار (تایبەت بەم پسووڵەیە) --- */}
+            {printOptions.showExchangeRate !== false && (
+              <Field label="نرخی 100 دۆلار (تایبەت بەم پسووڵەیە)">
+                <div style={{ display: "flex", border: "1px solid #93c5fd", borderRadius: 8, overflow: "hidden", background: "#f0f9ff" }}>
+                  <FormattedNumberInput
+                    value={exchangeRate}
+                    disabled={isLocked}
+                    onChange={(val) => {
+                      if (blockIfLocked()) return;
+                      setExchangeRate(val);
+                    }}
+                    style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 10px", background: "transparent", cursor: isLocked ? "not-allowed" : "text", color: "#1e40af", fontWeight: "bold" }}
+                  />
+                  <span style={{ border: "none", borderRight: "1px solid #bfdbfe", background: "#e0f2fe", padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#0369a1", fontSize: "12px", minWidth: "45px" }}>
+                    دینار
+                  </span>
+                </div>
               </Field>
             )}
 
@@ -2196,7 +2293,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
             <SummaryItem label="پارەی دراو" value={getPaidSummaryText()} />
             <SummaryItem
               label="ماوە"
-              value={formatCurrencyMap(supplierBalanceReductionByCurrency)}
+              value={formatCurrencyMapWithColors(getReturnRemainingByCurrency())}
               strong
             />
             <SummaryItem label="کۆی دانە" value={`${totalUnits}`} />
@@ -2359,7 +2456,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
 
               <PrintSummaryLine
                 label="ماوە"
-                value={formatCurrencyMap(supplierBalanceReductionByCurrency)}
+                value={formatCurrencyMap(getReturnRemainingByCurrency())}
                 bold
               />
             </div>
@@ -2671,11 +2768,11 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function StatBox({ title, value, color }: { title: string; value: React.ReactNode; color: string }) {
+function StatBox({ title, value, color }: { title: string; value: React.ReactNode; color?: string }) {
   return (
     <div style={statBox}>
       <div style={{ color: "#374151", fontWeight: 700 }}>{title}</div>
-      <div style={{ color, fontWeight: 900, fontSize: 18, marginTop: 6 }}>
+      <div style={{ color: color || "#111827", fontWeight: 900, fontSize: 18, marginTop: 6 }}>
         {value}
       </div>
     </div>
