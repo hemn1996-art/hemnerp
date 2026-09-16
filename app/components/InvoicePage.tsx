@@ -907,8 +907,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
         {activeEntries.map(([curIdText, val]) => {
-          const isNegative = val < -0.01;
-          const color = isNegative ? "#dc2626" : "#16a34a";
+          const color = val > 0.01 ? "#dc2626" : "#16a34a";
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
               {formatCurrencyAmountJSX(val, Number(curIdText))}
@@ -1450,13 +1449,23 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function convertCurrency(amount: number, fromId: number, toId: number) {
-    if (fromId === toId) return amount;
+    if (Number(fromId) === Number(toId)) return amount;
 
-    const from = currencies.find((c: any) => c.id === fromId);
-    const to = currencies.find((c: any) => c.id === toId);
+    const from = currencies.find((c: any) => Number(c.id) === Number(fromId));
+    const to = currencies.find((c: any) => Number(c.id) === Number(toId));
+    if (from && to && from.code === to.code) return amount;
+
     const rate = (toNumber(exchangeRate) / 100) || 1500;
 
-    if (!from || !to) return amount;
+    if (!from || !to) {
+      const isFromIqd = Number(fromId) === 2 || Number(fromId) === 12;
+      const isToIqd = Number(toId) === 2 || Number(toId) === 12;
+      const isFromUsd = Number(fromId) === 1 || Number(fromId) === 11;
+      const isToUsd = Number(toId) === 1 || Number(toId) === 11;
+      if (isFromIqd && isToUsd) return amount / rate;
+      if (isFromUsd && isToIqd) return amount * rate;
+      return amount;
+    }
 
     if (from.code === "IQD" && to.code === "USD") return amount / rate;
     if (from.code === "USD" && to.code === "IQD") return amount * rate;
@@ -1596,19 +1605,78 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }
 
   function getInvoiceRemainingByCurrency() {
-    const totals = getInvoiceNetTotalsByCurrency();
-    const paid = getPaidAmountsByCurrency();
-    const result: Record<string, number> = {};
+    const totals = { ...getInvoiceNetTotalsByCurrency() };
+    const paid = { ...getPaidAmountsByCurrency() };
+    const invCurKey = String(getCanonicalCurrencyId(invoiceCurrencyId));
 
-    const currencyKeys = Array.from(
-      new Set([...Object.keys(totals), ...Object.keys(paid)])
-    );
+    const diffs: Record<string, number> = {};
+    const allKeys = Array.from(new Set([...Object.keys(totals), ...Object.keys(paid), invCurKey]));
 
-    for (const key of currencyKeys) {
-      const diff = (totals[key] || 0) - (paid[key] || 0);
-      if (Math.abs(diff) > 0.001) {
-        result[key] = diff;
+    for (const key of allKeys) {
+      diffs[key] = (totals[key] || 0) - (paid[key] || 0);
+    }
+
+    let excessInInvoiceCur = 0;
+    const owedCurrencies: string[] = [];
+
+    for (const key of allKeys) {
+      const curId = Number(key);
+      const val = diffs[key] || 0;
+      if (val < -0.001) {
+        const excessInThisCur = Math.abs(val);
+        const excessConverted = convertCurrency(excessInThisCur, curId, invoiceCurrencyId);
+        excessInInvoiceCur += excessConverted;
+        diffs[key] = 0;
+      } else if (val > 0.001) {
+        owedCurrencies.push(key);
       }
+    }
+
+    if (excessInInvoiceCur > 0.001) {
+      if (diffs[invCurKey] && diffs[invCurKey] > 0.001) {
+        const canOffset = Math.min(diffs[invCurKey], excessInInvoiceCur);
+        diffs[invCurKey] -= canOffset;
+        excessInInvoiceCur -= canOffset;
+      }
+
+      for (const key of owedCurrencies) {
+        if (key === invCurKey) continue;
+        if (excessInInvoiceCur <= 0.001) break;
+        const curId = Number(key);
+        const owedInThisCur = diffs[key] || 0;
+        if (owedInThisCur > 0.001) {
+          const owedConverted = convertCurrency(owedInThisCur, curId, invoiceCurrencyId);
+          if (excessInInvoiceCur >= owedConverted) {
+            excessInInvoiceCur -= owedConverted;
+            diffs[key] = 0;
+          } else {
+            const partialOffsetThisCur = convertCurrency(excessInInvoiceCur, invoiceCurrencyId, curId);
+            diffs[key] = Math.max(0, diffs[key] - partialOffsetThisCur);
+            excessInInvoiceCur = 0;
+          }
+        }
+      }
+
+      if (excessInInvoiceCur > 0.001) {
+        diffs[invCurKey] = -excessInInvoiceCur;
+      }
+    }
+
+    const result: Record<string, number> = {};
+    for (const [key, val] of Object.entries(diffs)) {
+      const curId = Number(key);
+      const cur = currencies.find((c: any) => Number(c.id) === curId);
+      const isIQD = cur?.code === "IQD" || curId === 2 || curId === 12;
+      if (isIQD) {
+        const rounded = Math.round(val);
+        if (Math.abs(rounded) >= 1) result[key] = rounded;
+      } else {
+        if (Math.abs(val) > 0.005) result[key] = Number(val.toFixed(2));
+      }
+    }
+
+    if (Object.keys(result).length === 0) {
+      result[invCurKey] = 0;
     }
 
     return result;
@@ -3439,8 +3507,6 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
               {currencies.filter((c: any) => c.id === paidCurrencyId || (paidAmounts[c.id] && paidAmounts[c.id].trim() !== "" && parseFloat(paidAmounts[c.id]) !== 0)).map((currency: any) => {
                 const isCurrent = currency.id === paidCurrencyId;
-                const showRate = paidCurrencyId !== invoiceCurrencyId || getPaidCurrencies().some(x => x.currencyId !== invoiceCurrencyId);
-                const isConverted = showRate && currency.id !== invoiceCurrencyId;
 
                 const amountInput = (
                   <Field label={isCurrent ? "پارەی دراو" : `پارەی دراو (${currency.name})`}>
@@ -3473,35 +3539,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   </Field>
                 );
 
-                const rateInput = isConverted ? (
-                  <Field label="ڕەیتی 100 دۆلار">
-                    <div style={{ display: "flex", border: "1px solid #93c5fd", borderRadius: 8, overflow: "hidden", background: "#f0f9ff" }}>
-                      <FormattedNumberInput
-                        value={exchangeRate}
-                        disabled={isInvoiceLocked}
-                        onChange={(val) => {
-                          if (blockIfLocked()) return;
-                          setExchangeRate(val);
-                        }}
-                        style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 10px", background: "transparent", cursor: isInvoiceLocked ? "not-allowed" : "text", color: "#1e40af", fontWeight: "bold" }}
-                      />
-                      <span style={{ border: "none", borderRight: "1px solid #bfdbfe", background: "#e0f2fe", padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#0369a1", fontSize: "12px", minWidth: "45px" }}>
-                        دینار
-                      </span>
-                    </div>
-                  </Field>
-                ) : null;
-
                 return (
-                  <div key={currency.id} style={{ display: "flex", flexWrap: "wrap", gap: 8, width: "100%", alignItems: "flex-end" }}>
-                    <div style={{ flex: "1 1 200px" }}>
-                      {amountInput}
-                    </div>
-                    {rateInput && (
-                      <div style={{ flex: "1 1 145px", minWidth: "145px" }}>
-                        {rateInput}
-                      </div>
-                    )}
+                  <div key={currency.id} style={{ width: "100%" }}>
+                    {amountInput}
                   </div>
                 );
               })}
