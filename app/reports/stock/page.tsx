@@ -384,19 +384,27 @@ function StockReportContent() {
   };
 
   const getCurrencySymbol = (currencyId: number | string) => {
+    if (String(currencyId) === "2" || String(currencyId) === "6" || currencyId === "IQD") return "دینار";
+    if (String(currencyId) === "1" || String(currencyId) === "5" || currencyId === "USD") return "$";
     const active = currencies?.find((c: any) => String(c.id) === String(currencyId) || c.code === currencyId);
     return active ? active.symbol : "$";
   };
 
   const formatSalePrices = (item: StockItem | any) => {
-    const prices = item.salePrices && item.salePrices.length > 0
+    let prices = item.salePrices && Array.isArray(item.salePrices) && item.salePrices.length > 0
       ? item.salePrices
       : (item.sellPrice || item.price)
         ? [{ currencyId: 1, priceType: priceTypes[0]?.name || "نرخی تاک", amount: item.sellPrice || item.price }]
         : [];
 
-    if (prices.length === 0) {
-      return <span className="text-gray-400 font-normal">دیاری نەکراوە</span>;
+    // Filter out entries with zero or empty amounts if there are positive ones
+    const positivePrices = prices.filter((p: any) => p && p.amount !== undefined && p.amount !== null && Number(p.amount) > 0);
+    if (positivePrices.length > 0) {
+      prices = positivePrices;
+    }
+
+    if (prices.length === 0 || prices.every((p: any) => !p.amount || Number(p.amount) === 0)) {
+      return <span className="text-gray-400 font-normal text-xs">دیاری نەکراوە</span>;
     }
 
     const hasMultiplePriceTypes = priceTypes.length > 1;
@@ -405,12 +413,13 @@ function StockReportContent() {
       <div className="flex flex-col gap-0.5 items-center">
         {prices.map((sp: any, i: number) => {
           const symbol = getCurrencySymbol(sp.currencyId);
+          const isIQD = symbol === "دینار" || String(sp.currencyId) === "2" || String(sp.currencyId) === "6";
           const typeName = sp.priceType === "جوملە" && priceTypes[0]?.name ? priceTypes[0].name : sp.priceType;
           return (
-            <div key={i} className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 inline-flex items-center gap-1">
-              <FormattedNumber value={sp.amount} currencySymbol={symbol} decimals={2} />
+            <div key={i} className="text-xs font-bold text-blue-700 bg-blue-50/80 border border-blue-100 rounded px-1.5 py-0.5 inline-flex items-center gap-1 shadow-2xs">
+              <FormattedNumber value={sp.amount} currencySymbol={symbol} decimals={isIQD ? 0 : 2} />
               {hasMultiplePriceTypes && typeName && (
-                <span className="text-[10px] text-gray-400 font-normal">({typeName})</span>
+                <span className="text-[10px] text-gray-500 font-normal">({typeName})</span>
               )}
             </div>
           );

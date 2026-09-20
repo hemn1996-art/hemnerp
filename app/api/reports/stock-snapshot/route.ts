@@ -35,7 +35,7 @@ export async function GET(request: Request) {
           qtyChange: true,
           unitCost: true,
           currencyId: true,
-          product: { select: { name: true, code: true, category: true, brand: true, isMultiBatch: true } },
+          product: { select: { name: true, code: true, category: true, brand: true, isMultiBatch: true, salePrices: true } },
           warehouse: { select: { name: true } },
           voucher: {
             select: {
@@ -76,6 +76,7 @@ export async function GET(request: Request) {
           category: t.product?.category || "-",
           brand: t.product?.brand || "-",
           sellPrice: 0,
+          salePrices: t.product?.salePrices ? JSON.parse(t.product.salePrices) : [],
           warehouseId: t.warehouseId,
           warehouseName: t.warehouse?.name || "نەزانراو",
           quantity: 0,

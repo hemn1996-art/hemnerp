@@ -82,6 +82,7 @@ function StockSnapshotReportContent() {
     productName: true,
     category: true,
     brand: true,
+    sellPrice: true,
     warehouseName: true,
     quantity: true,
     cost: true,
@@ -245,6 +246,15 @@ function StockSnapshotReportContent() {
       } else if (sortColumn === "cost") {
         valA = a.cost || 0;
         valB = b.cost || 0;
+      } else if (sortColumn === "sellPrice") {
+        const getFirstPrice = (item: any) => {
+          if (item.salePrices && item.salePrices.length > 0) {
+            return Number(item.salePrices[0].amount) || 0;
+          }
+          return Number(item.sellPrice || item.price) || 0;
+        };
+        valA = getFirstPrice(a);
+        valB = getFirstPrice(b);
       }
       return sortDirection === "desc" ? valB - valA : valA - valB;
     });
@@ -252,6 +262,45 @@ function StockSnapshotReportContent() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const getCurrencySymbol = (currencyId: number | string) => {
+    if (String(currencyId) === "2" || String(currencyId) === "6" || currencyId === "IQD") return "دینار";
+    return "$";
+  };
+
+  const formatSalePrices = (item: any) => {
+    let prices = item.salePrices && Array.isArray(item.salePrices) && item.salePrices.length > 0
+      ? item.salePrices
+      : (item.sellPrice || item.price)
+        ? [{ currencyId: 1, priceType: "نرخی تاک", amount: item.sellPrice || item.price }]
+        : [];
+
+    const positivePrices = prices.filter((p: any) => p && p.amount !== undefined && p.amount !== null && Number(p.amount) > 0);
+    if (positivePrices.length > 0) {
+      prices = positivePrices;
+    }
+
+    if (prices.length === 0 || prices.every((p: any) => !p.amount || Number(p.amount) === 0)) {
+      return <span className="text-gray-400 font-normal text-xs">دیاری نەکراوە</span>;
+    }
+
+    return (
+      <div className="flex flex-col gap-0.5 items-center">
+        {prices.map((sp: any, i: number) => {
+          const symbol = getCurrencySymbol(sp.currencyId);
+          const isIQD = symbol === "دینار" || String(sp.currencyId) === "2" || String(sp.currencyId) === "6";
+          return (
+            <div key={i} className="text-xs font-bold text-blue-700 bg-blue-50/80 border border-blue-100 rounded px-1.5 py-0.5 inline-flex items-center gap-1 shadow-2xs">
+              <FormattedNumber value={sp.amount} currencySymbol={symbol} decimals={isIQD ? 0 : 2} />
+              {sp.priceType && sp.priceType !== "نرخی تاک" && (
+                <span className="text-[10px] text-gray-500 font-normal">({sp.priceType})</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const formatMoney = (amount: number, symbol: string = "$") => {
@@ -397,6 +446,11 @@ function StockSnapshotReportContent() {
                       براند {sortColumn === "brand" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
                     </th>
                   )}
+                  {visibleColumns.sellPrice && (
+                    <th onClick={() => handleSort("sellPrice")} className="px-2 py-2.5 font-bold border-l border-white/10 text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی نرخ">
+                      نرخی فرۆشتن {sortColumn === "sellPrice" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
+                    </th>
+                  )}
                   {visibleColumns.warehouseName && (
                     <th onClick={() => handleSort("warehouseName")} className="px-2 py-2.5 font-bold border-l border-white/10 text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی بەپێی پیت">
                       کۆگا {sortColumn === "warehouseName" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
@@ -453,6 +507,11 @@ function StockSnapshotReportContent() {
                       )}
                       {visibleColumns.category && <td className="px-2 py-2 text-center text-gray-600">{item.category}</td>}
                       {visibleColumns.brand && <td className="px-2 py-2 text-center text-gray-600">{item.brand}</td>}
+                      {visibleColumns.sellPrice && (
+                        <td className="px-2 py-2 text-center" dir="ltr">
+                          {formatSalePrices(item)}
+                        </td>
+                      )}
                       {visibleColumns.warehouseName && <td className="px-2 py-2 text-center text-gray-600">{item.warehouseName}</td>}
                       {visibleColumns.quantity && (
                         <td className="px-2 py-2 text-center text-gray-800 font-bold">
@@ -598,6 +657,7 @@ function StockSnapshotReportContent() {
                   { key: 'productName', label: 'کەرەستە' },
                   { key: 'category', label: 'کاتیگۆری' },
                   { key: 'brand', label: 'براند' },
+                  { key: 'sellPrice', label: 'نرخی فرۆشتن' },
                   { key: 'warehouseName', label: 'کۆگا' },
                   { key: 'quantity', label: 'عدد' },
                   { key: 'cost', label: 'کۆست' },
