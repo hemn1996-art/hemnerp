@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
+import ProductQuickModal from "../../components/ProductQuickModal";
 
 interface DropdownOption {
   value: string | number;
@@ -24,6 +25,7 @@ function ItemsReportContent() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReportStats, setShowReportStats] = useState(true);
+  const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
 
   // Date Filters
   const [startDate, setStartDate] = useState(() => {
@@ -663,9 +665,9 @@ function ItemsReportContent() {
                     {visibleColumns.productName && (
                       <td className="p-2 border-r border-slate-200 text-center allow-wrap">
                         <button
-                          onClick={() => router.push(`/materials?edit=${item.productId}`)}
-                          className="text-slate-800 font-bold hover:text-blue-600 hover:underline bg-transparent border-none p-0 cursor-pointer text-center inline-block text-[11px]"
-                          title="دەستکاری کردنی کەرەستە"
+                          onClick={() => setQuickProduct({ id: item.productId, name: item.productName, code: item.productCode || null })}
+                          className="text-blue-700 font-bold hover:text-blue-900 hover:underline bg-transparent border-none p-0 cursor-pointer text-center inline-block text-[11px]"
+                          title="کردارە خێراکان بۆ کەرەستە"
                         >
                           {item.productName}
                         </button>
@@ -676,8 +678,10 @@ function ItemsReportContent() {
                     {visibleColumns.warehouseName && <td className="p-2 border-r border-slate-200 text-center text-slate-500">{item.warehouseName}</td>}
                     {visibleColumns.cost && (
                       <td className="p-2 border-r border-slate-200 text-center font-medium">
-                        {item.isFixedRate ? (
-                          (() => {
+                        {(() => {
+                          const isCostIQD = item.costCurrencyId === 2 || item.costCurrencyId === 12 || item.costCurrencyCode === "IQD" || item.costCurrencySymbol === "دینار";
+                          const isFixedUSD = item.isFixedRate && !isCostIQD;
+                          if (isFixedUSD) {
                             const cRate = Number(item.customExchangeRate || 135000);
                             const leafRate = cRate > 10000 ? Math.round(cRate / 1000) : (cRate > 1000 ? Math.round(cRate / 10) : cRate);
                             const rateDisplay = (leafRate * 1000).toLocaleString("en-US");
@@ -694,12 +698,13 @@ function ItemsReportContent() {
                                 {formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}
                               </span>
                             );
-                          })()
-                        ) : (
-                          <span className="text-slate-600">
-                            {formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}
-                          </span>
-                        )}
+                          }
+                          return (
+                            <span className="text-slate-600">
+                              {formatCurrency(item.cost, item.costCurrencyId || item.currencyId, item.costCurrencySymbol, item.costCurrencyCode)}
+                            </span>
+                          );
+                        })()}
                       </td>
                     )}
                     {visibleColumns.quantity && (
@@ -1051,6 +1056,13 @@ function ItemsReportContent() {
           </div>
         </div>
       )}
+
+      {/* Product Quick Action Modal */}
+      <ProductQuickModal
+        isOpen={Boolean(quickProduct)}
+        onClose={() => setQuickProduct(null)}
+        product={quickProduct}
+      />
 
     </div>
   );

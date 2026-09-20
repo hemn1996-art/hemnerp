@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
-import BackButton from "../../components/BackButton";
+import ProductQuickModal from "../../components/ProductQuickModal";
 
 import { normalizeKurdishSearchText } from "../../utils/digits";
 
@@ -21,10 +21,12 @@ function ItemsReportContent() {
   const searchParams = useSearchParams();
   const paramProductId = searchParams.get("productId") || searchParams.get("id");
   const paramAccountId = searchParams.get("accountId");
+
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showReportStats, setShowReportStats] = useState(true);
+  const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
 
   const {
     accounts, fetchAccounts,
@@ -55,8 +57,7 @@ function ItemsReportContent() {
   const [filterBrands, setFilterBrands] = useState<string[]>([]);
   const [itemCode, setItemCode] = useState("");
   const [batchCode, setBatchCode] = useState("");
-  const [filterPaymentMethods, setFilterPaymentMethods] = useState<string[]>([]);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
@@ -168,7 +169,7 @@ function ItemsReportContent() {
   const employeeOptions = React.useMemo(() => {
     if (!invoices) return [];
     const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار کۆگای دۆستان", "هێمن حەمە فەرهاد"];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [invoices]);
 
@@ -645,9 +646,9 @@ function ItemsReportContent() {
                   {visibleColumns.productName && (
                     <td className="p-2.5 border-r border-slate-200 text-center allow-wrap">
                       <button
-                        onClick={() => router.push(`/materials?edit=${item.productId}`)}
-                        className="text-slate-800 font-bold hover:text-blue-600 hover:underline bg-transparent border-none p-0 cursor-pointer text-center inline-block text-[11px]"
-                        title="دەستکاری کردنی کەرەستە"
+                        onClick={() => setQuickProduct({ id: item.productId, name: item.productName, code: item.productCode || null })}
+                        className="text-blue-700 font-bold hover:text-blue-900 hover:underline bg-transparent border-none p-0 cursor-pointer text-center inline-block text-[11px]"
+                        title="کردارە خێراکان بۆ کەرەستە"
                       >
                         {item.productName}
                       </button>
@@ -985,6 +986,13 @@ function ItemsReportContent() {
           </div>
         </div>
       )}
+
+      {/* Product Quick Action Modal */}
+      <ProductQuickModal
+        isOpen={Boolean(quickProduct)}
+        onClose={() => setQuickProduct(null)}
+        product={quickProduct}
+      />
 
     </div>
   );

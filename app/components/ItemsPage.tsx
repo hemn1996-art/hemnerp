@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, type CSSProperties } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { store, useStore } from "../store/store";
 import { currencies as mockCurrencies } from "../data/mockData";
 import { Product } from "../types";
@@ -13,10 +13,51 @@ import ProductQuickModal from "./ProductQuickModal";
 type ItemKind = "inventory" | "service" | "expense";
 
 export default function ItemsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams?.get("edit") || searchParams?.get("id");
+  const isAddParam = searchParams?.get("add") === "true";
+
+  const products = useStore((state) => state.products) || [];
+  const fetchProducts = useStore((state) => state.fetchProducts);
+
   const [mode, setMode] = useState<"list" | "add" | "edit">("list");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isCopy, setIsCopy] = useState(false);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    if (editId) {
+      if (products.length > 0) {
+        const target = products.find((p: any) => p.id === Number(editId) || String(p.id) === String(editId));
+        if (target) {
+          setSelectedProduct(target);
+          setIsCopy(false);
+          setMode("edit");
+        }
+      }
+    } else if (isAddParam) {
+      setSelectedProduct(null);
+      setIsCopy(false);
+      setMode("add");
+    } else {
+      // Clean URL (/materials): Always ensure mode is "list"!
+      setMode("list");
+      setSelectedProduct(null);
+      setIsCopy(false);
+    }
+  }, [editId, isAddParam, products]);
+
+  const handleBackToList = () => {
+    router.replace("/materials");
+    setMode("list");
+    setSelectedProduct(null);
+    setIsCopy(false);
+  };
 
   return (
     <div style={{ direction: "rtl", minWidth: 0 }}>
@@ -28,6 +69,7 @@ export default function ItemsPage() {
             setMode("add");
           }}
           onEdit={(product: any) => {
+            router.push(`/materials?edit=${product.id}`);
             setSelectedProduct(product);
             setIsCopy(false);
             setMode("edit");
@@ -44,10 +86,10 @@ export default function ItemsPage() {
         <AddItemForm
           productToEdit={selectedProduct}
           isCopy={isCopy}
-          onBack={() => setMode("list")}
+          onBack={handleBackToList}
           onSuccess={(msg) => {
             setSuccessMessage(msg);
-            setMode("list");
+            handleBackToList();
           }}
         />
       )}
@@ -103,14 +145,7 @@ function ItemsList({
     if (s) {
       setSearch(decodeURIComponent(s));
     }
-    const editId = searchParams?.get("edit") || searchParams?.get("id");
-    if (editId && products.length > 0) {
-      const target = products.find((p: any) => p.id === Number(editId) || String(p.id) === String(editId));
-      if (target) {
-        onEdit(target);
-      }
-    }
-  }, [searchParams, products, onEdit]);
+  }, [searchParams]);
 
   useEffect(() => {
     if (successMsg) {
@@ -663,17 +698,35 @@ function AddItemForm({
         💡 ئەو فیڵدانەی کە بە <span style={{ color: "#ef4444", fontWeight: "bold", padding: "0 4px", fontSize: 16 }}>*</span> نیشانە کراون داواکراون.
       </div>
 
-      <div style={titleBox}>
-        <h2 style={{ margin: 0 }}>
-          {isCopy ? "زیادکردنی کەرەستە (کۆپی)" : productToEdit ? "دەستکاریکردنی کەرەستە" : "دروستکردنی کەرەستە"}
-        </h2>
-        <p style={{ margin: "6px 0 0", color: "#6b7280" }}>
-          {isCopy
-            ? "زیادکردنی کەرەستەی نوێ بە کۆپیکردنی زانیارییەکانی کەرەستەی پێشوو"
-            : productToEdit
-            ? "دەستکاریکردنی زانیاری و ڕێکخستنەکانی کەرەستە"
-            : "زانیاری کەرەستە، نرخی فرۆشتن، پێچانەوە و ڕێکخستنەکان"}
-        </p>
+      <div style={{ ...titleBox, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <h2 style={{ margin: 0 }}>
+            {isCopy ? "زیادکردنی کەرەستە (کۆپی)" : productToEdit ? "دەستکاریکردنی کەرەستە" : "دروستکردنی کەرەستە"}
+          </h2>
+          <p style={{ margin: "6px 0 0", color: "#6b7280" }}>
+            {isCopy
+              ? "زیادکردنی کەرەستەی نوێ بە کۆپیکردنی زانیارییەکانی کەرەستەی پێشوو"
+              : productToEdit
+              ? "دەستکاریکردنی زانیاری و ڕێکخستنەکانی کەرەستە"
+              : "زانیاری کەرەستە، نرخی فرۆشتن، پێچانەوە و ڕێکخستنەکان"}
+          </p>
+        </div>
+        <button
+          onClick={onBack}
+          style={{
+            ...backBtn,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontWeight: "bold",
+            color: "#1e293b",
+            background: "#f1f5f9",
+            borderColor: "#cbd5e1",
+          }}
+        >
+          <span>←</span>
+          <span>گەڕانەوە بۆ لیست</span>
+        </button>
       </div>
 
       <Section title="زانیاری بنەڕەتی" icon="ℹ">
