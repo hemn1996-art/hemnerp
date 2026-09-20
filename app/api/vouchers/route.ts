@@ -211,9 +211,10 @@ export async function POST(request: Request) {
       }
     }
 
+    const isShareholderVoucherType = data.type === "shareholder_deposit" || data.type === "shareholder_withdrawal";
     const dbCurrencies = await prisma.currency.findMany();
     let autoNote = "";
-    if (data.type !== "cashbox_transfer" && data.paidAmounts && Array.isArray(data.paidAmounts)) {
+    if (!isShareholderVoucherType && data.type !== "cashbox_transfer" && data.paidAmounts && Array.isArray(data.paidAmounts)) {
       const nonZeroPayments = data.paidAmounts.filter((p: any) => Number(p.amount) !== 0);
       const targetCurId = Number(data.currencyId);
       const isConversionNeeded = nonZeroPayments.length > 1 || (nonZeroPayments.length === 1 && Number(nonZeroPayments[0].currencyId) !== targetCurId);
@@ -261,9 +262,9 @@ export async function POST(request: Request) {
       }
     }
 
-    if (autoNote) {
-      data.printNote = autoNote;
-      data.internalNote = autoNote;
+    if (!isShareholderVoucherType && autoNote) {
+      data.printNote = data.printNote ? `${data.printNote} | ${autoNote}` : autoNote;
+      data.internalNote = data.internalNote ? `${data.internalNote} | ${autoNote}` : autoNote;
     }
 
     const creatorName = (data.employeeName && data.employeeName.trim() !== "")

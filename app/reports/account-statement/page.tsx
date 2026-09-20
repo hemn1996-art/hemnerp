@@ -196,6 +196,22 @@ function AccountStatementContent() {
     );
   };
 
+  const cleanShareholderManualNote = (rawNote: string | null | undefined): string => {
+    if (!rawNote) return "";
+    let clean = String(rawNote);
+    clean = clean.replace(/[^\n|]*ڕەیتی\s*گۆڕینەوە[^\n|]*/gi, "");
+    clean = clean.replace(/\([^\)]*دینار\s*بە\s*ڕەیتی\s*100\s*دۆلاری[^\)]*\)/gi, "");
+    clean = clean.replace(/[^\n|]*دینار\s*بە\s*ڕەیتی\s*100\s*دۆلاری[^\n|]*/gi, "");
+    clean = clean.replace(/[^\n|]*ڕەیتی\s*(?:١٠٠|100)\s*دۆلار[^\n|]*/gi, "");
+    clean = clean.replace(/[^\n|]*ڕەیتی\s*(?:100\$|دۆلار)[^\n|]*/gi, "");
+    clean = clean.replace(/[^\n|]*کۆی\s*گشتی[^\n|]*/gi, "");
+    const lines = clean
+      .split(/[\n|؛;]/)
+      .map(part => part.replace(/^[\s\-|—()]+|[\s\-|—()]+$/g, "").trim())
+      .filter(part => part.length > 0);
+    return lines.join(" - ");
+  };
+
   const convertAmount = (amount: number, fromCurrencyId: number | null, toCurrencyId: number | null, rate = 1500) => {
     if (!fromCurrencyId || !toCurrencyId || Number(fromCurrencyId) === Number(toCurrencyId)) return amount;
     const fromCur = currencies.find((c: any) => Number(c.id) === Number(fromCurrencyId));
@@ -323,10 +339,10 @@ function AccountStatementContent() {
             debit = netAmt;
           } else if (["purchase", "sales_return", "my_debt", "من قەرزارم", "people_debt_discount", "debt_discount", "داشکاندنم کردوە"].includes(v.type)) {
             credit = netAmt;
-          } else if (["money_in", "پارەی هاتوو"].includes(v.type)) {
-            credit = v.paidAmounts?.[0]?.amount || netAmt;
-          } else if (["money_out", "پارەی ڕۆشتوو"].includes(v.type)) {
-            debit = v.paidAmounts?.[0]?.amount || netAmt;
+          } else if (["money_in", "پارەی هاتوو", "shareholder_deposit", "دانانی پارە"].includes(v.type)) {
+            credit = v.paidAmounts?.[0]?.amount || v.totalAmount || netAmt;
+          } else if (["money_out", "پارەی ڕۆشتوو", "shareholder_withdrawal", "کشانەوەی پارە"].includes(v.type)) {
+            debit = v.paidAmounts?.[0]?.amount || v.totalAmount || netAmt;
           }
 
           if (debit > 0 || credit > 0) {
@@ -342,11 +358,14 @@ function AccountStatementContent() {
           type: v.type,
           originalType: v.type,
           kurdishType: getKurdishType(v.type),
-          totalAmount: v.netAmount,
+          totalAmount: (v.type === "shareholder_deposit" || v.type === "shareholder_withdrawal" || !v.netAmount) ? (v.totalAmount || v.netAmount || 0) : v.netAmount,
           currencyId: v.currencyId || 1,
           totalDiscount: v.totalDiscount,
           paidAmounts: v.paidAmounts ? v.paidAmounts.map(pa => ({ currencyId: pa.currencyId, amount: pa.amount, exchangeRate: pa.exchangeRate })) : [],
           note: v.printNote || v.internalNote || "",
+          rawPrintNote: v.printNote,
+          rawInternalNote: v.internalNote,
+          exchangeRate: v.exchangeRate,
           ledgerEntries: entries,
           hasLines: v.lines && v.lines.length > 0,
           lines: v.lines
@@ -878,24 +897,68 @@ function AccountStatementContent() {
                         {visibleColumns.note && (
                           <td className="p-3 text-center text-gray-500 text-xs allow-wrap">
                             {(() => {
-                              if (isShareholder && v.currencyId !== usdId) {
-                                let rate = 1500;
-                                const ledgerWithRate = v.ledgerEntries.find((le: any) => le.exchangeRate && le.exchangeRate > 10);
-                                if (ledgerWithRate) {
-                                  rate = ledgerWithRate.exchangeRate;
-                                } else {
-                                  const curObj = currencies.find((c: any) => c.id === v.currencyId);
-                                  if (curObj && curObj.rate > 1) {
-                                    rate = curObj.rate;
+                              const isDeposit = v.type === "shareholder_deposit";
+                              const isWithdrawal = v.type === "shareholder_withdrawal";
+                              const isShareholderRow = isDeposit || isWithdrawal || isShareholder;
+
+                              if (isShareholderRow) {
+                                // 1. Determine if payment / transaction was in IQD
+                                const iqdPayment = v.paidAmounts?.find((pa: any) => {
+                                  if (!pa || Number(pa.amount) <= 0) return false;
+                                  const c = currencies.find((cur: any) => Number(cur.id) === Number(pa.currencyId));
+                                  return c?.code === "IQD" || c?.symbol === "دینار" || Number(pa.currencyId) === 2 || Number(pa.currencyId) === 12;
+                                });
+                                const isVoucherIQD = v.currencyId !== usdId && (v.currencyId === 2 || v.currencyId === 12 || currencies.find((c: any) => Number(c.id) === Number(v.currencyId))?.code === "IQD");
+                                const isIQDTransaction = Boolean(iqdPayment) || isVoucherIQD;
+
+                                // 2. Extract clean manual note
+                                const rawManualCandidate = v.rawInternalNote || v.internalNote || v.rawPrintNote || v.printNote || v.note;
+                                const manualNote = cleanShareholderManualNote(rawManualCandidate);
+
+                                // 3. If IQD, show dollar exchange rate at the time of the voucher
+                                if (isIQDTransaction) {
+                                  let rate = 1540;
+                                  if (iqdPayment && iqdPayment.exchangeRate && iqdPayment.exchangeRate > 10) {
+                                    rate = iqdPayment.exchangeRate;
+                                  } else if (v.exchangeRate && v.exchangeRate > 10) {
+                                    rate = v.exchangeRate;
+                                  } else {
+                                    const ledgerWithRate = v.ledgerEntries?.find((le: any) => le.exchangeRate && le.exchangeRate > 10);
+                                    if (ledgerWithRate) {
+                                      rate = ledgerWithRate.exchangeRate;
+                                    } else {
+                                      const curObj = currencies.find((c: any) => c.code === "IQD" || c.id === 2);
+                                      if (curObj && curObj.rate > 1) {
+                                        rate = curObj.rate;
+                                      }
+                                    }
                                   }
+                                  const rate100 = rate >= 10000 ? rate : rate * 100;
+                                  const formattedRate = Math.round(rate100).toLocaleString("en-US");
+                                  const rateBadge = (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300 shadow-xs" dir="rtl">
+                                      ڕەیتی 100$: {formattedRate} دینار
+                                    </span>
+                                  );
+
+                                  if (manualNote) {
+                                    return (
+                                      <div className="flex flex-col items-center justify-center gap-1 py-0.5">
+                                        <span className="font-semibold text-slate-800 text-xs">{manualNote}</span>
+                                        {rateBadge}
+                                      </div>
+                                    );
+                                  }
+                                  return rateBadge;
                                 }
-                                const iqdAmount = v.paidAmounts && v.paidAmounts.length > 0
-                                  ? v.paidAmounts.reduce((sum: number, pa: any) => sum + pa.amount, 0)
-                                  : v.totalAmount;
-                                const usdVal = iqdAmount / rate;
-                                const autoNote = `ڕەیتی ١٠٠ دۆلار ${(rate * 100).toLocaleString("en-US")} دینار؛ بڕی پسووڵەکە = ${iqdAmount.toLocaleString("en-US")} دینار ($${usdVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })})`;
-                                return v.note ? `${v.note} | ${autoNote}` : autoNote;
+
+                                // 4. If USD (not Dinars): ONLY manual note or "—"
+                                if (manualNote) {
+                                  return <span className="font-medium text-slate-800 text-xs">{manualNote}</span>;
+                                }
+                                return <span className="text-gray-400">—</span>;
                               }
+
                               return v.note || "—";
                             })()}
                           </td>

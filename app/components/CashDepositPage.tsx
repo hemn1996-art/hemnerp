@@ -631,10 +631,7 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
     };
 
     const rateVal = (toNumber(exchangeRate) / 100) || 1540;
-    const autoNote = isIQD
-      ? `(${toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری ${toNumber(exchangeRate).toLocaleString('en-US')} دیناری)`
-      : "";
-    const finalPrintNote = autoNote ? (printNote ? `${autoNote}\n${printNote}` : autoNote) : printNote;
+    const finalNote = (receiptNote || printNote || "").trim();
 
     const payload = {
       type: "shareholder_deposit",
@@ -646,8 +643,8 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
       exchangeRate: rateVal,
       totalAmount: currentUsdEquivalent,
       netAmount: 0,
-      internalNote: receiptNote,
-      printNote: finalPrintNote,
+      internalNote: finalNote,
+      printNote: finalNote,
       paidAmounts: [
         {
           currencyId: Number(currencyId),
@@ -1090,8 +1087,8 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
             </div>
 
             {isIQD && toNumber(amount) > 0 && (
-              <div style={{ marginTop: 16, background: "#eff6ff", padding: "10px 14px", borderRadius: 8, border: "1px solid #bfdbfe", color: "#1e40af", fontSize: 13, fontWeight: "bold" }}>
-                تێبینی خۆکارانەی پسووڵە: ({toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری {toNumber(exchangeRate).toLocaleString('en-US')} دیناری)
+              <div style={{ marginTop: 16, background: "#fef3c7", padding: "10px 14px", borderRadius: 8, border: "1px solid #fde68a", color: "#92400e", fontSize: 13, fontWeight: "bold" }}>
+                ڕەیتی 100$: {toNumber(exchangeRate).toLocaleString('en-US')} دینار
               </div>
             )}
           </div>
@@ -1213,8 +1210,10 @@ export default function CashDepositPage({ headerSelector, editId }: Props) {
             }}>
               <b>تێبینی:</b>
               <div style={{ marginTop: 4, whiteSpace: "pre-line" }}>
-                {isIQD && toNumber(amount) > 0 && !printNote.includes("بە ڕەیتی 100 دۆلاری") && (
-                  `(${toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری ${toNumber(exchangeRate).toLocaleString('en-US')} دیناری)\n`
+                {isIQD && toNumber(amount) > 0 && (
+                  <div style={{ fontWeight: "bold", color: "#b45309", marginBottom: printNote ? 4 : 0 }}>
+                    ڕەیتی 100$: {toNumber(exchangeRate).toLocaleString('en-US')} دینار
+                  </div>
                 )}
                 {printNote}
               </div>

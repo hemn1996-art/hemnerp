@@ -621,6 +621,22 @@ function InvoiceReportContent() {
     return `${day}-${month}-${year} ${hourStr}:${minutes} ${ampm}`;
   };
 
+  const cleanShareholderManualNote = (rawNote: string | null | undefined): string => {
+    if (!rawNote) return "";
+    let clean = String(rawNote);
+    clean = clean.replace(/[^\n|]*ڕەیتی\s*گۆڕینەوە[^\n|]*/gi, "");
+    clean = clean.replace(/\([^\)]*دینار\s*بە\s*ڕەیتی\s*100\s*دۆلاری[^\)]*\)/gi, "");
+    clean = clean.replace(/[^\n|]*دینار\s*بە\s*ڕەیتی\s*100\s*دۆلاری[^\n|]*/gi, "");
+    clean = clean.replace(/[^\n|]*ڕەیتی\s*(?:١٠٠|100)\s*دۆلار[^\n|]*/gi, "");
+    clean = clean.replace(/[^\n|]*ڕەیتی\s*(?:100\$|دۆلار)[^\n|]*/gi, "");
+    clean = clean.replace(/[^\n|]*کۆی\s*گشتی[^\n|]*/gi, "");
+    const lines = clean
+      .split(/[\n|؛;]/)
+      .map(part => part.replace(/^[\s\-|—()]+|[\s\-|—()]+$/g, "").trim())
+      .filter(part => part.length > 0);
+    return lines.join(" - ");
+  };
+
   // Get active system base currency
   const getBaseCurrency = () => {
     if (typeof window !== "undefined") {
@@ -2837,6 +2853,39 @@ function InvoiceReportContent() {
                           {visibleColumns.notes && (
                             <td className="px-4 py-3.5 text-center text-xs font-medium align-middle max-w-[200px] break-words whitespace-normal allow-wrap">
                               {(() => {
+                                if (voucher.type === "shareholder_deposit" || voucher.type === "shareholder_withdrawal") {
+                                  const rawNote = voucher.internalNote || voucher.printNote || "";
+                                  const manualNote = cleanShareholderManualNote(rawNote);
+                                  const iqdPayment = voucher.paidAmounts?.find((pa: any) => {
+                                    if (!pa || Number(pa.amount) <= 0) return false;
+                                    const c = currencies.find((cur: any) => Number(cur.id) === Number(pa.currencyId));
+                                    return c?.code === "IQD" || c?.symbol === "دینار" || Number(pa.currencyId) === 2 || Number(pa.currencyId) === 12;
+                                  });
+                                  const isIQDTransaction = Boolean(iqdPayment) || (voucher.currencyId !== 1 && (voucher.currencyId === 2 || voucher.currencyId === 12));
+                                  if (isIQDTransaction) {
+                                    let rate = voucher.exchangeRate || 1540;
+                                    if (iqdPayment && iqdPayment.exchangeRate && iqdPayment.exchangeRate > 10) rate = iqdPayment.exchangeRate;
+                                    const rate100 = rate >= 10000 ? rate : rate * 100;
+                                    const rateText = `ڕەیتی 100$: ${Math.round(rate100).toLocaleString("en-US")} دینار`;
+                                    if (manualNote) {
+                                      return (
+                                        <div className="flex flex-col items-center justify-center gap-1">
+                                          <span>{manualNote}</span>
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                                            {rateText}
+                                          </span>
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                                        {rateText}
+                                      </span>
+                                    );
+                                  }
+                                  return manualNote || "-";
+                                }
+
                                 const lineNotes = voucher.lines && voucher.lines.length > 0
                                   ? voucher.lines.map((l: any) => l.note?.trim()).filter(Boolean).join(" ، ")
                                   : "";
