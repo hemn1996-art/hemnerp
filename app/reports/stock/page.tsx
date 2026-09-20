@@ -1,13 +1,16 @@
 "use client";
 
 import MultiSelectDropdown from "../../components/MultiSelectDropdown";
-import React, { useEffect, useState, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState, useMemo, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "../../store/store";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import FormattedNumber from "../../components/FormattedNumber";
 import { currencies as mockCurrencies } from "../../data/mockData";
+import ProductQuickModal from "../../components/ProductQuickModal";
+import AccountQuickModal from "../../components/AccountQuickModal";
+import CostEditModal from "../../components/CostEditModal";
 
 interface StockItem {
   productId: number;
@@ -29,36 +32,13 @@ interface StockItem {
   customExchangeRate?: number;
 }
 
-interface PendingStockItem {
-  id: string;
-  voucherId: number;
-  referenceNo: string;
-  purchaseDate: string;
-  sellerName: string;
-  sellerId: number | null;
-  productId: number;
-  productName: string;
-  productCode: string;
-  category: string;
-  brand: string;
-  warehouseName: string;
-  quantity: number;
-  purchasePrice: number;
-  expense: number;
-  cost: number;
-  totalValueUsd: number;
-  currencyCode: string;
-  isIQD: boolean;
-  rawPurchasePrice?: number;
-  rawCost?: number;
-}
-
-export default function StockReportPage() {
+function StockReportContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const paramProductId = searchParams.get("productId") || searchParams.get("id");
+  const paramSellerId = searchParams.get("sellerId") || searchParams.get("accountId");
+
   const [stockData, setStockData] = useState<StockItem[]>([]);
-  const [viewMode, setViewMode] = useState<"available" | "pending">("available");
-  const [pendingGoods, setPendingGoods] = useState<PendingStockItem[]>([]);
-  const [pendingArrivalValueUsd, setPendingArrivalValueUsd] = useState(0);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showReportStats, setShowReportStats] = useState(true);
@@ -98,6 +78,11 @@ export default function StockReportPage() {
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
+  // Quick action and edit modals state
+  const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string } | null>(null);
+  const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
+  const [costModalItem, setCostModalItem] = useState<any | null>(null);
+
   // Filters state
   const [filters, setFilters] = useState({
     warehouseIds: [] as (number | string)[],
@@ -110,6 +95,7 @@ export default function StockReportPage() {
     warehouseStatus: "available",
     rateType: "all",
     currency: "all",
+    costDisplayCurrency: "original" as "original" | "iqd" | "usd",
   });
 
   // Columns visibility state
@@ -188,8 +174,16 @@ export default function StockReportPage() {
   }, [fetchWarehouses, fetchProducts, fetchAccounts]);
 
   useEffect(() => {
-    loadStockData();
-  }, []);
+    let initialFilters = { ...filters };
+    if (paramProductId) {
+      initialFilters.productIds = [Number(paramProductId)];
+    }
+    if (paramSellerId) {
+      initialFilters.sellerNames = [paramSellerId];
+    }
+    setFilters(initialFilters);
+    loadStockData(initialFilters);
+  }, [paramProductId, paramSellerId]);
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -203,6 +197,7 @@ export default function StockReportPage() {
     if (filters.rateType && filters.rateType !== "all") count++;
     if (filters.currency && filters.currency !== "all") count++;
     if (filters.warehouseStatus && filters.warehouseStatus !== "available") count++;
+    if (filters.costDisplayCurrency && filters.costDisplayCurrency !== "original") count++;
     return count;
   }, [filters]);
 
@@ -219,79 +214,10 @@ export default function StockReportPage() {
       warehouseStatus: "available",
       rateType: "all",
       currency: "all",
+      costDisplayCurrency: "original" as "original" | "iqd" | "usd",
     };
     setFilters(cleanFilters);
     loadStockData(cleanFilters);
-  };
-
-  const fetchPendingGoods = async () => {
-    try {
-      const res = await fetch("/api/vouchers?type=purchase");
-      if (!res.ok) return;
-      const vouchers = await res.json();
-      if (!Array.isArray(vouchers)) return;
-
-      const unarrived = vouchers.filter((v: any) => v.isArrived === false && !v.isDeleted);
-      const items: PendingStockItem[] = [];
-      let totalUsd = 0;
-
-      for (const v of unarrived) {
-        const sellerName = v.account?.name || "نادیار";
-        const sellerId = v.accountId || null;
-        const purchaseDate = v.date ? v.date.slice(0, 10) : "-";
-        const refNo = v.referenceNo || String(v.id);
-        const rate = (v.exchangeRate > 100 ? v.exchangeRate / 100 : v.exchangeRate) || 1520;
-
-        const totalVoucherExpense = (v.expenses || []).reduce((acc: number, exp: any) => acc + (Number(exp.amount) || 0), 0);
-        const totalVoucherQty = (v.lines || []).reduce((acc: number, l: any) => acc + (Number(l.qty) || 0), 0);
-        const expensePerUnit = totalVoucherQty > 0 ? (totalVoucherExpense / totalVoucherQty) : 0;
-
-        if (v.lines && Array.isArray(v.lines)) {
-          v.lines.forEach((l: any, idx: number) => {
-            const qty = Number(l.qty || 0);
-            const purchasePrice = Number(l.unitPrice || 0);
-            const isIQD = l.currencyId === 2 || v.currencyId === 2 || purchasePrice > 1000;
-            const expUnit = expensePerUnit;
-            const cost = purchasePrice + expUnit;
-            const lineTotal = Number(l.lineTotal || (qty * purchasePrice));
-            const lineUsd = isIQD ? (lineTotal / rate) : lineTotal;
-            totalUsd += lineUsd;
-
-            const product = products.find((p: any) => p.id === l.productId);
-            const warehouse = warehouses.find((w: any) => w.id === l.warehouseId);
-
-            items.push({
-              id: `pending-${v.id}-${l.id || idx}`,
-              voucherId: v.id,
-              referenceNo: refNo,
-              purchaseDate,
-              sellerName,
-              sellerId,
-              productId: l.productId,
-              productName: l.product?.name || product?.name || `کەرەستە #${l.productId}`,
-              productCode: l.product?.code || product?.code || "-",
-              category: l.product?.category || product?.category || "-",
-              brand: l.product?.brand || product?.brand || "-",
-              warehouseName: warehouse?.name || "کۆگای سەرەکی",
-              quantity: qty,
-              purchasePrice,
-              expense: expUnit,
-              cost,
-              totalValueUsd: lineUsd,
-              currencyCode: isIQD ? "IQD" : "USD",
-              isIQD,
-              rawPurchasePrice: purchasePrice,
-              rawCost: cost,
-            });
-          });
-        }
-      }
-
-      setPendingGoods(items);
-      setPendingArrivalValueUsd(Math.round(totalUsd * 100) / 100);
-    } catch (e) {
-      console.error("Error fetching pending goods:", e);
-    }
   };
 
   const loadStockData = async (overrideFilters?: any) => {
@@ -299,7 +225,6 @@ export default function StockReportPage() {
     try {
       setLoading(true);
       setErrorMsg(null);
-      fetchPendingGoods();
       const query = new URLSearchParams();
       if (activeFilters.warehouseIds.length > 0) query.append("warehouseId", activeFilters.warehouseIds.join(","));
       if (activeFilters.productIds.length > 0) query.append("productId", activeFilters.productIds.join(","));
@@ -392,6 +317,65 @@ export default function StockReportPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const iqdCurrency = currencies?.find((c: any) => c.code === "IQD" || c.id === 2 || c.id === 12 || c.name?.includes("دینار"));
+  const rawRate = iqdCurrency?.rate || 1520;
+  const marketRatePerDollar = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
+
+  const getItemDisplayCost = (item: any) => {
+    const isIQDItem = item.isIQD === true || item.currencyCode === "IQD";
+    const baseCost = isIQDItem ? (item.rawCost || item.cost || 0) : (item.cost || 0);
+    if (filters.costDisplayCurrency === "usd") {
+      return isIQDItem ? (baseCost / marketRatePerDollar) : (item.costUsd || baseCost);
+    }
+    if (filters.costDisplayCurrency === "iqd") {
+      return isIQDItem ? baseCost : (baseCost * marketRatePerDollar);
+    }
+    return baseCost;
+  };
+
+  const getItemDisplayPurchasePrice = (item: any) => {
+    const isIQDItem = item.isIQD === true || item.currencyCode === "IQD";
+    const basePrice = isIQDItem ? (item.rawPurchasePrice || item.purchasePrice || 0) : (item.purchasePrice || 0);
+    if (filters.costDisplayCurrency === "usd") {
+      return isIQDItem ? (basePrice / marketRatePerDollar) : (item.purchasePriceUsd || basePrice);
+    }
+    if (filters.costDisplayCurrency === "iqd") {
+      return isIQDItem ? basePrice : (basePrice * marketRatePerDollar);
+    }
+    return basePrice;
+  };
+
+  const getItemDisplayExpense = (item: any) => {
+    const isIQDItem = item.isIQD === true || item.currencyCode === "IQD";
+    const baseExpense = isIQDItem ? (item.rawExpense || item.expense || 0) : (item.expense || 0);
+    if (filters.costDisplayCurrency === "usd") {
+      return isIQDItem ? (baseExpense / marketRatePerDollar) : (item.expenseUsd || baseExpense);
+    }
+    if (filters.costDisplayCurrency === "iqd") {
+      return isIQDItem ? baseExpense : (baseExpense * marketRatePerDollar);
+    }
+    return baseExpense;
+  };
+
+  const getItemDisplaySymbol = (item: any) => {
+    if (filters.costDisplayCurrency === "usd") return "$";
+    if (filters.costDisplayCurrency === "iqd") return "دینار";
+    const isIQDItem = item.isIQD === true || item.currencyCode === "IQD";
+    return isIQDItem ? "دینار" : "$";
+  };
+
+  const getItemDisplayDecimals = (item: any) => {
+    if (filters.costDisplayCurrency === "usd") return 2;
+    if (filters.costDisplayCurrency === "iqd") return 0;
+    const isIQDItem = item.isIQD === true || item.currencyCode === "IQD";
+    return isIQDItem ? 0 : 2;
+  };
+
+  const getItemDisplayWarehouseValue = (item: any) => {
+    const cost = getItemDisplayCost(item);
+    return cost * (item.quantity || 0);
   };
 
   const formatMoney = (amount: number, symbol: string = "$") => {
@@ -632,127 +616,77 @@ export default function StockReportPage() {
         valA = a.quantity || 0;
         valB = b.quantity || 0;
       } else if (sortColumn === "warehouseValue") {
-        valA = (a.purchasePrice || a.cost || 0) * (a.quantity || 0);
-        valB = (b.purchasePrice || b.cost || 0) * (b.quantity || 0);
+        valA = getItemDisplayWarehouseValue(a);
+        valB = getItemDisplayWarehouseValue(b);
       } else if (sortColumn === "purchasePrice") {
-        valA = a.purchasePrice || 0;
-        valB = b.purchasePrice || 0;
+        valA = getItemDisplayPurchasePrice(a);
+        valB = getItemDisplayPurchasePrice(b);
       } else if (sortColumn === "cost") {
-        valA = a.cost || 0;
-        valB = b.cost || 0;
+        valA = getItemDisplayCost(a);
+        valB = getItemDisplayCost(b);
       } else if (sortColumn === "expense") {
-        valA = a.expense || 0;
-        valB = b.expense || 0;
+        valA = getItemDisplayExpense(a);
+        valB = getItemDisplayExpense(b);
       } else if (sortColumn === "sellPrice") {
         valA = a.sellPrice || 0;
         valB = b.sellPrice || 0;
       }
       return sortDirection === "desc" ? valB - valA : valA - valB;
     });
-  }, [filteredStockData, sortColumn, sortDirection]);
-
-  const filteredPendingGoods = useMemo(() => {
-    return pendingGoods.filter((item) => {
-      if (quickSearch && !item.productName.toLowerCase().includes(quickSearch.toLowerCase()) && !item.productCode.toLowerCase().includes(quickSearch.toLowerCase())) return false;
-      if (filters.sellerNames.length > 0 && !filters.sellerNames.includes(item.sellerName)) return false;
-      if (filters.categories.length > 0 && !filters.categories.includes(item.category)) return false;
-      if (filters.brands.length > 0 && !filters.brands.includes(item.brand)) return false;
-      if (filters.productIds.length > 0 && !filters.productIds.includes(item.productId)) return false;
-      if (filters.code && !item.productCode.toLowerCase().includes(filters.code.toLowerCase())) return false;
-      return true;
-    });
-  }, [pendingGoods, quickSearch, filters]);
-
-  const totalPendingQty = useMemo(() => {
-    return filteredPendingGoods.reduce((sum, item) => sum + item.quantity, 0);
-  }, [filteredPendingGoods]);
-
-  const totalPendingVal = useMemo(() => {
-    return filteredPendingGoods.reduce((sum, item) => sum + item.totalValueUsd, 0);
-  }, [filteredPendingGoods]);
-
-  const sortedPendingData = useMemo(() => {
-    if (!sortColumn) return filteredPendingGoods;
-    return [...filteredPendingGoods].sort((a: any, b: any) => {
-      let valA: any = "";
-      let valB: any = "";
-      if (sortColumn === "productName") {
-        valA = a.productName || "";
-        valB = b.productName || "";
-        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
-      } else if (sortColumn === "category") {
-        valA = a.category || "";
-        valB = b.category || "";
-        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
-      } else if (sortColumn === "brand") {
-        valA = a.brand || "";
-        valB = b.brand || "";
-        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
-      } else if (sortColumn === "warehouseName") {
-        valA = a.warehouseName || "";
-        valB = b.warehouseName || "";
-        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
-      } else if (sortColumn === "sellerName") {
-        valA = a.sellerName || "";
-        valB = b.sellerName || "";
-        return sortDirection === "desc" ? valB.localeCompare(valA, "ckb") : valA.localeCompare(valB, "ckb");
-      } else if (sortColumn === "purchaseDate") {
-        const dateA = a.purchaseDate && a.purchaseDate !== "-" ? new Date(a.purchaseDate).getTime() : 0;
-        const dateB = b.purchaseDate && b.purchaseDate !== "-" ? new Date(b.purchaseDate).getTime() : 0;
-        return sortDirection === "desc" ? dateB - dateA : dateA - dateB;
-      } else if (sortColumn === "quantity") {
-        valA = a.quantity || 0;
-        valB = b.quantity || 0;
-      } else if (sortColumn === "warehouseValue") {
-        valA = a.totalValueUsd || 0;
-        valB = b.totalValueUsd || 0;
-      } else if (sortColumn === "purchasePrice") {
-        valA = a.purchasePrice || 0;
-        valB = b.purchasePrice || 0;
-      } else if (sortColumn === "cost") {
-        valA = a.cost || 0;
-        valB = b.cost || 0;
-      } else if (sortColumn === "expense") {
-        valA = a.expense || 0;
-        valB = b.expense || 0;
-      }
-      return sortDirection === "desc" ? valB - valA : valA - valB;
-    });
-  }, [filteredPendingGoods, sortColumn, sortDirection]);
-
-  const activeDisplayList = viewMode === "available" ? sortedStockData : sortedPendingData;
+  }, [filteredStockData, sortColumn, sortDirection, filters.costDisplayCurrency]);
 
   const totalPages = useMemo(() => {
     if (pageSize === "all") return 1;
-    return Math.ceil(activeDisplayList.length / pageSize) || 1;
-  }, [activeDisplayList.length, pageSize]);
+    return Math.ceil(sortedStockData.length / pageSize) || 1;
+  }, [sortedStockData.length, pageSize]);
 
   const paginatedStockData = useMemo(() => {
-    if (pageSize === "all") return activeDisplayList;
+    if (pageSize === "all") return sortedStockData;
     const start = (currentPage - 1) * pageSize;
-    return activeDisplayList.slice(start, start + pageSize);
-  }, [activeDisplayList, currentPage, pageSize]);
+    return sortedStockData.slice(start, start + pageSize);
+  }, [sortedStockData, currentPage, pageSize]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters, pageSize, sortColumn, sortDirection, viewMode]);
+  }, [filters, pageSize, sortColumn, sortDirection]);
 
   // Calculate totals
   const totalItems = filteredStockData.length;
   const totalQuantity = filteredStockData.reduce((sum, item) => sum + item.quantity, 0);
 
-  const totalValueUsd = filteredStockData.reduce((sum, item: any) => {
-    const costInUsd = item.costUsd || item.purchasePriceUsd || (item.isIQD ? (item.cost / 1520) : item.cost);
-    return sum + (costInUsd * item.quantity);
-  }, 0);
+  let dailyUsdSum = 0;
+  let fixedUsdSum = 0;
+  let fixedUsdEffectiveSum = 0;
+  let iqdSum = 0;
 
-  const totalValueIqd = filteredStockData.reduce((sum, item: any) => {
-    if (item.isIQD || item.currencyCode === "IQD") {
-      const costInIqd = item.rawCost || item.cost;
-      return sum + (costInIqd * item.quantity);
+  filteredStockData.forEach((item: any) => {
+    const qty = item.quantity || 0;
+    if (qty <= 0) return;
+    const isIQD = item.isIQD === true || item.currencyCode === "IQD";
+    const isFixed = item.exchangeRateType === "FIXED";
+
+    if (isIQD) {
+      const costIqd = item.rawCost || item.cost || 0;
+      iqdSum += qty * costIqd;
+    } else if (isFixed) {
+      const costFixed = item.cost || item.purchasePrice || 0;
+      fixedUsdSum += qty * costFixed;
+      const customRate = item.customExchangeRate || 135000;
+      const fixedRatePerDollar = customRate > 10000 ? customRate / 100 : customRate;
+      fixedUsdEffectiveSum += (qty * costFixed * fixedRatePerDollar) / marketRatePerDollar;
+    } else {
+      const costUsd = item.cost || item.purchasePrice || 0;
+      dailyUsdSum += qty * costUsd;
     }
-    return sum;
-  }, 0);
+  });
+
+  const totalEffectiveUsd = dailyUsdSum + fixedUsdEffectiveSum + (iqdSum / marketRatePerDollar);
+  const totalValueUsd = totalEffectiveUsd;
+  const totalValueIqd = totalEffectiveUsd * marketRatePerDollar;
+
+  const hasFixedUsd = fixedUsdSum > 0;
+  const hasDailyUsd = dailyUsdSum > 0;
+  const hasIqd = iqdSum > 0;
 
   const hasIqdItems = filteredStockData.some((item: any) => item.isIQD || item.currencyCode === "IQD");
 
@@ -784,9 +718,7 @@ export default function StockReportPage() {
       <div id="print-area" className="p-4 md:p-6 mx-auto bg-transparent min-h-screen">
         {/* Print Header */}
         <div className="hidden print:block mb-6">
-          <h2 className="text-center font-black text-lg mb-6">
-            {viewMode === "pending" ? "ڕاپۆرتی کاڵا نەگەیشتووەکان بە کۆگا (لە ڕێگادایە)" : "ڕاپۆرتی کۆگا"}
-          </h2>
+          <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی کۆگا</h2>
         </div>
         
         {/* Actions Bar */}
@@ -831,7 +763,7 @@ export default function StockReportPage() {
             <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-md hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
               پرینت 🖨️
             </button>
-            <button onClick={() => exportTableToExcel("stock-report-table", viewMode === "pending" ? "kala_nageyshtuwekan.xlsx" : "raporti_koga.xlsx")}
+            <button onClick={() => exportTableToExcel("stock-report-table", "raporti_koga.xlsx")}
               className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 py-2.5 rounded-md hover:bg-emerald-700 transition-colors cursor-pointer text-sm shadow-sm border-none">
               ناردن بۆ ئێکسڵ 📊
             </button>
@@ -851,160 +783,120 @@ export default function StockReportPage() {
           </div>
         </div>
 
-        {/* Pending Arrival Highlight Interactive Card */}
-        {pendingArrivalValueUsd > 0 && (
-          <div 
-            onClick={() => setViewMode(prev => prev === "pending" ? "available" : "pending")}
-            className={`mb-6 rounded-xl p-4.5 transition-all duration-200 cursor-pointer border shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 select-none ${
-              viewMode === "pending"
-                ? "bg-gradient-to-r from-amber-500 to-amber-600 border-amber-600 text-white ring-4 ring-amber-300/60 shadow-lg scale-[1.005]"
-                : "bg-gradient-to-r from-amber-50 to-orange-50/90 border-amber-300 hover:border-amber-400 hover:bg-amber-100/70"
-            }`}
-          >
-            <div className="flex items-center gap-3.5">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-inner ${
-                viewMode === "pending" ? "bg-white/20 text-white" : "bg-amber-200/90 text-amber-900"
-              }`}>
-                📦
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className={`font-black text-base md:text-lg ${viewMode === "pending" ? "text-white" : "text-amber-950"}`}>
-                    کۆی کاڵای نەگەیشتوو بە کۆگا (لە ڕێگادایە)
-                  </span>
-                  <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
-                    viewMode === "pending" ? "bg-white text-amber-900 shadow-xs" : "bg-amber-200 text-amber-900"
-                  }`}>
-                    {pendingGoods.length} کاڵا
-                  </span>
-                </div>
-                <span className={`text-xs font-medium block mt-1 ${
-                  viewMode === "pending" ? "text-amber-100" : "text-amber-800/90"
-                }`}>
-                  {viewMode === "pending"
-                    ? "ئێستا لە بینینی لیستی کاڵا نەگەیشتووەکاندایت — کلیک بکە بۆ گەڕانەوە بۆ کاڵاکانی بەردەست لە کۆگا"
-                    : "ئەم بڕە لە پسووڵەی کڕیندایە بەڵام هێشتا نەگەیشتۆتە کۆگا — کلیک بکە بۆ گۆڕینی لیست بۆ کاڵا نەگەیشتووەکان"}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className={`text-2xl md:text-3xl font-black font-mono tracking-tight ${
-                viewMode === "pending" ? "text-white" : "text-amber-900"
-              }`} dir="ltr">
-                $ {pendingArrivalValueUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <button 
-                type="button"
-                className={`text-xs font-black px-4 py-2 rounded-lg transition-all shadow-xs flex items-center gap-1.5 ${
-                  viewMode === "pending"
-                    ? "bg-white text-amber-900 hover:bg-amber-50"
-                    : "bg-amber-600 text-white hover:bg-amber-700"
-                }`}
-              >
-                {viewMode === "pending" ? "گەڕانەوە بۆ کۆگا ↩" : "پیشاندانی لیست 👁️"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* View Mode Switcher Tabs */}
-        <div className="flex items-center gap-2 mb-4 no-print">
-          <button
-            onClick={() => setViewMode("available")}
-            className={`px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs ${
-              viewMode === "available"
-                ? "bg-[#0b1f50] text-white ring-2 ring-[#0b1f50]/30 shadow-sm"
-                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            <span>🏢 کاڵاکانی بەردەست لە کۆگا</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs ${viewMode === "available" ? "bg-white/20 text-white" : "bg-gray-100 text-gray-700"}`}>
-              {filteredStockData.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setViewMode("pending")}
-            className={`px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all cursor-pointer flex items-center gap-2 shadow-xs ${
-              viewMode === "pending"
-                ? "bg-amber-600 text-white ring-2 ring-amber-600/30 shadow-sm"
-                : "bg-white border border-amber-300 text-amber-900 hover:bg-amber-50"
-            }`}
-          >
-            <span>📦 کاڵا نەگەیشتووەکان (لە ڕێگادایە)</span>
-            <span className={`px-2 py-0.5 rounded-full text-xs ${viewMode === "pending" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900 font-black"}`}>
-              {filteredPendingGoods.length}
-            </span>
-          </button>
-        </div>
-
         {/* Totals Cards */}
         {showReportStats && (
-          viewMode === "available" ? (
-            <div className={`grid grid-cols-1 ${visibleColumns.warehouseValue ? (filters.currency === 'iqd' ? 'md:grid-cols-4' : 'md:grid-cols-3') : 'md:grid-cols-2'} gap-4 mb-6 animate-in fade-in duration-200`}>
-              {visibleColumns.warehouseValue && (
-                <div className="bg-white rounded-md p-5 border-r-4 border-blue-500 shadow-sm flex flex-col items-center justify-center">
-                  <span className="text-blue-900 font-medium text-sm mb-2">بەهای کۆگا بە دۆلاری ڕۆژ 🟢</span>
-                  <span className="text-2xl font-medium text-gray-800" dir="ltr">{formatMoney(totalValueUsd, "$")}</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-in fade-in duration-200">
+            {visibleColumns.warehouseValue && (
+              filters.costDisplayCurrency === 'iqd' ? (
+                <div className="bg-white rounded-xl p-4 border-r-4 border-amber-500 shadow-sm flex flex-col justify-between border border-gray-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
+                      کۆی بەهای کۆگا بە دینار
+                    </span>
+                    <span className="text-[11px] font-bold text-gray-500 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                      100$ = {Math.round(marketRatePerDollar * 100).toLocaleString("en-US")} د.ع
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-2 my-1.5">
+                    <span className="text-2xl font-black text-amber-950" dir="ltr">
+                      {Math.round(totalValueIqd).toLocaleString("en-US")} <span className="text-base font-bold text-amber-700">دینار</span>
+                    </span>
+                    <span className="text-xs font-bold text-gray-600 bg-gray-50 px-2 py-0.5 rounded border border-gray-200" dir="ltr">
+                      {formatMoney(totalEffectiveUsd, "$")}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-gray-100" dir="rtl">
+                    {hasDailyUsd && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-bold text-blue-900" title="کاڵاکان بە دۆلاری ڕۆژ">
+                        <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
+                        <span>دۆلاری ڕۆژ:</span>
+                        <span dir="ltr" className="font-black text-blue-700">{formatMoney(dailyUsdSum, "$")}</span>
+                      </div>
+                    )}
+                    {hasFixedUsd && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-xs font-bold text-purple-900" title="کاڵاکان بە دۆلاری جێگیر (گەڵا بە ١٣٥)">
+                        <span className="w-2 h-2 rounded-full bg-purple-600 inline-block"></span>
+                        <span>دۆلاری جێگیر:</span>
+                        <span dir="ltr" className="font-black text-purple-700">{formatMoney(fixedUsdSum, "$")}</span>
+                        <span className="text-[10px] text-purple-600 font-semibold" dir="ltr">({formatMoney(fixedUsdEffectiveSum, "$")})</span>
+                      </div>
+                    )}
+                    {hasIqd && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900" title="کاڵاکان بە دینار">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                        <span>دینار:</span>
+                        <span dir="ltr" className="font-black text-amber-800">{Math.round(iqdSum).toLocaleString("en-US")} دینار</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              
-              {filters.currency === 'iqd' && (
-                <div className="bg-amber-50/90 rounded-md p-5 border-r-4 border-amber-500 shadow-sm flex flex-col items-center justify-center border border-amber-200">
-                  <span className="text-amber-900 font-medium text-sm mb-2 flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
-                    کۆی بەهای کۆگا بە دینار 🟠
-                  </span>
-                  <span className="text-2xl font-medium text-amber-950" dir="ltr">
-                    {Math.round(totalValueIqd).toLocaleString("en-US")} <span className="text-base font-medium text-amber-700">دینار</span>
-                  </span>
-                </div>
-              )}
+              ) : (
+                <div className="bg-white rounded-xl p-4 border-r-4 border-blue-600 shadow-sm flex flex-col justify-between border border-gray-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-blue-900 font-bold text-sm flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block animate-pulse"></span>
+                      کۆی بەهای کۆگا بە دۆلاری ڕۆژ
+                    </span>
+                    <span className="text-[11px] font-bold text-gray-500 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                      100$ = {Math.round(marketRatePerDollar * 100).toLocaleString("en-US")} د.ع
+                    </span>
+                  </div>
 
-              <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-                <span className="text-gray-500 font-normal text-sm mb-2">گشتی عدد</span>
-                <div className="text-2xl font-normal text-gray-800" dir="ltr">
-                  <span className="text-sm font-normal text-gray-400 ml-1">دانە</span>
-                  {totalQuantity.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                </div>
-              </div>
+                  <div className="flex items-baseline justify-between gap-2 my-1.5">
+                    <span className="text-2xl font-black text-gray-900" dir="ltr">
+                      {formatMoney(totalEffectiveUsd, "$")}
+                    </span>
+                  </div>
 
-              <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-                <span className="text-gray-500 font-normal text-sm mb-2">گشتی کەرەستە</span>
-                <span className="text-2xl font-normal text-gray-800">{totalItems}</span>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-gray-100" dir="rtl">
+                    {hasDailyUsd && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-bold text-blue-900" title="کاڵاکان بە دۆلاری ڕۆژ">
+                        <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
+                        <span>دۆلاری ڕۆژ:</span>
+                        <span dir="ltr" className="font-black text-blue-700">{formatMoney(dailyUsdSum, "$")}</span>
+                      </div>
+                    )}
+                    {hasFixedUsd && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-xs font-bold text-purple-900" title="کاڵاکان بە دۆلاری جێگیر (گەڵا بە ١٣٥)">
+                        <span className="w-2 h-2 rounded-full bg-purple-600 inline-block"></span>
+                        <span>دۆلاری جێگیر:</span>
+                        <span dir="ltr" className="font-black text-purple-700">{formatMoney(fixedUsdSum, "$")}</span>
+                        <span className="text-[10px] text-purple-600 font-semibold" dir="ltr">({formatMoney(fixedUsdEffectiveSum, "$")})</span>
+                      </div>
+                    )}
+                    {hasIqd && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900" title="کاڵاکان بە دینار">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                        <span>دینار:</span>
+                        <span dir="ltr" className="font-black text-amber-800">{Math.round(iqdSum).toLocaleString("en-US")} دینار</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+
+            <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
+              <span className="text-gray-500 font-normal text-sm mb-2">گشتی عدد</span>
+              <div className="text-2xl font-normal text-gray-800" dir="ltr">
+                <span className="text-sm font-normal text-gray-400 ml-1">دانە</span>
+                {totalQuantity.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-in fade-in duration-200">
-              <div className="bg-amber-50 rounded-md p-5 border-r-4 border-amber-500 shadow-sm flex flex-col items-center justify-center border border-amber-200">
-                <span className="text-amber-900 font-black text-sm mb-2">کۆی بەهای نەگەیشتوو ($) 📦</span>
-                <span className="text-2xl font-black text-amber-950" dir="ltr">
-                  $ {totalPendingVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
 
-              <div className="bg-white rounded-md p-5 border-r-4 border-orange-400 shadow-sm flex flex-col items-center justify-center">
-                <span className="text-gray-500 font-bold text-sm mb-2">گشتی عددی لە ڕێگا</span>
-                <div className="text-2xl font-black text-gray-800" dir="ltr">
-                  <span className="text-sm font-normal text-gray-400 ml-1">دانە</span>
-                  {totalPendingQty.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-                <span className="text-gray-500 font-bold text-sm mb-2">گشتی کاڵای لە ڕێگا</span>
-                <span className="text-2xl font-black text-gray-800">{filteredPendingGoods.length}</span>
-              </div>
+            <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
+              <span className="text-gray-500 font-normal text-sm mb-2">گشتی کەرەستە</span>
+              <span className="text-2xl font-normal text-gray-800">{totalItems}</span>
             </div>
-          )
+          </div>
         )}
 
         {/* Main Table */}
         <div className="bg-white rounded-md shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table id="stock-report-table" className="w-full text-xs text-right whitespace-nowrap">
-              <thead className={`${viewMode === "pending" ? "bg-amber-800" : "bg-[#0b1f50]"} text-white transition-colors`}>
+              <thead className="bg-[#0b1f50] text-white">
                 <tr>
                   {visibleColumns.id && <th className="px-2 py-2.5 font-bold border-l border-white/10 text-center w-10">#</th>}
                   {visibleColumns.productName && (
@@ -1022,7 +914,7 @@ export default function StockReportPage() {
                       براند {sortColumn === "brand" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
                     </th>
                   )}
-                  {viewMode === "available" && visibleColumns.sellPrice && (
+                  {visibleColumns.sellPrice && (
                     <th onClick={() => handleSort("sellPrice")} className="px-2 py-2.5 font-bold border-l border-white/10 text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی زۆر/کەم">
                       نرخی فرۆشتن {sortColumn === "sellPrice" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
                     </th>
@@ -1039,7 +931,7 @@ export default function StockReportPage() {
                   )}
                   {visibleColumns.purchasePrice && (
                     <th onClick={() => handleSort("purchasePrice")} className="px-2 py-2.5 font-bold border-l border-white/10 text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی زۆر/کەم">
-                      نرخی کڕین {sortColumn === "purchasePrice" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
+                      نرخی کڕین {filters.costDisplayCurrency === "usd" ? "($)" : filters.costDisplayCurrency === "iqd" ? "(دینار)" : ""} {sortColumn === "purchasePrice" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
                     </th>
                   )}
                   {visibleColumns.expense && (
@@ -1049,12 +941,12 @@ export default function StockReportPage() {
                   )}
                   {visibleColumns.cost && (
                     <th onClick={() => handleSort("cost")} className="px-2 py-2.5 font-bold border-l border-white/10 text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی زۆر/کەم">
-                      کۆست {sortColumn === "cost" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
+                      کۆست {filters.costDisplayCurrency === "usd" ? "($)" : filters.costDisplayCurrency === "iqd" ? "(دینار)" : ""} {sortColumn === "cost" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
                     </th>
                   )}
                   {visibleColumns.warehouseValue && (
                     <th onClick={() => handleSort("warehouseValue")} className="px-2 py-2.5 font-bold border-l border-white/10 text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی زۆر/کەم">
-                      {viewMode === "pending" ? "کۆی بەها ($)" : "بەهای کۆگا"} {sortColumn === "warehouseValue" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
+                      بەهای کۆگا {filters.costDisplayCurrency === "usd" ? "($)" : filters.costDisplayCurrency === "iqd" ? "(دینار)" : ""} {sortColumn === "warehouseValue" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
                     </th>
                   )}
                   {visibleColumns.sellerName && (
@@ -1064,12 +956,7 @@ export default function StockReportPage() {
                   )}
                   {visibleColumns.purchaseDate && (
                     <th onClick={() => handleSort("purchaseDate")} className="px-2 py-2.5 font-bold text-center cursor-pointer hover:bg-white/10 select-none" title="کلیک بکە بۆ ڕێکخستنی بەپێی بەروار">
-                      بەرواری پسووڵە {sortColumn === "purchaseDate" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
-                    </th>
-                  )}
-                  {viewMode === "pending" && (
-                    <th className="px-2 py-2.5 font-bold text-center bg-amber-900 border-r border-white/10">
-                      کردار و گەیاندن 🚚
+                      بەرواری کۆتا کڕین {sortColumn === "purchaseDate" ? (sortDirection === "desc" ? " ⬇" : " ⬆") : " ⇅"}
                     </th>
                   )}
                 </tr>
@@ -1077,11 +964,11 @@ export default function StockReportPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={14} className="p-8 text-center text-gray-500 font-bold">باردەکرێت...</td>
+                    <td colSpan={13} className="p-8 text-center text-gray-500 font-bold">باردەکرێت...</td>
                   </tr>
                 ) : errorMsg ? (
                   <tr>
-                    <td colSpan={14} className="p-8 text-center">
+                    <td colSpan={13} className="p-8 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <span className="text-red-500 text-3xl">⚠️</span>
                         <span className="text-red-600 font-bold text-sm">{errorMsg}</span>
@@ -1096,96 +983,8 @@ export default function StockReportPage() {
                   </tr>
                 ) : paginatedStockData.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="p-8 text-center text-gray-500 font-bold">
-                      {viewMode === "pending" ? "هیچ کاڵایەکی لە ڕێگا (نەگەیشتوو بە کۆگا) بوونی نییە" : "هیچ داتایەک نەدۆزرایەوە"}
-                    </td>
+                    <td colSpan={13} className="p-8 text-center text-gray-500 font-bold">هیچ داتایەک نەدۆزرایەوە</td>
                   </tr>
-                ) : viewMode === "pending" ? (
-                  paginatedStockData.map((item: any, itemIdx) => {
-                    const rowNumber = pageSize === "all" ? (itemIdx + 1) : ((currentPage - 1) * (pageSize as number) + itemIdx + 1);
-                    const isIQDItem = item.isIQD;
-                    const itemSymbol = isIQDItem ? "دینار" : "$";
-                    const itemPurchasePrice = item.purchasePrice;
-                    const itemCost = item.cost;
-                    const itemDecimals = isIQDItem ? 0 : 2;
-
-                    return (
-                      <tr 
-                        key={item.id || itemIdx} 
-                        className="border-b border-gray-100 hover:bg-amber-50/60 transition-colors"
-                      >
-                        {visibleColumns.id && <td className="px-2 py-2.5 text-center text-gray-500 font-bold">{rowNumber}</td>}
-                        {visibleColumns.productName && (
-                          <td 
-                            className="px-2 py-2.5 text-center text-[#4f46e5] font-bold cursor-pointer hover:underline"
-                            onClick={() => router.push(`/materials?search=${encodeURIComponent(item.productName)}`)}
-                          >
-                            {item.productName}
-                          </td>
-                        )}
-                        {visibleColumns.category && <td className="px-2 py-2.5 text-center text-gray-600 font-medium">{item.category}</td>}
-                        {visibleColumns.brand && <td className="px-2 py-2.5 text-center text-gray-600 font-medium">{item.brand}</td>}
-                        {visibleColumns.warehouseName && <td className="px-2 py-2.5 text-center text-gray-600 font-medium">{item.warehouseName}</td>}
-                        {visibleColumns.quantity && (
-                          <td className="px-2 py-2.5 text-center font-black text-amber-900">
-                            <span className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-md">
-                              {item.quantity} <span className="text-amber-700 font-normal text-[10px]">دانە</span>
-                            </span>
-                          </td>
-                        )}
-                        {visibleColumns.purchasePrice && (
-                          <td className="px-2 py-2.5 text-center text-gray-800 font-bold" dir="ltr">
-                            {formatMoney(itemPurchasePrice, itemSymbol)}
-                          </td>
-                        )}
-                        {visibleColumns.expense && (
-                          <td className="px-2 py-2.5 text-center text-gray-700 font-medium" dir="ltr">
-                            {formatMoney(item.expense, itemSymbol)}
-                          </td>
-                        )}
-                        {visibleColumns.cost && (
-                          <td className="px-2 py-2.5 text-center text-gray-900 font-bold" dir="ltr">
-                            <FormattedNumber value={itemCost} currencySymbol={itemSymbol} decimals={itemDecimals} />
-                          </td>
-                        )}
-                        {visibleColumns.warehouseValue && (
-                          <td className="px-2 py-2.5 text-center font-black text-amber-900" dir="ltr">
-                            $ {item.totalValueUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                        )}
-                        {visibleColumns.sellerName && (
-                          <td className="px-2 py-2.5 text-center font-bold">
-                            {item.sellerId ? (
-                              <span
-                                className="text-[#4f46e5] cursor-pointer hover:underline"
-                                onClick={() => router.push(`/reports/account-statement?accountId=${item.sellerId}`)}
-                              >
-                                {item.sellerName}
-                              </span>
-                            ) : (
-                              <span>{item.sellerName}</span>
-                            )}
-                          </td>
-                        )}
-                        {visibleColumns.purchaseDate && (
-                          <td className="px-2 py-2.5 text-center text-gray-500 font-medium" dir="ltr">
-                            {formatDate(item.purchaseDate)}
-                          </td>
-                        )}
-                        <td className="px-2 py-2.5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => router.push(`/invoices?type=purchase&editId=${item.voucherId}`)}
-                            className="bg-amber-600 hover:bg-amber-700 text-white font-black text-[11px] px-3 py-1.5 rounded-md shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1 mx-auto"
-                            title="کردنەوەی پسووڵە بۆ گەیاندن یان دەستکاریکردن"
-                          >
-                            <span>پسووڵە #{item.referenceNo}</span>
-                            <span>✏️</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
                 ) : (
                   paginatedStockData.map((item: any, itemIdx) => {
                     // Currency detection: rely on server flags ONLY. Never guess from price magnitude.
@@ -1205,7 +1004,8 @@ export default function StockReportPage() {
                       {visibleColumns.productName && (
                         <td 
                           className="px-2 py-2 text-center text-[#4f46e5] font-bold cursor-pointer hover:underline"
-                          onClick={() => router.push(`/materials?search=${encodeURIComponent(item.productName)}`)}
+                          onClick={() => setQuickProduct({ id: item.productId, name: item.productName, code: item.productCode })}
+                          title="کلیک بکە بۆ کردارە خێراکان"
                         >
                           {item.productName}
                         </td>
@@ -1229,7 +1029,13 @@ export default function StockReportPage() {
                       )}
                       {visibleColumns.purchasePrice && (
                         <td className="px-2 py-2 text-center text-gray-800 font-bold" dir="ltr">
-                          {isIQDItem ? (
+                          {filters.costDisplayCurrency === "iqd" ? (
+                            <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
+                              {formatMoney(getItemDisplayPurchasePrice(item), "دینار")}
+                            </span>
+                          ) : filters.costDisplayCurrency === "usd" ? (
+                            formatMoney(getItemDisplayPurchasePrice(item), "$")
+                          ) : isIQDItem ? (
                             <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
                               {formatMoney(itemPurchasePrice, itemSymbol)}
                             </span>
@@ -1246,132 +1052,66 @@ export default function StockReportPage() {
                           )}
                         </td>
                       )}
-                      {visibleColumns.expense && <td className="px-2 py-2 text-center text-gray-800" dir="ltr">{formatMoney(item.expense, itemSymbol)}</td>}
+                      {visibleColumns.expense && (
+                        <td className="px-2 py-2 text-center text-gray-800" dir="ltr">
+                          {formatMoney(getItemDisplayExpense(item), getItemDisplaySymbol(item))}
+                        </td>
+                      )}
                       {visibleColumns.cost && (
                         (() => {
-                          const key = `${item.productId}-${item.warehouseId}`;
-                          const isEditing = editingCellKey === key;
+                          const displayCost = getItemDisplayCost(item);
+                          const displaySymbol = getItemDisplaySymbol(item);
+                          const displayDecimals = getItemDisplayDecimals(item);
+                          const isDisplayIQD = displaySymbol === "دینار";
+
                           return (
                             <td className="px-2 py-1 text-center text-gray-800 font-bold" dir="ltr">
-                              {isEditing ? (
-                                <div className="flex items-center justify-center gap-1">
-                                  <span className="text-gray-500 font-bold">{itemSymbol}</span>
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    autoFocus
-                                    onFocus={(e) => e.target.select()}
-                                    className="w-24 px-1.5 py-0.5 text-center border border-gray-300 rounded focus:outline-none focus:border-[#0b1f50] font-bold bg-white text-gray-800 shadow-sm"
-                                    value={
-                                      editingCost[key] !== undefined
-                                        ? editingCost[key]
-                                        : itemCost.toFixed(itemDecimals)
-                                    }
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      if (val === "" || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                                        setEditingCost((prev) => ({
-                                          ...prev,
-                                          [key]: val,
-                                        }));
-                                      }
-                                    }}
-                                    onBlur={() => {
-                                      const val = editingCost[key];
-                                      if (val !== undefined) {
-                                        handleSaveCost(item.productId, item.warehouseId, val);
-                                      }
-                                      setEditingCellKey(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        const val = editingCost[key];
-                                        if (val !== undefined) {
-                                          handleSaveCost(item.productId, item.warehouseId, val);
-                                        }
-                                        setEditingCellKey(null);
-                                      } else if (e.key === "Escape") {
-                                        setEditingCellKey(null);
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              ) : isIQDItem ? (
-                                <span
-                                  className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs cursor-pointer"
-                                  onClick={() => {
-                                    setEditingCellKey(key);
-                                    setEditingCost((prev) => ({ ...prev, [key]: itemCost.toFixed(itemDecimals) }));
-                                  }}
-                                  title="کلیک بکە بۆ دەستکاریکردن"
-                                >
-                                  <FormattedNumber value={itemCost} currencySymbol={itemSymbol} decimals={itemDecimals} />
-                                </span>
-                              ) : (item as any).exchangeRateType === "FIXED" ? (
-                                <span
-                                  className="inline-flex items-center px-2.5 py-1 rounded-lg border text-sm cursor-help font-black shadow-sm"
-                                  style={{ backgroundColor: "#f3e8ff", borderColor: "#c084fc", color: "#6b21a8" }}
-                                  title={`نرخی جێگیری 100$: ${((item as any).customExchangeRate || 135000).toLocaleString("en-US")} دینار`}
-                                  onClick={() => {
-                                    setEditingCellKey(key);
-                                    setEditingCost((prev) => ({ ...prev, [key]: itemCost.toFixed(itemDecimals) }));
-                                  }}
-                                >
-                                  <FormattedNumber value={itemPurchasePrice} currencySymbol={itemSymbol} decimals={itemDecimals} />
-                                </span>
-                              ) : (
-                                <div
-                                  onClick={() => {
-                                    setEditingCellKey(key);
-                                    setEditingCost((prev) => ({ ...prev, [key]: itemCost.toFixed(itemDecimals) }));
-                                  }}
-                                  className="cursor-pointer hover:bg-gray-100 rounded px-2 py-0.5 inline-block font-bold"
-                                  title="کلیک بکە بۆ دەستکاریکردن"
-                                >
-                                  <FormattedNumber value={itemCost} currencySymbol={itemSymbol} decimals={itemDecimals} />
-                                </div>
-                              )}
+                              <div
+                                onClick={() => setCostModalItem(item)}
+                                className={`inline-block px-2.5 py-1 rounded-lg text-sm font-black cursor-pointer transition-transform hover:scale-105 ${
+                                  isDisplayIQD
+                                    ? "border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs"
+                                    : "border border-gray-200 bg-gray-50/80 hover:bg-gray-100 text-gray-800 shadow-2xs"
+                                }`}
+                                title="کلیک بکە بۆ نوێکردنەوە یان بینینی مێژووی نرخ"
+                              >
+                                <FormattedNumber value={displayCost} currencySymbol={displaySymbol} decimals={displayDecimals} />
+                              </div>
                             </td>
                           );
                         })()
                       )}
                       {visibleColumns.warehouseValue && (
-                        <td className="px-2 py-2 text-center font-bold" dir="ltr">
-                          {isIQDItem ? (
-                            <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
-                              {formatMoney(itemCost * item.quantity, itemSymbol)}
-                            </span>
-                          ) : (
-                            formatMoney(itemCost * item.quantity, itemSymbol)
-                          )}
-                        </td>
+                        (() => {
+                          const displayVal = getItemDisplayWarehouseValue(item);
+                          const displaySymbol = getItemDisplaySymbol(item);
+                          const isDisplayIQD = displaySymbol === "دینار";
+
+                          return (
+                            <td className="px-2 py-2 text-center font-bold" dir="ltr">
+                              {isDisplayIQD ? (
+                                <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
+                                  {formatMoney(displayVal, displaySymbol)}
+                                </span>
+                              ) : (
+                                formatMoney(displayVal, displaySymbol)
+                              )}
+                            </td>
+                          );
+                        })()
                       )}
                       {visibleColumns.sellerName && (
                         <td className="px-2 py-2 text-center font-bold">
-                          {(item as any).exchangeRateType === "FIXED" ? (
+                          {item.sellerId ? (
                             <span
-                              className="inline-flex items-center px-2.5 py-1 rounded-lg border text-sm cursor-help font-black shadow-sm"
-                              style={{ backgroundColor: "#f3e8ff", borderColor: "#c084fc", color: "#6b21a8" }}
-                              title={`نرخی جێگیری 100$: ${((item as any).customExchangeRate || 132000).toLocaleString("en-US")} دینار`}
-                              onClick={() => {
-                                if (item.sellerId) {
-                                  router.push(`/reports/account-statement?accountId=${item.sellerId}`);
-                                }
-                              }}
+                              className="text-[#4f46e5] cursor-pointer hover:underline"
+                              onClick={() => setQuickAccount({ id: item.sellerId, name: item.sellerName })}
+                              title="کلیک بکە بۆ کردارە خێراکان"
                             >
                               {item.sellerName}
                             </span>
                           ) : (
-                            <span
-                              className="text-[#4f46e5] cursor-pointer hover:underline"
-                              onClick={() => {
-                                if (item.sellerId) {
-                                  router.push(`/reports/account-statement?accountId=${item.sellerId}`);
-                                }
-                              }}
-                            >
-                              {item.sellerName}
-                            </span>
+                            <span className="text-gray-500">{item.sellerName}</span>
                           )}
                         </td>
                       )}
@@ -1698,7 +1438,16 @@ export default function StockReportPage() {
                   />
                 </div>
                 <div>
-                  {/* Empty space for alignment */}
+                  <h4 className="font-bold text-gray-800 text-[14px] mb-2">پیشاندانی تێچوو بە دراوی 💱</h4>
+                  <select
+                    value={filters.costDisplayCurrency}
+                    onChange={e => setFilters(prev => ({ ...prev, costDisplayCurrency: e.target.value as any }))}
+                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 outline-none text-right min-h-[48px] font-bold shadow-sm focus:border-[#0b1f50] cursor-pointer bg-white"
+                  >
+                    <option value="original">دراوی ڕەسەن</option>
+                    <option value="iqd">دینار</option>
+                    <option value="usd">$ (دۆلار)</option>
+                  </select>
                 </div>
               </div>
 
@@ -1763,7 +1512,42 @@ export default function StockReportPage() {
           </div>
         </div>
       )}
+      {/* Product Quick Action Modal */}
+      <ProductQuickModal
+        isOpen={Boolean(quickProduct)}
+        onClose={() => setQuickProduct(null)}
+        product={quickProduct}
+        onFilterStock={(pId) => {
+          const updated = { ...filters, productIds: [pId] };
+          setFilters(updated);
+          loadStockData(updated);
+        }}
+      />
+
+      {/* Account Quick Action Modal */}
+      <AccountQuickModal
+        isOpen={Boolean(quickAccount)}
+        onClose={() => setQuickAccount(null)}
+        account={quickAccount}
+      />
+
+      {/* Cost Edit & History Modal */}
+      <CostEditModal
+        isOpen={Boolean(costModalItem)}
+        onClose={() => setCostModalItem(null)}
+        item={costModalItem}
+        onSaveSuccess={() => loadStockData()}
+        marketRate={marketRatePerDollar}
+      />
 
     </div>
+  );
+}
+
+export default function StockReportPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500 font-bold">باردەکرێت...</div>}>
+      <StockReportContent />
+    </Suspense>
   );
 }

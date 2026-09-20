@@ -695,37 +695,63 @@ function InvoiceReportContent() {
     return `$ ${formattedNumber}`;
   };
 
+  const getVoucherCurrencyProfile = (v: any) => {
+    if (v && v.lines && Array.isArray(v.lines) && v.lines.length > 0) {
+      let hasUSD = false;
+      let hasIQD = false;
+      let usdAmt = 0;
+      let iqdAmt = 0;
+      for (const line of v.lines) {
+        const isLineIQD = line.currencyId === 2 || Number(line.currencyId) === 2 || Number(line.currencyId) === 12;
+        const qty = Number(line.qty || 0);
+        const price = Number(line.unitPrice || 0);
+        const disc = Number(line.discountAmount || 0);
+        const lineTot = Math.max(0, (qty * price) - disc);
+        if (isLineIQD) {
+          hasIQD = true;
+          iqdAmt += lineTot;
+        } else {
+          hasUSD = true;
+          usdAmt += lineTot;
+        }
+      }
+      if (hasUSD && hasIQD) {
+        return { isMixed: true, isPureIQD: false, isPureUSD: false, usdAmt, iqdAmt };
+      }
+      if (hasIQD && !hasUSD) {
+        return { isMixed: false, isPureIQD: true, isPureUSD: false, usdAmt: 0, iqdAmt };
+      }
+      return { isMixed: false, isPureIQD: false, isPureUSD: true, usdAmt, iqdAmt: 0 };
+    }
+    const isVoucherIQD = v?.currencyId === 2 || Number(v?.currencyId) === 2 || Number(v?.currencyId) === 12;
+    return {
+      isMixed: false,
+      isPureIQD: isVoucherIQD,
+      isPureUSD: !isVoucherIQD,
+      usdAmt: isVoucherIQD ? 0 : Number(v?.netAmount || 0),
+      iqdAmt: isVoucherIQD ? Number(v?.netAmount || 0) : 0,
+    };
+  };
+
   const getVoucherMultiCurrencyBreakdownJSX = (v: any) => {
-    if (!v || !v.lines || !Array.isArray(v.lines) || v.lines.length === 0) return null;
-    const totalsByCurrency: Record<string, number> = {};
-    for (const line of v.lines) {
-      const isIQD = line.currencyId === 2 || Number(line.currencyId) === 2;
-      const curKey = isIQD ? "2" : "1";
-      const lineTot = Number(line.lineTotal || (Number(line.qty) * Number(line.unitPrice)));
-      totalsByCurrency[curKey] = (totalsByCurrency[curKey] || 0) + lineTot;
-    }
-    const keys = Object.keys(totalsByCurrency).filter(k => totalsByCurrency[k] > 0);
-    if (keys.length > 1) {
-      const usdAmt = totalsByCurrency["1"] || 0;
-      const iqdAmt = totalsByCurrency["2"] || 0;
-      return (
-        <div className="flex flex-col items-center gap-0.5">
-          {usdAmt > 0 && (
-            <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
-              <span className="text-[0.78em] opacity-85 font-bold">$</span>
-              <span>{usdAmt.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-            </span>
-          )}
-          {iqdAmt > 0 && (
-            <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
-              <span className="text-[0.78em] opacity-85 font-bold">دینار</span>
-              <span>{Math.round(iqdAmt).toLocaleString("en-US")}</span>
-            </span>
-          )}
-        </div>
-      );
-    }
-    return null;
+    const profile = getVoucherCurrencyProfile(v);
+    if (!profile.isMixed) return null;
+    return (
+      <div className="flex flex-col items-center gap-0.5">
+        {profile.usdAmt > 0 && (
+          <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
+            <span className="text-[0.78em] opacity-85 font-bold">$</span>
+            <span>{profile.usdAmt.toLocaleString("en-US", { minimumFractionDigits: profile.usdAmt % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}</span>
+          </span>
+        )}
+        {profile.iqdAmt > 0 && (
+          <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
+            <span className="text-[0.78em] opacity-85 font-bold">دینار</span>
+            <span>{Math.round(profile.iqdAmt).toLocaleString("en-US")}</span>
+          </span>
+        )}
+      </div>
+    );
   };
 
   const getVoucherPaidAmountsJSX = (v: any, fallbackDisplayId: number, fallbackPaidVal: number) => {
@@ -929,14 +955,14 @@ function InvoiceReportContent() {
 
       // Only check incoming stock vouchers: purchase, warehouse_stock, or incoming inventory movements
       const isIncoming = v.type === "purchase" || v.type === "warehouse_stock" || v.rawType === "purchase" || v.rawType === "warehouse_stock" || (v.inventoryTransactions || []).some((t: any) => t.qtyChange > 0);
-      const isWarehouseStockWithCustom = (v.type === "warehouse_stock" || v.rawType === "warehouse_stock" || v.type === "جەردی کۆگا") && customRate && (Number(customRate) === 135000 || Number(customRate) === 132000 || Number(customRate) < 145000);
-      const isFixed = rateType === "FIXED" || Boolean(isWarehouseStockWithCustom);
+      const isFixed = rateType === "FIXED";
 
       if (isIncoming && isFixed && customRate) {
         const rateVal = Number(customRate) > 10000 ? Number(customRate) / 100 : Number(customRate);
         if (v.lines) {
           v.lines.forEach((l: any) => {
-            if (l.productId) map[l.productId] = rateVal;
+            const lineCur = l.currencyId || v.currencyId || 1;
+            if (l.productId && (lineCur === 1 || lineCur === 11)) map[l.productId] = rateVal;
           });
         }
         if (v.inventoryTransactions) {
@@ -1133,35 +1159,32 @@ function InvoiceReportContent() {
 
     const usdCur = currencies?.find((c: any) => c.code === "USD");
     const usdId = usdCur ? usdCur.id : 1;
-    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
+    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2 || c.id === 12);
     const iqdId = iqdCur?.id || 2;
     const rawRate = iqdCur?.rate || 1520;
     const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
-
-    const vCurId = voucher.currencyId || usdId;
-    const saleIsIQD = vCurId === iqdId || vCurId === 2 || vCurId === 12;
     const vRate = normalizeRate(voucher.exchangeRate) || marketRate;
 
-    // Check if voucher has mixed currencies
-    const hasMixedCurrencies = (() => {
-      if (voucher.lines && Array.isArray(voucher.lines) && voucher.lines.length > 0) {
-        const lineCurrencies = new Set(
-          voucher.lines.map((l: any) => Number(l.currencyId || voucher.currencyId || usdId))
-        );
-        if (lineCurrencies.size > 1) return true;
-      }
-      return false;
-    })();
+    const profile = getVoucherCurrencyProfile(voucher);
 
-    const netUSD = saleIsIQD ? (Number(voucher.netAmount || 0) / vRate) : Number(voucher.netAmount || 0);
+    let netUSD = 0;
+    if (profile.isMixed) {
+      netUSD = profile.usdAmt + (profile.iqdAmt / vRate);
+    } else if (profile.isPureIQD) {
+      const rawIqd = profile.iqdAmt > 0 ? profile.iqdAmt : Number(voucher.netAmount || 0);
+      netUSD = rawIqd / vRate;
+    } else {
+      netUSD = profile.usdAmt > 0 ? profile.usdAmt : Number(voucher.netAmount || 0);
+    }
+
     const costUSD = getVoucherCostUSD(voucher);
     const profitUSD = voucher.type === "sales_return" ? -(netUSD - costUSD) : (netUSD - costUSD);
 
-    if (hasMixedCurrencies) {
+    if (profile.isMixed) {
       return { amount: profitUSD, currencyId: usdId };
     }
 
-    if (saleIsIQD) {
+    if (profile.isPureIQD) {
       return { amount: profitUSD * vRate, currencyId: iqdId };
     } else {
       return { amount: profitUSD, currencyId: usdId };
@@ -1190,6 +1213,14 @@ function InvoiceReportContent() {
       return Number(filterCurrencyId);
     }
     
+    // For sales/purchase invoices, respect the invoice's own currency profile
+    if (["sales", "purchase", "sales_return", "purchase_return"].includes(voucher.type)) {
+      const profile = getVoucherCurrencyProfile(voucher);
+      if (profile.isPureIQD) return 2;
+      if (profile.isPureUSD) return 1;
+      return voucher.currencyId || 1;
+    }
+
     // Expense vouchers should not change: they show in their paid amount currency
     if (voucher.type === "expense") {
       if (voucher.paidAmounts && voucher.paidAmounts.length > 0) {
@@ -2721,26 +2752,29 @@ function InvoiceReportContent() {
                           {visibleColumns.total && (
                             <td className="px-4 py-3.5 text-center font-black">
                               {(() => {
-                                const breakdownJSX = getVoucherMultiCurrencyBreakdownJSX(voucher);
-                                if (breakdownJSX) {
+                                const profile = getVoucherCurrencyProfile(voucher);
+                                if (profile.isMixed) {
+                                  return getVoucherMultiCurrencyBreakdownJSX(voucher);
+                                }
+                                if (profile.isPureIQD) {
+                                  const iqdVal = profile.iqdAmt > 0 ? profile.iqdAmt : (voucherCurrencyId === 2 ? Number(voucher.netAmount || 0) : valVal);
                                   return (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      {breakdownJSX}
-                                      <span className="text-[11px] text-gray-500 font-bold mt-0.5" title="نرخی گواستنەوە بۆ دۆلاری ڕۆژ">
-                                        ≈ {formatCurrencyValueJSX(valVal, displayCurrencyId)}
-                                      </span>
-                                    </div>
+                                    <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
+                                      <span className="text-[0.78em] opacity-85 font-bold">دینار</span>
+                                      <span>{Math.round(iqdVal).toLocaleString("en-US")}</span>
+                                    </span>
                                   );
                                 }
+                                const usdVal = profile.usdAmt > 0 ? profile.usdAmt : (voucherCurrencyId !== 2 ? Number(voucher.netAmount || 0) : valVal);
                                 return isFixedRateVoucher ? (
                                   <span
                                     title={`📌 دۆلاری جێگیر: 100$ = ${Number(Number(customExRate) > 10000 ? customExRate : Number(customExRate) * 100).toLocaleString("en-US")} دینار`}
                                     style={{ color: "#7c3aed" }}
                                   >
-                                    {formatCurrencyValueJSX(valVal, displayCurrencyId)}
+                                    {formatCurrencyValueJSX(usdVal, 1)}
                                   </span>
                                 ) : (
-                                  formatCurrencyValueJSX(valVal, displayCurrencyId)
+                                  formatCurrencyValueJSX(usdVal, 1)
                                 );
                               })()}
                             </td>
@@ -2934,8 +2968,9 @@ function InvoiceReportContent() {
                                         <tbody className="divide-y divide-slate-100">
                                           {voucher.lines.map((line, idx) => {
                                             const lineCurId = line.currencyId || voucher.currencyId || 1;
+                                            const isLineIQD = lineCurId === 2 || lineCurId === 12;
                                             const fixedRate = productFixedRateMap[line.productId];
-                                            const isFixedProduct = !['sales', 'sales_return'].includes(voucher.type) && isFixedRateVoucher && fixedRate !== undefined && fixedRate > 0;
+                                            const isFixedProduct = !['sales', 'sales_return'].includes(voucher.type) && isFixedRateVoucher && fixedRate !== undefined && fixedRate > 0 && !isLineIQD;
                                             return (
                                               <tr key={line.id} className={`hover:bg-slate-50/80 transition-colors ${isFixedProduct ? "bg-purple-50/30" : ""}`}>
                                                 <td className="py-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
@@ -3294,23 +3329,6 @@ function InvoiceReportContent() {
                       <option value="all">ھەموو</option>
                       <option value="discounted">تەنیا پسوڵەکانی خاوەن داشکاندن</option>
                       <option value="none">تەنیا پسوڵەکانی بێ داشکاندن</option>
-                    </select>
-                  </div>
-
-                  {/* Invoice Currency */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-600 font-bold text-[11px] mr-1">دراوی پسوڵە</label>
-                    <select
-                      value={filterCurrencyId}
-                      onChange={(e) => setFilterCurrencyId(e.target.value)}
-                      className="border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white min-h-[46px] cursor-pointer"
-                    >
-                      <option value="all">ھەموو دراوەکان</option>
-                      {currencies.map((c: any) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.symbol})
-                        </option>
-                      ))}
                     </select>
                   </div>
                 </div>

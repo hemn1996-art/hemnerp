@@ -77,6 +77,7 @@ export async function GET(request: Request) {
               exchangeRate: true,
               account: { select: { id: true, name: true, exchangeRateType: true, customExchangeRate: true } },
               versions: { select: { version: true, data: true } },
+              expenses: { select: { amount: true, currencyId: true } },
               lines: {
                 select: {
                   productId: true,
@@ -140,13 +141,17 @@ export async function GET(request: Request) {
       const vRate = (t.voucher as any)?.exchangeRate && (t.voucher as any).exchangeRate > 100
         ? ((t.voucher as any).exchangeRate > 10000 ? (t.voucher as any).exchangeRate / 100 : (t.voucher as any).exchangeRate)
         : marketRatePerDollar;
+
+      // Ensure price is normalized:
       let originalPriceUsd = isIQD ? (rawPrice / vRate) : rawPrice;
 
+      // Extract versionData for fixedRate/customRate
       let versionData: any = {};
       if (t.voucher?.versions && t.voucher.versions.length > 0) {
         const sortedV = [...t.voucher.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
-        const latestV = sortedV[sortedV.length - 1];
-        try { versionData = JSON.parse(latestV.data); } catch(e){}
+        try {
+          versionData = JSON.parse(sortedV[sortedV.length - 1].data || "{}");
+        } catch (e) {}
       }
 
       const sellerAcc = t.voucher?.account;
@@ -156,45 +161,81 @@ export async function GET(request: Request) {
       if (t.qtyChange > 0 && rawPrice > 0) {
         let effectiveUnitCostUsd = originalPriceUsd;
 
-        // Only convert IQD items using fixed rate. USD items already ARE in USD — no conversion needed.
+        // If FIXED exchange rate account:
         if (isIQD && rateTypeForProduct === "FIXED") {
-          const fixedRatePerDollar = customRateForProduct / 100;
+          const fixedRatePerDollar = customRateForProduct > 10000 ? customRateForProduct / 100 : customRateForProduct;
           effectiveUnitCostUsd = rawPrice / fixedRatePerDollar;
         } else if (!isIQD && rateTypeForProduct === "FIXED") {
-          // USD item with FIXED rate account → price stays in USD as entered, no adjustment
-          effectiveUnitCostUsd = originalPriceUsd;
+          // USD item with FIXED rate contract (e.g. 135,000 IQD per 100$)
+          // Effective value at daily market dollar = (rawPrice * fixedRatePerDollar) / marketRatePerDollar
+          const fixedRatePerDollar = customRateForProduct > 10000 ? customRateForProduct / 100 : customRateForProduct;
+          effectiveUnitCostUsd = (rawPrice * fixedRatePerDollar) / marketRatePerDollar;
         }
 
-        const unitExpense = 0;
+        // Calculate incoming unit expense
+        let unitExpenseRaw = 0;
+        if (Number(t.unitCost || 0) > rawPrice && rawPrice > 0) {
+          unitExpenseRaw = Number(t.unitCost) - rawPrice;
+        } else if (t.voucher?.expenses && t.voucher.expenses.length > 0) {
+          const totalLinesQty = t.voucher.lines?.reduce((sum: number, l: any) => sum + Math.max(0, Number(l.qty || 0)), 0) || t.qtyChange;
+          let totalExpInBatchCur = 0;
+          for (const exp of t.voucher.expenses) {
+            const isExpIQD = exp.currencyId === 2 || Number(exp.currencyId) === 2 || Number(exp.currencyId) === 12;
+            const amt = Number(exp.amount || 0);
+            if (isIQD) {
+              totalExpInBatchCur += isExpIQD ? amt : (amt * vRate);
+            } else {
+              totalExpInBatchCur += isExpIQD ? (amt / vRate) : amt;
+            }
+          }
+          unitExpenseRaw = totalLinesQty > 0 ? (totalExpInBatchCur / totalLinesQty) : 0;
+        }
+        const unitExpenseUsd = isIQD ? (unitExpenseRaw / vRate) : unitExpenseRaw;
+
         const qtyIn = t.qtyChange;
-        const unitCostUsdIn = effectiveUnitCostUsd + unitExpense;
-        const unitRawCostIn = isIQD ? rawPrice : originalPriceUsd;
+        const incomingRawPurchasePrice = isIQD ? rawPrice : originalPriceUsd;
+        const incomingPurchasePriceUsd = effectiveUnitCostUsd;
 
         if (stockMap[key].isMultiBatch) {
-          stockMap[key].runningCostUsd = unitCostUsdIn;
-          stockMap[key].runningRawCost = unitRawCostIn;
+          stockMap[key].runningRawPurchasePrice = incomingRawPurchasePrice;
+          stockMap[key].runningPurchasePriceUsd = incomingPurchasePriceUsd;
+          stockMap[key].runningRawExpense = unitExpenseRaw;
+          stockMap[key].runningExpenseUsd = unitExpenseUsd;
+          stockMap[key].runningRawCost = incomingRawPurchasePrice + unitExpenseRaw;
+          stockMap[key].runningCostUsd = incomingPurchasePriceUsd + unitExpenseUsd;
           stockMap[key].runningOnHandQty = (stockMap[key].runningOnHandQty || 0) + qtyIn;
         } else {
           // Perpetual Moving Average Cost: averages incoming batch with currently available on-hand stock
           const currentOnHand = stockMap[key].runningOnHandQty || 0;
           if (currentOnHand <= 0) {
-            stockMap[key].runningCostUsd = unitCostUsdIn;
-            stockMap[key].runningRawCost = unitRawCostIn;
+            stockMap[key].runningRawPurchasePrice = incomingRawPurchasePrice;
+            stockMap[key].runningPurchasePriceUsd = incomingPurchasePriceUsd;
+            stockMap[key].runningRawExpense = unitExpenseRaw;
+            stockMap[key].runningExpenseUsd = unitExpenseUsd;
+            stockMap[key].runningRawCost = incomingRawPurchasePrice + unitExpenseRaw;
+            stockMap[key].runningCostUsd = incomingPurchasePriceUsd + unitExpenseUsd;
             stockMap[key].runningOnHandQty = qtyIn;
           } else {
-            const totalValUsd = (currentOnHand * (stockMap[key].runningCostUsd || 0)) + (qtyIn * unitCostUsdIn);
-            const totalValRaw = (currentOnHand * (stockMap[key].runningRawCost || 0)) + (qtyIn * unitRawCostIn);
             const newOnHand = currentOnHand + qtyIn;
+            const newRawPurchasePrice = ((currentOnHand * (stockMap[key].runningRawPurchasePrice || 0)) + (qtyIn * incomingRawPurchasePrice)) / newOnHand;
+            const newPurchasePriceUsd = ((currentOnHand * (stockMap[key].runningPurchasePriceUsd || 0)) + (qtyIn * incomingPurchasePriceUsd)) / newOnHand;
+            const newRawExpense = ((currentOnHand * (stockMap[key].runningRawExpense || 0)) + (qtyIn * unitExpenseRaw)) / newOnHand;
+            const newExpenseUsd = ((currentOnHand * (stockMap[key].runningExpenseUsd || 0)) + (qtyIn * unitExpenseUsd)) / newOnHand;
+
             stockMap[key].runningOnHandQty = newOnHand;
-            stockMap[key].runningCostUsd = totalValUsd / newOnHand;
-            stockMap[key].runningRawCost = totalValRaw / newOnHand;
+            stockMap[key].runningRawPurchasePrice = newRawPurchasePrice;
+            stockMap[key].runningPurchasePriceUsd = newPurchasePriceUsd;
+            stockMap[key].runningRawExpense = newRawExpense;
+            stockMap[key].runningExpenseUsd = newExpenseUsd;
+            stockMap[key].runningRawCost = newRawPurchasePrice + newRawExpense;
+            stockMap[key].runningCostUsd = newPurchasePriceUsd + newExpenseUsd;
           }
         }
 
         stockMap[key].totalPurchaseValue += (t.qtyChange * effectiveUnitCostUsd);
         stockMap[key].totalPurchaseValueRaw = (stockMap[key].totalPurchaseValueRaw || 0) + (t.qtyChange * (isIQD ? rawPrice : originalPriceUsd));
         stockMap[key].totalPurchaseQty += t.qtyChange;
-        stockMap[key].totalExpenseValue += (t.qtyChange * unitExpense);
+        stockMap[key].totalExpenseValue += (t.qtyChange * unitExpenseUsd);
         
         stockMap[key].exchangeRateType = rateTypeForProduct;
         stockMap[key].customExchangeRate = customRateForProduct;
@@ -202,15 +243,19 @@ export async function GET(request: Request) {
         stockMap[key].currencyCode = isIQD ? "IQD" : "USD";
         stockMap[key].currencySymbol = isIQD ? "دینار" : "$";
         stockMap[key].latestRawPrice = isIQD ? rawPrice : originalPriceUsd;
-        stockMap[key].latestCostUsd = effectiveUnitCostUsd + unitExpense;
+        stockMap[key].latestCostUsd = effectiveUnitCostUsd + unitExpenseUsd;
 
-        stockMap[key].rawPurchasePrice = stockMap[key].runningRawCost;
+        stockMap[key].rawPurchasePrice = stockMap[key].runningRawPurchasePrice;
+        stockMap[key].purchasePrice = isIQD ? stockMap[key].runningRawPurchasePrice : stockMap[key].runningPurchasePriceUsd;
+        stockMap[key].purchasePriceUsd = stockMap[key].runningPurchasePriceUsd;
+
+        stockMap[key].rawExpense = stockMap[key].runningRawExpense;
+        stockMap[key].expense = isIQD ? stockMap[key].runningRawExpense : stockMap[key].runningExpenseUsd;
+        stockMap[key].expenseUsd = stockMap[key].runningExpenseUsd;
+
         stockMap[key].rawCost = stockMap[key].runningRawCost;
-        stockMap[key].purchasePrice = isIQD ? stockMap[key].runningRawCost : stockMap[key].runningCostUsd;
         stockMap[key].cost = isIQD ? stockMap[key].runningRawCost : stockMap[key].runningCostUsd;
         stockMap[key].costUsd = stockMap[key].runningCostUsd;
-        stockMap[key].purchasePriceUsd = stockMap[key].runningCostUsd;
-        stockMap[key].expense = unitExpense;
 
         if (t.voucher?.account?.name) {
           stockMap[key].sellerName = t.voucher.account.name;
@@ -241,12 +286,35 @@ export async function GET(request: Request) {
       const costInfo = productCostMap.get(item.productId);
       if (costInfo && costInfo.costPrice > 0) {
         const isCostIQD = costInfo.costCurrencyId === 2;
-        item.cost = costInfo.costPrice;
-        item.costUsd = isCostIQD ? (costInfo.costPrice / marketRatePerDollar) : costInfo.costPrice;
-        item.purchasePrice = costInfo.costPrice;
-        item.purchasePriceUsd = item.costUsd;
-        item.rawCost = costInfo.costPrice;
-        item.rawPurchasePrice = costInfo.costPrice;
+        const isFixed = costInfo.exchangeRateType === "FIXED" && costInfo.customExchangeRate;
+        const fixedRate = isFixed ? (costInfo.customExchangeRate > 10000 ? costInfo.customExchangeRate / 100 : costInfo.customExchangeRate) : null;
+
+        const convertToUsd = (val: number) => {
+          if (isCostIQD) return val / marketRatePerDollar;
+          if (isFixed && fixedRate) return (val * fixedRate) / marketRatePerDollar;
+          return val;
+        };
+
+        const purchasePriceRaw = costInfo.purchasePrice || costInfo.costPrice;
+        const expenseRaw = costInfo.expensePerUnit || 0;
+        const costRaw = costInfo.costPrice;
+
+        const purchasePriceUsd = convertToUsd(purchasePriceRaw);
+        const expenseUsd = convertToUsd(expenseRaw);
+        const costUsd = convertToUsd(costRaw);
+
+        item.purchasePrice = isCostIQD ? purchasePriceRaw : purchasePriceUsd;
+        item.purchasePriceUsd = purchasePriceUsd;
+        item.rawPurchasePrice = purchasePriceRaw;
+
+        item.expense = isCostIQD ? expenseRaw : expenseUsd;
+        item.expenseUsd = expenseUsd;
+        item.rawExpense = expenseRaw;
+
+        item.cost = isCostIQD ? costRaw : costUsd;
+        item.costUsd = costUsd;
+        item.rawCost = costRaw;
+
         item.isIQD = isCostIQD;
         item.currencyCode = isCostIQD ? "IQD" : "USD";
         item.currencySymbol = isCostIQD ? "دینار" : "$";
@@ -257,10 +325,22 @@ export async function GET(request: Request) {
           (t: any) => t.productId === item.productId && t.unitCost && t.unitCost > 0
         );
         if (txWithCost) {
+          const isIQD = item.isIQD;
+          const isFixed = item.exchangeRateType === "FIXED" && item.customExchangeRate;
+          let costUsd = txWithCost.unitCost;
+          if (isIQD) {
+            costUsd = txWithCost.unitCost / marketRatePerDollar;
+          } else if (isFixed) {
+            const fixedRate = item.customExchangeRate > 10000 ? item.customExchangeRate / 100 : item.customExchangeRate;
+            costUsd = (txWithCost.unitCost * fixedRate) / marketRatePerDollar;
+          }
           item.purchasePrice = txWithCost.unitCost;
+          item.expense = 0;
+          item.rawExpense = 0;
+          item.expenseUsd = 0;
           item.cost = txWithCost.unitCost;
-          item.costUsd = item.isIQD ? (txWithCost.unitCost / marketRatePerDollar) : txWithCost.unitCost;
-          item.purchasePriceUsd = item.costUsd;
+          item.costUsd = costUsd;
+          item.purchasePriceUsd = costUsd;
           item.rawCost = txWithCost.unitCost;
           item.rawPurchasePrice = txWithCost.unitCost;
         }
@@ -377,10 +457,12 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
     const data = await request.json();
     const productId = Number(data.productId);
     const warehouseId = Number(data.warehouseId);
     const cost = Number(data.cost);
+    const reason = data.reason ? String(data.reason).trim() : "";
 
     if (isNaN(productId) || isNaN(warehouseId) || isNaN(cost)) {
       return NextResponse.json(
@@ -397,7 +479,11 @@ export async function PUT(request: Request) {
         qtyChange: { gt: 0 },
         voucher: { isDeleted: false }
       },
-      select: { id: true }
+      include: {
+        voucher: {
+          include: { versions: { select: { version: true } } }
+        }
+      }
     });
 
     if (txs.length > 0) {
@@ -409,6 +495,36 @@ export async function PUT(request: Request) {
           unitCost: cost
         }
       });
+
+      // Record reason and version on the latest incoming voucher
+      const latestTx = txs[txs.length - 1];
+      if (latestTx?.voucherId) {
+        if (reason) {
+          await prisma.voucher.update({
+            where: { id: latestTx.voucherId },
+            data: { internalNote: reason }
+          });
+        }
+        const currentVersions = latestTx.voucher?.versions || [];
+        const nextVersion = currentVersions.length > 0
+          ? Math.max(...currentVersions.map(v => v.version)) + 1
+          : 1;
+
+        await prisma.voucherVersion.create({
+          data: {
+            voucherId: latestTx.voucherId,
+            version: nextVersion,
+            employeeName: currentUser?.name || "سیستەم",
+            data: JSON.stringify({
+              action: "cost_update",
+              oldCost: latestTx.unitCost,
+              newCost: cost,
+              reason: reason || "دەستکاری دەستی کۆست",
+              updatedAt: new Date().toISOString()
+            })
+          }
+        });
+      }
     } else {
       // If no incoming transactions, try to find any transaction to update
       const latestTx = await prisma.inventoryTransaction.findFirst({
@@ -420,7 +536,11 @@ export async function PUT(request: Request) {
         orderBy: {
           id: "desc"
         },
-        select: { id: true }
+        include: {
+          voucher: {
+            include: { versions: { select: { version: true } } }
+          }
+        }
       });
 
       if (latestTx) {
@@ -428,6 +548,34 @@ export async function PUT(request: Request) {
           where: { id: latestTx.id },
           data: { unitCost: cost }
         });
+
+        if (latestTx.voucherId) {
+          if (reason) {
+            await prisma.voucher.update({
+              where: { id: latestTx.voucherId },
+              data: { internalNote: reason }
+            });
+          }
+          const currentVersions = latestTx.voucher?.versions || [];
+          const nextVersion = currentVersions.length > 0
+            ? Math.max(...currentVersions.map(v => v.version)) + 1
+            : 1;
+
+          await prisma.voucherVersion.create({
+            data: {
+              voucherId: latestTx.voucherId,
+              version: nextVersion,
+              employeeName: currentUser?.name || "سیستەم",
+              data: JSON.stringify({
+                action: "cost_update",
+                oldCost: latestTx.unitCost,
+                newCost: cost,
+                reason: reason || "دەستکاری دەستی کۆست",
+                updatedAt: new Date().toISOString()
+              })
+            }
+          });
+        }
       } else {
         return NextResponse.json(
           { error: "هیچ مامەڵەیەک نەدۆزرایەوە بۆ ئەم کاڵایە لەم کۆگایەدا" },

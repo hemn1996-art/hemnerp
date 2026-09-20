@@ -18,6 +18,14 @@ export interface InventoryTxItem {
   unitCost: number;
   currencyId?: number | null;
   date: Date | string;
+  unitPrice?: number;
+  unitExpense?: number;
+  productId?: number;
+  product?: {
+    id?: number;
+    name?: string;
+    isMultiBatch?: boolean;
+  } | null;
   voucher?: {
     type?: string | null;
     exchangeRate?: number | null;
@@ -33,11 +41,24 @@ export interface InventoryTxItem {
       version?: number;
       data?: string;
     }> | null;
+    expenses?: Array<{
+      amount: number;
+      currencyId: number;
+    }> | null;
+    lines?: Array<{
+      productId: number;
+      unitPrice: number;
+      unitCost?: number | null;
+      qty: number;
+      currencyId?: number | null;
+    }> | null;
   } | null;
 }
 
 export interface ProductCostResult {
   costPrice: number;
+  purchasePrice: number;
+  expensePerUnit: number;
   costCurrencyId: number;
   exchangeRateType: string;
   customExchangeRate: number | null;
@@ -64,7 +85,7 @@ export function parseTransactionVoucherMetadata(t: InventoryTxItem, defaultMarke
   let incomingCustomRate: number | null = null;
 
   if (t.voucher?.type === "warehouse_stock") {
-    if (vRateType === "FIXED" || (vCustomRate && (vCustomRate === 135000 || vCustomRate < 145000))) {
+    if (vRateType === "FIXED" && vCustomRate) {
       incomingRateType = "FIXED";
       incomingCustomRate = vCustomRate || 135000;
     }
@@ -100,6 +121,8 @@ export function calculateWeightedProductCost(
 
   let runningOnHand = 0;
   let runningCost = 0;
+  let runningPurchasePrice = 0;
+  let runningExpense = 0;
   let currentCurrencyId = 1;
   let currentRateType = "DAILY_MARKET";
   let currentCustomRate: number | null = null;
@@ -108,40 +131,93 @@ export function calculateWeightedProductCost(
     const { incomingRateType, incomingCustomRate, voucherMarketRate, incomingCurId } =
       parseTransactionVoucherMetadata(t, defaultMarketRate);
 
-    if (t.qtyChange > 0 && t.unitCost > 0) {
+    if (t.qtyChange > 0 && (t.unitCost > 0 || (t.unitPrice && t.unitPrice > 0))) {
+      // 1. Determine incoming unit purchase price
+      const txProductId = t.productId || t.product?.id;
+      const matchingLine = t.voucher?.lines?.find((l: any) => txProductId && l.productId === txProductId);
+      
+      let incomingPurchasePrice = 0;
+      if (t.unitPrice !== undefined && t.unitPrice > 0) {
+        incomingPurchasePrice = t.unitPrice;
+      } else if (matchingLine && matchingLine.unitPrice > 0) {
+        incomingPurchasePrice = matchingLine.unitPrice;
+      } else {
+        incomingPurchasePrice = t.unitCost || 0;
+      }
+
+      // 2. Determine incoming unit expense
+      let incomingUnitExpense = 0;
+      if (t.unitExpense !== undefined && t.unitExpense >= 0) {
+        incomingUnitExpense = t.unitExpense;
+      } else if (matchingLine && Number(matchingLine.unitCost || 0) > Number(matchingLine.unitPrice || 0)) {
+        incomingUnitExpense = Number(matchingLine.unitCost) - Number(matchingLine.unitPrice);
+      } else if (Number(t.unitCost || 0) > incomingPurchasePrice && incomingPurchasePrice > 0) {
+        incomingUnitExpense = Number(t.unitCost) - incomingPurchasePrice;
+      } else if (t.voucher?.expenses && t.voucher.expenses.length > 0) {
+        const totalLinesQty = t.voucher.lines?.reduce((sum: number, l: any) => sum + Math.max(0, Number(l.qty || 0)), 0) || t.qtyChange;
+        let totalExpInBatchCur = 0;
+        const isBatchIQD = incomingCurId === 2;
+        for (const exp of t.voucher.expenses) {
+          const isExpIQD = exp.currencyId === 2 || Number(exp.currencyId) === 2 || Number(exp.currencyId) === 12;
+          const amt = Number(exp.amount || 0);
+          if (isBatchIQD) {
+            totalExpInBatchCur += isExpIQD ? amt : (amt * voucherMarketRate);
+          } else {
+            totalExpInBatchCur += isExpIQD ? (amt / voucherMarketRate) : amt;
+          }
+        }
+        incomingUnitExpense = totalLinesQty > 0 ? (totalExpInBatchCur / totalLinesQty) : 0;
+      }
+
+      const incomingTotalCost = incomingPurchasePrice + incomingUnitExpense;
+
       if (isMultiBatch || runningOnHand <= 0) {
-        runningCost = t.unitCost;
+        runningPurchasePrice = incomingPurchasePrice;
+        runningExpense = incomingUnitExpense;
+        runningCost = incomingTotalCost;
         runningOnHand = t.qtyChange;
         currentCurrencyId = incomingCurId;
         currentRateType = incomingRateType;
         currentCustomRate = incomingCustomRate;
       } else {
-        // Step 1: Convert existing stock runningCost to IQD
+        // Step 1: Convert existing stock purchase price and expense to IQD
+        let priorPriceInIqd = runningPurchasePrice;
+        let priorExpenseInIqd = runningExpense;
         let priorCostInIqd = runningCost;
+
         if (currentCurrencyId === 1) { // USD
-          if (currentRateType === "FIXED" && currentCustomRate) {
-            const fixedRatePerDollar = currentCustomRate / 100;
-            priorCostInIqd = runningCost * fixedRatePerDollar;
-          } else {
-            priorCostInIqd = runningCost * voucherMarketRate;
-          }
+          const multiplier = (currentRateType === "FIXED" && currentCustomRate)
+            ? (currentCustomRate / 100)
+            : voucherMarketRate;
+          priorPriceInIqd = runningPurchasePrice * multiplier;
+          priorExpenseInIqd = runningExpense * multiplier;
+          priorCostInIqd = runningCost * multiplier;
         }
 
-        // Step 2: Convert existing stock IQD cost into incoming batch's currency
+        // Step 2: Convert existing stock into incoming batch's currency
+        let priorPriceInTargetCurrency = priorPriceInIqd;
+        let priorExpenseInTargetCurrency = priorExpenseInIqd;
         let priorCostInTargetCurrency = priorCostInIqd;
+
         if (incomingCurId === 1) { // Target is USD
-          if (incomingRateType === "FIXED" && incomingCustomRate) {
-            const fixedRatePerDollar = incomingCustomRate / 100;
-            priorCostInTargetCurrency = priorCostInIqd / fixedRatePerDollar;
-          } else {
-            priorCostInTargetCurrency = priorCostInIqd / voucherMarketRate;
-          }
+          const divisor = (incomingRateType === "FIXED" && incomingCustomRate)
+            ? (incomingCustomRate / 100)
+            : voucherMarketRate;
+          priorPriceInTargetCurrency = divisor > 0 ? (priorPriceInIqd / divisor) : priorPriceInIqd;
+          priorExpenseInTargetCurrency = divisor > 0 ? (priorExpenseInIqd / divisor) : priorExpenseInIqd;
+          priorCostInTargetCurrency = divisor > 0 ? (priorCostInIqd / divisor) : priorCostInIqd;
         }
 
-        // Step 3: Perpetual weighted average in target currency
-        const totalVal = (runningOnHand * priorCostInTargetCurrency) + (t.qtyChange * t.unitCost);
-        runningOnHand += t.qtyChange;
-        runningCost = totalVal / runningOnHand;
+        // Step 3: Perpetual weighted average in target currency for both purchase price and expense
+        const newOnHand = runningOnHand + t.qtyChange;
+        const newPurchasePrice = ((runningOnHand * priorPriceInTargetCurrency) + (t.qtyChange * incomingPurchasePrice)) / newOnHand;
+        const newExpense = ((runningOnHand * priorExpenseInTargetCurrency) + (t.qtyChange * incomingUnitExpense)) / newOnHand;
+        const newCost = newPurchasePrice + newExpense;
+
+        runningOnHand = newOnHand;
+        runningPurchasePrice = newPurchasePrice;
+        runningExpense = newExpense;
+        runningCost = newCost;
 
         // Step 4: Cost currency and rate type become those of the newer incoming voucher
         currentCurrencyId = incomingCurId;
@@ -155,6 +231,8 @@ export function calculateWeightedProductCost(
 
   return {
     costPrice: runningCost,
+    purchasePrice: runningPurchasePrice,
+    expensePerUnit: runningExpense,
     costCurrencyId: currentCurrencyId,
     exchangeRateType: currentRateType,
     customExchangeRate: currentCustomRate,
