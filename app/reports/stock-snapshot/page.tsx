@@ -9,6 +9,7 @@ import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
 import ProductQuickModal from "../../components/ProductQuickModal";
+import AccountQuickModal from "../../components/AccountQuickModal";
 
 interface StockItem {
   productId: number;
@@ -33,6 +34,7 @@ function StockSnapshotReportContent() {
   const searchParams = useSearchParams();
   const paramProductId = searchParams.get("productId") || searchParams.get("id");
   const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
+  const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
   const paramSellerId = searchParams.get("sellerId") || searchParams.get("accountId");
 
   const [stockData, setStockData] = useState<StockItem[]>([]);
@@ -581,29 +583,32 @@ function StockSnapshotReportContent() {
                       {visibleColumns.sellerName && (
                         <td className="px-2 py-2 text-center font-bold">
                           {(item as any).exchangeRateType === "FIXED" ? (
-                            <span
-                              className="inline-flex items-center px-2.5 py-1 rounded-lg border text-sm cursor-help font-black shadow-sm"
+                            <button
+                              type="button"
+                              className="inline-flex items-center px-2.5 py-1 rounded-lg border text-sm cursor-pointer font-black shadow-sm bg-transparent"
                               style={{ backgroundColor: "#f3e8ff", borderColor: "#c084fc", color: "#6b21a8" }}
-                              title={`نرخی جێگیری 100$: ${((item as any).customExchangeRate || 132000).toLocaleString("en-US")} دینار`}
+                              title="کردارە خێراکان بۆ هەژمار"
                               onClick={() => {
                                 if (item.sellerId) {
-                                  router.push(`/reports/account-statement?accountId=${item.sellerId}`);
+                                  setQuickAccount({ id: item.sellerId, name: item.sellerName });
                                 }
                               }}
                             >
                               {item.sellerName}
-                            </span>
+                            </button>
                           ) : (
-                            <span
-                              className="text-[#4f46e5] cursor-pointer hover:underline"
+                            <button
+                              type="button"
+                              className="text-[#4f46e5] cursor-pointer hover:underline bg-transparent border-none p-0 font-bold"
+                              title="کردارە خێراکان بۆ هەژمار"
                               onClick={() => {
                                 if (item.sellerId) {
-                                  router.push(`/reports/account-statement?accountId=${item.sellerId}`);
+                                  setQuickAccount({ id: item.sellerId, name: item.sellerName });
                                 }
                               }}
                             >
                               {item.sellerName}
-                            </span>
+                            </button>
                           )}
                         </td>
                       )}
@@ -801,6 +806,13 @@ function StockSnapshotReportContent() {
         isOpen={Boolean(quickProduct)}
         onClose={() => setQuickProduct(null)}
         product={quickProduct}
+      />
+
+      {/* Account Quick Action Modal */}
+      <AccountQuickModal
+        isOpen={Boolean(quickAccount)}
+        onClose={() => setQuickAccount(null)}
+        account={quickAccount}
       />
 
     </div>

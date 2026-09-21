@@ -45,6 +45,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const [companyName, setCompanyName] = useState("کۆگای دۆستان");
   const [kpiPeriod, setKpiPeriod] = useState<string>("today");
   const [donutPeriod, setDonutPeriod] = useState<string>("today");
+  const [recentVoucherFilter, setRecentVoucherFilter] = useState<string>("all");
 
   useEffect(() => {
     setMounted(true);
@@ -886,12 +887,24 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
       </div>
 
-      {/* 4. High Value Invoices Table Card */}
+      {/* 4. Recent 10 Transactions Table Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-[#0d1e3d] text-white">
-          <span className="font-bold text-base">پسوولە بەها بەرزەکان</span>
-          <select className="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-1.5 text-sm font-bold outline-none cursor-pointer">
-            <option className="text-gray-900">هەمووی</option>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
+            <span className="font-bold text-base">١٠ جووڵەی کۆتایی</span>
+          </div>
+          <select 
+            value={recentVoucherFilter}
+            onChange={(e) => setRecentVoucherFilter(e.target.value)}
+            className="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-1.5 text-sm font-bold outline-none cursor-pointer hover:bg-white/20 transition-colors"
+          >
+            <option value="all" className="text-gray-900">هەمووی</option>
+            <option value="فرۆشتن" className="text-gray-900">فرۆشتن</option>
+            <option value="کڕین" className="text-gray-900">کڕین</option>
+            <option value="خەرجی" className="text-gray-900">خەرجی</option>
+            <option value="پارەی هاتوو" className="text-gray-900">پارەی هاتوو</option>
+            <option value="پارەی ڕۆشتوو" className="text-gray-900">پارەی ڕۆشتوو</option>
           </select>
         </div>
         <div className="overflow-x-auto">
@@ -913,8 +926,17 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white text-slate-700 font-semibold">
               {[...invoices]
-                .sort((a: any, b: any) => b.total - a.total)
-                .slice(0, 5)
+                .filter((inv: any) => {
+                  if (recentVoucherFilter === "all") return true;
+                  return inv.type === recentVoucherFilter;
+                })
+                .sort((a: any, b: any) => {
+                  const dateB = b.date ? new Date(b.date).getTime() : 0;
+                  const dateA = a.date ? new Date(a.date).getTime() : 0;
+                  if (dateB !== dateA) return dateB - dateA;
+                  return (b.id || 0) - (a.id || 0);
+                })
+                .slice(0, 10)
                 .map((inv, idx) => {
                   let badgeClass = "bg-gray-100 text-gray-800";
                   if (inv.type === "فرۆشتن") badgeClass = "bg-[#fee2e2] text-[#ef4444]";

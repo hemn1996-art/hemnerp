@@ -7,6 +7,7 @@ import { store, useStore } from "../../store/store";
 import DateInput from "../../components/DateInput";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
+import AccountQuickModal from "../../components/AccountQuickModal";
 
 type DebtReportData = {
   id: number;
@@ -38,6 +39,7 @@ export default function DebtReportPage() {
   const [data, setData] = useState<DebtReportData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReportStats, setShowReportStats] = useState(true);
+  const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
 
   // Sorting
   const [sortField, setSortField] = useState<"totalDebt" | "lastPaymentDate" | null>("totalDebt"); // Default sort by totalDebt
@@ -617,9 +619,14 @@ export default function DebtReportPage() {
                     <td className="p-3 text-sm font-bold text-gray-400 text-center w-12">{index + 1}</td>
                     {visibleColumns.account && (
                       <td className="p-3 text-sm font-bold text-center">
-                        <a href={`/reports/account-statement?accountId=${item.id}`} className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
+                        <button
+                          type="button"
+                          onClick={() => setQuickAccount({ id: item.id, name: item.name })}
+                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-none p-0 font-bold text-sm"
+                          title="کردارە خێراکان بۆ هەژمار"
+                        >
                           {item.name}
-                        </a>
+                        </button>
                       </td>
                     )}
                     {visibleColumns.phone && <td className="p-3 text-sm text-gray-600 text-center" dir="ltr">{item.phone}</td>}
@@ -854,6 +861,12 @@ export default function DebtReportPage() {
           </div>
         </div>
       )}
+      {/* Account Quick Action Modal */}
+      <AccountQuickModal
+        isOpen={Boolean(quickAccount)}
+        onClose={() => setQuickAccount(null)}
+        account={quickAccount}
+      />
     </div>
   );
 }

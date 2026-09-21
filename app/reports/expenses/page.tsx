@@ -8,6 +8,7 @@ import MultiSelectDropdown, { Option } from "../../components/MultiSelectDropdow
 import DateInput from "../../components/DateInput";
 import { exportTableToExcel } from "../../utils/excelExport";
 import { normalizeKurdishSearchText } from "../../utils/digits";
+import AccountQuickModal from "../../components/AccountQuickModal";
 
 interface ExpenseVoucherLine {
   id: number;
@@ -54,6 +55,7 @@ export default function ExpensesReportPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activePeriod, setActivePeriod] = useState<"today" | "week" | "month" | "year" | "all" | "custom">("month");
+  const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
 
   // Helper date functions
   const formatDateStr = (d: Date) => {
@@ -609,7 +611,18 @@ export default function ExpensesReportPage() {
                       {/* Account */}
                       {visibleColumns.accountName && (
                         <td className="py-3 px-4 text-center font-semibold text-slate-700">
-                          {v.accountName}
+                          {v.accountId ? (
+                            <button
+                              type="button"
+                              onClick={() => setQuickAccount({ id: v.accountId!, name: v.accountName })}
+                              className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-none p-0 font-semibold text-sm"
+                              title="کردارە خێراکان بۆ هەژمار"
+                            >
+                              {v.accountName}
+                            </button>
+                          ) : (
+                            v.accountName || "-"
+                          )}
                         </td>
                       )}
 
@@ -1000,6 +1013,12 @@ export default function ExpensesReportPage() {
           </div>
         </div>
       )}
+      {/* Account Quick Action Modal */}
+      <AccountQuickModal
+        isOpen={Boolean(quickAccount)}
+        onClose={() => setQuickAccount(null)}
+        account={quickAccount}
+      />
     </div>
   );
 }

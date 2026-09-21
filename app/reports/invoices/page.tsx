@@ -9,6 +9,8 @@ import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import { normalizeKurdishSearchText } from "../../utils/digits";
 import BackButton from "../../components/BackButton";
+import ProductQuickModal from "../../components/ProductQuickModal";
+import AccountQuickModal from "../../components/AccountQuickModal";
 
 // TypeScript Interfaces for DB Vouchers & Relations
 interface Product {
@@ -247,6 +249,8 @@ function InvoiceReportContent() {
   const [vouchers, setVouchers] = useState<RawVoucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReportStats, setShowReportStats] = useState(true);
+  const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
+  const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
   const [voucherType, setVoucherType] = useState("all");
   const [deleteVoucherId, setDeleteVoucherId] = useState<number | null>(null);
 
@@ -2751,14 +2755,17 @@ function InvoiceReportContent() {
                                 if (tempCust && tempCust.name) {
                                   return <span>{tempCust.name}</span>;
                                 }
-                                if (voucher.account) {
+                                const acc = voucher.account;
+                                if (acc) {
                                   return (
-                                    <a
-                                      href={`/reports/account-statement?accountId=${voucher.accountId}`}
-                                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    <button
+                                      type="button"
+                                      onClick={() => setQuickAccount({ id: voucher.accountId || acc.id, name: acc.name, code: (acc as any).code })}
+                                      className="text-blue-600 hover:text-blue-800 hover:underline bg-transparent border-none p-0 cursor-pointer text-right font-bold inline-block"
+                                      title="کردارە خێراکان بۆ هەژمار"
                                     >
-                                      {voucher.account.name}
-                                    </a>
+                                      {acc.name}
+                                    </button>
                                   );
                                 }
                                 return "-";
@@ -3024,16 +3031,17 @@ function InvoiceReportContent() {
                                               <tr key={line.id} className={`hover:bg-slate-50/80 transition-colors ${isFixedProduct ? "bg-purple-50/30" : ""}`}>
                                                 <td className="py-2.5 text-center font-bold text-slate-400">{idx + 1}</td>
                                                 <td className="py-2.5 text-right font-bold">
-                                                  {isFixedProduct ? (
-                                                    <span
-                                                      title={`📌 نرخی دۆلاری جێگیر: 100$ = ${Number(Number(fixedRate) > 10000 ? fixedRate : Number(fixedRate) * 100).toLocaleString("en-US")} دینار`}
-                                                      style={{ color: "#7c3aed", cursor: "help" }}
-                                                      className="border-b border-dashed border-purple-300"
+                                                  {line.product ? (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setQuickProduct({ id: line.productId, name: line.product.name, code: line.product.code })}
+                                                      className="text-blue-700 font-bold hover:text-blue-900 hover:underline bg-transparent border-none p-0 cursor-pointer text-right inline-block text-xs"
+                                                      title="کردارە خێراکان بۆ کەرەستە"
                                                     >
-                                                      {line.product?.name || "نەناسراو"}
-                                                    </span>
+                                                      {line.product.name}
+                                                    </button>
                                                   ) : (
-                                                    <span className="text-slate-800">{line.product?.name || "\u0646\u06d5\u0646\u0627\u0633\u0631\u0627\u0648"}</span>
+                                                    <span className="text-slate-800">نەناسراو</span>
                                                   )}
                                                 </td>
                                                 <td className="py-2.5 text-center text-slate-500 font-mono text-[11px]">{line.product?.code || "-"}</td>
@@ -3953,6 +3961,20 @@ function InvoiceReportContent() {
       })()}
 
       {/* Delete Confirmation Modal */}
+      {/* Product Quick Action Modal */}
+      <ProductQuickModal
+        isOpen={Boolean(quickProduct)}
+        onClose={() => setQuickProduct(null)}
+        product={quickProduct}
+      />
+
+      {/* Account Quick Action Modal */}
+      <AccountQuickModal
+        isOpen={Boolean(quickAccount)}
+        onClose={() => setQuickAccount(null)}
+        account={quickAccount}
+      />
+
       {deleteVoucherId !== null && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDeleteVoucherId(null)}>
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>

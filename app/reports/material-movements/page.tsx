@@ -8,6 +8,7 @@ import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
 import ProductQuickModal from "../../components/ProductQuickModal";
+import AccountQuickModal from "../../components/AccountQuickModal";
 
 interface DropdownOption {
   value: string | number;
@@ -26,6 +27,7 @@ function ItemsReportContent() {
   const [loading, setLoading] = useState(true);
   const [showReportStats, setShowReportStats] = useState(true);
   const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
+  const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
 
   // Date Filters
   const [startDate, setStartDate] = useState(() => {
@@ -650,13 +652,14 @@ function ItemsReportContent() {
                     {visibleColumns.accountName && (
                       <td className="p-2 border-r border-slate-200 text-center">
                         {item.accountId ? (
-                          <span
-                            onClick={() => router.push(`/reports/account-statement?accountId=${item.accountId}`)}
-                            className="text-blue-700 font-bold hover:underline cursor-pointer transition"
-                            title="پیشاندانی ڕاپۆرتی حیساب"
+                          <button
+                            type="button"
+                            onClick={() => setQuickAccount({ id: item.accountId, name: item.accountName })}
+                            className="text-blue-700 font-bold hover:underline cursor-pointer transition bg-transparent border-none p-0 text-center inline-block"
+                            title="کردارە خێراکان بۆ هەژمار"
                           >
                             {item.accountName}
-                          </span>
+                          </button>
                         ) : (
                           <span className="text-slate-500 font-medium">{item.accountName}</span>
                         )}
@@ -1062,6 +1065,13 @@ function ItemsReportContent() {
         isOpen={Boolean(quickProduct)}
         onClose={() => setQuickProduct(null)}
         product={quickProduct}
+      />
+
+      {/* Account Quick Action Modal */}
+      <AccountQuickModal
+        isOpen={Boolean(quickAccount)}
+        onClose={() => setQuickAccount(null)}
+        account={quickAccount}
       />
 
     </div>
