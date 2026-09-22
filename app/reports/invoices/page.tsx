@@ -319,7 +319,10 @@ function InvoiceReportContent() {
   const [filterCashboxIds, setFilterCashboxIds] = useState<number[]>([]);
   const [filterWarehouseIds, setFilterWarehouseIds] = useState<number[]>([]);
   const [filterInvoiceNo, setFilterInvoiceNo] = useState("");
-  const [filterDiscountType, setFilterDiscountType] = useState("all"); // all, discounted, none
+  const [filterDiscountType, setFilterDiscountType] = useState(() => {
+    const dt = searchParams.get("discountType");
+    return dt || "all";
+  }); // all, discounted, none
   const [filterEmployees, setFilterEmployees] = useState<string[]>([]); // employee filter
   const [filterCurrencyId, setFilterCurrencyId] = useState("all"); // currency filter
   const [filterCityName, setFilterCityName] = useState("all");
@@ -332,6 +335,7 @@ function InvoiceReportContent() {
     const paramStart = searchParams.get("startDate");
     const paramEnd = searchParams.get("endDate");
     const paramAccountId = searchParams.get("accountId");
+    const paramDiscountType = searchParams.get("discountType");
 
     if (paramAccountId) {
       setFilterAccountIds([Number(paramAccountId)]);
@@ -340,10 +344,13 @@ function InvoiceReportContent() {
     if (paramType) {
       setFilterInvoiceTypes(paramType.split(","));
     }
+    if (paramDiscountType) {
+      setFilterDiscountType(paramDiscountType);
+    }
     if (paramStart) setStartDate(paramStart);
     if (paramEnd) setEndDate(paramEnd);
 
-    if (paramType || paramStart || paramEnd || paramAccountId) {
+    if (paramType || paramStart || paramEnd || paramAccountId || paramDiscountType) {
       setFiltersLoaded(true);
       return;
     }
@@ -1785,9 +1792,16 @@ function InvoiceReportContent() {
 
     // Discount Filter
     if (filterDiscountType === "discounted") {
-      list = list.filter((v) => v.totalDiscount > 0);
+      list = list.filter((v) => {
+        const isStandaloneDiscount = v.type === "my_debt_discount" || v.type === "داشکاندنم بۆ کراوە" || v.type === "people_debt_discount" || v.type === "داشکاندنم کردوە" || v.type === "debt_discount";
+        return (v.totalDiscount && v.totalDiscount > 0) || (isStandaloneDiscount && ((v.netAmount && v.netAmount > 0) || (v.totalAmount && v.totalAmount > 0)));
+      });
     } else if (filterDiscountType === "none") {
-      list = list.filter((v) => v.totalDiscount === 0);
+      list = list.filter((v) => {
+        const isStandaloneDiscount = v.type === "my_debt_discount" || v.type === "داشکاندنم بۆ کراوە" || v.type === "people_debt_discount" || v.type === "داشکاندنم کردوە" || v.type === "debt_discount";
+        const hasDiscount = (v.totalDiscount && v.totalDiscount > 0) || (isStandaloneDiscount && ((v.netAmount && v.netAmount > 0) || (v.totalAmount && v.totalAmount > 0)));
+        return !hasDiscount;
+      });
     }
 
     // Employee Filter (multi-select)
@@ -1882,7 +1896,9 @@ function InvoiceReportContent() {
     processedVouchers.forEach((v) => {
       const curId = v.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1;
       const val = convertAmount(v.netAmount, v.currencyId, "USD", v.exchangeRate);
-      const disc = convertAmount(v.totalDiscount, v.currencyId, "USD", v.exchangeRate);
+      const isStandaloneDiscount = v.type === "my_debt_discount" || v.type === "داشکاندنم بۆ کراوە" || v.type === "people_debt_discount" || v.type === "داشکاندنم کردوە" || v.type === "debt_discount";
+      const rawDisc = (v.totalDiscount && v.totalDiscount > 0) ? v.totalDiscount : (isStandaloneDiscount ? (v.netAmount || v.totalAmount || 0) : 0);
+      const disc = convertAmount(rawDisc, v.currencyId, "USD", v.exchangeRate);
       const paid = getVoucherPaidUSD(v);
       let rem = Math.max(val - paid, 0);
       if (rem < 1.0) rem = 0;
@@ -1898,7 +1914,7 @@ function InvoiceReportContent() {
 
       // Per-currency accumulation (in original currency)
       valueByCurrency[curId] = (valueByCurrency[curId] || 0) + v.netAmount;
-      discountByCurrency[curId] = (discountByCurrency[curId] || 0) + v.totalDiscount;
+      discountByCurrency[curId] = (discountByCurrency[curId] || 0) + rawDisc;
       
       const paidInVoucherCurrency = v.paidAmounts.reduce((sum, pa) => {
         return sum + convertBetweenCurrencies(pa.amount, pa.currencyId, curId, pa.exchangeRate || v.exchangeRate || 1500);
