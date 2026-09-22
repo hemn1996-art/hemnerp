@@ -175,65 +175,7 @@ export async function PUT(
       }
     }
 
-    const isShareholderVoucherType = data.type === "shareholder_deposit" || data.type === "shareholder_withdrawal";
-    const dbCurrencies = await prisma.currency.findMany();
-    let autoNote = "";
-    if (!isShareholderVoucherType && data.type !== "cashbox_transfer" && data.paidAmounts && Array.isArray(data.paidAmounts)) {
-      const nonZeroPayments = data.paidAmounts.filter((p: any) => Number(p.amount) !== 0);
-      const targetCurId = Number(data.currencyId);
-      const isConversionNeeded = nonZeroPayments.length > 1 || (nonZeroPayments.length === 1 && Number(nonZeroPayments[0].currencyId) !== targetCurId);
-
-      if (isConversionNeeded) {
-        const parts = nonZeroPayments.map((p: any) => {
-          const cur = dbCurrencies.find(c => Number(c.id) === Number(p.currencyId));
-          const curName = cur ? (cur.code === "IQD" ? "دینار" : cur.symbol || cur.name) : "";
-          const formattedAmount = Math.abs(Number(p.amount)).toLocaleString("en-US");
-          return cur?.code === "IQD" ? `${formattedAmount} ${curName}` : `${curName} ${formattedAmount}`;
-        });
-
-        const rawExRate = Number(data.exchangeRate) || 1500;
-        const displayRate100 = rawExRate >= 10000 ? rawExRate : rawExRate * 100;
-        const formattedRate = Number(displayRate100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-
-        const ratePerUSD = displayRate100 / 100;
-        let totalEquivalent = 0;
-        nonZeroPayments.forEach((p: any) => {
-          const fromId = Number(p.currencyId);
-          const amt = Math.abs(Number(p.amount));
-          if (fromId === targetCurId) {
-            totalEquivalent += amt;
-          } else {
-            const fromCur = dbCurrencies.find(c => Number(c.id) === fromId);
-            const toCur = dbCurrencies.find(c => Number(c.id) === targetCurId);
-            if (fromCur?.code === "IQD" && toCur?.code === "USD") {
-              totalEquivalent += amt / ratePerUSD;
-            } else if (fromCur?.code === "USD" && toCur?.code === "IQD") {
-              totalEquivalent += amt * ratePerUSD;
-            } else {
-              totalEquivalent += amt;
-            }
-          }
-        });
-
-        const targetCur = dbCurrencies.find(c => Number(c.id) === targetCurId);
-        const targetSymbol = targetCur ? (targetCur.code === "IQD" ? "دینار" : targetCur.symbol || "$") : "$";
-        const roundedTotal = Math.round(totalEquivalent * 100) / 100;
-        const totalText = targetCur?.code === "IQD"
-          ? `کۆی گشتی ${roundedTotal.toLocaleString("en-US")} دینار`
-          : `کۆی گشتی ${targetSymbol} ${roundedTotal.toLocaleString("en-US")}`;
-
-        autoNote = `${parts.join("   ")}   ڕەیتی گۆڕینەوە ${formattedRate}   ${totalText}`;
-      }
-    }
-
-    if (!isShareholderVoucherType && autoNote) {
-      if (!data.printNote || !data.printNote.includes(autoNote)) {
-        data.printNote = data.printNote ? `${data.printNote} | ${autoNote}` : autoNote;
-      }
-      if (!data.internalNote || !data.internalNote.includes(autoNote)) {
-        data.internalNote = data.internalNote ? `${data.internalNote} | ${autoNote}` : autoNote;
-      }
-    }
+    
 
     const updatedVoucher = await prisma.$transaction(async (tx) => {
       // 1. Fetch the existing voucher with its payments and lines to reverse them
