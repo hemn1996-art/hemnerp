@@ -263,8 +263,12 @@ export async function POST(request: Request) {
     }
 
     if (!isShareholderVoucherType && autoNote) {
-      data.printNote = data.printNote ? `${data.printNote} | ${autoNote}` : autoNote;
-      data.internalNote = data.internalNote ? `${data.internalNote} | ${autoNote}` : autoNote;
+      if (!data.printNote || !data.printNote.includes(autoNote)) {
+        data.printNote = data.printNote ? `${data.printNote} | ${autoNote}` : autoNote;
+      }
+      if (!data.internalNote || !data.internalNote.includes(autoNote)) {
+        data.internalNote = data.internalNote ? `${data.internalNote} | ${autoNote}` : autoNote;
+      }
     }
 
     const creatorName = (data.employeeName && data.employeeName.trim() !== "")
@@ -496,6 +500,15 @@ export async function POST(request: Request) {
 
           const dbCurrencies = await tx.currency.findMany();
 
+          const itemsTotalsByCurrency: Record<string, number> = {};
+          if (data.lines && Array.isArray(data.lines)) {
+            for (const line of data.lines) {
+              const curId = String(line.currencyId || createdVoucher.currencyId || 1);
+              const lTotal = Number(line.lineTotal || (Number(line.qty || 0) * Number(line.unitPrice || 0)));
+              itemsTotalsByCurrency[curId] = (itemsTotalsByCurrency[curId] || 0) + lTotal;
+            }
+          }
+
           const { ledgerEntries: computedEntries } = calculateLedgerEntries({
             type: createdVoucher.type,
             netAmount: createdVoucher.netAmount,
@@ -515,14 +528,15 @@ export async function POST(request: Request) {
                 };
               }) : []),
               ...(Number(data.totalDiscount) > 0 ? [{
-                currencyId: createdVoucher.currencyId || 1,
+                currencyId: Number(data.discountCurrencyId || createdVoucher.currencyId || 1),
                 amount: Number(data.totalDiscount),
                 exchangeRate: effectiveVoucherRate
               }] : [])
             ],
             extraPaymentHandling: data.extraPaymentHandling || null,
             balanceBeforeByCurrency,
-            currencies: dbCurrencies
+            currencies: dbCurrencies,
+            itemsTotalsByCurrency
           });
 
           for (const le of computedEntries) {

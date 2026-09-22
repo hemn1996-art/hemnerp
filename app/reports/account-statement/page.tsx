@@ -6,6 +6,7 @@ import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
 import BackButton from "../../components/BackButton";
+import { formatCurrencyJSX } from "../../utils/currencyHelper";
 
 interface Product { id: number; name: string; code: string | null; costPrice: number | null; }
 interface VoucherLine { id: number; productId: number; qty: number; unitPrice: number; discountAmount: number; lineTotal: number; note: string | null; product: Product; }
@@ -182,33 +183,36 @@ function AccountStatementContent() {
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   };
 
-  const formatMoney = (amount: number, curId: number, showMinus = false) => {
-    const cur = currencies.find((c: any) => c.id === curId);
-    const isRounding = cur ? cur.rounding : false;
-    const absVal = Math.abs(amount).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: isRounding ? 0 : 2 });
-    const symbol = cur?.symbol || cur?.code || "";
-
-    return (
-      <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: "3px" }} dir="ltr">
-        <span style={{ fontSize: "0.85em", opacity: 0.85 }} className="font-bold flex-shrink-0">{symbol}</span>
-        <span className="whitespace-nowrap">{absVal}</span>
-      </span>
-    );
+  const formatMoney = (amount: number, curId: number) => {
+    return formatCurrencyJSX(Math.abs(amount), curId, currencies);
   };
 
   const cleanShareholderManualNote = (rawNote: string | null | undefined): string => {
     if (!rawNote) return "";
     let clean = String(rawNote);
+
+    // 1. Remove verbose exchange summary: e.g. "... دینار ڕەیتی گۆڕینەوە ... کۆی گشتی ..."
     clean = clean.replace(/[^\n|]*ڕەیتی\s*گۆڕینەوە[^\n|]*/gi, "");
+
+    // 2. Remove verbose deposit/withdrawal note: e.g. "(... دینار بە ڕەیتی 100 دۆلاری ...)"
     clean = clean.replace(/\([^\)]*دینار\s*بە\s*ڕەیتی\s*100\s*دۆلاری[^\)]*\)/gi, "");
     clean = clean.replace(/[^\n|]*دینار\s*بە\s*ڕەیتی\s*100\s*دۆلاری[^\n|]*/gi, "");
+
+    // 3. Remove "ڕەیتی ١٠٠ دۆلار ... بڕی دراو = ..."
     clean = clean.replace(/[^\n|]*ڕەیتی\s*(?:١٠٠|100)\s*دۆلار[^\n|]*/gi, "");
+
+    // 4. Remove any existing simple rate badges
     clean = clean.replace(/[^\n|]*ڕەیتی\s*(?:100\$|دۆلار)[^\n|]*/gi, "");
+
+    // 5. Remove any standalone "کۆی گشتی" leftovers
     clean = clean.replace(/[^\n|]*کۆی\s*گشتی[^\n|]*/gi, "");
+
+    // 6. Split by lines / pipes, trim punctuation and clean up
     const lines = clean
       .split(/[\n|؛;]/)
       .map(part => part.replace(/^[\s\-|—()]+|[\s\-|—()]+$/g, "").trim())
       .filter(part => part.length > 0);
+
     return lines.join(" - ");
   };
 
@@ -262,7 +266,7 @@ function AccountStatementContent() {
                   }`}
                 >
                   <span className={`text-base print:text-[10px] font-black ${isNegative ? "text-rose-700" : "text-emerald-700"}`} dir="ltr">
-                    {formatMoney(val, Number(curId), false)}
+                    {formatMoney(val, Number(curId))}
                   </span>
                   {showNote && (
                     <span className={`text-xs print:text-[9px] font-black ${isNegative ? "text-rose-900" : "text-emerald-900"}`} dir="rtl">
@@ -281,9 +285,9 @@ function AccountStatementContent() {
           }
 
           return (
-            <div key={curId} className="flex items-center gap-1.5 flex-wrap justify-center text-xs md:text-sm">
-              <span className={`font-bold tracking-tight ${isNegative ? "text-rose-600" : "text-emerald-600"}`} dir="ltr">
-                {formatMoney(val, Number(curId), false)}
+            <div key={curId} className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap print:whitespace-nowrap justify-center text-xs md:text-sm print:text-[10.5px]">
+              <span className={`font-bold tracking-tight whitespace-nowrap print:whitespace-nowrap ${isNegative ? "text-rose-600" : "text-emerald-600"}`} dir="ltr">
+                {formatMoney(val, Number(curId))}
               </span>
               {showNote && (
                 <span className={`text-[11px] font-bold ${isNegative ? "text-rose-700" : "text-emerald-700"}`}>
@@ -350,6 +354,21 @@ function AccountStatementContent() {
           }
         }
 
+        let rowCurrencyId = v.currencyId || 1;
+        let rowTotalAmount = (v.type === "shareholder_deposit" || v.type === "shareholder_withdrawal" || !v.netAmount) ? (v.totalAmount || v.netAmount || 0) : v.netAmount;
+        let rowTotalDiscount = v.totalDiscount || 0;
+
+        if (v.type === "money_out" || v.type === "money_in" || v.type === "پارەی ڕۆشتوو" || v.type === "پارەی هاتوو") {
+          const nonZeroPayments = (v.paidAmounts || []).filter((pa: any) => pa.amount > 0);
+          if (nonZeroPayments.length === 1) {
+            const singlePaidCurId = nonZeroPayments[0].currencyId;
+            rowCurrencyId = singlePaidCurId;
+            if (singlePaidCurId === 2 && rowTotalAmount < 5000 && nonZeroPayments[0].amount > 10000) {
+              rowTotalAmount = nonZeroPayments[0].amount;
+            }
+          }
+        }
+
         rowsList.push({
           id: `${v.id}-main`,
           voucherId: v.id,
@@ -358,9 +377,9 @@ function AccountStatementContent() {
           type: v.type,
           originalType: v.type,
           kurdishType: getKurdishType(v.type),
-          totalAmount: (v.type === "shareholder_deposit" || v.type === "shareholder_withdrawal" || !v.netAmount) ? (v.totalAmount || v.netAmount || 0) : v.netAmount,
-          currencyId: v.currencyId || 1,
-          totalDiscount: v.totalDiscount,
+          totalAmount: rowTotalAmount,
+          currencyId: rowCurrencyId,
+          totalDiscount: rowTotalDiscount,
           paidAmounts: v.paidAmounts ? v.paidAmounts.map(pa => ({ currencyId: pa.currencyId, amount: pa.amount, exchangeRate: pa.exchangeRate })) : [],
           note: v.printNote || v.internalNote || "",
           rawPrintNote: v.printNote,
@@ -475,6 +494,41 @@ function AccountStatementContent() {
     return { visibleItems, previousBalances, finalBalances };
   }, [vouchers, accountIdParam, startDate, endDate, filterCurrencyId, account]);
 
+  const shareholderSummary = useMemo(() => {
+    if (!isShareholder) return null;
+    let totalDepositedUSD = 0;
+    let totalWithdrawnUSD = 0;
+
+    processed.visibleItems.forEach((item: any) => {
+      const type = item.originalType || item.type;
+      if (type === "shareholder_deposit") {
+        let valUSD = 0;
+        if (item.paidAmounts && item.paidAmounts.length > 0) {
+          valUSD = item.paidAmounts.reduce((sum: number, pa: any) => {
+            const rate = (pa.exchangeRate && pa.exchangeRate > 10) ? pa.exchangeRate : 1500;
+            return sum + (pa.currencyId === usdId ? pa.amount : pa.amount / rate);
+          }, 0);
+        } else {
+          valUSD = item.totalAmount || 0;
+        }
+        totalDepositedUSD += valUSD;
+      } else if (type === "shareholder_withdrawal") {
+        let valUSD = 0;
+        if (item.paidAmounts && item.paidAmounts.length > 0) {
+          valUSD = item.paidAmounts.reduce((sum: number, pa: any) => {
+            const rate = (pa.exchangeRate && pa.exchangeRate > 10) ? pa.exchangeRate : 1500;
+            return sum + (pa.currencyId === usdId ? pa.amount : pa.amount / rate);
+          }, 0);
+        } else {
+          valUSD = item.totalAmount || 0;
+        }
+        totalWithdrawnUSD += valUSD;
+      }
+    });
+
+    return { totalDepositedUSD, totalWithdrawnUSD };
+  }, [isShareholder, processed.visibleItems, usdId]);
+
   useEffect(() => {
     if (filterShowItems === "پیشاندان") {
       const newExpanded: Record<number, boolean> = {};
@@ -574,31 +628,58 @@ function AccountStatementContent() {
           }
           th {
             border: 1px solid #475569 !important;
-            padding: 3px 2px !important;
-            font-size: 10px !important;
+            padding: 4px 2px !important;
+            font-size: 11px !important;
+            font-weight: 800 !important;
             line-height: 1.2 !important;
             background-color: #03133f !important;
             color: white !important;
             text-align: center !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            overflow: hidden !important;
-            white-space: normal !important;
+            white-space: nowrap !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+          }
+          th.allow-wrap {
+            white-space: normal !important;
           }
           td {
             border: 1px solid #94a3b8 !important;
             padding: 3px 2px !important;
-            font-size: 9.5px !important;
+            font-size: 10.5px !important;
             line-height: 1.2 !important;
             text-align: center !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            overflow: hidden !important;
-            white-space: normal !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+          }
+          td.allow-wrap {
+            white-space: normal !important;
+            word-break: break-word !important;
+          }
+          td:not(.allow-wrap) {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+          }
+          /* Keep all numeric, currency, and paid amount cells strictly single line */
+          .single-line-amount,
+          .paid-amount-item,
+          td[dir="ltr"],
+          td[dir="ltr"] * {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            font-variant-numeric: tabular-nums !important;
+          }
+          .paid-amount-item {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 2px !important;
+            font-size: 10.5px !important;
+            font-weight: 800 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
           .no-print {
             display: none !important;
@@ -719,6 +800,47 @@ function AccountStatementContent() {
           </div>
         </div>
 
+        {/* Shareholder Summary Cards (when viewing a shareholder account) */}
+        {isShareholder && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 no-print" style={{ direction: "rtl" }}>
+            {/* Total Deposit Card */}
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-emerald-100/70 border-2 border-emerald-300 rounded-2xl shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-sm">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-emerald-900 font-black">کۆی دانانی پارە (داخڵکردن)</span>
+                  <span className="text-[11px] text-emerald-700 font-bold">لە ماوەی دیاریکراودا</span>
+                </div>
+              </div>
+              <div className="text-xl md:text-2xl font-black text-emerald-800 tracking-tight" dir="ltr">
+                {formatMoney(shareholderSummary?.totalDepositedUSD || 0, usdId)}
+              </div>
+            </div>
+
+            {/* Total Withdrawal Card */}
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-rose-50 to-rose-100/70 border-2 border-rose-300 rounded-2xl shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-rose-600 text-white flex items-center justify-center font-black shadow-sm">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-rose-900 font-black">کۆی کشانەوەی پارە (دەرکردن)</span>
+                  <span className="text-[11px] text-rose-700 font-bold">لە ماوەی دیاریکراودا</span>
+                </div>
+              </div>
+              <div className="text-xl md:text-2xl font-black text-rose-800 tracking-tight" dir="ltr">
+                {formatMoney(shareholderSummary?.totalWithdrawnUSD || 0, usdId)}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Print-Only Classic Compact Info Header Table */}
         <div id="pdf-print-info-table" className="hidden print:block w-full border border-[#0b1f50] rounded-lg overflow-hidden mb-3 bg-slate-50 text-[11px] shadow-sm" style={{ direction: "rtl" }}>
           <table className="w-full text-right border-collapse">
@@ -778,15 +900,15 @@ function AccountStatementContent() {
           <table id="account-statement-table" className="w-full text-right text-sm print:text-xs">
             <thead className="bg-[#03133f] text-white">
               <tr className="divide-x divide-x-reverse divide-[#ffffff20]">
-                <th className="p-2 font-black text-center text-xs w-[4%]">#</th>
-                {visibleColumns.date && <th className="p-2 font-black text-center text-xs w-[11%]">بەروار</th>}
-                {visibleColumns.voucherId && <th className="p-2 font-black text-center text-xs w-[9%]">پسووڵە</th>}
-                {visibleColumns.type && <th className="p-2 font-black text-center text-xs w-[14%]">جۆری پسووڵە</th>}
-                {visibleColumns.totalAmount && <th className="p-2 font-black text-center text-xs w-[11%]">کۆی گشتی</th>}
-                {visibleColumns.discount && <th className="p-2 font-black text-center text-xs w-[9%]">داشکاندن</th>}
-                {visibleColumns.paidAmount && <th className="p-2 font-black text-center text-xs w-[11%]">پارەی دراو</th>}
-                {visibleColumns.balance && <th className="p-2 font-black text-center text-xs w-[13%]">باڵانس</th>}
-                {visibleColumns.note && <th className="p-2 font-black text-center text-xs w-[18%] allow-wrap">تێبینی</th>}
+                <th className="p-2 font-black text-center text-xs w-[3.5%]">#</th>
+                {visibleColumns.date && <th className="p-2 font-black text-center text-xs w-[9.5%]">بەروار</th>}
+                {visibleColumns.voucherId && <th className="p-2 font-black text-center text-xs w-[7%]">پسووڵە</th>}
+                {visibleColumns.type && <th className="p-2 font-black text-center text-xs w-[12%]">جۆری پسووڵە</th>}
+                {visibleColumns.totalAmount && <th className="p-2 font-black text-center text-xs w-[12%]">کۆی گشتی</th>}
+                {visibleColumns.discount && <th className="p-2 font-black text-center text-xs w-[8%]">داشکاندن</th>}
+                {visibleColumns.paidAmount && <th className="p-2 font-black text-center text-xs w-[14%]">پارەی دراو</th>}
+                {visibleColumns.balance && <th className="p-2 font-black text-center text-xs w-[15%]">باڵانس</th>}
+                {visibleColumns.note && <th className="p-2 font-black text-center text-xs w-[19%] allow-wrap">تێبینی</th>}
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -811,26 +933,61 @@ function AccountStatementContent() {
                   const hasLines = v.lines && v.lines.length > 0;
 
                   // Color scheme per voucher type
-                  const typeColors: Record<string, { header: string; badge: string; itemBg: string; itemBorder: string; balanceBg: string }> = {
-                    sales:             { header: "bg-blue-50 border-blue-300",   badge: "bg-blue-600 text-white",   itemBg: "bg-blue-50/40",   itemBorder: "border-blue-200",   balanceBg: "bg-blue-100" },
-                    purchase:          { header: "bg-emerald-50 border-emerald-300", badge: "bg-emerald-600 text-white", itemBg: "bg-emerald-50/40", itemBorder: "border-emerald-200", balanceBg: "bg-emerald-100" },
-                    money_in:          { header: "bg-teal-50 border-teal-300",   badge: "bg-teal-600 text-white",   itemBg: "bg-teal-50/40",   itemBorder: "border-teal-200",   balanceBg: "bg-teal-100" },
-                    money_out:         { header: "bg-rose-50 border-rose-300",   badge: "bg-rose-600 text-white",   itemBg: "bg-rose-50/40",   itemBorder: "border-rose-200",   balanceBg: "bg-rose-100" },
-                    expense:           { header: "bg-orange-50 border-orange-300", badge: "bg-orange-600 text-white", itemBg: "bg-orange-50/40", itemBorder: "border-orange-200", balanceBg: "bg-orange-100" },
-                    sales_return:      { header: "bg-purple-50 border-purple-300", badge: "bg-purple-600 text-white", itemBg: "bg-purple-50/40", itemBorder: "border-purple-200", balanceBg: "bg-purple-100" },
-                    purchase_return:   { header: "bg-indigo-50 border-indigo-300", badge: "bg-indigo-600 text-white", itemBg: "bg-indigo-50/40", itemBorder: "border-indigo-200", balanceBg: "bg-indigo-100" },
-                    my_debt_discount:  { header: "bg-sky-50 border-sky-300",     badge: "bg-sky-600 text-white",     itemBg: "bg-sky-50/40",     itemBorder: "border-sky-200",     balanceBg: "bg-sky-100" },
-                    people_debt_discount: { header: "bg-violet-50 border-violet-300", badge: "bg-violet-600 text-white", itemBg: "bg-violet-50/40", itemBorder: "border-violet-200", balanceBg: "bg-violet-100" },
-                    "expense-debt":    { header: "bg-amber-50 border-amber-300", badge: "bg-amber-600 text-white",   itemBg: "bg-amber-50/40",   itemBorder: "border-amber-200",   balanceBg: "bg-amber-100" },
+                  const typeColors: Record<string, { 
+                    header: string; 
+                    badge: string; 
+                    itemBg: string; 
+                    itemBorder: string; 
+                    balanceBg: string;
+                    rowBorder?: string;
+                    typeBadge?: string;
+                    indicatorDot?: string;
+                    paidText?: string;
+                    amountColor?: string;
+                  }> = {
+                    sales:             { header: "bg-blue-50 border-blue-300",   badge: "bg-blue-600 text-white",   itemBg: "bg-blue-50/40",   itemBorder: "border-blue-200",   balanceBg: "bg-blue-100", paidText: "text-emerald-700" },
+                    purchase:          { header: "bg-emerald-50 border-emerald-300", badge: "bg-emerald-600 text-white", itemBg: "bg-emerald-50/40", itemBorder: "border-emerald-200", balanceBg: "bg-emerald-100", paidText: "text-emerald-700" },
+                    money_in:          { header: "bg-teal-50 border-teal-300",   badge: "bg-teal-600 text-white",   itemBg: "bg-teal-50/40",   itemBorder: "border-teal-200",   balanceBg: "bg-teal-100", paidText: "text-teal-700" },
+                    money_out:         { header: "bg-rose-50 border-rose-300",   badge: "bg-rose-600 text-white",   itemBg: "bg-rose-50/40",   itemBorder: "border-rose-200",   balanceBg: "bg-rose-100", paidText: "text-rose-700" },
+                    expense:           { header: "bg-orange-50 border-orange-300", badge: "bg-orange-600 text-white", itemBg: "bg-orange-50/40", itemBorder: "border-orange-200", balanceBg: "bg-orange-100", paidText: "text-orange-700" },
+                    sales_return:      { header: "bg-purple-50 border-purple-300", badge: "bg-purple-600 text-white", itemBg: "bg-purple-50/40", itemBorder: "border-purple-200", balanceBg: "bg-purple-100", paidText: "text-purple-700" },
+                    purchase_return:   { header: "bg-indigo-50 border-indigo-300", badge: "bg-indigo-600 text-white", itemBg: "bg-indigo-50/40", itemBorder: "border-indigo-200", balanceBg: "bg-indigo-100", paidText: "text-indigo-700" },
+                    my_debt_discount:  { header: "bg-sky-50 border-sky-300",     badge: "bg-sky-600 text-white",     itemBg: "bg-sky-50/40",     itemBorder: "border-sky-200",     balanceBg: "bg-sky-100", paidText: "text-sky-700" },
+                    people_debt_discount: { header: "bg-violet-50 border-violet-300", badge: "bg-violet-600 text-white", itemBg: "bg-violet-50/40", itemBorder: "border-violet-200", balanceBg: "bg-violet-100", paidText: "text-violet-700" },
+                    "expense-debt":    { header: "bg-amber-50 border-amber-300", badge: "bg-amber-600 text-white",   itemBg: "bg-amber-50/40",   itemBorder: "border-amber-200",   balanceBg: "bg-amber-100", paidText: "text-amber-700" },
+                    shareholder_deposit: {
+                      header: "bg-emerald-50/90 border-emerald-300 hover:bg-emerald-100/60",
+                      rowBorder: "border-r-4 border-r-emerald-500",
+                      badge: "bg-emerald-600 text-white shadow-xs hover:bg-emerald-700",
+                      typeBadge: "bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs",
+                      itemBg: "bg-emerald-50/40",
+                      itemBorder: "border-emerald-300",
+                      balanceBg: "bg-emerald-100/80 text-emerald-950",
+                      paidText: "text-emerald-700",
+                      amountColor: "text-emerald-800",
+                      indicatorDot: "bg-emerald-500",
+                    },
+                    shareholder_withdrawal: {
+                      header: "bg-rose-50/90 border-rose-300 hover:bg-rose-100/60",
+                      rowBorder: "border-r-4 border-r-rose-500",
+                      badge: "bg-rose-600 text-white shadow-xs hover:bg-rose-700",
+                      typeBadge: "bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs",
+                      itemBg: "bg-rose-50/40",
+                      itemBorder: "border-rose-300",
+                      balanceBg: "bg-rose-100/80 text-rose-950",
+                      paidText: "text-rose-700",
+                      amountColor: "text-rose-800",
+                      indicatorDot: "bg-rose-500",
+                    },
                   };
-                  const tc = typeColors[v.type] || { header: "bg-gray-50 border-gray-300", badge: "bg-gray-600 text-white", itemBg: "bg-gray-50/40", itemBorder: "border-gray-200", balanceBg: "bg-gray-100" };
+                  const tc = typeColors[v.type] || { header: "bg-gray-50 border-gray-300", badge: "bg-gray-600 text-white", itemBg: "bg-gray-50/40", itemBorder: "border-gray-200", balanceBg: "bg-gray-100", paidText: "text-gray-800" };
 
                   return (
                     <React.Fragment key={v.id}>
                       {/* === VOUCHER HEADER ROW === */}
                       <tr
                         onClick={filterShowItems === "شاردنەوە" && hasLines ? () => toggleRow(v.id) : undefined}
-                        className={`border-b-0 border-t-2 border-gray-300 transition-colors ${filterShowItems === "شاردنەوە" && hasLines ? "cursor-pointer hover:brightness-95" : ""} ${tc.header}`}
+                        className={`border-b-0 border-t-2 border-gray-300 transition-colors ${filterShowItems === "شاردنەوە" && hasLines ? "cursor-pointer hover:brightness-95" : ""} ${tc.header} ${tc.rowBorder || ""}`}
                       >
                         <td className="p-3 text-center text-gray-500 font-bold text-xs">{vIdx + 1}</td>
                         {visibleColumns.date && <td className="p-3 text-center text-gray-700 font-bold text-xs">{formatDate(v.date)}</td>}
@@ -850,12 +1007,19 @@ function AccountStatementContent() {
                         {visibleColumns.type && (
                           <td className="p-3 text-center font-bold text-gray-800">
                             <div className="flex flex-col items-center justify-center">
-                              <span className="flex items-center justify-center gap-1 font-extrabold">
-                                {filterShowItems === "شاردنەوە" && hasLines && (
-                                  <span className="text-gray-400 text-xs">{isRowExpanded ? "▲" : "▼"}</span>
-                                )}
-                                {v.kurdishType}
-                              </span>
+                              {tc.typeBadge ? (
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-black ${tc.typeBadge}`}>
+                                  {tc.indicatorDot && <span className={`w-2 h-2 rounded-full ${tc.indicatorDot} inline-block animate-pulse`}></span>}
+                                  {v.kurdishType}
+                                </span>
+                              ) : (
+                                <span className="flex items-center justify-center gap-1 font-extrabold">
+                                  {filterShowItems === "شاردنەوە" && hasLines && (
+                                    <span className="text-gray-400 text-xs">{isRowExpanded ? "▲" : "▼"}</span>
+                                  )}
+                                  {v.kurdishType}
+                                </span>
+                              )}
                               {["purchase", "money_out"].includes(v.type) && v.referenceNo && String(v.referenceNo).trim() !== "" && String(v.referenceNo) !== String(v.voucherId) && (
                                 <span className="text-[11px] text-gray-500 font-bold mt-0.5 normal-case font-sans">
                                   ({v.type === "purchase" ? "لای فرۆشیار" : "لای وەرگر"}: {String(v.referenceNo).replace('OLD-', '').replace(/-11$/, '').replace(/-12$/, '')})
@@ -864,33 +1028,87 @@ function AccountStatementContent() {
                             </div>
                           </td>
                         )}
-                        {visibleColumns.totalAmount && <td className="p-3 text-center text-gray-800 font-black" dir="ltr">{formatMoney(v.totalAmount, v.currencyId || 1)}</td>}
-                        {visibleColumns.discount && <td className="p-3 text-center text-red-500" dir="ltr">{v.totalDiscount > 0 ? formatMoney(v.totalDiscount, v.currencyId || 1) : "—"}</td>}
+                        {visibleColumns.totalAmount && (
+                          <td className={`p-3 text-center font-black print:p-1 whitespace-nowrap print:whitespace-nowrap text-xs print:text-[10.5px] ${tc.amountColor || "text-gray-800"}`} dir="ltr">
+                            {formatMoney(v.totalAmount, v.currencyId || 1)}
+                          </td>
+                        )}
+                        {visibleColumns.discount && (
+                          <td className="p-3 text-center text-red-500 print:p-1 whitespace-nowrap print:whitespace-nowrap text-xs print:text-[10.5px]" dir="ltr">
+                            {v.totalDiscount > 0 ? formatMoney(v.totalDiscount, v.currencyId || 1) : "—"}
+                          </td>
+                        )}
                         {visibleColumns.paidAmount && (
-                          <td className="p-3 text-center text-emerald-700 font-bold" dir="ltr">
-                            {v.paidAmounts && v.paidAmounts.length > 0 ? (() => {
-                              let accountCurrencyId = v.currencyId;
-                              if (!accountCurrencyId || !currencies.some((c: any) => Number(c.id) === Number(accountCurrencyId))) {
-                                accountCurrencyId = account?.balanceCurrencyId || account?.creditLimitCurrencyId;
-                              }
-                              if (!accountCurrencyId || !currencies.some((c: any) => Number(c.id) === Number(accountCurrencyId))) {
-                                accountCurrencyId = currencies.length > 0 ? currencies[0].id : 8;
-                              }
+                          <td className={`p-3 text-center ${tc.paidText || "text-emerald-700"} font-bold print:p-1 whitespace-nowrap print:whitespace-nowrap`} dir="ltr">
+                            {v.paidAmounts && v.paidAmounts.length > 0 ? (
+                              <div className="flex flex-col items-center justify-center gap-1 print:gap-0.5 whitespace-nowrap print:whitespace-nowrap">
+                                {v.paidAmounts.map((pa: any, pIdx: number) => {
+                                  const curObj = currencies.find((c: any) => Number(c.id) === Number(pa.currencyId));
+                                  const isIQD = curObj?.code === "IQD" || curObj?.symbol === "دینار" || pa.currencyId === 2 || pa.currencyId === 12;
+                                  const isDeposit = v.type === "shareholder_deposit";
+                                  const isWithdrawal = v.type === "shareholder_withdrawal";
 
-                              const totalConverted = v.paidAmounts.reduce((sum: number, pa: any) => {
-                                const actualRate = (Number(pa.currencyId) === Number(accountCurrencyId))
-                                  ? 1
-                                  : (pa.exchangeRate && pa.exchangeRate > 10 ? pa.exchangeRate : (v.exchangeRate && v.exchangeRate > 10 ? v.exchangeRate : 1500));
-                                return sum + convertAmount(pa.amount, pa.currencyId, accountCurrencyId, actualRate);
-                              }, 0);
-                              return formatMoney(totalConverted, accountCurrencyId);
-                            })() : (
-                              "—"
+                                  // Formatting the actual paid amount in its currency
+                                  const formattedActual = formatMoney(pa.amount, pa.currencyId);
+
+                                  // Color & pill customization per currency and voucher type
+                                  let curPillClass = "text-slate-800";
+                                  if (isDeposit) {
+                                    curPillClass = isIQD
+                                      ? "text-blue-700 bg-blue-50/90 border border-blue-200/90"
+                                      : "text-emerald-700 bg-emerald-50/90 border border-emerald-200/90";
+                                  } else if (isWithdrawal) {
+                                    curPillClass = isIQD
+                                      ? "text-amber-800 bg-amber-50/90 border border-amber-200/90"
+                                      : "text-rose-700 bg-rose-50/90 border border-rose-200/90";
+                                  } else {
+                                    curPillClass = isIQD ? "text-blue-700" : (tc.paidText || "text-emerald-700");
+                                  }
+
+                                  // In shareholder statements, balance is USD. If paid in IQD, show converted USD equivalent
+                                  let convertedSubtext = null;
+                                  if (isShareholder && isIQD) {
+                                    const actualRate = (pa.exchangeRate && pa.exchangeRate > 10)
+                                      ? pa.exchangeRate
+                                      : (v.exchangeRate && v.exchangeRate > 10 ? v.exchangeRate : 1500);
+                                    const usdEq = pa.amount / actualRate;
+                                    convertedSubtext = (
+                                      <span className={`text-[10px] font-bold ${isWithdrawal ? "text-rose-600" : "text-emerald-600"} opacity-90 print:text-[9px] print:inline print:ms-1`} dir="ltr">
+                                        ({formatMoney(usdEq, usdId)})
+                                      </span>
+                                    );
+                                  }
+
+                                  return (
+                                    <div
+                                      key={pIdx}
+                                      className={`paid-amount-item inline-flex flex-col print:flex-row items-center justify-center px-2 py-0.5 rounded-md text-xs font-black shadow-2xs ${curPillClass} print:bg-transparent print:border-none print:shadow-none print:p-0 whitespace-nowrap print:whitespace-nowrap`}
+                                    >
+                                      <div className="flex items-center gap-1 print:inline-flex whitespace-nowrap print:whitespace-nowrap" dir="ltr">
+                                        <span className="text-xs print:text-[10.5px] font-bold whitespace-nowrap print:whitespace-nowrap">{formattedActual}</span>
+                                      </div>
+                                      {convertedSubtext}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              (v.type === "shareholder_deposit" || v.type === "shareholder_withdrawal") && v.totalAmount > 0 ? (
+                                <div className={`inline-flex items-center justify-center px-2.5 py-1 rounded-md text-xs font-black shadow-2xs ${
+                                  v.type === "shareholder_deposit"
+                                    ? "text-emerald-700 bg-emerald-50 border border-emerald-200"
+                                    : "text-rose-700 bg-rose-50 border border-rose-200"
+                                } print:bg-transparent print:border-none print:shadow-none print:p-0 whitespace-nowrap`} dir="ltr">
+                                  <span className="text-xs print:text-[10.5px] font-bold whitespace-nowrap">{formatMoney(v.totalAmount, v.currencyId || 1)}</span>
+                                </div>
+                              ) : (
+                                "—"
+                              )
                             )}
                           </td>
                         )}
                         {visibleColumns.balance && (
-                          <td className={`p-3 text-center font-black text-sm ${tc.balanceBg}`} dir="ltr">
+                          <td className={`p-3 text-center font-black text-sm print:text-[10.5px] print:p-1 whitespace-nowrap print:whitespace-nowrap ${tc.balanceBg}`} dir="ltr">
                             {renderBalances(v.rowBalances)}
                           </td>
                         )}

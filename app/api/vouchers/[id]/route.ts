@@ -227,8 +227,12 @@ export async function PUT(
     }
 
     if (!isShareholderVoucherType && autoNote) {
-      data.printNote = data.printNote ? `${data.printNote} | ${autoNote}` : autoNote;
-      data.internalNote = data.internalNote ? `${data.internalNote} | ${autoNote}` : autoNote;
+      if (!data.printNote || !data.printNote.includes(autoNote)) {
+        data.printNote = data.printNote ? `${data.printNote} | ${autoNote}` : autoNote;
+      }
+      if (!data.internalNote || !data.internalNote.includes(autoNote)) {
+        data.internalNote = data.internalNote ? `${data.internalNote} | ${autoNote}` : autoNote;
+      }
     }
 
     const updatedVoucher = await prisma.$transaction(async (tx) => {
@@ -543,6 +547,15 @@ export async function PUT(
 
           const dbCurrencies = await tx.currency.findMany();
 
+          const itemsTotalsByCurrency: Record<string, number> = {};
+          if (data.lines && Array.isArray(data.lines)) {
+            for (const line of data.lines) {
+              const curId = String(line.currencyId || updated.currencyId || 1);
+              const lTotal = Number(line.lineTotal || (Number(line.qty || 0) * Number(line.unitPrice || 0)));
+              itemsTotalsByCurrency[curId] = (itemsTotalsByCurrency[curId] || 0) + lTotal;
+            }
+          }
+
           const { ledgerEntries: computedEntries } = calculateLedgerEntries({
             type: updated.type,
             netAmount: updated.netAmount,
@@ -555,14 +568,15 @@ export async function PUT(
                 exchangeRate: Number(pa.exchangeRate || 1)
               })) : []),
               ...(Number(data.totalDiscount) > 0 ? [{
-                currencyId: updated.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 11,
+                currencyId: Number(data.discountCurrencyId || updated.currencyId || (await tx.currency.findFirst({ where: { isActive: true } }))?.id || 11),
                 amount: Number(data.totalDiscount),
-                exchangeRate: 1
+                exchangeRate: Number(data.exchangeRate || 1)
               }] : [])
             ],
             extraPaymentHandling: data.extraPaymentHandling || null,
             balanceBeforeByCurrency,
-            currencies: dbCurrencies
+            currencies: dbCurrencies,
+            itemsTotalsByCurrency
           });
 
           for (const le of computedEntries) {

@@ -60,6 +60,7 @@ export interface CalculateLedgerEntriesParams {
   extraPaymentHandling: "convert_to_other_currency" | "keep_as_same_currency_balance" | null;
   balanceBeforeByCurrency: Record<string, number>;
   currencies?: { id: number; code: string; symbol: string; name: string }[];
+  itemsTotalsByCurrency?: Record<string, number>;
 }
 
 export function calculateLedgerEntries({
@@ -71,6 +72,7 @@ export function calculateLedgerEntries({
   extraPaymentHandling,
   balanceBeforeByCurrency,
   currencies,
+  itemsTotalsByCurrency,
 }: CalculateLedgerEntriesParams) {
   // Normalize types
   const incomingTypes = ["sales", "money_in", "purchase_return", "people_debt_discount", "debt_discount", "داشکاندنم کردوە"];
@@ -134,17 +136,49 @@ export function calculateLedgerEntries({
   }
 
   // 1. Transaction (invoice) balance impact (before payment)
+  const hasItemsTotals = itemsTotalsByCurrency && Object.keys(itemsTotalsByCurrency).length > 0;
+
   if (type === "sales" || type === "purchase_return" || type === "people_debt" || type === "قەرزم لای خەڵکە" || type === "my_debt_discount" || type === "داشکاندنم بۆ کراوە") {
     // Debit effect: increases what they owe us
-    tempBalance[String(currencyId)] = (tempBalance[String(currencyId)] || 0) + netAmount;
-    if (!isOpening && (type === "sales" || type === "purchase_return")) {
-      ledgerEntries.push({ currencyId, debit: netAmount, credit: 0, exchangeRate });
+    if (hasItemsTotals && (type === "sales" || type === "purchase_return")) {
+      for (const [cIdStr, cAmt] of Object.entries(itemsTotalsByCurrency!)) {
+        const cId = Number(cIdStr);
+        if (cAmt > 0.0001) {
+          tempBalance[String(cId)] = (tempBalance[String(cId)] || 0) + cAmt;
+          ledgerEntries.push({
+            currencyId: cId,
+            debit: cAmt,
+            credit: 0,
+            exchangeRate: isUSD(cId, currencies) ? 1 : exchangeRate,
+          });
+        }
+      }
+    } else {
+      tempBalance[String(currencyId)] = (tempBalance[String(currencyId)] || 0) + netAmount;
+      if (!isOpening && (type === "sales" || type === "purchase_return")) {
+        ledgerEntries.push({ currencyId, debit: netAmount, credit: 0, exchangeRate });
+      }
     }
   } else if (type === "purchase" || type === "sales_return" || type === "my_debt" || type === "من قەرزارم" || type === "people_debt_discount" || type === "daشکاندن لە قەرزم لای خەڵکە" || type === "debt_discount") {
     // Credit effect: increases what we owe them
-    tempBalance[String(currencyId)] = (tempBalance[String(currencyId)] || 0) - netAmount;
-    if (!isOpening && (type === "purchase" || type === "sales_return")) {
-      ledgerEntries.push({ currencyId, debit: 0, credit: netAmount, exchangeRate });
+    if (hasItemsTotals && (type === "purchase" || type === "sales_return")) {
+      for (const [cIdStr, cAmt] of Object.entries(itemsTotalsByCurrency!)) {
+        const cId = Number(cIdStr);
+        if (cAmt > 0.0001) {
+          tempBalance[String(cId)] = (tempBalance[String(cId)] || 0) - cAmt;
+          ledgerEntries.push({
+            currencyId: cId,
+            debit: 0,
+            credit: cAmt,
+            exchangeRate: isUSD(cId, currencies) ? 1 : exchangeRate,
+          });
+        }
+      }
+    } else {
+      tempBalance[String(currencyId)] = (tempBalance[String(currencyId)] || 0) - netAmount;
+      if (!isOpening && (type === "purchase" || type === "sales_return")) {
+        ledgerEntries.push({ currencyId, debit: 0, credit: netAmount, exchangeRate });
+      }
     }
   }
 

@@ -383,6 +383,124 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
   const isMultiCurrencyAccount = activeBalances.length > 1;
 
+  const autoResolvedCurrency = useMemo(() => {
+    const usdCur = currencies.find((c: any) => c.code === "USD") || { id: 1 };
+    const iqdCur = currencies.find((c: any) => c.code === "IQD") || { id: 2 };
+    const defaultId = defaultCurrency.id || usdCur.id;
+
+    if (!selectedAccount) {
+      return {
+        targetCurrencyId: defaultId,
+        isSingleCurrencyAccount: false,
+        singleBalanceCurrencyId: defaultId,
+      };
+    }
+
+    const iqdBal = Number(accountBalanceBeforeByCurrency[String(iqdCur.id)] || 0);
+    const usdBal = Number(accountBalanceBeforeByCurrency[String(usdCur.id)] || 0);
+
+    const hasActiveIqd = Math.abs(iqdBal) > 0.01;
+    const hasActiveUsd = Math.abs(usdBal) > 0.01;
+
+    const iqdPaid = toNumber(paidAmounts[iqdCur.id]);
+    const usdPaid = toNumber(paidAmounts[usdCur.id]);
+    const hasPaidIqd = iqdPaid > 0;
+    const hasPaidUsd = usdPaid > 0;
+
+    // Rule 1: Single Currency Account (Account balance is ONLY in IQD or ONLY in USD)
+    // ئەگەر هەژمارێک باڵانسەکەی دینار بوو پارەکەی بە دینار و بە دۆلار درا بە پێێ ڕەیتی رۆژ هەموو پارەکە لەو باڵانسە ئەڕوات بۆ دۆلاریش بە هەمان شێوە
+    if (hasActiveIqd && !hasActiveUsd) {
+      return {
+        targetCurrencyId: iqdCur.id,
+        isSingleCurrencyAccount: true,
+        singleBalanceCurrencyId: iqdCur.id,
+      };
+    }
+    if (hasActiveUsd && !hasActiveIqd) {
+      return {
+        targetCurrencyId: usdCur.id,
+        isSingleCurrencyAccount: true,
+        singleBalanceCurrencyId: usdCur.id,
+      };
+    }
+
+    // Rule 2: Dual Currency Account (Both balances exist and are non-zero)
+    // بۆ هەژمارێک کە هەردوو باڵانسی هەبوو: دینار دینار بگۆڕێت و دۆلار دۆلار بگۆڕێت
+    if (hasActiveIqd && hasActiveUsd) {
+      if (hasPaidIqd && !hasPaidUsd) {
+        return {
+          targetCurrencyId: iqdCur.id,
+          isSingleCurrencyAccount: false,
+          singleBalanceCurrencyId: null,
+        };
+      }
+      if (hasPaidUsd && !hasPaidIqd) {
+        return {
+          targetCurrencyId: usdCur.id,
+          isSingleCurrencyAccount: false,
+          singleBalanceCurrencyId: null,
+        };
+      }
+      if (editId && originalVoucher?.currencyId) {
+        return {
+          targetCurrencyId: originalVoucher.currencyId,
+          isSingleCurrencyAccount: false,
+          singleBalanceCurrencyId: null,
+        };
+      }
+      return {
+        targetCurrencyId: paidCurrencyId || usdCur.id,
+        isSingleCurrencyAccount: false,
+        singleBalanceCurrencyId: null,
+      };
+    }
+
+    // Rule 3: Zero or No Active Balances (both zero)
+    if (hasPaidIqd && !hasPaidUsd) {
+      return {
+        targetCurrencyId: iqdCur.id,
+        isSingleCurrencyAccount: false,
+        singleBalanceCurrencyId: null,
+      };
+    }
+    if (hasPaidUsd && !hasPaidIqd) {
+      return {
+        targetCurrencyId: usdCur.id,
+        isSingleCurrencyAccount: false,
+        singleBalanceCurrencyId: null,
+      };
+    }
+    if (editId && originalVoucher?.currencyId) {
+      return {
+        targetCurrencyId: originalVoucher.currencyId,
+        isSingleCurrencyAccount: false,
+        singleBalanceCurrencyId: null,
+      };
+    }
+    const defaultAccountCur = selectedAccount.balanceCurrencyId || selectedAccount.creditLimitCurrencyId;
+    return {
+      targetCurrencyId: defaultAccountCur || defaultId,
+      isSingleCurrencyAccount: false,
+      singleBalanceCurrencyId: null,
+    };
+  }, [
+    selectedAccount,
+    accountBalanceBeforeByCurrency,
+    paidAmounts,
+    paidCurrencyId,
+    currencies,
+    defaultCurrency,
+    editId,
+    originalVoucher,
+  ]);
+
+  const activeTargetCurrencyId = autoResolvedCurrency.targetCurrencyId;
+  const activeDiscountCurrencyId = discountCurrencyId || (
+    autoResolvedCurrency.isSingleCurrencyAccount
+      ? autoResolvedCurrency.singleBalanceCurrencyId!
+      : autoResolvedCurrency.targetCurrencyId
+  ) || 1;
+
   const getDiscountLedgerPayload = (activeTargetId: number, rate: number) => {
     const rawDiscount = toNumber(discountAmount);
     if (rawDiscount <= 0) return null;
@@ -402,19 +520,6 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
       exchangeRate: (activeDiscountCurrencyId === activeTargetId) ? 1 : rate
     };
   };
-
-  useEffect(() => {
-    if (selectedAccount) {
-      if (activeBalances.length > 1) {
-        const hasPaidCur = activeBalances.some(([id]) => Number(id) === paidCurrencyId);
-        setTargetCurrencyId(hasPaidCur ? paidCurrencyId : Number(activeBalances[0][0]));
-      } else {
-        setTargetCurrencyId(undefined);
-      }
-    } else {
-      setTargetCurrencyId(undefined);
-    }
-  }, [accountId, paidCurrencyId, activeBalances, selectedAccount]);
 
   const filteredAccounts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
@@ -436,8 +541,6 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
   const hasMixedPaidCurrency =
     new Set(paidCurrencies.map((x: any) => x.currencyId)).size > 1;
 
-  const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
-  const activeDiscountCurrencyId = discountCurrencyId || activeTargetCurrencyId || 1;
   const showRate = hasMixedPaidCurrency || paidCurrencyId !== activeTargetCurrencyId;
 
   const currentSnapshot = useMemo(() => {
@@ -662,7 +765,7 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
     const symbol = getCurrencySymbol(currencyId);
     const absValue = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+      return `${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} دینار`;
     }
     return `${symbol} ${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
@@ -698,7 +801,6 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {showSign && isNegative && <span>-</span>}
         {isIQD ? (
           <>
             {numberJSX}
@@ -1579,48 +1681,6 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
             )}
           </div>
 
-          {selectedAccount && isMultiCurrencyAccount && !isLocked && (
-            <div style={{
-              background: "rgba(243, 244, 246, 0.6)",
-              border: "1px solid #e5e7eb",
-              borderRadius: 14,
-              padding: 12,
-              marginBottom: 12,
-            }}>
-              <div style={{ ...labelStyle, fontSize: 13, marginBottom: 8 }}>کەمکردنەوە لە باڵانسی دراوی:</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {activeBalances.map(([currencyIdText]) => {
-                  const curId = Number(currencyIdText);
-                  const symbol = getCurrencySymbol(curId);
-                  const code = getCurrencyCode(curId);
-                  const isSelected = targetCurrencyId === curId;
-                  
-                  return (
-                    <button
-                      key={curId}
-                      type="button"
-                      onClick={() => setTargetCurrencyId(curId)}
-                      style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        borderRadius: 10,
-                        border: isSelected ? "2px solid #2563eb" : "1px solid #d1d5db",
-                        background: isSelected ? "#eff6ff" : "white",
-                        color: isSelected ? "#1d4ed8" : "#374151",
-                        fontWeight: isSelected ? 900 : 700,
-                        cursor: "pointer",
-                        fontSize: 13,
-                        fontFamily: appFont,
-                        textAlign: "center"
-                      }}
-                    >
-                      {symbol} ({code})
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {selectedAccount && (
             <div style={accountInfoToggleBox}>
@@ -1860,12 +1920,22 @@ export default function MoneyInPage({ headerSelector, editId }: Props) {
                   />
                   <select
                     value={activeDiscountCurrencyId}
-                    disabled={isLocked}
+                    disabled={isLocked || autoResolvedCurrency.isSingleCurrencyAccount}
                     onChange={(e) => {
                       if (blockIfLocked()) return;
                       setDiscountCurrencyId(Number(e.target.value));
                     }}
-                    style={{ border: "none", borderLeft: "1px solid #d1d5db", background: "#f8fafc", padding: "0 12px", outline: "none", fontWeight: "bold", color: "#1e293b", cursor: isLocked ? "not-allowed" : "pointer", minWidth: "90px" }}
+                    style={{
+                      border: "none",
+                      borderLeft: "1px solid #d1d5db",
+                      background: autoResolvedCurrency.isSingleCurrencyAccount ? "#f1f5f9" : "#f8fafc",
+                      padding: "0 12px",
+                      outline: "none",
+                      fontWeight: "bold",
+                      color: "#1e293b",
+                      cursor: (isLocked || autoResolvedCurrency.isSingleCurrencyAccount) ? "not-allowed" : "pointer",
+                      minWidth: "90px"
+                    }}
                   >
                     {currencies.map((curr: any) => (
                       <option key={curr.id} value={curr.id}>
