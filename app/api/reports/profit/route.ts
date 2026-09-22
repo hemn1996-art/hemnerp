@@ -89,7 +89,7 @@ export async function GET(request: Request) {
             select: { accountTypeId: true }
           },
           inventoryTransactions: {
-            select: { qtyChange: true, unitCost: true, warehouseId: true, productId: true },
+            select: { qtyChange: true, unitCost: true, warehouseId: true, productId: true, currencyId: true },
           },
           lines: {
             select: { productId: true, qty: true, lineTotal: true, currencyId: true },
@@ -121,6 +121,7 @@ export async function GET(request: Request) {
             select: {
               currencyId: true,
               exchangeRate: true,
+              accountId: true,
               account: { select: { exchangeRateType: true, customExchangeRate: true } },
               versions: { select: { version: true, data: true } }
             }
@@ -197,8 +198,7 @@ export async function GET(request: Request) {
           } catch(e) {}
         }
 
-        const isWarehouseStockWithCustom = (t.voucher as any)?.type === "warehouse_stock" && customRate && (customRate === 135000 || customRate === 132000 || customRate < 145000);
-        const isFixed = rateType === "FIXED" || Boolean(isWarehouseStockWithCustom);
+        const isFixed = rateType === "FIXED";
 
         if (isFixed && customRate) {
           productFixedRates[t.productId] = customRate > 10000 ? customRate / 100 : customRate;
@@ -312,20 +312,28 @@ export async function GET(request: Request) {
       const amount = convertVoucherToTarget(v.netAmount, v.currencyId || usdId, v.exchangeRate);
 
       const getItemCostUsdForVoucher = (productId: number, rawCost?: number, rawCurId?: number) => {
-        // 1. If transaction has a recorded unitCost (COGS at the time of sale), strictly preserve it!
-        if (rawCost && rawCost > 0) {
-          const isIQD = rawCurId === 2 || rawCurId === 12 || rawCost > 500;
-          const vRate = (v.exchangeRate && v.exchangeRate > 100)
-            ? (v.exchangeRate > 10000 ? v.exchangeRate / 100 : v.exchangeRate)
-            : marketRatePerDollar;
-          return isIQD ? (rawCost / vRate) : rawCost;
+        const saleRate = (v.exchangeRate && v.exchangeRate > 0)
+          ? (v.exchangeRate > 10000 ? v.exchangeRate / 100 : (v.exchangeRate < 10 ? v.exchangeRate * 100 : v.exchangeRate))
+          : marketRatePerDollar;
+
+        // 1. Check if product has fixed exchange rate from purchase/stock voucher
+        const fixedRate = productFixedRates[productId];
+        if (fixedRate && fixedRate > 0) {
+          if (rawCost && rawCost > 0) {
+            const isCostIQD = rawCost > 500;
+            const costIQD = isCostIQD ? rawCost : (rawCost * fixedRate);
+            return costIQD / saleRate;
+          }
+          const fixedIQD = fixedCostIQD[productId];
+          if (fixedIQD !== undefined && fixedIQD > 0) {
+            return fixedIQD / saleRate;
+          }
         }
 
-        // 2. Check if product has fixed-rate IQD cost
-        const fixedIQD = fixedCostIQD[productId];
-        if (fixedIQD !== undefined && fixedIQD > 0) {
-          // Convert IQD cost to USD at market rate
-          return fixedIQD / marketRatePerDollar;
+        // 2. Regular product with recorded transaction unitCost
+        if (rawCost && rawCost > 0) {
+          const isIQD = rawCost > 500;
+          return isIQD ? (rawCost / saleRate) : rawCost;
         }
 
         // 3. Fallback to product costs calculated from purchases
