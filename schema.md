@@ -33,6 +33,18 @@
    - Products marked with `isExpense: true` are non-inventory expense items (e.g. electricity, rent, store expenses).
    - They MUST ONLY appear in Expense Vouchers (`/components/ExpensePage.tsx` or voucher type `expense`).
    - They MUST NEVER appear in Sales Invoices (`/invoices`), Purchases, Returns, Stock adjustments, or Warehouse stock reports (`/reports/stock`, `/reports/stock-snapshot`).
+9. **Money Out & Money In Automatic Balance & Currency Resolution**:
+   - Manual balance selection buttons (`کەمکردنەوە لە باڵانسی دراوی`) are completely removed from Money Out and Money In pages.
+   - **Single-Currency Account**: If an account has balance in only one currency (e.g. Dinars only or Dollars only), any payment made in Dinars or Dollars (converted at daily rate) applies directly to that balance. Discount currency is locked to that balance currency. Payments in that native currency are never converted or recorded as USD.
+   - **Dual-Currency Account**: If an account has active balances in both currencies, Dinar payments reduce Dinar balance and Dollar payments reduce Dollar balance directly without conversion ("دینار دینار، دۆلار دۆلار"). If one balance is 0 (or becomes 0), remaining payments automatically apply to the remaining active balance as a single-currency account.
+   - **Discount Currency & Ledger Alignment**: Voucher discount ledger entries strictly use `discountCurrencyId`, preventing discounts in Dinars from being recorded as Dollars. Account statement displays the exact native transaction currency and amounts for money in/out vouchers.
+
+10. **Foundational Incoming Origin Cost Currency (MANDATORY)**:
+   - The authoritative currency of an item's purchase cost is STRICTLY determined by how the item ENTERED the inventory (`InventoryTransaction.qtyChange > 0` through purchase or warehouse stock vouchers).
+   - **NEVER use the sales transaction's `currencyId` (`tx.currencyId` on `qtyChange < 0`) or the customer's sales voucher currency to determine cost currency.** Outgoing transactions inherit the sales voucher's currency, not the product's purchase currency.
+   - When an item purchased in USD (e.g. $150) is sold in an IQD invoice, its cost remains $150 USD (converted to IQD at the sale voucher's exchange rate). It must NEVER be treated as 150 IQD (9 cents).
+   - When an item entered in IQD (e.g. 575,000 IQD) is sold in a USD invoice, its cost remains 575,000 IQD (converted to USD at the sale voucher's exchange rate). It must NEVER be treated as $575,000 USD.
+   - In Invoices Report top KPI cards, the Profit card strictly converts each invoice's profit to USD at that invoice's own exchange rate (`ڕەیتی کاتی فرۆشتنەکە`), presenting a single, unified USD total.
 
 ## 2. Main Models (Prisma)
 - `Product`: Stores master item details, `salePrices`, `category`, `brand`, etc.
