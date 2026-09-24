@@ -59,7 +59,7 @@ export function calculateProductCostsMap(
   productsMap.forEach((p, pId) => {
     if (productCostsUSD[pId] === undefined && fixedCostIQDMap[pId] === undefined) {
       const rawCost = p.costPrice || 0;
-      const isCostIQD = rawCost > 500;
+      const isCostIQD = p.costCurrencyId === 2 || p.costCurrencyId === 12;
       productCostsUSD[pId] = isCostIQD ? (rawCost / marketRatePerDollar) : rawCost;
     }
   });
@@ -94,7 +94,7 @@ export function getVoucherCOGSInUSD(
     let costUSD = productCostsUSD[productId];
     if (costUSD === undefined || costUSD === null || costUSD === 0) {
       if (rawCost && rawCost > 0) {
-        const isCostIQD = rawCost > 500;
+        const isCostIQD = _rawCurId === 2 || _rawCurId === 12;
         costUSD = isCostIQD ? (rawCost / saleRate) : rawCost;
       }
     }
@@ -104,7 +104,7 @@ export function getVoucherCOGSInUSD(
   // If voucher has inventory transactions, compute from transactions
   if (voucher.inventoryTransactions && voucher.inventoryTransactions.length > 0) {
     return voucher.inventoryTransactions.reduce((sum: number, tx: any) => {
-      const cost = getCostUSD(tx.productId, tx.unitCost, tx.currencyId);
+      const cost = getCostUSD(tx.productId, tx.unitCost);
       return sum + Math.abs(tx.qtyChange) * cost;
     }, 0);
   }

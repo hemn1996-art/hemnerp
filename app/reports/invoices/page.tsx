@@ -1005,9 +1005,10 @@ function InvoiceReportContent() {
   // Pre-calculate product unit costs from incoming purchase/warehouse transactions
   // For fixed-rate products: cost stored in IQD (unitCost$ × fixedRate)
   // For regular products: cost stored in USD
-  const { productCostsMap, fixedRateCostIQDMap } = useMemo(() => {
+  const { productCostsMap, fixedRateCostIQDMap, productCostCurrencyMap } = useMemo(() => {
     const stats: Record<number, { runningCostUSD: number; runningOnHandQty: number; latestCostUSD: number; isMultiBatch: boolean }> = {};
     const fixedStats: Record<number, { runningCostIQD: number; runningOnHandQty: number; latestCostIQD: number; isMultiBatch: boolean }> = {};
+    const productCostCurrencyMap: Record<number, number> = {};
     const usdCur = currencies?.find((c: any) => c.code === "USD");
     const usdId = usdCur ? usdCur.id : 1;
     const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
@@ -1024,10 +1025,11 @@ function InvoiceReportContent() {
         const isMultiBatch = prod?.isMultiBatch || false;
         const fixedRate = productFixedRateMap[pId];
         const txCurId = t.currencyId ?? v.currencyId ?? usdId;
-        const isCostIQD = t.unitCost > 500;
+        const isCostIQD = txCurId === iqdId || txCurId === 2 || txCurId === 12;
 
         if (t.qtyChange > 0 && t.unitCost > 0) {
           const qtyIn = t.qtyChange;
+          productCostCurrencyMap[pId] = txCurId;
 
           // Fixed-rate product (cost in USD but with fixed IQD rate)
           if (fixedRate && !isCostIQD) {
@@ -1099,22 +1101,26 @@ function InvoiceReportContent() {
       fixedIQD[Number(pId)] = s.isMultiBatch ? s.latestCostIQD : s.runningCostIQD;
     }
 
-    return { productCostsMap: costs, fixedRateCostIQDMap: fixedIQD };
+    return { productCostsMap: costs, fixedRateCostIQDMap: fixedIQD, productCostCurrencyMap };
   }, [vouchers, currencies, products, productFixedRateMap]);
 
   // Helper: Get item cost in USD for a specific voucher
   // For fixed-rate products, converts IQD cost to USD at the sale voucher's daily rate
   const getItemCostUsdForVoucher = (voucher: RawVoucher, productId: number, rawCost?: number, _rawCurId?: number) => {
     const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
+    const iqdId = iqdCur?.id || 2;
     const rawRate = iqdCur?.rate || 1520;
     const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
     const saleRate = normalizeRate(voucher.exchangeRate) || marketRate;
+
+    // Foundational cost currency resolution strictly from incoming origin (productCostCurrencyMap)
+    const originCurId = productCostCurrencyMap[productId] || _rawCurId || 1;
+    const isCostIQD = originCurId === iqdId || originCurId === 2 || originCurId === 12;
 
     // Check if product has fixed exchange rate from purchase/stock voucher
     const fixedRate = productFixedRateMap[productId];
     if (fixedRate && fixedRate > 0) {
       if (rawCost && rawCost > 0) {
-        const isCostIQD = rawCost > 500;
         const costIQD = isCostIQD ? rawCost : (rawCost * fixedRate);
         return costIQD / saleRate;
       }
@@ -1126,7 +1132,6 @@ function InvoiceReportContent() {
 
     // Regular product: cost already in USD or check transaction cost
     if (rawCost && rawCost > 0) {
-      const isCostIQD = rawCost > 500;
       return isCostIQD ? (rawCost / saleRate) : rawCost;
     }
 
@@ -1141,13 +1146,13 @@ function InvoiceReportContent() {
     let cogs = 0;
     if (voucher.inventoryTransactions && voucher.inventoryTransactions.length > 0) {
       voucher.inventoryTransactions.forEach((tx: any) => {
-        const costUsd = getItemCostUsdForVoucher(voucher, tx.productId, tx.unitCost, tx.currencyId);
+        const costUsd = getItemCostUsdForVoucher(voucher, tx.productId, tx.unitCost);
         cogs += Math.abs(tx.qtyChange) * costUsd;
       });
     } else if (voucher.lines) {
       voucher.lines.forEach((line: any) => {
-        const costUsd = getItemCostUsdForVoucher(voucher, line.productId);
-        cogs += line.qty * costUsd;
+        const costUsd = getItemCostUsdForVoucher(voucher, line.productId, line.unitCost);
+        cogs += (line.qty || line.quantity || 0) * costUsd;
       });
     }
     return cogs;
@@ -1939,9 +1944,15 @@ function InvoiceReportContent() {
       }, 0);
       expensesByCurrency[curId] = (expensesByCurrency[curId] || 0) + expInVoucherCurrency;
       
-      // Profit is always in base currency
-      const baseCurId = getBaseCurrency().id;
-      profitByCurrency[baseCurId] = (profitByCurrency[baseCurId] || 0) + prof;
+      // Profit: calculate per-currency matching the table rows
+      if (v.type === "sales" || v.type === "sales_return") {
+        const rowProf = getVoucherProfitInVoucherCurrency(v);
+        const pCurId = rowProf.currencyId || 1;
+        profitByCurrency[pCurId] = (profitByCurrency[pCurId] || 0) + rowProf.amount;
+        const vRate = normalizeRate(v.exchangeRate) || 1520;
+        const profUSD = (pCurId === 2 || pCurId === 12) ? (rowProf.amount / vRate) : rowProf.amount;
+        totalProfitUSD += profUSD;
+      }
     });
 
     return {
@@ -2509,7 +2520,7 @@ function InvoiceReportContent() {
               <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
                 <span className="text-slate-600 text-xs font-bold">قازانج (فرۆشتن)</span>
                 <span className="text-amber-900 text-xl font-black mt-2">
-                  {isProfitColumnVisible ? formatKPIMultiCurrency(totals.profitByCurrency) : "ناچالاکە"}
+                  {isProfitColumnVisible ? formatCurrencyValueJSX(totals.profit, 1) : "ناچالاکە"}
                 </span>
               </div>
             )}

@@ -100,7 +100,7 @@ export function parseTransactionVoucherMetadata(t: InventoryTxItem, defaultMarke
   const rawRate = Number(t.voucher?.exchangeRate || defaultMarketRate);
   const voucherMarketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : defaultMarketRate);
 
-  const incomingCurId = t.currencyId || (t.unitCost > 1000 ? 2 : 1);
+  const incomingCurId = t.currencyId || (t.voucher as any)?.currencyId || 1;
 
   return {
     incomingRateType,

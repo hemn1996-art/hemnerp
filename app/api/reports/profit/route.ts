@@ -209,6 +209,7 @@ export async function GET(request: Request) {
     const productPurchaseStats: Record<number, { runningCostUSD: number, runningOnHandQty: number, latestCost: number, isMultiBatch: boolean }> = {};
     // Fixed-rate products: cost tracked in IQD
     const fixedPurchaseStats: Record<number, { runningCostIQD: number, runningOnHandQty: number, latestCost: number, isMultiBatch: boolean }> = {};
+    const productCostCurrencies: Record<number, number> = {};
 
     inventoryTrans.forEach((t: any) => {
       const matchesWarehouse = !warehouseIds || warehouseIds.includes(t.warehouseId);
@@ -217,7 +218,8 @@ export async function GET(request: Request) {
 
       const pId = t.productId;
       const isMultiBatch = t.product?.isMultiBatch || false;
-      const isCostIQD = t.unitCost > 500;
+      const txCurId = t.currencyId ?? (t.voucher as any)?.currencyId ?? usdId;
+      const isCostIQD = txCurId === iqdId || txCurId === 2 || txCurId === 12;
       const fixedRate = productFixedRates[pId];
 
       const vRate = (t.voucher as any)?.exchangeRate && (t.voucher as any).exchangeRate > 100
@@ -226,6 +228,7 @@ export async function GET(request: Request) {
 
       if (t.qtyChange > 0 && t.unitCost > 0) {
         const qtyIn = t.qtyChange;
+        productCostCurrencies[pId] = txCurId;
 
         // Fixed-rate product (cost in USD but with fixed IQD rate)
         if (fixedRate && !isCostIQD) {
@@ -298,7 +301,7 @@ export async function GET(request: Request) {
     dbProducts.forEach((p: any) => {
       if (productCosts[p.id] === undefined) {
         const rawCost = p.costPrice || 0;
-        const isCostIQD = rawCost > 500;
+        const isCostIQD = productCostCurrencies[p.id] === iqdId || p.costCurrencyId === iqdId;
         productCosts[p.id] = isCostIQD ? (rawCost / marketRatePerDollar) : rawCost;
       }
     });
@@ -316,11 +319,13 @@ export async function GET(request: Request) {
           ? (v.exchangeRate > 10000 ? v.exchangeRate / 100 : (v.exchangeRate < 10 ? v.exchangeRate * 100 : v.exchangeRate))
           : marketRatePerDollar;
 
+        const originCurId = productCostCurrencies[productId] || rawCurId || usdId;
+        const isCostIQD = originCurId === iqdId || originCurId === 2 || originCurId === 12;
+
         // 1. Check if product has fixed exchange rate from purchase/stock voucher
         const fixedRate = productFixedRates[productId];
         if (fixedRate && fixedRate > 0) {
           if (rawCost && rawCost > 0) {
-            const isCostIQD = rawCost > 500;
             const costIQD = isCostIQD ? rawCost : (rawCost * fixedRate);
             return costIQD / saleRate;
           }
@@ -332,8 +337,7 @@ export async function GET(request: Request) {
 
         // 2. Regular product with recorded transaction unitCost
         if (rawCost && rawCost > 0) {
-          const isIQD = rawCost > 500;
-          return isIQD ? (rawCost / saleRate) : rawCost;
+          return isCostIQD ? (rawCost / saleRate) : rawCost;
         }
 
         // 3. Fallback to product costs calculated from purchases
@@ -366,7 +370,7 @@ export async function GET(request: Request) {
             v.inventoryTransactions.forEach((tx: any) => {
               if (matchesProductFilters(tx.productId)) {
                 if (!hasWarehouseFilter || warehouseIds!.includes(tx.warehouseId)) {
-                  const costUsd = getItemCostUsdForVoucher(tx.productId, tx.unitCost, tx.currencyId);
+                  const costUsd = getItemCostUsdForVoucher(tx.productId, tx.unitCost);
                   cogs += Math.abs(tx.qtyChange) * costUsd;
                 }
               }
