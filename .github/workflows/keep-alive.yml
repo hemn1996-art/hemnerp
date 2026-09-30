@@ -1,0 +1,16 @@
+name: Database Keep-Alive
+
+on:
+  schedule:
+    # Run every day at 06:00 UTC and 18:00 UTC
+    - cron: '0 6,18 * * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Keep-Alive API
+        run: |
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "https://hemnerp.org/api/cron/keep-alive")
+          echo "$response"
