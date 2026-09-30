@@ -131,18 +131,18 @@ export function calculateWeightedProductCost(
     const { incomingRateType, incomingCustomRate, voucherMarketRate, incomingCurId } =
       parseTransactionVoucherMetadata(t, defaultMarketRate);
 
-    if (t.qtyChange > 0 && (t.unitCost > 0 || (t.unitPrice && t.unitPrice > 0))) {
+    if (t.qtyChange > 0) {
       // 1. Determine incoming unit purchase price
       const txProductId = t.productId || t.product?.id;
       const matchingLine = t.voucher?.lines?.find((l: any) => txProductId && l.productId === txProductId);
       
       let incomingPurchasePrice = 0;
-      if (t.unitPrice !== undefined && t.unitPrice > 0) {
-        incomingPurchasePrice = t.unitPrice;
-      } else if (matchingLine && matchingLine.unitPrice > 0) {
-        incomingPurchasePrice = matchingLine.unitPrice;
+      if (t.unitPrice !== undefined && t.unitPrice !== null && !isNaN(Number(t.unitPrice))) {
+        incomingPurchasePrice = Number(t.unitPrice);
+      } else if (matchingLine && matchingLine.unitPrice !== undefined && matchingLine.unitPrice !== null && !isNaN(Number(matchingLine.unitPrice))) {
+        incomingPurchasePrice = Number(matchingLine.unitPrice);
       } else {
-        incomingPurchasePrice = t.unitCost || 0;
+        incomingPurchasePrice = Number(t.unitCost || 0);
       }
 
       // 2. Determine incoming unit expense
@@ -210,8 +210,8 @@ export function calculateWeightedProductCost(
 
         // Step 3: Perpetual weighted average in target currency for both purchase price and expense
         const newOnHand = runningOnHand + t.qtyChange;
-        const newPurchasePrice = ((runningOnHand * priorPriceInTargetCurrency) + (t.qtyChange * incomingPurchasePrice)) / newOnHand;
-        const newExpense = ((runningOnHand * priorExpenseInTargetCurrency) + (t.qtyChange * incomingUnitExpense)) / newOnHand;
+        const newPurchasePrice = newOnHand > 0 ? (((runningOnHand * priorPriceInTargetCurrency) + (t.qtyChange * incomingPurchasePrice)) / newOnHand) : 0;
+        const newExpense = newOnHand > 0 ? (((runningOnHand * priorExpenseInTargetCurrency) + (t.qtyChange * incomingUnitExpense)) / newOnHand) : 0;
         const newCost = newPurchasePrice + newExpense;
 
         runningOnHand = newOnHand;

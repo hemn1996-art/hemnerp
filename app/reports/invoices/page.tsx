@@ -1146,12 +1146,12 @@ function InvoiceReportContent() {
     let cogs = 0;
     if (voucher.inventoryTransactions && voucher.inventoryTransactions.length > 0) {
       voucher.inventoryTransactions.forEach((tx: any) => {
-        const costUsd = getItemCostUsdForVoucher(voucher, tx.productId, tx.unitCost);
+        const costUsd = getItemCostUsdForVoucher(voucher, tx.productId, tx.unitCost, tx.currencyId);
         cogs += Math.abs(tx.qtyChange) * costUsd;
       });
     } else if (voucher.lines) {
       voucher.lines.forEach((line: any) => {
-        const costUsd = getItemCostUsdForVoucher(voucher, line.productId, line.unitCost);
+        const costUsd = getItemCostUsdForVoucher(voucher, line.productId, line.unitCost, line.currencyId);
         cogs += (line.qty || line.quantity || 0) * costUsd;
       });
     }
@@ -1174,7 +1174,16 @@ function InvoiceReportContent() {
     const isVoucherIQD = vCurId === iqdId || vCurId === 2 || vCurId === 12;
     const vRate = normalizeRate(voucher.exchangeRate) || marketRate;
 
-    const netUSD = isVoucherIQD ? (Number(voucher.netAmount || 0) / vRate) : Number(voucher.netAmount || 0);
+    const profile = getVoucherCurrencyProfile(voucher);
+    let netUSD = 0;
+    if (profile.isMixed) {
+      netUSD = profile.usdAmt + (profile.iqdAmt / vRate);
+    } else if (profile.isPureIQD) {
+      const rawIqd = profile.iqdAmt > 0 ? profile.iqdAmt : Number(voucher.netAmount || 0);
+      netUSD = rawIqd / vRate;
+    } else {
+      netUSD = profile.usdAmt > 0 ? profile.usdAmt : Number(voucher.netAmount || 0);
+    }
     const costUSD = getVoucherCostUSD(voucher);
     const profitUSD = voucher.type === "sales_return" ? -(netUSD - costUSD) : (netUSD - costUSD);
 
@@ -1918,22 +1927,45 @@ function InvoiceReportContent() {
       totalProfitUSD += prof;
 
       // Per-currency accumulation (in original currency)
-      valueByCurrency[curId] = (valueByCurrency[curId] || 0) + v.netAmount;
-      discountByCurrency[curId] = (discountByCurrency[curId] || 0) + rawDisc;
-      
-      const paidInVoucherCurrency = v.paidAmounts.reduce((sum, pa) => {
-        return sum + convertBetweenCurrencies(pa.amount, pa.currencyId, curId, pa.exchangeRate || v.exchangeRate || 1500);
-      }, 0);
-      paidByCurrency[curId] = (paidByCurrency[curId] || 0) + paidInVoucherCurrency;
-      
-      let remInVoucherCur = Math.max(v.netAmount - paidInVoucherCurrency, 0);
-      const isIqdCur = curId === 2 || curId === 12 || currencies.find((c: any) => c.id === curId)?.code === "IQD";
-      if (isIqdCur && remInVoucherCur < 1000) {
-        remInVoucherCur = 0;
-      } else if (!isIqdCur && remInVoucherCur < 1.0) {
-        remInVoucherCur = 0;
+      const profile = getVoucherCurrencyProfile(v);
+      if (profile.isMixed) {
+        valueByCurrency[1] = (valueByCurrency[1] || 0) + profile.usdAmt;
+        valueByCurrency[2] = (valueByCurrency[2] || 0) + profile.iqdAmt;
+
+        // Paid amounts by currency
+        let paidUSD = 0;
+        let paidIQD = 0;
+        (v.paidAmounts || []).forEach((pa: any) => {
+          const isPaIQD = pa.currencyId === 2 || pa.currencyId === 12;
+          if (isPaIQD) paidIQD += Number(pa.amount || 0);
+          else paidUSD += Number(pa.amount || 0);
+        });
+
+        paidByCurrency[1] = (paidByCurrency[1] || 0) + paidUSD;
+        paidByCurrency[2] = (paidByCurrency[2] || 0) + paidIQD;
+
+        const remUSD = Math.max(0, profile.usdAmt - paidUSD);
+        const remIQD = Math.max(0, profile.iqdAmt - paidIQD);
+        remainingByCurrency[1] = (remainingByCurrency[1] || 0) + (remUSD < 0.01 ? 0 : remUSD);
+        remainingByCurrency[2] = (remainingByCurrency[2] || 0) + (remIQD < 1000 ? 0 : remIQD);
+      } else {
+        valueByCurrency[curId] = (valueByCurrency[curId] || 0) + v.netAmount;
+        discountByCurrency[curId] = (discountByCurrency[curId] || 0) + rawDisc;
+        
+        const paidInVoucherCurrency = v.paidAmounts.reduce((sum, pa) => {
+          return sum + convertBetweenCurrencies(pa.amount, pa.currencyId, curId, pa.exchangeRate || v.exchangeRate || 1500);
+        }, 0);
+        paidByCurrency[curId] = (paidByCurrency[curId] || 0) + paidInVoucherCurrency;
+        
+        let remInVoucherCur = Math.max(v.netAmount - paidInVoucherCurrency, 0);
+        const isIqdCur = curId === 2 || curId === 12 || currencies.find((c: any) => c.id === curId)?.code === "IQD";
+        if (isIqdCur && remInVoucherCur < 1000) {
+          remInVoucherCur = 0;
+        } else if (!isIqdCur && remInVoucherCur < 1.0) {
+          remInVoucherCur = 0;
+        }
+        remainingByCurrency[curId] = (remainingByCurrency[curId] || 0) + remInVoucherCur;
       }
-      remainingByCurrency[curId] = (remainingByCurrency[curId] || 0) + remInVoucherCur;
       
       // Expenses: use same approach
       const expInVoucherCurrency = v.expenses.reduce((sum, e) => {
@@ -2855,11 +2887,45 @@ function InvoiceReportContent() {
                                   );
                                 })()
                               ) : (
-                                remainingVal > 0 ? (
-                                  <span className="text-rose-700">{formatCurrencyValue(remainingVal, displayCurrencyId)}</span>
-                                ) : (
-                                  <span className="text-emerald-600">0</span>
-                                )
+                                (() => {
+                                  const profile = getVoucherCurrencyProfile(voucher);
+                                  if (profile.isMixed) {
+                                    let paidUSD = 0;
+                                    let paidIQD = 0;
+                                    (voucher.paidAmounts || []).forEach((pa: any) => {
+                                      const isPaIQD = pa.currencyId === 2 || pa.currencyId === 12;
+                                      if (isPaIQD) paidIQD += Number(pa.amount || 0);
+                                      else paidUSD += Number(pa.amount || 0);
+                                    });
+                                    const remUSD = Math.max(0, profile.usdAmt - paidUSD);
+                                    const remIQD = Math.max(0, profile.iqdAmt - paidIQD);
+
+                                    if (remUSD <= 0.01 && remIQD <= 100) {
+                                      return <span className="text-emerald-600">0</span>;
+                                    }
+
+                                    return (
+                                      <div className="flex flex-col items-center gap-0.5 font-bold">
+                                        {remUSD > 0.01 && (
+                                          <span className="text-rose-700 text-xs">
+                                            {formatCurrencyValueJSX(remUSD, 1)}
+                                          </span>
+                                        )}
+                                        {remIQD > 100 && (
+                                          <span className="text-rose-700 text-xs">
+                                            {formatCurrencyValueJSX(remIQD, 2)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+
+                                  return remainingVal > 0 ? (
+                                    <span className="text-rose-700">{formatCurrencyValue(remainingVal, displayCurrencyId)}</span>
+                                  ) : (
+                                    <span className="text-emerald-600">0</span>
+                                  );
+                                })()
                               )}
                             </td>
                           )}

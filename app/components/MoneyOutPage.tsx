@@ -260,6 +260,8 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [isLocked, setIsLocked] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [lockedBalanceBefore, setLockedBalanceBefore] = useState<Record<string, number> | null>(null);
+  const [lockedBalanceAfter, setLockedBalanceAfter] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     if (accountId && accounts.length > 0) {
@@ -324,6 +326,9 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const [originalVoucher, setOriginalVoucher] = useState<any>(null);
 
   const accountBalanceBeforeByCurrency = useMemo(() => {
+    if (lockedBalanceBefore) {
+      return lockedBalanceBefore;
+    }
     const currentBalMap = getAccountBalanceBeforeMap(selectedAccount);
     if (!editId) {
       return currentBalMap;
@@ -356,9 +361,12 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     }
 
     return computedBefore;
-  }, [selectedAccount, editId, originalVoucher, accountId]);
+  }, [selectedAccount, editId, originalVoucher, accountId, lockedBalanceBefore]);
 
   const screenAccountBalanceBeforeByCurrency = useMemo(() => {
+    if (lockedBalanceBefore) {
+      return lockedBalanceBefore;
+    }
     const currentBalMap = getAccountBalanceBeforeMap(selectedAccount);
     if (!editId || !originalVoucher || !selectedAccount) {
       return currentBalMap;
@@ -377,7 +385,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
       });
     }
     return computedBefore;
-  }, [selectedAccount, editId, originalVoucher, accountId]);
+  }, [selectedAccount, editId, originalVoucher, accountId, lockedBalanceBefore]);
 
   const activeBalances = useMemo(() => {
     return Object.entries(accountBalanceBeforeByCurrency)
@@ -602,11 +610,11 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const isSaved = savedSnapshot !== "" && savedSnapshot === currentSnapshot;
 
   const accountBalanceAfterByCurrency = useMemo(() => {
+    if (lockedBalanceAfter) {
+      return lockedBalanceAfter;
+    }
     if (!selectedAccount) return {};
     const before = accountBalanceBeforeByCurrency;
-    if (isSaved && !editId) {
-      return before;
-    }
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const rate = toNumber(exchangeRate) / 100;
 
@@ -628,14 +636,14 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isSaved, editId]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, accountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isLocked, lockedBalanceAfter]);
 
   const screenAccountBalanceAfterByCurrency = useMemo(() => {
+    if (lockedBalanceAfter) {
+      return lockedBalanceAfter;
+    }
     if (!selectedAccount) return {};
     const before = screenAccountBalanceBeforeByCurrency;
-    if (isSaved && !editId) {
-      return before;
-    }
     const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const rate = toNumber(exchangeRate) / 100;
 
@@ -657,7 +665,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, isSaved, editId]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, isMultiCurrencyAccount, screenAccountBalanceBeforeByCurrency, discountAmount, discountCurrencyId, lockedBalanceAfter]);
 
   useEffect(() => {
     const checkFn = () => {
@@ -1262,6 +1270,8 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
   function resetReceipt() {
     clearVoucherDraft("money_out");
+    setLockedBalanceBefore(null);
+    setLockedBalanceAfter(null);
     if (editId) {
       router.push("/invoices?type=money_out");
       return;
@@ -1430,6 +1440,9 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
       extraPaymentHandling: extraHandling
     };
 
+    const snapBefore = { ...accountBalanceBeforeByCurrency };
+    const snapAfter = { ...result.balanceAfterByCurrency };
+
     setIsSaving(true);
     const effectiveEditId = editId || (typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('editId') || new URLSearchParams(window.location.search).get('edit')) : null);
     const isEditMode = Boolean(effectiveEditId && !isNaN(Number(effectiveEditId)) && Number(effectiveEditId) > 0);
@@ -1441,10 +1454,15 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
       .then((res) => {
         if (res) {
           clearVoucherDraft("money_out");
+          setLockedBalanceBefore(snapBefore);
+          setLockedBalanceAfter(snapAfter);
           if (!editId) {
             applyAccountBalanceIncrease(action);
             applyCashboxDecrease();
             setIsLocked(true);
+            if (res && res.id) {
+              setOriginalVoucher(res);
+            }
           } else {
             // Refetch to sync historicalBalanceBefore and ledgerEntries
             fetch(`/api/vouchers/${editId}`)
@@ -2342,7 +2360,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
                   باڵانسی ئێستا
                 </td>
                 <td style={{ border: "1px solid #cbd5e1", padding: "10px 14px", textAlign: "center", fontWeight: 900, fontSize: 15 }}>
-                  {formatCurrencyMapForPrint(editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency)}
+                  {formatCurrencyMapForPrint(lockedBalanceAfter || (editId && selectedAccount ? getAccountBalanceBeforeMap(selectedAccount) : accountBalanceAfterByCurrency))}
                 </td>
               </tr>
 

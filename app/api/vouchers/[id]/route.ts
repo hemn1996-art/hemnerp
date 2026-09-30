@@ -298,17 +298,58 @@ export async function PUT(
               qtyChange = -qtyChange;
             }
             if (line.warehouseId) {
+              // Foundational resolution for outgoing inventory transactions:
+              // For additions (purchase, stock), currencyId is line/voucher currency.
+              // For reductions (sales, damage), look up the incoming purchase transaction's currencyId.
+              let costCurrencyId = Number(line.costCurrencyId || line.costCurrency || 0);
+              let resolvedUnitCost = 0;
+
+              if (qtyChange > 0) {
+                // Incoming transaction (purchase, warehouse_stock, etc.)
+                if (line.unitCost !== undefined && line.unitCost !== null && line.unitCost !== "" && !isNaN(Number(line.unitCost))) {
+                  resolvedUnitCost = Number(line.unitCost);
+                } else if (line.unitPrice !== undefined && line.unitPrice !== null && line.unitPrice !== "" && !isNaN(Number(line.unitPrice))) {
+                  resolvedUnitCost = Number(line.unitPrice);
+                } else {
+                  resolvedUnitCost = 0;
+                }
+              } else {
+                // Outgoing transaction (sales, damage, issue, purchase_return)
+                // NEVER use line.unitPrice (selling price) as cost!
+                if (line.unitCost !== undefined && line.unitCost !== null && line.unitCost !== "" && !isNaN(Number(line.unitCost))) {
+                  resolvedUnitCost = Number(line.unitCost);
+                } else {
+                  const incomingTx = await tx.inventoryTransaction.findFirst({
+                    where: { productId: Number(line.productId), qtyChange: { gt: 0 } },
+                    orderBy: { date: "desc" },
+                    select: { unitCost: true, currencyId: true },
+                  });
+                  resolvedUnitCost = Number(incomingTx?.unitCost ?? 0);
+                  if (!costCurrencyId && incomingTx?.currencyId) {
+                    costCurrencyId = incomingTx.currencyId;
+                  }
+                }
+
+                if (!costCurrencyId) {
+                  const incomingTx = await tx.inventoryTransaction.findFirst({
+                    where: { productId: Number(line.productId), qtyChange: { gt: 0 } },
+                    orderBy: { date: "desc" },
+                    select: { currencyId: true },
+                  });
+                  costCurrencyId = incomingTx?.currencyId || Number(line.currencyId ?? data.currencyId ?? 1);
+                }
+              }
+
               await tx.inventoryTransaction.create({
                 data: {
                   voucherId: updated.id,
                   productId: Number(line.productId),
                   warehouseId: Number(line.warehouseId),
                   qtyChange,
-                  unitCost: Number(line.unitCost || line.unitPrice || 0),
-                  // IMPORTANT: line.currencyId is the authoritative source for the item's currency.
-                  // Fall back to the voucher's currencyId if line doesn't have one.
-                  // Never fall back to hardcoded 1 (USD) because that causes IQD items to get tagged as USD.
-                  currencyId: Number(line.currencyId ?? data.currencyId),
+                  unitCost: resolvedUnitCost,
+                  currencyId: qtyChange > 0
+                    ? Number(line.currencyId ?? data.currencyId)
+                    : costCurrencyId,
                   date: updated.arrivalDate || updated.date,
                 },
               });
@@ -493,8 +534,11 @@ export async function PUT(
           if (data.lines && Array.isArray(data.lines)) {
             for (const line of data.lines) {
               const curId = String(line.currencyId || updated.currencyId || 1);
-              const lTotal = Number(line.lineTotal || (Number(line.qty || 0) * Number(line.unitPrice || 0)));
-              itemsTotalsByCurrency[curId] = (itemsTotalsByCurrency[curId] || 0) + lTotal;
+              const lQty = Number(line.qty || 0);
+              const lPrice = Number(line.unitPrice || 0);
+              const lDisc = Number(line.discountAmount || 0);
+              const lTotalInRowCur = (lQty * lPrice) - lDisc;
+              itemsTotalsByCurrency[curId] = (itemsTotalsByCurrency[curId] || 0) + lTotalInRowCur;
             }
           }
 
