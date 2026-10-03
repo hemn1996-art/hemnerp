@@ -21,8 +21,14 @@ export function formatNumber(value: number | string | null | undefined): string 
  * Format number with currency symbol
  */
 export function formatCurrency(value: number | string | null | undefined, symbol: string = "$"): string {
-  if (symbol === "IQD" || symbol === "دینار") {
-    return `دینار ${formatNumber(value)}`;
+  if (value === null || value === undefined || value === "") return "0";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  const isNeg = !isNaN(num) && num < 0;
+  const absFormatted = formatNumber(Math.abs(num || 0));
+  const sign = isNeg ? "-" : "";
+
+  if (symbol === "IQD" || symbol === "دینار" || symbol?.includes("دینار") || symbol?.includes("IQD") || symbol === "د.ع") {
+    return `${sign}دینار ${absFormatted}`;
   }
-  return `${symbol} ${formatNumber(value)}`;
+  return `${sign}${symbol} ${absFormatted}`;
 }

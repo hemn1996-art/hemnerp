@@ -7,7 +7,7 @@ You are my long-term AI software engineering partner.
 - ICONS: NEVER use emojis (e.g. 📊, 🚀) as UI elements. ALWAYS use modern, professional SVG icon libraries (like Lucide Icons or Heroicons) to ensure the system looks advanced and premium.
 - LANGUAGES: For any project with a user-facing UI, the default language is Kurdish Sorani (Bazari Dialect) with Right-to-Left (RTL) layout, with English as secondary — unless I say a specific project targets a different audience (e.g., an English-only client tool, or a backend/API with no UI). ALWAYS use CSS logical properties (e.g. `margin-inline-start` instead of `margin-left`) so the UI flips between RTL and LTR automatically.
 - SAAS TENANT ISOLATION: For multi-tenant SaaS projects, NEVER use raw SQL `WHERE tenant_id = ?` clauses. ALWAYS use `TenantDB` or `TenantModel` to automatically enforce tenant boundaries at the data-access layer. The one exception is a single, explicit, audited escape hatch (e.g. `DB::unscopedQuery()`) for legitimate cross-tenant operations like admin-wide reports or cron jobs spanning all tenants — every use must log a reason. Before declaring any multi-tenant feature complete, write a test simulating one tenant trying to read/write another tenant's data through every endpoint that accepts a record ID, and show me the actual test output, not just a pass/fail summary.
-- CURRENCY FORMATTING: For all UI display and receipt/voucher print layouts, the currency name/symbol MUST always appear on the RIGHT of the number (e.g. `4,233,750 دینار` and `$ 82.5`). For IQD, the format is `{number} دینار`. For USD, the format is `$ {number}`. In code with `dir="ltr"`, دینار must come AFTER the number in the DOM order.
+- CURRENCY FORMATTING: For all UI display and receipt/voucher print layouts, the currency name/symbol MUST always appear on the LEFT of the number (e.g. `دینار 4,233,750` and `$ 82.5`). For IQD, the format is `دینار {number}`. For USD, the format is `$ {number}`.
 </RULE[antigravity_toolkit]>
 
 ## About Me
@@ -113,10 +113,10 @@ You are my long-term AI software engineering partner.
 ## Deployment Mindset
 - Build with deployment in mind, not just local development.
 - Think about server setup, domain, database migration, environment variables, backups, security, and scaling when relevant.
-- **Client 1 Deployment (hemnerp.org)**:
-  - This repository (`ok erp` / `hemnerp`) is strictly for Client 1 (کۆگای دۆستان).
-  - Production Domain: `hemnerp.org`.
-  - Completely isolated: Has ZERO connection/relation to Client 2 (`orientiraq.xyz`). Do NOT use, reference, or bring any data or assumptions between the two.
+- **Client 2 Deployment (orientiraq.xyz)**:
+  - This repository (`client-2-dwkan`) is strictly for Client 2 (کڕیاری دووەم).
+  - Production Domain: `orientiraq.xyz` (Vercel Project Name: `orient-iraq`).
+  - Completely isolated: Has ZERO connection/relation to `hemnerp.org`. Do NOT use, reference, or bring any data or assumptions from `hemnerp.org`.
   - Always push verified local changes to GitHub (`git push origin main`).
   - Execute `npx vercel --prod` from the local terminal to push the build to production.
 

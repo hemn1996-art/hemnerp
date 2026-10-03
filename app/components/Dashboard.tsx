@@ -104,7 +104,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const formatInvoiceCurrency = (val: number, currencyCode: string) => {
     const formatted = (val || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     if (currencyCode === "IQD" || currencyCode === "دینار") {
-      return `${formatted} دینار`;
+      return `دینار ${formatted}`;
     }
     const cur = currencies.find((c: any) => c.code === currencyCode);
     return `${cur?.symbol || "$"} ${formatted}`;

@@ -145,7 +145,7 @@ export function formatCurrencyString(
   const sign = "";
 
   if (isIQD) {
-    return `${formattedNum} دینار`;
+    return `دینار ${formattedNum}`;
   }
 
   const symbol = cfg?.symbol || "$";
@@ -153,16 +153,14 @@ export function formatCurrencyString(
     return `$ ${formattedNum}`;
   }
 
-  return `${formattedNum} ${symbol}`;
+  return `${symbol} ${formattedNum}`;
 }
 
 /**
  * Render currency JSX element with guaranteed correct visual layout:
  * - Uses `<span dir="ltr">`
- * - No minus sign (values distinguished by color: red for credit/negative, green for debit/positive)
- * - IQD: `{number} دینار` (دینار on the right)
+ * - IQD: `دینار {number}` (دینار on the left)
  * - USD: `$ {number}` ($ on the left)
- * - Eliminates BiDi flips in RTL documents.
  */
 export function formatCurrencyJSX(
   value: number | string | null | undefined,
@@ -217,15 +215,15 @@ export function formatCurrencyJSX(
         className={`inline-flex items-baseline gap-1 font-semibold ${options?.className || ""}`}
         dir="ltr"
       >
+        <span className={options?.symbolClassName || ""} style={symbolStyle}>
+          دینار
+        </span>
         <span>{wholePart}</span>
         {decimalPart && (
           <span className={options?.decimalClassName || ""} style={decimalStyle}>
             .{decimalPart}
           </span>
         )}
-        <span className={options?.symbolClassName || ""} style={symbolStyle}>
-          دینار
-        </span>
       </span>
     );
   }
