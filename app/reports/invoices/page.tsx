@@ -9,6 +9,7 @@ import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import { normalizeKurdishSearchText } from "../../utils/digits";
 import BackButton from "../../components/BackButton";
+import { formatCurrencyString, formatCurrencyJSX, roundCurrency } from "../../utils/currencyHelper";
 import ProductQuickModal from "../../components/ProductQuickModal";
 import AccountQuickModal from "../../components/AccountQuickModal";
 
@@ -699,27 +700,13 @@ function InvoiceReportContent() {
 
   // Format currency dynamically based on original and filter settings
   const formatCurrencyValue = (amount: number, currencyId: number) => {
-    const currencyObj = currencies.find((c: any) => c.id === currencyId);
-    const isIQD = currencyObj?.code === "IQD" || Number(currencyId) === 2 || Number(currencyId) === 12;
-    if (isIQD) {
-      return `دینار ${Math.round(amount).toLocaleString("en-US")}`;
-    }
-    const formattedNumber = amount.toLocaleString("en-US", { 
-      minimumFractionDigits: amount % 1 === 0 ? 0 : 2, 
-      maximumFractionDigits: 2 
-    });
-    return `$ ${formattedNumber}`;
+    return formatCurrencyString(amount, currencyId, currencies);
   };
 
   // Format values in base currency
   const formatBaseCurrency = (val: number) => {
     const baseCurrency = getBaseCurrency();
-    const isIQD = baseCurrency.code === "IQD" || Number(baseCurrency.id) === 2 || Number(baseCurrency.id) === 12;
-    if (isIQD) {
-      return `دینار ${Math.round(val).toLocaleString("en-US")}`;
-    }
-    const formattedNumber = val.toLocaleString("en-US", { minimumFractionDigits: val % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
-    return `$ ${formattedNumber}`;
+    return formatCurrencyString(val, baseCurrency, currencies);
   };
 
   const getVoucherCurrencyProfile = (v: any) => {
@@ -766,15 +753,13 @@ function InvoiceReportContent() {
     return (
       <div className="flex flex-col items-center gap-0.5">
         {profile.usdAmt > 0 && (
-          <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
-            <span className="text-[0.78em] opacity-85 font-bold">$</span>
-            <span>{profile.usdAmt.toLocaleString("en-US", { minimumFractionDigits: profile.usdAmt % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}</span>
+          <span className="text-slate-900 font-black text-xs">
+            {formatCurrencyJSX(profile.usdAmt, 1, currencies)}
           </span>
         )}
         {profile.iqdAmt > 0 && (
-          <span className="text-slate-900 font-black text-xs inline-flex items-baseline gap-0.5" dir="ltr">
-            <span className="text-[0.78em] opacity-85 font-bold">دینار</span>
-            <span>{Math.round(profile.iqdAmt).toLocaleString("en-US")}</span>
+          <span className="text-slate-900 font-black text-xs">
+            {formatCurrencyJSX(profile.iqdAmt, 2, currencies)}
           </span>
         )}
       </div>
@@ -805,98 +790,12 @@ function InvoiceReportContent() {
   };
 
   const formatCurrencyValueJSX = (amount: number, currencyId: number) => {
-    const currencyObj = currencies.find((c: any) => c.id === currencyId);
-    const isIQD = currencyObj?.code === "IQD" || Number(currencyId) === 2 || Number(currencyId) === 12;
-
-    if (isIQD) {
-      const rounded = Math.round(amount).toLocaleString("en-US");
-      return (
-        <span className="inline-flex items-baseline gap-1" dir="ltr">
-          <span>{rounded}</span>
-          <span style={{ fontSize: '0.85em', opacity: 0.85 }}>دینار</span>
-        </span>
-      );
-    }
-
-    const isInteger = amount % 1 === 0;
-    const formattedNumber = amount.toLocaleString("en-US", { 
-      minimumFractionDigits: isInteger ? 0 : 2, 
-      maximumFractionDigits: 2 
-    });
-
-    const parts = formattedNumber.split('.');
-    const whole = parts[0];
-    const decimal = parts[1];
-
-    const renderedNumber = (
-      <span dir="ltr">
-        {whole}
-        {decimal !== undefined && (
-          <span className="text-[0.82em] opacity-85" style={{ fontSize: '0.82em', opacity: 0.85 }}>.{decimal}</span>
-        )}
-      </span>
-    );
-
-    return (
-      <span className="inline-flex items-baseline gap-1" dir="ltr">
-        <span style={{ fontSize: '0.85em', opacity: 0.85 }}>$</span>
-        {renderedNumber}
-      </span>
-    );
+    return formatCurrencyJSX(amount, currencyId, currencies);
   };
 
   const formatBaseCurrencyJSX = (val: number) => {
     const baseCurrency = getBaseCurrency();
-    const isIQD = baseCurrency.code === "IQD" || Number(baseCurrency.id) === 2 || Number(baseCurrency.id) === 12;
-
-    if (isIQD) {
-      return (
-        <span className="inline-flex items-baseline gap-1" dir="ltr">
-          <span style={{ fontSize: '0.85em', opacity: 0.85 }}>دینار</span>
-          <span>{Math.round(val).toLocaleString("en-US")}</span>
-        </span>
-      );
-    }
-
-    const isInteger = val % 1 === 0;
-    const formattedNumber = val.toLocaleString("en-US", { 
-      minimumFractionDigits: isInteger ? 0 : 2, 
-      maximumFractionDigits: 2 
-    });
-
-    const parts = formattedNumber.split('.');
-    const whole = parts[0];
-    const decimal = parts[1];
-
-    const renderedNumber = (
-      <span dir="ltr">
-        {whole}
-        {decimal !== undefined && (
-          <span className="text-[0.82em] opacity-85" style={{ fontSize: '0.82em', opacity: 0.85 }}>.{decimal}</span>
-        )}
-      </span>
-    );
-
-    let prefix = "$ ";
-    let suffix = "";
-    if (baseCurrency.code === "USD") {
-      prefix = "$ ";
-      suffix = "";
-    } else if (baseCurrency.code === "IQD") {
-      prefix = "";
-      suffix = " دینار";
-    } else {
-      prefix = `${baseCurrency.symbol} `;
-      suffix = "";
-    }
-
-    return (
-      <span className="inline-flex items-baseline" style={{ display: 'inline-flex', alignItems: 'baseline', gap: '2px' }}>
-        {prefix && <span style={{ fontSize: '0.85em', opacity: 0.8 }}>{prefix}</span>}
-        {renderedNumber}
-        {suffix && <span style={{ fontSize: '0.85em', opacity: 0.8 }}>{suffix}</span>}
-      </span>
-    );
+    return formatCurrencyJSX(val, baseCurrency, currencies);
   };
 
   // Dynamic KPI Formatter converting USD to active filtered currency if chosen
@@ -964,11 +863,11 @@ function InvoiceReportContent() {
   };
 
   // Map of product purchase custom exchange rates
-  // Map of product purchase custom exchange rates
   const productFixedRateMap = useMemo(() => {
     const map: Record<number, number> = {};
     if (!vouchers) return map;
-    vouchers.forEach((v: any) => {
+    const sorted = [...vouchers].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
+    sorted.forEach((v: any) => {
       let versionData: any = {};
       if (v.versions && v.versions.length > 0) {
         const sortedV = [...v.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
@@ -982,19 +881,30 @@ function InvoiceReportContent() {
 
       // Only check incoming stock vouchers: purchase, warehouse_stock, or incoming inventory movements
       const isIncoming = v.type === "purchase" || v.type === "warehouse_stock" || v.rawType === "purchase" || v.rawType === "warehouse_stock" || (v.inventoryTransactions || []).some((t: any) => t.qtyChange > 0);
-      const isFixed = rateType === "FIXED";
 
-      if (isIncoming && isFixed && customRate) {
-        const rateVal = Number(customRate) > 10000 ? Number(customRate) / 100 : Number(customRate);
+      if (isIncoming) {
+        const isFixed = rateType === "FIXED" && Boolean(customRate);
+        const rateVal = isFixed ? (Number(customRate) > 10000 ? Number(customRate) / 100 : Number(customRate)) : null;
+
+        const updateProd = (pId: number) => {
+          if (!pId) return;
+          if (isFixed && rateVal) {
+            map[pId] = rateVal;
+          } else {
+            // Newest purchase is daily market or not fixed -> clear any prior fixed rate!
+            delete map[pId];
+          }
+        };
+
         if (v.lines) {
           v.lines.forEach((l: any) => {
             const lineCur = l.currencyId || v.currencyId || 1;
-            if (l.productId && (lineCur === 1 || lineCur === 11)) map[l.productId] = rateVal;
+            if (l.productId && (lineCur === 1 || lineCur === 11)) updateProd(l.productId);
           });
         }
         if (v.inventoryTransactions) {
           v.inventoryTransactions.forEach((t: any) => {
-            if (t.productId && t.qtyChange > 0) map[t.productId] = rateVal;
+            if (t.productId && t.qtyChange > 0) updateProd(t.productId);
           });
         }
       }
@@ -1008,7 +918,6 @@ function InvoiceReportContent() {
   const { productCostsMap, fixedRateCostIQDMap, productCostCurrencyMap } = useMemo(() => {
     const stats: Record<number, { runningCostUSD: number; runningOnHandQty: number; latestCostUSD: number; isMultiBatch: boolean }> = {};
     const fixedStats: Record<number, { runningCostIQD: number; runningOnHandQty: number; latestCostIQD: number; isMultiBatch: boolean }> = {};
-    const productCostCurrencyMap: Record<number, number> = {};
     const usdCur = currencies?.find((c: any) => c.code === "USD");
     const usdId = usdCur ? usdCur.id : 1;
     const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
@@ -1016,7 +925,10 @@ function InvoiceReportContent() {
     const rawRate = iqdCur?.rate || 1520;
     const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
 
-    (vouchers || []).forEach((v: any) => {
+    const productCostCurrencyMap: Record<number, number> = {};
+
+    const sortedVouchers = [...(vouchers || [])].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
+    sortedVouchers.forEach((v: any) => {
       const vRate = normalizeRate(v.exchangeRate) || marketRate;
 
       (v.inventoryTransactions || []).forEach((t: any) => {
@@ -1106,7 +1018,7 @@ function InvoiceReportContent() {
 
   // Helper: Get item cost in USD for a specific voucher
   // For fixed-rate products, converts IQD cost to USD at the sale voucher's daily rate
-  const getItemCostUsdForVoucher = (voucher: RawVoucher, productId: number, rawCost?: number, _rawCurId?: number) => {
+  const getItemCostUsdForVoucher = (voucher: RawVoucher, productId: number, rawCost?: number, rawCurId?: number) => {
     const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
     const iqdId = iqdCur?.id || 2;
     const rawRate = iqdCur?.rate || 1520;
@@ -1114,7 +1026,7 @@ function InvoiceReportContent() {
     const saleRate = normalizeRate(voucher.exchangeRate) || marketRate;
 
     // Foundational cost currency resolution strictly from incoming origin (productCostCurrencyMap)
-    const originCurId = productCostCurrencyMap[productId] || _rawCurId || 1;
+    const originCurId = productCostCurrencyMap[productId] || rawCurId || 1;
     const isCostIQD = originCurId === iqdId || originCurId === 2 || originCurId === 12;
 
     // Check if product has fixed exchange rate from purchase/stock voucher
@@ -1184,6 +1096,7 @@ function InvoiceReportContent() {
     } else {
       netUSD = profile.usdAmt > 0 ? profile.usdAmt : Number(voucher.netAmount || 0);
     }
+
     const costUSD = getVoucherCostUSD(voucher);
     const profitUSD = voucher.type === "sales_return" ? -(netUSD - costUSD) : (netUSD - costUSD);
 
@@ -1917,14 +1830,12 @@ function InvoiceReportContent() {
       let rem = Math.max(val - paid, 0);
       if (rem < 1.0) rem = 0;
       const exp = getVoucherExpensesUSD(v);
-      const prof = getVoucherProfitBase(v);
 
       totalValueUSD += val;
       totalDiscountUSD += disc;
       totalPaidUSD += paid;
       totalRemainingUSD += rem;
       totalExpensesUSD += exp;
-      totalProfitUSD += prof;
 
       // Per-currency accumulation (in original currency)
       const profile = getVoucherCurrencyProfile(v);
@@ -2709,7 +2620,17 @@ function InvoiceReportContent() {
                     const displayCurrencyId = getDisplayCurrencyId(voucher);
                     const displayCurrencyObj = currencies.find((c: any) => c.id === displayCurrencyId);
 
-                    const voucherCurrencyId = voucher.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1;
+                    const profile = getVoucherCurrencyProfile(voucher);
+                    let effectiveVoucherCurrencyId = voucher.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1;
+                    if (profile.isPureIQD) effectiveVoucherCurrencyId = 2;
+                    else if (profile.isPureUSD) effectiveVoucherCurrencyId = 1;
+
+                    let effectiveNetAmount = voucher.netAmount;
+                    if (profile.isPureIQD && profile.iqdAmt > 0 && effectiveNetAmount < 10000 && profile.iqdAmt > 5000) {
+                      effectiveNetAmount = profile.iqdAmt;
+                    }
+
+                    const voucherCurrencyId = effectiveVoucherCurrencyId;
                     const iqdIdForDelivery = currencies.find((c: any) => c.code === "IQD")?.id || 12;
 
                     const paidVal = voucher.paidAmounts.reduce((sum, pa) => {
@@ -2717,7 +2638,7 @@ function InvoiceReportContent() {
                       return sum + paInDisplay;
                     }, 0);
 
-                    let valVal = convertBetweenCurrencies(voucher.netAmount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
+                    let valVal = convertBetweenCurrencies(effectiveNetAmount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
                     if (["money_in", "money_out", "shareholder_deposit", "shareholder_withdrawal"].includes(voucher.type)) {
                       valVal = paidVal;
                     }
@@ -2908,12 +2829,12 @@ function InvoiceReportContent() {
                                       <div className="flex flex-col items-center gap-0.5 font-bold">
                                         {remUSD > 0.01 && (
                                           <span className="text-rose-700 text-xs">
-                                            {formatCurrencyValueJSX(remUSD, 1)}
+                                            {formatCurrencyJSX(remUSD, 1, currencies)}
                                           </span>
                                         )}
                                         {remIQD > 100 && (
                                           <span className="text-rose-700 text-xs">
-                                            {formatCurrencyValueJSX(remIQD, 2)}
+                                            {formatCurrencyJSX(remIQD, 2, currencies)}
                                           </span>
                                         )}
                                       </div>
@@ -4054,20 +3975,6 @@ function InvoiceReportContent() {
       })()}
 
       {/* Delete Confirmation Modal */}
-      {/* Product Quick Action Modal */}
-      <ProductQuickModal
-        isOpen={Boolean(quickProduct)}
-        onClose={() => setQuickProduct(null)}
-        product={quickProduct}
-      />
-
-      {/* Account Quick Action Modal */}
-      <AccountQuickModal
-        isOpen={Boolean(quickAccount)}
-        onClose={() => setQuickAccount(null)}
-        account={quickAccount}
-      />
-
       {deleteVoucherId !== null && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDeleteVoucherId(null)}>
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 text-center" onClick={(e) => e.stopPropagation()}>
@@ -4090,6 +3997,20 @@ function InvoiceReportContent() {
           </div>
         </div>
       )}
+
+      {/* Product Quick Action Modal */}
+      <ProductQuickModal
+        isOpen={Boolean(quickProduct)}
+        onClose={() => setQuickProduct(null)}
+        product={quickProduct}
+      />
+
+      {/* Account Quick Action Modal */}
+      <AccountQuickModal
+        isOpen={Boolean(quickAccount)}
+        onClose={() => setQuickAccount(null)}
+        account={quickAccount}
+      />
     </div>
   );
 }

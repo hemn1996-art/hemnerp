@@ -62,6 +62,7 @@ type InvoiceRow = {
   showCost: boolean;
   isExpense?: boolean;
   isService?: boolean;
+  isManualPrice?: boolean;
 };
 
 type ProductLike = {
@@ -369,7 +370,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         let changed = false;
         const newRows = prevRows.map((r) => {
           // If editing an existing voucher and row has a historical cost, protect it from future cost changes!
-          if (editId && r.costPrice && r.costPrice > 0) {
+          if (editId && r.costPrice !== undefined && r.costPrice !== null && !isNaN(Number(r.costPrice))) {
             return r;
           }
           const p = products.find((item: any) => item.id === r.productId);
@@ -453,6 +454,15 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }
   }, [cashboxes, editId, cashboxId]);
 
+  const usdCurrency = useMemo(() => {
+    return currencies.find((c: any) => c.code === "USD" || c.symbol === "$" || c.name?.includes("دۆلار")) || currencies[0];
+  }, [currencies]);
+
+  const iqdCurrency = useMemo(() => {
+    return currencies.find((c: any) => c.code === "IQD" || c.symbol === "دینار" || c.symbol === "د.ع" || c.name?.includes("دینار")) || currencies[1] || currencies[0];
+  }, [currencies]);
+
+  const [currencyMode, setCurrencyMode] = useState<"native" | number>("native");
   const [invoiceCurrencyId, setInvoiceCurrencyId] = useState<number>(defaultCurrency.id);
 
   const [paidCurrencyId, setPaidCurrencyId] = useState<number>(
@@ -460,6 +470,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   );
   const [paidAmounts, setPaidAmounts] = useState<PaidAmounts>({});
   const [paymentTypeMode, setPaymentTypeMode] = useState<"cash" | "partial" | "debt">("cash");
+  const userEditedPaidRef = useRef(false);
 
   const lastLoadedEditIdRef = useRef<string | null>(null);
 
@@ -698,13 +709,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                   return 0;
                 })(),
                 costCurrencyId: (() => {
-                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
-                  if (tx?.currencyId) return tx.currencyId;
-                  if (tx?.unitCost && tx.unitCost > 1000) return 2;
-                  if (tx?.unitCost && tx.unitCost <= 1000) return 1;
                   const prod = products.find((p: any) => p.id === line.productId);
                   if (prod?.costCurrencyId) return prod.costCurrencyId;
                   if (line.product?.costCurrencyId) return line.product.costCurrencyId;
+                  const tx = voucher.inventoryTransactions?.find((t: any) => t.productId === line.productId);
+                  if (tx?.currencyId) return tx.currencyId;
                   return 1;
                 })(),
                 exchangeRateType: (() => {
@@ -894,9 +903,30 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+      return `${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} دینار`;
     }
     return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatAccountBalanceWithColors(map: Record<string, number>) {
+    const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
+    if (activeEntries.length === 0) {
+      return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+        {activeEntries.map(([curIdText, val]) => {
+          // Positive balance (val > 0.01): customer owes us -> GREEN (#16a34a)
+          // Negative balance (val < -0.01): we owe customer -> RED (#dc2626)
+          const color = val > 0.01 ? "#16a34a" : (val < -0.01 ? "#dc2626" : "#9ca3af");
+          return (
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
+              {formatCurrencyAmountJSX(Math.abs(val), Number(curIdText))}
+            </span>
+          );
+        })}
+      </div>
+    );
   }
 
   function formatCurrencyMapWithColors(map: Record<string, number>) {
@@ -910,7 +940,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           const color = val > 0.01 ? "#dc2626" : "#16a34a";
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {formatCurrencyAmountJSX(val, Number(curIdText))}
+              {formatCurrencyAmountJSX(Math.abs(val), Number(curIdText))}
             </span>
           );
         })}
@@ -983,11 +1013,9 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const decimal = parts[1]; // undefined when no decimal part (IQD always, USD when .00)
 
     const displaySymbol = isIQD ? "دینار" : symbol;
-    const isNegative = isNegativeParam !== undefined ? isNegativeParam : value < 0;
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {isNegative && <span>-</span>}
         {!isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
         <span>
           <span>{whole}</span>
@@ -1084,10 +1112,29 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }
   }, [accountId, paidCurrencyId, activeBalances, selectedAccount]);
 
+  const effectiveInvoiceCurrencyId = useMemo(() => {
+    if (currencyMode !== "native") return invoiceCurrencyId;
+    if (rows.length > 0) {
+      const allIQD = rows.every((r: any) => r.currencyId === 2 || r.currencyId === 12);
+      if (allIQD) return 2;
+      const allUSD = rows.every((r: any) => r.currencyId === 1 || r.currencyId === 11);
+      if (allUSD) return 1;
+      return rows[0]?.currencyId || defaultCurrency?.id || 1;
+    }
+    return defaultCurrency?.id || 1;
+  }, [currencyMode, rows, defaultCurrency, invoiceCurrencyId]);
+
+  useEffect(() => {
+    if (currencyMode === "native" && effectiveInvoiceCurrencyId) {
+      setInvoiceCurrencyId(effectiveInvoiceCurrencyId);
+      setPaidCurrencyId(effectiveInvoiceCurrencyId);
+    }
+  }, [currencyMode, effectiveInvoiceCurrencyId]);
+
   const itemCount = rows.reduce((sum, row) => sum + toNumber(row.qty), 0);
   const itemsSubtotal = rows.reduce((sum, row) => sum + getRowTotal(row), 0);
 
-  const invoiceCurrency = currencies.find((c: any) => c.id === invoiceCurrencyId);
+  const invoiceCurrency = currencies.find((c: any) => c.id === effectiveInvoiceCurrencyId);
   const invoiceSymbol = invoiceCurrency?.symbol || "$";
   const iqdCurrencyId = currencies.find((c: any) => c.code === "IQD")?.id || 12;
 
@@ -1142,7 +1189,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, [invoiceCurrencyId, exchangeRate, currencies]);
 
   useEffect(() => {
-    if (paymentTypeMode === "cash") {
+    if (paymentTypeMode === "cash" && !userEditedPaidRef.current) {
       const itemTotals = getItemsTotalsByCurrency();
       const newPaid: PaidAmounts = {};
       Object.entries(itemTotals).forEach(([curIdText, amount]) => {
@@ -1171,22 +1218,28 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     else if (invoiceType === "گەڕانەوەی کڕین") mappedType = "purchase_return";
     else if (invoiceType === "نرخاندن") mappedType = "quotation";
 
+    const recon = getCashReconciliation();
+    const activeRate = (paymentTypeMode === "cash" && recon.isCashSettled) ? recon.effectiveRate : rate;
+    const activeNetAmount = (paymentTypeMode === "cash" && recon.isCashSettled) ? recon.effectiveNetAmount : total;
+
     const result = calculateLedgerEntries({
       type: mappedType,
-      netAmount: total,
+      netAmount: activeNetAmount,
       currencyId: invoiceCurrencyId,
-      exchangeRate: rate,
+      exchangeRate: activeRate,
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
+        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : activeRate
       })),
       extraPaymentHandling: null,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      itemsTotalsByCurrency: getInvoiceNetTotalsByCurrency(),
+      currencies,
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, accountBalanceBeforeByCurrency, total, invoiceCurrencyId, invoiceType, editId, isInvoiceLocked]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, accountBalanceBeforeByCurrency, total, invoiceCurrencyId, invoiceType, editId, isInvoiceLocked, paymentTypeMode, rows]);
 
   const screenAccountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
@@ -1201,22 +1254,28 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     else if (invoiceType === "گەڕانەوەی کڕین") mappedType = "purchase_return";
     else if (invoiceType === "نرخاندن") mappedType = "quotation";
 
+    const recon = getCashReconciliation();
+    const activeRate = (paymentTypeMode === "cash" && recon.isCashSettled) ? recon.effectiveRate : rate;
+    const activeNetAmount = (paymentTypeMode === "cash" && recon.isCashSettled) ? recon.effectiveNetAmount : total;
+
     const result = calculateLedgerEntries({
       type: mappedType,
-      netAmount: total,
+      netAmount: activeNetAmount,
       currencyId: invoiceCurrencyId,
-      exchangeRate: rate,
+      exchangeRate: activeRate,
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
+        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : activeRate
       })),
       extraPaymentHandling: null,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      itemsTotalsByCurrency: getInvoiceNetTotalsByCurrency(),
+      currencies,
     });
 
     return result.balanceAfterByCurrency;
-  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, screenAccountBalanceBeforeByCurrency, total, invoiceCurrencyId, invoiceType]);
+  }, [selectedAccount, paidAmounts, targetCurrencyId, exchangeRate, screenAccountBalanceBeforeByCurrency, total, invoiceCurrencyId, invoiceType, paymentTypeMode]);
   const selectedCashbox = cashboxes.find((c: any) => c.id === cashboxId);
 
   const visibleColumnCount =
@@ -1397,7 +1456,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, [productSearch, products, invoiceType]);
 
   const paidConverted = getTotalPaidInInvoiceCurrency();
-  const remaining = Math.max(total - paidConverted, 0);
+  const hasAnyPaid = getPaidCurrencies().length > 0;
+  const recon = getCashReconciliation();
+  const remaining = (paymentTypeMode === "cash" && hasAnyPaid && recon.isCashSettled)
+    ? 0
+    : Math.max(total - paidConverted, 0);
 
   const oldDebt = Number(selectedAccount?.balance || 0);
   const newDebt = oldDebt + remaining;
@@ -1494,6 +1557,103 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     }, 0);
   }
 
+  function getCashReconciliation() {
+    const rawRate = (toNumber(exchangeRate) / 100) || 1500;
+    if (paymentTypeMode !== "cash") {
+      return {
+        effectiveRate: rawRate,
+        effectiveNetAmount: total,
+        fractionDiscount: 0,
+        isCashSettled: false,
+      };
+    }
+
+    const paidList = getPaidCurrencies();
+    if (paidList.length === 0) {
+      return {
+        effectiveRate: rawRate,
+        effectiveNetAmount: total,
+        fractionDiscount: 0,
+        isCashSettled: false,
+      };
+    }
+
+    const usdCur = currencies.find((c: any) => c.code === "USD" || c.id === 1 || c.id === 11);
+    const iqdCur = currencies.find((c: any) => c.code === "IQD" || c.id === 2 || c.id === 12);
+    const usdId = usdCur?.id || 1;
+    const iqdId = iqdCur?.id || 2;
+
+    const isInvIqd = invoiceCurrencyId === iqdId || (currencies.find((c: any) => c.id === invoiceCurrencyId)?.code === "IQD");
+    const isInvUsd = invoiceCurrencyId === usdId || (currencies.find((c: any) => c.id === invoiceCurrencyId)?.code === "USD");
+
+    const usdPaidItem = paidList.find((p: any) => p.currencyId === usdId);
+    const iqdPaidItem = paidList.find((p: any) => p.currencyId === iqdId);
+    const currentUsdPaid = usdPaidItem ? usdPaidItem.amount : 0;
+    const currentIqdPaid = iqdPaidItem ? iqdPaidItem.amount : 0;
+
+    let effectiveRate = rawRate;
+
+    if (isInvIqd && currentUsdPaid > 0) {
+      const neededIqd = Math.max(0, total - currentIqdPaid);
+      if (neededIqd > 0) {
+        const calcRate = neededIqd / currentUsdPaid;
+        const stdUsdInIqd = currentUsdPaid * rawRate;
+        const totalPaidAtStd = currentIqdPaid + stdUsdInIqd;
+        const diffAtStd = total - totalPaidAtStd;
+
+        if (totalPaidAtStd >= total || (diffAtStd > 0 && diffAtStd <= 5000)) {
+          effectiveRate = calcRate;
+        }
+      }
+    } else if (isInvUsd && currentIqdPaid > 0) {
+      const neededUsd = Math.max(0, total - currentUsdPaid);
+      if (neededUsd > 0) {
+        const calcRate = currentIqdPaid / neededUsd;
+        const stdIqdInUsd = currentIqdPaid / rawRate;
+        const totalPaidAtStd = currentUsdPaid + stdIqdInUsd;
+        const diffAtStd = total - totalPaidAtStd;
+
+        if (totalPaidAtStd >= total || (diffAtStd > 0 && diffAtStd <= 5.0)) {
+          effectiveRate = calcRate;
+        }
+      }
+    }
+
+    let totalPaidInInvCur = 0;
+    paidList.forEach((p: any) => {
+      if (p.currencyId === invoiceCurrencyId) {
+        totalPaidInInvCur += p.amount;
+      } else if (isInvIqd && (p.currencyId === usdId)) {
+        totalPaidInInvCur += p.amount * effectiveRate;
+      } else if (isInvUsd && (p.currencyId === iqdId)) {
+        totalPaidInInvCur += p.amount / effectiveRate;
+      } else {
+        totalPaidInInvCur += convertCurrency(p.amount, p.currencyId, invoiceCurrencyId);
+      }
+    });
+
+    const diff = total - totalPaidInInvCur;
+    let fractionDiscount = 0;
+    let effectiveNetAmount = total;
+    let isCashSettled = false;
+
+    if (diff <= 0.01) {
+      isCashSettled = true;
+      effectiveNetAmount = totalPaidInInvCur;
+    } else if ((isInvIqd && diff <= 5000) || (!isInvIqd && diff <= 5.0)) {
+      isCashSettled = true;
+      fractionDiscount = diff;
+      effectiveNetAmount = totalPaidInInvCur;
+    }
+
+    return {
+      effectiveRate,
+      effectiveNetAmount,
+      fractionDiscount,
+      isCashSettled,
+    };
+  }
+
   function getPaidSummaryText() {
     const paidList = getPaidCurrencies();
 
@@ -1543,7 +1703,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     return convertCurrency(
       getRowNetTotalInRowCurrency(row),
       row.currencyId,
-      invoiceCurrencyId
+      effectiveInvoiceCurrencyId
     );
   }
 
@@ -1713,7 +1873,6 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {isNegative && <span>-</span>}
         {!isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
         <span>
           <span>{whole}</span>
@@ -1975,6 +2134,44 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     return withAmount || prices[0];
   }
 
+  function hasProductPredefinedPrice(product?: ProductLike, targetPriceType?: string): boolean {
+    if (!product) return false;
+    const prices = getProductPrices(product);
+    if (!prices || prices.length === 0) {
+      return Number(product.salePrice || 0) > 0;
+    }
+    if (targetPriceType) {
+      const p = findPriceByType(product, targetPriceType);
+      const amt = Number((p as any)?.amount || (p as any)?.price || 0) || 0;
+      if (amt > 0) return true;
+    }
+    return prices.some((p: any) => Number(p.amount || p.price || 0) > 0);
+  }
+
+  function isRowPriceManual(row: InvoiceRow): boolean {
+    if (row.isManualPrice !== undefined) {
+      return row.isManualPrice;
+    }
+    const product = products.find((p: any) => p.id === row.productId);
+    if (!product || !hasProductPredefinedPrice(product, row.priceType)) {
+      return true;
+    }
+    const selectedPrice = findPriceByType(product, row.priceType);
+    const rawPriceAmount =
+      Number((selectedPrice as any)?.amount || (selectedPrice as any)?.price || 0) || 0;
+    if (rawPriceAmount <= 0) return true;
+
+    const sourceCurrencyId = Number(selectedPrice?.currencyId || 1);
+    const expectedPrice = convertAmountBetweenCurrencies(
+      rawPriceAmount,
+      sourceCurrencyId,
+      row.currencyId || invoiceCurrencyId,
+      exchangeRate
+    );
+    const currentPriceNum = toNumber(row.price);
+    return Math.abs(expectedPrice - currentPriceNum) > 0.001;
+  }
+
   function chooseProduct(product: ProductLike) {
     if (blockIfLocked()) return;
 
@@ -1997,15 +2194,27 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       ) || 0;
 
     const sourceCurrencyId = Number(selectedPrice?.currencyId || 1);
-    const rowCurrencyId = invoiceCurrencyId;
+    const rowCurrencyId = currencyMode === "native" ? sourceCurrencyId : invoiceCurrencyId;
 
-    // Auto-convert if product price currency differs from invoice currency:
-    const finalPriceAmount = convertAmountBetweenCurrencies(
-      rawPriceAmount,
-      sourceCurrencyId,
-      rowCurrencyId,
-      exchangeRate
-    );
+    if (currencyMode !== "native") {
+      setInvoiceCurrencyId(currencyMode);
+      setPaidCurrencyId(currencyMode);
+    } else {
+      if (rows.length === 0 || rows.every(r => r.currencyId === rowCurrencyId)) {
+        setInvoiceCurrencyId(rowCurrencyId);
+        setPaidCurrencyId(rowCurrencyId);
+      }
+    }
+
+    // Auto-convert if product price currency differs from row currency:
+    const finalPriceAmount = (currencyMode === "native")
+      ? rawPriceAmount
+      : convertAmountBetweenCurrencies(
+          rawPriceAmount,
+          sourceCurrencyId,
+          rowCurrencyId,
+          exchangeRate
+        );
 
     const defaultWarehouseName = warehouses[0]?.name || "کۆگای سەرەکی";
     const availableQty = getRowAvailableQty(product.id, defaultWarehouseName);
@@ -2047,6 +2256,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       showCost: false,
       isExpense: Boolean(product.isExpense),
       isService: isServiceOrExpense,
+      isManualPrice: rawPriceAmount <= 0,
     };
 
     setRows((prev) => [newRow, ...prev]);
@@ -2121,6 +2331,34 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     // Only newly added items will adopt the new price type.
   }
 
+  function handleCurrencyModeChange(mode: "native" | number) {
+    if (blockIfLocked()) return;
+    setCurrencyMode(mode);
+
+    if (mode === "native") {
+      setRows((prevRows) =>
+        prevRows.map((row) => {
+          if (isRowPriceManual(row)) {
+            return row;
+          }
+          const product = products.find((p: any) => p.id === row.productId);
+          if (!product) return row;
+          const selectedPrice = findPriceByType(product, row.priceType);
+          const rawPriceAmount =
+            Number((selectedPrice as any)?.amount || (selectedPrice as any)?.price || 0) || 0;
+          const sourceCurrencyId = Number(selectedPrice?.currencyId || 1);
+          return {
+            ...row,
+            currencyId: sourceCurrencyId,
+            price: String(rawPriceAmount),
+          };
+        })
+      );
+    } else {
+      handleInvoiceCurrencyChange(mode);
+    }
+  }
+
   function handleInvoiceCurrencyChange(newCurId: number) {
     if (newCurId === invoiceCurrencyId) return;
     const oldCurId = invoiceCurrencyId;
@@ -2130,18 +2368,51 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     setRows((prevRows) =>
       prevRows.map((row) => {
-        const currentPriceNum = toNumber(row.price);
-        const converted = convertAmountBetweenCurrencies(
-          currentPriceNum,
-          row.currencyId || oldCurId,
-          newCurId,
-          exchangeRate
-        );
+        // If price was manually entered on the invoice:
+        // Keep the number as is, only change currency!
+        if (isRowPriceManual(row)) {
+          return {
+            ...row,
+            currencyId: newCurId,
+            price: row.price,
+          };
+        }
+
+        const product = products.find((p: any) => p.id === row.productId);
+        let newPriceStr = "";
+
+        // Predefined price: Check if product has an explicit price for newCurId first
+        if (product) {
+          const explicitPrice = getProductPrices(product).find((price: any) => {
+            const pType = price.priceType || price.name;
+            return (
+              isSamePriceType(pType, row.priceType) &&
+              Number(price.currencyId) === Number(newCurId) &&
+              Number(price.amount || price.price || 0) > 0
+            );
+          });
+          if (explicitPrice) {
+            newPriceStr = String(
+              (explicitPrice as any).amount || (explicitPrice as any).price || 0
+            );
+          }
+        }
+
+        if (!newPriceStr) {
+          const currentPriceNum = toNumber(row.price);
+          const converted = convertAmountBetweenCurrencies(
+            currentPriceNum,
+            row.currencyId || oldCurId,
+            newCurId,
+            exchangeRate
+          );
+          newPriceStr = String(converted);
+        }
 
         return {
           ...row,
           currencyId: newCurId,
-          price: String(converted),
+          price: newPriceStr,
         };
       })
     );
@@ -2170,12 +2441,21 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     updateRow(row.id, {
       priceType,
       price: String(finalPrice),
+      isManualPrice: rawPriceAmount <= 0,
     });
   }
 
   function changeRowCurrency(row: InvoiceRow, newCurrencyId: number) {
     if (blockIfLocked()) return;
     if (row.currencyId === newCurrencyId) return;
+
+    if (isRowPriceManual(row)) {
+      updateRow(row.id, {
+        currencyId: newCurrencyId,
+        price: row.price,
+      });
+      return;
+    }
 
     const product = products.find((p: any) => p.id === row.productId);
     let newPriceStr = "";
@@ -2215,35 +2495,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   function updatePaidAmount(currencyId: number, value: string) {
     if (blockIfLocked()) return;
 
+    userEditedPaidRef.current = true;
+
     const clean = onlyDecimal(value);
     const newPaidState = {
       ...paidAmounts,
       [currencyId]: clean,
     };
-
-    const rate = (toNumber(exchangeRate) / 100) || 1500;
-    const totalPaidValConverted = Object.entries(newPaidState).reduce((sum, [cIdStr, amtStr]) => {
-      const amt = parseFloat(amtStr || "0") || 0;
-      const cId = Number(cIdStr);
-      let inInvoiceCur = amt;
-      if (cId !== invoiceCurrencyId) {
-        if ((cId === 2 || cId === 12) && (invoiceCurrencyId === 1 || invoiceCurrencyId === 11)) {
-          inInvoiceCur = amt / rate;
-        } else if ((cId === 1 || cId === 11) && (invoiceCurrencyId === 2 || invoiceCurrencyId === 12)) {
-          inInvoiceCur = amt * rate;
-        }
-      }
-      return sum + inInvoiceCur;
-    }, 0);
-
-    const diff = Math.abs(totalPaidValConverted - total);
-    if (totalPaidValConverted <= 0.01) {
-      setPaymentTypeMode("debt");
-    } else if (diff < 1.0 || totalPaidValConverted >= total - 0.01) {
-      setPaymentTypeMode("cash");
-    } else {
-      setPaymentTypeMode("partial");
-    }
 
     setPaidAmounts(newPaidState);
   }
@@ -2253,6 +2511,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setPaymentTypeMode(mode);
 
     if (mode === "cash") {
+      userEditedPaidRef.current = false;
       const itemTotals = getItemsTotalsByCurrency();
       const newPaid: PaidAmounts = {};
       Object.entries(itemTotals).forEach(([curIdText, amount]) => {
@@ -2282,6 +2541,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
       setPaidAmounts(newPaid);
     } else if (mode === "debt") {
+      userEditedPaidRef.current = false;
       setPaidAmounts({});
     }
   }
@@ -2491,18 +2751,27 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }))
       .filter((x: any) => x.amount > 0);
 
+    const recon = getCashReconciliation();
+    const activeRate = (paymentTypeMode === "cash" && recon.isCashSettled) ? recon.effectiveRate : rate;
+    const activeNetAmount = (paymentTypeMode === "cash" && recon.isCashSettled) ? recon.effectiveNetAmount : total;
+    const activeDiscount = (paymentTypeMode === "cash" && recon.isCashSettled)
+      ? invoiceDiscountAmount + recon.fractionDiscount
+      : invoiceDiscountAmount;
+
     const result = calculateLedgerEntries({
       type: mappedType,
-      netAmount: total,
-      currencyId: invoiceCurrencyId,
-      exchangeRate: rate,
+      netAmount: activeNetAmount,
+      currencyId: effectiveInvoiceCurrencyId,
+      exchangeRate: activeRate,
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
+        exchangeRate: (p.currencyId === effectiveInvoiceCurrencyId) ? 1 : activeRate
       })),
       extraPaymentHandling: extraHandling,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      currencies,
+      itemsTotalsByCurrency: getInvoiceNetTotalsByCurrency()
     });
 
     const combineDateAndTime = (dateStr: string, timeStr: string) => {
@@ -2541,11 +2810,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       date: combineDateAndTime(invoiceDate, createdTime),
       accountId: isTemporaryCustomer ? null : (accountId || null),
       cashboxId: cashboxId || null,
-      currencyId: invoiceCurrencyId,
-      exchangeRate: rate,
+      currencyId: effectiveInvoiceCurrencyId,
+      exchangeRate: activeRate,
       totalAmount: itemsSubtotal,
-      totalDiscount: invoiceDiscountAmount,
-      netAmount: total,
+      totalDiscount: activeDiscount,
+      netAmount: activeNetAmount,
       internalNote: internalNote,
       printNote: printNote,
       employeeName: employeeName || currentUser?.name || currentUser?.username || "بەڕێوەبەر",
@@ -2567,13 +2836,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           note: row.note,
           currencyId: row.currencyId,
           warehouseId,
-          unitCost: toNumber(row.costPrice || 0),
+          costCurrencyId: row.costCurrencyId || 1,
+          unitCost: toNumber(row.costPrice ?? 0),
         };
       }),
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
+        exchangeRate: (p.currencyId === effectiveInvoiceCurrencyId) ? 1 : activeRate
       })),
       ledgerEntries: result.ledgerEntries,
       extraPaymentHandling: extraHandling,
@@ -2685,15 +2955,17 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const result = calculateLedgerEntries({
       type: mappedType,
       netAmount: total,
-      currencyId: invoiceCurrencyId,
+      currencyId: effectiveInvoiceCurrencyId,
       exchangeRate: rate,
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (p.currencyId === invoiceCurrencyId) ? 1 : rate
+        exchangeRate: (p.currencyId === effectiveInvoiceCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: null,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      itemsTotalsByCurrency: getInvoiceNetTotalsByCurrency(),
+      currencies,
     });
 
     if (result.excess.exists) {
@@ -3250,7 +3522,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               </InfoRow>
 
               <InfoRow label="قەرز">
-                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(selectedAccount))}
+                {formatAccountBalanceWithColors(getAccountBalanceBeforeMap(selectedAccount))}
               </InfoRow>
 
               <InfoRow label="ئاگاداری دواکەوتن">
@@ -3505,25 +3777,17 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             {/* --- پارەی دراو --- */}
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
 
-              {currencies.filter((c: any) => c.id === paidCurrencyId || (paidAmounts[c.id] && paidAmounts[c.id].trim() !== "" && parseFloat(paidAmounts[c.id]) !== 0)).map((currency: any) => {
+              {currencies.filter((c: any) => {
+                const isUsdOrIqd = c.code === "USD" || c.code === "IQD" || c.id === 1 || c.id === 2 || c.id === 11 || c.id === 12;
+                const isCurrent = c.id === paidCurrencyId || c.id === invoiceCurrencyId;
+                const hasAmount = paidAmounts[c.id] && paidAmounts[c.id].trim() !== "" && parseFloat(paidAmounts[c.id]) !== 0;
+                return isUsdOrIqd || isCurrent || hasAmount;
+              }).map((currency: any) => {
                 const isCurrent = currency.id === paidCurrencyId;
 
                 const amountInput = (
-                  <Field label={isCurrent ? "پارەی دراو" : `پارەی دراو (${currency.name})`}>
+                  <Field label={`پارەی دراو (${currency.name})`}>
                     <div style={{ display: "flex", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden", width: "100%" }}>
-                      <select
-                        value={currency.id}
-                        disabled={isInvoiceLocked}
-                        onChange={(e) => setPaidCurrencyId(Number(e.target.value))}
-                        style={{ border: "none", borderLeft: "1px solid #d1d5db", background: "#f8fafc", padding: "0 12px", outline: "none", fontWeight: "bold", color: "#1e293b", cursor: isInvoiceLocked ? "not-allowed" : "pointer", minWidth: "90px" }}
-                      >
-                        {currencies.map((curr: any) => (
-                          <option key={curr.id} value={curr.id}>
-                            {curr.name}
-                          </option>
-                        ))}
-                      </select>
-
                       <FormattedNumberInput
                         value={paidAmounts[currency.id] || ""}
                         disabled={isInvoiceLocked}
@@ -3532,7 +3796,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 12px", background: isInvoiceLocked ? "#f3f4f6" : "#fff", cursor: isInvoiceLocked ? "not-allowed" : "text", textAlign: "left" }}
                       />
 
-                      <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px" }}>
+                      <span style={{ border: "none", borderRight: "1px solid #d1d5db", background: "#f8fafc", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#475569", fontSize: "13px", minWidth: "60px" }}>
                         {currency.name}
                       </span>
                     </div>
@@ -4026,9 +4290,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                           const prod = products.find((p: any) => p.id === row.productId);
                                           const isFixedRate = (row as any).exchangeRateType === "FIXED" ||
                                             prod?.exchangeRateType === "FIXED" ||
-                                            Boolean((row as any).customExchangeRate) ||
-                                            Boolean(prod?.customExchangeRate) ||
-                                            (prod?.brand === "Hisense" || prod?.brand === "هایسنس" || prod?.name?.includes("هایسنس"));
+                                            Boolean((row as any).customExchangeRate && (row as any).exchangeRateType === "FIXED") ||
+                                            Boolean(prod?.customExchangeRate && prod?.exchangeRateType === "FIXED");
                                           const rawFixed = (row as any).customExchangeRate || prod?.customExchangeRate || (isFixedRate ? 135000 : null);
                                           const leafRate = rawFixed
                                             ? (rawFixed > 10000 ? Math.round(rawFixed / 1000) : (rawFixed > 1000 ? Math.round(rawFixed / 10) : rawFixed))
@@ -4165,6 +4428,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                       onChange={(val) =>
                                         updateRow(row.id, {
                                           price: val,
+                                          isManualPrice: true,
                                         })
                                       }
                                       style={{
@@ -4259,6 +4523,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                                 onChange={(val) =>
                                   updateRow(row.id, {
                                     price: val,
+                                    isManualPrice: true,
                                   })
                                 }
                                 style={{
@@ -4550,21 +4815,40 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                 <h3 style={settingsTitle}>دراوی سەرەکی پسوڵە</h3>
 
                 <div style={priceTypeBox}>
-                  {currencies.map((curr: any) => (
-                    <button
-                      key={curr.id}
-                      type="button"
-                      onClick={() => handleInvoiceCurrencyChange(curr.id)}
-                      style={{
-                        ...priceTypeBtn,
-                        ...(invoiceCurrencyId === curr.id
-                          ? priceTypeBtnActive
-                          : {}),
-                      }}
-                    >
-                      {curr.name} ({curr.symbol})
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    onClick={() => handleCurrencyModeChange("native")}
+                    style={{
+                      ...priceTypeBtn,
+                      ...(currencyMode === "native" ? priceTypeBtnActive : {}),
+                    }}
+                  >
+                    دراوی ڕەسەن
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => usdCurrency && handleCurrencyModeChange(usdCurrency.id)}
+                    style={{
+                      ...priceTypeBtn,
+                      ...(typeof currencyMode === "number" && currencyMode === usdCurrency?.id
+                        ? priceTypeBtnActive
+                        : {}),
+                    }}
+                  >
+                    $
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => iqdCurrency && handleCurrencyModeChange(iqdCurrency.id)}
+                    style={{
+                      ...priceTypeBtn,
+                      ...(typeof currencyMode === "number" && currencyMode === iqdCurrency?.id
+                        ? priceTypeBtnActive
+                        : {}),
+                    }}
+                  >
+                    دینار
+                  </button>
                 </div>
               </div>
 

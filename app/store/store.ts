@@ -79,26 +79,10 @@ interface StoreState {
   updateVoucher: (id: number, voucherData: any) => Promise<any>;
 }
 
-// Fallback: read user data from sessionStorage or user_session cookie
+// Fallback: read user data from the user_session cookie (set at login)
 // Used when /api/users/me fails due to server errors (not auth errors)
 function _readUserFromCookie(): CurrentUser | null {
   try {
-    if (typeof sessionStorage !== "undefined") {
-      const cached = sessionStorage.getItem("user_session_cache");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.id) {
-          return {
-            id: parsed.id,
-            username: parsed.username,
-            name: parsed.name,
-            role: parsed.role,
-            isActive: true,
-            permissions: [],
-          };
-        }
-      }
-    }
     const cookies = document.cookie.split(";").map((c) => c.trim());
     const sessionCookie = cookies.find((c) => c.startsWith("user_session="));
     if (!sessionCookie) return null;
@@ -296,22 +280,45 @@ export const useStore = create<StoreState>((set, get) => ({
           else if (v.type === "warehouse_damage" || v.type === "خەسارەی کۆگا") uiType = "زیانی کۆگا";
           else if (v.type === "warehouse_stock" || v.type === "جەردی کۆگا") uiType = "جەردی کۆگا";
           else if (v.type === "product_transfer" || v.type === "گواستنەوەی کاڵا") uiType = "گواستنەوەی کەرەستە";
+          const lines = v.lines || [];
+          const allLinesIQD = lines.length > 0 && lines.every((l: any) => l.currencyId === 2 || l.currencyId === 12);
+          const allLinesUSD = lines.length > 0 && lines.every((l: any) => l.currencyId === 1 || l.currencyId === 11);
+
+          let effectiveCurrencyId = v.currencyId || 1;
+          let effectiveCurrencyCode = v.currency?.code || (v.currencyId === 2 ? "IQD" : "USD");
+          let effectiveTotal = v.netAmount;
+
+          if (allLinesIQD) {
+            effectiveCurrencyId = 2;
+            effectiveCurrencyCode = "IQD";
+            const iqdSum = lines.reduce((sum: number, l: any) => sum + (Number(l.unitPrice) * Number(l.qty ?? 1) || Number(l.lineTotal) || 0), 0);
+            if (iqdSum > 0 && (Number(v.netAmount) < 10000 || v.currencyId === 1)) {
+              effectiveTotal = iqdSum - (v.totalDiscount || 0);
+            }
+          } else if (allLinesUSD) {
+            effectiveCurrencyId = 1;
+            effectiveCurrencyCode = "USD";
+          } else if (v.currencyId === 2) {
+            effectiveCurrencyId = 2;
+            effectiveCurrencyCode = "IQD";
+          }
+
           return {
             id: v.id,
             accountId: v.accountId,
             type: uiType,
-            total: v.netAmount,
+            total: effectiveTotal,
             paid: v.paidAmounts?.reduce((sum: number, pa: any) => sum + pa.amount, 0) || 0,
             totalDiscount: v.totalDiscount || 0,
             date: v.date,
             referenceNo: v.referenceNo,
             accountName: v.account?.name || "",
             cashboxName: v.cashbox?.name || "",
-            currencyCode: v.currency?.code || "USD",
+            currencyCode: effectiveCurrencyCode,
             internalNote: v.internalNote,
             printNote: v.printNote,
             cashboxId: v.cashboxId,
-            currencyId: v.currencyId,
+            currencyId: effectiveCurrencyId,
             rawType: v.type,
             fromCashboxId: v.fromCashboxId,
             toCashboxId: v.toCashboxId,
@@ -322,8 +329,8 @@ export const useStore = create<StoreState>((set, get) => ({
             exchangeRate: v.exchangeRate,
             employeeName: v.employeeName,
             versions: v.versions || [],
-            lines: v.lines || [],
-            items: v.lines || [],
+            lines: lines,
+            items: lines,
           };
         });
 

@@ -72,6 +72,42 @@ export function sanitizeAndGuardVoucherData(data: any, currencies: CurrencyRecor
   const iqdCurrency = currencies.find(c => c.code === "IQD" || c.id === 2);
   const defaultIqdRate = getCurrencyRate(iqdCurrency);
 
+  // 0. Auto-sync voucher currency with lines if all lines are pure IQD or pure USD
+  if (data.lines && Array.isArray(data.lines) && data.lines.length > 0) {
+    const allLinesIQD = data.lines.every((l: any) => l.currencyId === 2 || l.currencyId === 12);
+    const allLinesUSD = data.lines.every((l: any) => l.currencyId === 1 || l.currencyId === 11);
+
+    if (allLinesIQD) {
+      data.currencyId = 2;
+      const sumIQD = data.lines.reduce((s: number, l: any) => s + (Number(l.lineTotal || (Number(l.qty || 0) * Number(l.unitPrice || 0))) || 0), 0);
+      // If totalAmount was erroneously converted to USD (e.g. 769.23 while sumIQD is 1,200,000), restore sumIQD
+      if (sumIQD > 5000 && Number(data.totalAmount) < 10000) {
+        data.totalAmount = sumIQD;
+        data.netAmount = sumIQD - Number(data.totalDiscount || 0);
+      }
+    } else if (allLinesUSD && Number(data.currencyId) !== 1) {
+      // If line amounts or total are >= 10000, they are almost certainly IQD entered under USD default
+      if (Number(data.totalAmount) >= 10000 || data.lines.some((l: any) => Number(l.lineTotal) >= 10000 || Number(l.unitPrice) >= 10000)) {
+        data.currencyId = 2;
+        data.lines.forEach((l: any) => { l.currencyId = 2; });
+        if (data.paidAmounts && Array.isArray(data.paidAmounts)) {
+          data.paidAmounts.forEach((p: any) => { if (Number(p.amount) >= 10000) p.currencyId = 2; });
+        }
+      } else {
+        data.currencyId = 1;
+      }
+    } else if (Number(data.currencyId) === 1) {
+      // If total amount is >= 10000 and paid amount is >= 10000, user entered IQD without switching currency
+      if (Number(data.totalAmount) >= 10000 || (data.paidAmounts && data.paidAmounts.some((p: any) => Number(p.amount) >= 10000))) {
+        data.currencyId = 2;
+        data.lines.forEach((l: any) => { l.currencyId = 2; });
+        if (data.paidAmounts && Array.isArray(data.paidAmounts)) {
+          data.paidAmounts.forEach((p: any) => { if (Number(p.amount) >= 10000) p.currencyId = 2; });
+        }
+      }
+    }
+  }
+
   // 1. Determine voucher currency
   const voucherCurrencyId = Number(data.currencyId || 1);
   const isVoucherIQD = voucherCurrencyId === 2 || (iqdCurrency && voucherCurrencyId === iqdCurrency.id);

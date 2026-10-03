@@ -42,7 +42,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const [chartCurrency, setChartCurrency] = useState<"all" | "USD" | "IQD">("all");
 
   const [mounted, setMounted] = useState(false);
-  const [companyName, setCompanyName] = useState("کۆگای دۆستان");
+  const [companyName, setCompanyName] = useState("سەنتەری کارەبای لەندەن");
   const [kpiPeriod, setKpiPeriod] = useState<string>("today");
   const [donutPeriod, setDonutPeriod] = useState<string>("today");
   const [recentVoucherFilter, setRecentVoucherFilter] = useState<string>("all");
@@ -54,7 +54,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
       try {
         const parsed = JSON.parse(saved);
         if (parsed.companyName === "کۆگای دۆستان") {
-          parsed.companyName = "کۆگای دۆستان";
+          parsed.companyName = "سەنتەری کارەبای لەندەن";
           localStorage.setItem("general_settings", JSON.stringify(parsed));
         }
         if (parsed.companyName) {
@@ -102,12 +102,12 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   };
 
   const formatInvoiceCurrency = (val: number, currencyCode: string) => {
-    const formatted = val.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-    if (currencyCode === "IQD") {
+    const formatted = (val || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    if (currencyCode === "IQD" || currencyCode === "دینار") {
       return `${formatted} دینار`;
     }
     const cur = currencies.find((c: any) => c.code === currencyCode);
-    return `${cur?.symbol || "$"}${formatted}`;
+    return `${cur?.symbol || "$"} ${formatted}`;
   };
 
   const getFilteredInvoices = (period: string) => {
@@ -161,12 +161,19 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     filteredInvs.forEach((inv: any) => {
       if (inv.type === filterType) {
         if (sumField === "total") {
-          // Use voucher's main currency
-          const code = inv.currencyCode || "USD";
+          // Use voucher's main currency or derive from items
+          const allLinesIQD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 2 || l.currencyId === 12);
+          const allLinesUSD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 1 || l.currencyId === 11);
+          const code = allLinesIQD ? "IQD" : (allLinesUSD ? "USD" : (inv.currencyCode || (inv.currencyId === 2 ? "IQD" : "USD")));
+          const iqdLineSum = allLinesIQD ? inv.lines.reduce((s: number, l: any) => s + (Number(l.unitPrice) * Number(l.qty ?? 1) || Number(l.lineTotal) || 0), 0) : 0;
+          const trueTotal = (allLinesIQD && (inv.total < 10000 || inv.currencyId === 1) && iqdLineSum > 0)
+            ? (iqdLineSum - (inv.totalDiscount || 0))
+            : (inv.total || 0);
+
           if (code === "USD") {
-            usd += inv.total || 0;
+            usd += trueTotal;
           } else if (code === "IQD") {
-            iqd += inv.total || 0;
+            iqd += trueTotal;
           }
         } else {
           // Use actual paid amounts currencies
@@ -224,11 +231,18 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
       if (d.getFullYear() === chartYear) {
         const month = d.getMonth(); // 0 to 11
         if (month >= 0 && month < 12) {
-          const curCode = inv.currencyCode || "USD";
+          const allLinesIQD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 2 || l.currencyId === 12);
+          const allLinesUSD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 1 || l.currencyId === 11);
+          const curCode = allLinesIQD ? "IQD" : (allLinesUSD ? "USD" : (inv.currencyCode || (inv.currencyId === 2 ? "IQD" : "USD")));
+          const iqdLineSum = allLinesIQD ? inv.lines.reduce((s: number, l: any) => s + (Number(l.unitPrice) * Number(l.qty ?? 1) || Number(l.lineTotal) || 0), 0) : 0;
+          const trueTotal = (allLinesIQD && (inv.total < 10000 || inv.currencyId === 1) && iqdLineSum > 0)
+            ? (iqdLineSum - (inv.totalDiscount || 0))
+            : (inv.total || 0);
+
           if (curCode === "USD") {
-            barData[month].usd += inv.total || 0;
+            barData[month].usd += trueTotal;
           } else if (curCode === "IQD") {
-            barData[month].iqd += inv.total || 0;
+            barData[month].iqd += trueTotal;
           }
         }
       }
@@ -945,9 +959,20 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                   else if (inv.type === "پارەی هاتوو") badgeClass = "bg-[#f3e8ff] text-[#8b5cf6]";
                   else if (inv.type === "پارەی ڕۆشتوو") badgeClass = "bg-[#ecfeff] text-[#06b6d4]";
 
-                  const payStatus = getPaymentStatus(inv.total, inv.paid);
-                  const currencyCode = inv.currencyCode || "USD";
-                  const remaining = Math.max(inv.total - inv.paid, 0);
+                  const allLinesIQD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 2 || l.currencyId === 12);
+                  const allLinesUSD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 1 || l.currencyId === 11);
+                  const currencyCode = allLinesIQD ? "IQD" : (allLinesUSD ? "USD" : (inv.currencyCode || (inv.currencyId === 2 ? "IQD" : "USD")));
+
+                  const iqdLineSum = allLinesIQD ? inv.lines.reduce((s: number, l: any) => s + (Number(l.unitPrice) * Number(l.qty ?? 1) || Number(l.lineTotal) || 0), 0) : 0;
+                  const rowTotal = (allLinesIQD && (inv.total < 10000 || inv.currencyId === 1) && iqdLineSum > 0)
+                    ? (iqdLineSum - (inv.totalDiscount || 0))
+                    : inv.total;
+
+                  const paidCurId = inv.paidAmounts?.[0]?.currencyId;
+                  const paidCurrencyCode = (paidCurId === 2 || paidCurId === 12) ? "IQD" : ((paidCurId === 1 || paidCurId === 11) ? "USD" : currencyCode);
+
+                  const payStatus = getPaymentStatus(rowTotal, inv.paid);
+                  const remaining = Math.max(rowTotal - inv.paid, 0);
 
                   return (
                     <tr key={inv.id || idx} className="hover:bg-gray-50 transition-colors">
@@ -1008,13 +1033,13 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                         )}
                       </td>
                       <td className="px-4 py-3.5 text-center font-bold font-mono text-gray-800">
-                        {formatInvoiceCurrency(inv.total, currencyCode)}
+                        {formatInvoiceCurrency(rowTotal, currencyCode)}
                       </td>
                       <td className="px-4 py-3.5 text-center text-rose-600 font-mono">
                         {inv.totalDiscount > 0 ? formatInvoiceCurrency(inv.totalDiscount, currencyCode) : "-"}
                       </td>
                       <td className="px-4 py-3.5 text-center text-green-600 font-bold font-mono">
-                        {inv.paid > 0 ? formatInvoiceCurrency(inv.paid, currencyCode) : "-"}
+                        {inv.paid > 0 ? formatInvoiceCurrency(inv.paid, paidCurrencyCode) : "-"}
                       </td>
                       <td className="px-4 py-3.5 text-center text-red-500 font-bold font-mono">
                         {remaining > 0 ? formatInvoiceCurrency(remaining, currencyCode) : "-"}

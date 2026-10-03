@@ -358,6 +358,20 @@ function AccountStatementContent() {
         let rowTotalAmount = (v.type === "shareholder_deposit" || v.type === "shareholder_withdrawal" || !v.netAmount) ? (v.totalAmount || v.netAmount || 0) : v.netAmount;
         let rowTotalDiscount = v.totalDiscount || 0;
 
+        if (v.lines && Array.isArray(v.lines) && v.lines.length > 0) {
+          const allLinesIQD = v.lines.every((l: any) => l.currencyId === 2 || l.currencyId === 12);
+          const allLinesUSD = v.lines.every((l: any) => l.currencyId === 1 || l.currencyId === 11);
+          if (allLinesIQD) {
+            rowCurrencyId = 2;
+            const sumIQD = v.lines.reduce((s: number, l: any) => s + (Number(l.lineTotal || (Number(l.qty || 0) * Number(l.unitPrice || 0))) || 0), 0);
+            if (sumIQD > 5000 && rowTotalAmount < 10000) {
+              rowTotalAmount = sumIQD;
+            }
+          } else if (allLinesUSD) {
+            rowCurrencyId = 1;
+          }
+        }
+
         if (v.type === "money_out" || v.type === "money_in" || v.type === "پارەی ڕۆشتوو" || v.type === "پارەی هاتوو") {
           const nonZeroPayments = (v.paidAmounts || []).filter((pa: any) => pa.amount > 0);
           if (nonZeroPayments.length === 1) {
