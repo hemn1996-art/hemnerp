@@ -783,7 +783,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const result = calculateLedgerEntries({
       type: "purchase",
       netAmount: itemsSubtotalInBase,
-      currencyId: purchaseCurrencyId || defaultCurrency?.id || 5,
+      currencyId: purchaseCurrencyId || defaultCurrency?.id || 1,
       exchangeRate: rate,
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
@@ -807,7 +807,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const result = calculateLedgerEntries({
       type: "purchase",
       netAmount: itemsSubtotalInBase,
-      currencyId: purchaseCurrencyId || defaultCurrency?.id || 5,
+      currencyId: purchaseCurrencyId || defaultCurrency?.id || 1,
       exchangeRate: rate,
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
@@ -900,15 +900,15 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       convertCurrency(
         Math.max(amount, 0),
         Number(currencyIdText),
-        purchaseCurrencyId || defaultCurrency?.id || 5
+        purchaseCurrencyId || defaultCurrency?.id || 1
       )
     );
   }, 0);
 
-  const expensesTotalInBase = getExpensesTotalInCurrency(purchaseCurrencyId || defaultCurrency?.id || 5);
+  const expensesTotalInBase = getExpensesTotalInCurrency(purchaseCurrencyId || defaultCurrency?.id || 1);
 
   const calculatedExpensesTotalInSelectedCurrency = getExpensesTotalInCurrency(
-    expenseTotalCurrencyId || defaultCurrency?.id || 5
+    expenseTotalCurrencyId || defaultCurrency?.id || 1
   );
 
   const displayedExpenseTotal = isExpenseTotalManual
@@ -1034,7 +1034,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   }
 
   function getCurrencyKey(currencyId?: number) {
-    const rawId = Number(currencyId || purchaseCurrencyId || defaultCurrency?.id || 11);
+    const rawId = Number(currencyId || purchaseCurrencyId || defaultCurrency?.id || 1);
     const found = (currencies || []).find((c: any) => Number(c.id) === rawId);
     if (!found) return String(rawId);
     const mainCur = (currencies || []).find((c: any) => c.code === found.code && (c.isActive !== false));
@@ -1131,7 +1131,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     return convertCurrency(
       getRowTotalInOwnCurrency(row),
       row.currencyId,
-      purchaseCurrencyId || defaultCurrency?.id || 5
+      purchaseCurrencyId || defaultCurrency?.id || 1
     );
   }
 
@@ -1177,7 +1177,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       const val = diffs[key] || 0;
       if (val < -0.001) {
         const excessInThisCur = Math.abs(val);
-        const excessConverted = convertCurrency(excessInThisCur, curId, purchaseCurrencyId || defaultCurrency?.id || 11);
+        const excessConverted = convertCurrency(excessInThisCur, curId, purchaseCurrencyId || defaultCurrency?.id || 1);
         excessInPurCur += excessConverted;
         diffs[key] = 0;
       } else if (val > 0.001) {
@@ -1198,12 +1198,12 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
         const curId = Number(key);
         const owedInThisCur = diffs[key] || 0;
         if (owedInThisCur > 0.001) {
-          const owedConverted = convertCurrency(owedInThisCur, curId, purchaseCurrencyId || defaultCurrency?.id || 11);
+          const owedConverted = convertCurrency(owedInThisCur, curId, purchaseCurrencyId || defaultCurrency?.id || 1);
           if (excessInPurCur >= owedConverted) {
             excessInPurCur -= owedConverted;
             diffs[key] = 0;
           } else {
-            const partialOffsetThisCur = convertCurrency(excessInPurCur, purchaseCurrencyId || defaultCurrency?.id || 11, curId);
+            const partialOffsetThisCur = convertCurrency(excessInPurCur, purchaseCurrencyId || defaultCurrency?.id || 1, curId);
             diffs[key] = Math.max(0, diffs[key] - partialOffsetThisCur);
             excessInPurCur = 0;
           }
@@ -1334,7 +1334,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
   function getTotalPaidInPurchaseCurrency() {
     return getPaidCurrencies().reduce((sum, item) => {
       return (
-        sum + convertCurrency(item.amount, item.currencyId, purchaseCurrencyId || defaultCurrency?.id || 5)
+        sum + convertCurrency(item.amount, item.currencyId, purchaseCurrencyId || defaultCurrency?.id || 1)
       );
     }, 0);
   }
@@ -1372,7 +1372,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     }
 
     const rowCurrencyId =
-      product.purchaseCurrencyId || product.costCurrencyId || purchaseCurrencyId || defaultCurrency?.id || 5;
+      product.purchaseCurrencyId || product.costCurrencyId || purchaseCurrencyId || defaultCurrency?.id || 1;
 
     const newRow: PurchaseRow = {
       id: Date.now() + Math.floor(Math.random() * 100000),
@@ -1463,7 +1463,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       {
         id: Date.now() + Math.floor(Math.random() * 100000),
         amount: "",
-        currencyId: purchaseCurrencyId || defaultCurrency?.id || 5,
+        currencyId: purchaseCurrencyId || defaultCurrency?.id || 1,
         accountId: undefined,
         note: "",
         addAsDebt: false,
@@ -1657,7 +1657,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       const expenseInBase = convertCurrency(
         toNumber(expense.amount),
         expense.currencyId,
-        purchaseCurrencyId || defaultCurrency?.id || 5
+        purchaseCurrencyId || defaultCurrency?.id || 1
       );
 
       account.balance = Number(account.balance || 0) - expenseInBase;
@@ -1827,7 +1827,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     setExcessModalConfig(null);
 
     const rate = (toNumber(exchangeRate) / 100) || 1500;
-    const activeTargetCurrencyId = targetCurrencyId || (supplier ? getSingleAccountBalanceCurrencyId(supplier) : (defaultCurrency?.id || 5));
+    const activeTargetCurrencyId = targetCurrencyId || (supplier ? getSingleAccountBalanceCurrencyId(supplier) : (defaultCurrency?.id || 1));
     const before = accountBalanceBeforeByCurrency;
 
     const extraHandling = action === "cross_deduct"
@@ -1844,7 +1844,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const result = calculateLedgerEntries({
       type: "purchase",
       netAmount: itemsSubtotalInBase,
-      currencyId: purchaseCurrencyId || defaultCurrency?.id || 5,
+      currencyId: purchaseCurrencyId || defaultCurrency?.id || 1,
       exchangeRate: rate,
       paidAmounts: paidList.map((p: any) => ({
         currencyId: p.currencyId,
@@ -1940,7 +1940,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
     savePromise.then((res) => {
       setIsSaving(false);
-      if (res) {
+      if (res && !res.error) {
         clearVoucherDraft("purchase");
         fetchProducts(); // refresh products stock
         setSavedSnapshot(currentSnapshot);
@@ -1951,7 +1951,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           showToast("پسوڵەی کڕین خەزن کرا ✅ کۆست و ستۆک نوێکرایەوە.", "success");
         }
       } else {
-        showToast("هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.", "error");
+        const errorMsg = res?.error || "هەڵە لە خەزنکردن! تکایە دووبارە هەوڵ بدەوە.";
+        showToast(errorMsg, "error");
       }
     }).catch((err) => {
       setIsSaving(false);
@@ -1975,7 +1976,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     }
 
     const rate = (toNumber(exchangeRate) / 100) || 1500;
-    const activeTargetCurrencyId = targetCurrencyId || (supplier ? getSingleAccountBalanceCurrencyId(supplier) : (defaultCurrency?.id || 5));
+    const activeTargetCurrencyId = targetCurrencyId || (supplier ? getSingleAccountBalanceCurrencyId(supplier) : (defaultCurrency?.id || 1));
     const before = accountBalanceBeforeByCurrency;
 
     const paidList = Object.entries(paidAmounts)
@@ -3602,7 +3603,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
               label="کۆی بڕی خەرجی"
               value={formatCurrencyAmountJSX(
                 finalExpenseTotalInSelectedCurrency,
-                expenseTotalCurrencyId || defaultCurrency?.id || 5
+                expenseTotalCurrencyId || defaultCurrency?.id || 1
               )}
             />
             <SummaryItem
@@ -3805,7 +3806,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی بەهای کاڵاکان</td>
                     </tr>
                     <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyAmountJSX(finalExpenseTotalInSelectedCurrency, expenseTotalCurrencyId || defaultCurrency?.id || 5)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatCurrencyAmountJSX(finalExpenseTotalInSelectedCurrency, expenseTotalCurrencyId || defaultCurrency?.id || 1)}</td>
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی بڕی خەرجی</td>
                     </tr>
                     <tr>

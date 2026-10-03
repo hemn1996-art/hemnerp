@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { calculateLedgerEntries } from "../../../utils/ledgerHelper";
 import { getCurrentUser } from "../../../lib/auth";
+import { sanitizeAndGuardVoucherData } from "../../../../lib/voucherGuard";
 
 export async function GET(
   request: Request,
@@ -144,6 +145,8 @@ export async function PUT(
     const { id } = await params;
     const voucherId = Number(id);
     const data = await request.json();
+    const dbCurrencies = await prisma.currency.findMany();
+    sanitizeAndGuardVoucherData(data, dbCurrencies);
 
     if (data.accountId) {
       const account = await prisma.account.findUnique({

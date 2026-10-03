@@ -67,17 +67,41 @@ type Props = {
   editId?: string;
 };
 
+// Helper to determine the main rate of 100 USD in Dinars (IQD)
+function getMainDollarRate100(currenciesList: any[]): number {
+  const iqd = (currenciesList || []).find((c: any) => c.code === "IQD" || c.name === "دینار" || c.name?.includes("دینار"));
+  if (!iqd || !iqd.rate) return 156000;
+  const r = Number(iqd.rate);
+  if (!r || isNaN(r) || r <= 0) return 156000;
+  return r >= 10000 ? Math.round(r) : Math.round(r * 100);
+}
+
+// Helper to get normalized rate per 1 USD (e.g. 1560)
+function getNormalizedRatePerDollar(val: string | number, fallbackRate100: number): number {
+  const num = Number(val) || 0;
+  if (num <= 0) return fallbackRate100 / 100;
+  // If user entered 100$ rate (e.g. 156,000), divide by 100 -> 1560
+  if (num >= 10000) return num / 100;
+  // If user entered 1$ rate (e.g. 1560), it is already rate per 1 USD
+  if (num >= 500) return num;
+  // If corrupted (e.g. 15.6), multiply by 100 -> 1560
+  if (num > 0) return num * 100;
+  return fallbackRate100 / 100;
+}
+
 export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
   const [isEditLoading, setIsEditLoading] = useState(!!editId);
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchAccounts = useStore((s: any) => s.fetchAccounts);
   const fetchCashboxes = useStore((s: any) => s.fetchCashboxes);
+  const fetchCurrencies = useStore((s: any) => s.fetchCurrencies);
 
   useEffect(() => {
     fetchAccounts();
     fetchCashboxes();
-  }, [fetchAccounts, fetchCashboxes]);
+    fetchCurrencies();
+  }, [fetchAccounts, fetchCashboxes, fetchCurrencies]);
 
   useEffect(() => {
     setIsEditLoading(!!editId);
@@ -102,6 +126,8 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
   const defaultCurrency =
     currencies[0] ||
     ({ id: 1, name: "دۆلار", code: "USD", symbol: "$" } as any);
+
+  const mainIqdRate100 = useMemo(() => getMainDollarRate100(currencies), [currencies]);
 
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<ToastType>("error");
@@ -128,14 +154,12 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
 
   const [amount, setAmount] = useState("");
   const [currencyId, setCurrencyId] = useState<number>(defaultCurrency.id);
-  const [exchangeRate, setExchangeRate] = useState<string>("154000");
+  const [exchangeRate, setExchangeRate] = useState<string>(() => String(getMainDollarRate100(currencies)));
 
   useEffect(() => {
     if (!editId && currencies && currencies.length > 0) {
-      const iqd = currencies.find((c: any) => c.code === "IQD");
-      if (iqd && iqd.rate) {
-        setExchangeRate(String(iqd.rate * 100));
-      }
+      const rate100 = getMainDollarRate100(currencies);
+      setExchangeRate(String(rate100));
     }
   }, [currencies, editId]);
 
@@ -186,7 +210,17 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
 
             if (voucher.exchangeRate) {
               const rawEx = Number(voucher.exchangeRate);
-              setExchangeRate(String(rawEx >= 1000 ? rawEx : rawEx * 100));
+              if (!isNaN(rawEx) && rawEx > 0) {
+                let rate100 = rawEx;
+                if (rawEx < 100) {
+                  rate100 = rawEx * 10000;
+                } else if (rawEx < 10000) {
+                  rate100 = rawEx * 100;
+                }
+                setExchangeRate(String(Math.round(rate100)));
+              }
+            } else {
+              setExchangeRate(String(getMainDollarRate100(currencies)));
             }
 
             setReceiptNote(voucher.internalNote || "");
@@ -199,7 +233,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
         .catch((err) => console.error("Error loading voucher:", err))
         .finally(() => setIsEditLoading(false));
     }
-  }, [editId, accounts]);
+  }, [editId, accounts, currencies]);
 
   const usdCurrencyId = currencies.find((c: any) => c.code === "USD")?.id || defaultCurrency.id || 1;
   const iqdCurrencyId = currencies.find((c: any) => c.code === "IQD")?.id || 2;
@@ -209,9 +243,9 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
     const rawAmt = Number(amount) || 0;
     if (rawAmt <= 0) return 0;
     if (!isIQD) return rawAmt;
-    const rate = (Number(exchangeRate) || 154000) / 100;
+    const rate = getNormalizedRatePerDollar(exchangeRate, mainIqdRate100);
     return Number((rawAmt / rate).toFixed(2));
-  }, [amount, isIQD, exchangeRate]);
+  }, [amount, isIQD, exchangeRate, mainIqdRate100]);
 
   const [receiptNote, setReceiptNote] = useState("");
   const [printNote, setPrintNote] = useState("");
@@ -422,14 +456,26 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
     const decimal = parts[1];
     const displaySymbol = isIQDVal ? "دینار" : symbol;
 
+    const numberJSX = (
+      <span>
+        <span>{whole}</span>
+        {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+      </span>
+    );
+
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {isNegative && <span>-</span>}
-        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
-        <span>
-          <span>{whole}</span>
-          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
-        </span>
+        {isIQDVal ? (
+          <>
+            {numberJSX}
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>دینار</span>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{symbol}</span>
+            {numberJSX}
+          </>
+        )}
       </span>
     );
   }
@@ -556,6 +602,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
     setCashboxId(getDefaultCashbox(cashboxes)?.id);
     setAmount("");
     setCurrencyId(defaultCurrency.id);
+    setExchangeRate(String(getMainDollarRate100(currencies)));
 
     setReceiptNote("");
     setPrintNote("");
@@ -630,7 +677,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
       return new Date().toISOString();
     };
 
-    const rateVal = (toNumber(exchangeRate) / 100) || 1540;
+    const rateVal = getNormalizedRatePerDollar(exchangeRate, mainIqdRate100);
     const finalNote = (receiptNote || printNote || "").trim();
 
     const payload = {
@@ -664,7 +711,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
 
     savePromise
       .then((res: any) => {
-        if (res) {
+        if (res && !res.error) {
           if (!editId) {
             applyCashboxDecrease();
             applyShareholderBalanceDecrease();
@@ -680,7 +727,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
             "success"
           );
         } else {
-          showToast("تکایە دووبارە هەوڵ بدەرەوە ❌");
+          showToast(res?.error || "تکایە دووبارە هەوڵ بدەرەوە ❌");
         }
       })
       .catch((err: any) => {
@@ -966,16 +1013,39 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
 
             {isIQD && (
               <Field label="ڕەیتی ١٠٠ دۆلار (بۆ گۆڕین بۆ باڵانسی دۆلار)">
-                <FormattedNumberInput
-                  value={exchangeRate}
-                  disabled={isLocked}
-                  onChange={(val) => {
-                    if (blockIfLocked()) return;
-                    setExchangeRate(val);
-                  }}
-                  placeholder="154,000"
-                  style={{ ...input, ...lockedFieldStyle, borderColor: "#3b82f6" }}
-                />
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%" }}>
+                  <FormattedNumberInput
+                    value={exchangeRate}
+                    disabled={isLocked}
+                    onChange={(val) => {
+                      if (blockIfLocked()) return;
+                      setExchangeRate(val);
+                    }}
+                    placeholder="156,000"
+                    style={{ ...input, ...lockedFieldStyle, borderColor: "#3b82f6" }}
+                  />
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                    <span>ڕەیتی سەرەکی دۆلار: <b>{mainIqdRate100.toLocaleString('en-US')}</b> دینار</span>
+                    {!isLocked && (
+                      <button
+                        type="button"
+                        onClick={() => setExchangeRate(String(mainIqdRate100))}
+                        style={{
+                          background: "#eff6ff",
+                          color: "#1d4ed8",
+                          border: "1px solid #bfdbfe",
+                          borderRadius: 4,
+                          padding: "2px 6px",
+                          fontSize: 11,
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
+                      >
+                        وەرگرتن لە نرخی سەرەکی
+                      </button>
+                    )}
+                  </div>
+                </div>
               </Field>
             )}
 
@@ -1033,7 +1103,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
                         setPrintNote(event.target.value);
                       }}
                       rows={2}
-                      placeholder={isIQD ? `خۆکارانە دەنوسرێت: (${toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری ${toNumber(exchangeRate).toLocaleString('en-US')} دیناری)` : "تێبینی سەر پسوڵە بنووسە..."}
+                      placeholder={isIQD ? `خۆکارانە دەنوسرێت: (${toNumber(amount).toLocaleString('en-US')} دینار بە ڕەیتی 100 دۆلاری ${Math.round(getNormalizedRatePerDollar(exchangeRate, mainIqdRate100) * 100).toLocaleString('en-US')} دیناری)` : "تێبینی سەر پسوڵە بنووسە..."}
                       style={{ ...textarea, ...lockedFieldStyle }}
                     />
                   </Field>
@@ -1088,7 +1158,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
 
             {isIQD && toNumber(amount) > 0 && (
               <div style={{ marginTop: 16, background: "#fef3c7", padding: "10px 14px", borderRadius: 8, border: "1px solid #fde68a", color: "#92400e", fontSize: 13, fontWeight: "bold" }}>
-                ڕەیتی 100$: {toNumber(exchangeRate).toLocaleString('en-US')} دینار
+                ڕەیتی 100$: {Math.round(getNormalizedRatePerDollar(exchangeRate, mainIqdRate100) * 100).toLocaleString('en-US')} دینار
               </div>
             )}
           </div>
@@ -1212,7 +1282,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
               <div style={{ marginTop: 4, whiteSpace: "pre-line" }}>
                 {isIQD && toNumber(amount) > 0 && (
                   <div style={{ fontWeight: "bold", color: "#b45309", marginBottom: printNote ? 4 : 0 }}>
-                    ڕەیتی 100$: {toNumber(exchangeRate).toLocaleString('en-US')} دینار
+                    ڕەیتی 100$: {Math.round(getNormalizedRatePerDollar(exchangeRate, mainIqdRate100) * 100).toLocaleString('en-US')} دینار
                   </div>
                 )}
                 {printNote}

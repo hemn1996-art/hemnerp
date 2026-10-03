@@ -505,7 +505,10 @@ function AccountStatementContent() {
         let valUSD = 0;
         if (item.paidAmounts && item.paidAmounts.length > 0) {
           valUSD = item.paidAmounts.reduce((sum: number, pa: any) => {
-            const rate = (pa.exchangeRate && pa.exchangeRate > 10) ? pa.exchangeRate : 1500;
+            let rate = Number(pa.exchangeRate) || 0;
+            if (rate > 0 && rate < 100) rate = rate * 100;
+            if (rate > 10000) rate = rate / 100;
+            if (rate <= 0) rate = 1500;
             return sum + (pa.currencyId === usdId ? pa.amount : pa.amount / rate);
           }, 0);
         } else {
@@ -516,7 +519,10 @@ function AccountStatementContent() {
         let valUSD = 0;
         if (item.paidAmounts && item.paidAmounts.length > 0) {
           valUSD = item.paidAmounts.reduce((sum: number, pa: any) => {
-            const rate = (pa.exchangeRate && pa.exchangeRate > 10) ? pa.exchangeRate : 1500;
+            let rate = Number(pa.exchangeRate) || 0;
+            if (rate > 0 && rate < 100) rate = rate * 100;
+            if (rate > 10000) rate = rate / 100;
+            if (rate <= 0) rate = 1500;
             return sum + (pa.currencyId === usdId ? pa.amount : pa.amount / rate);
           }, 0);
         } else {
