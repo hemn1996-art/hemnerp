@@ -11,6 +11,7 @@ import { currencies as mockCurrencies } from "../../data/mockData";
 import ProductQuickModal from "../../components/ProductQuickModal";
 import AccountQuickModal from "../../components/AccountQuickModal";
 import CostEditModal from "../../components/CostEditModal";
+import { getReportSessionState, saveReportSessionState, clearReportSessionState } from "../../utils/reportSession";
 
 interface StockItem {
   productId: number;
@@ -84,19 +85,32 @@ function StockReportContent() {
   const [costModalItem, setCostModalItem] = useState<any | null>(null);
 
   // Filters state
-  const [filters, setFilters] = useState({
-    warehouseIds: [] as (number | string)[],
-    sellerNames: [] as string[],
-    categories: [] as string[],
-    brands: [] as string[],
-    productIds: [] as (number | string)[],
-    code: "",
-    batchCode: "",
-    warehouseStatus: "available",
-    rateType: "all",
-    currency: "all",
-    costDisplayCurrency: "original" as "original" | "iqd" | "usd",
+  const sessionSaved = getReportSessionState("__erp_stock_report_filters", {
+    quickSearch: "",
+    filters: {
+      warehouseIds: [] as (number | string)[],
+      sellerNames: [] as string[],
+      categories: [] as string[],
+      brands: [] as string[],
+      productIds: paramProductId ? [Number(paramProductId)] : ([] as (number | string)[]),
+      code: "",
+      batchCode: "",
+      warehouseStatus: "available",
+      rateType: "all",
+      currency: "all",
+      costDisplayCurrency: "original" as "original" | "iqd" | "usd",
+    }
   });
+
+  const [quickSearch, setQuickSearch] = useState(sessionSaved.quickSearch || "");
+  const [filters, setFilters] = useState(sessionSaved.filters);
+
+  useEffect(() => {
+    saveReportSessionState("__erp_stock_report_filters", {
+      quickSearch,
+      filters,
+    });
+  }, [quickSearch, filters]);
 
   // Columns visibility state
   const defaultStockCols = {
@@ -168,7 +182,7 @@ function StockReportContent() {
           if (typeof parsed.showReportStats === "boolean") {
             setShowReportStats(parsed.showReportStats);
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   }, [fetchWarehouses, fetchProducts, fetchAccounts]);
@@ -184,6 +198,13 @@ function StockReportContent() {
     setFilters(initialFilters);
     loadStockData(initialFilters);
   }, [paramProductId, paramSellerId]);
+
+  const productOptions = useMemo(() => {
+    return (products || []).map((p: any) => ({
+      value: p.id,
+      label: p.code ? `${p.name} (${p.code})` : p.name,
+    }));
+  }, [products]);
 
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -202,6 +223,7 @@ function StockReportContent() {
   }, [filters]);
 
   const handleResetFilters = () => {
+    clearReportSessionState("__erp_stock_report_filters");
     setQuickSearch("");
     const cleanFilters = {
       warehouseIds: [] as (number | string)[],
@@ -452,22 +474,22 @@ function StockReportContent() {
   const handleOpenPricesModal = (item: StockItem | any) => {
     const product = products.find((p: any) => p.id === item.productId);
     setEditingPriceItem(item);
-    
+
     const prices = product?.salePrices || item.salePrices || [];
     setEditingPrices(
       prices.length > 0
         ? prices.map((p: any) => ({
-            currencyId: String(p.currencyId),
-            priceType: p.priceType === "جوملە" && priceTypes[0]?.name ? priceTypes[0].name : p.priceType,
-            amount: String(p.amount),
-          }))
+          currencyId: String(p.currencyId),
+          priceType: p.priceType === "جوملە" && priceTypes[0]?.name ? priceTypes[0].name : p.priceType,
+          amount: String(p.amount),
+        }))
         : [
-            {
-              currencyId: "1",
-              priceType: priceTypes[0]?.name || "نرخی تاک",
-              amount: "",
-            },
-          ]
+          {
+            currencyId: "1",
+            priceType: priceTypes[0]?.name || "نرخی تاک",
+            amount: "",
+          },
+        ]
     );
   };
 
@@ -539,8 +561,6 @@ function StockReportContent() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  const [quickSearch, setQuickSearch] = useState("");
-
   // Client-side filtering logic fallback for local storage attributes
   const filteredStockData = useMemo(() => {
     return stockData
@@ -553,6 +573,14 @@ function StockReportContent() {
         };
       })
       .filter((item: any) => {
+        // Product ID filter
+        if (filters.productIds && filters.productIds.length > 0) {
+          const pId = item.productId;
+          if (!filters.productIds.includes(pId) && !filters.productIds.includes(Number(pId)) && !filters.productIds.includes(String(pId))) {
+            return false;
+          }
+        }
+
         // Quick search filter (product name, code, brand, category)
         if (quickSearch && quickSearch.trim() !== "") {
           const q = quickSearch.toLowerCase().trim();
@@ -590,32 +618,32 @@ function StockReportContent() {
       if (sortColumn === "productName") {
         valA = a.productName || "";
         valB = b.productName || "";
-        return sortDirection === "desc" 
-          ? valB.localeCompare(valA, "ckb") 
+        return sortDirection === "desc"
+          ? valB.localeCompare(valA, "ckb")
           : valA.localeCompare(valB, "ckb");
       } else if (sortColumn === "category") {
         valA = a.category || "";
         valB = b.category || "";
-        return sortDirection === "desc" 
-          ? valB.localeCompare(valA, "ckb") 
+        return sortDirection === "desc"
+          ? valB.localeCompare(valA, "ckb")
           : valA.localeCompare(valB, "ckb");
       } else if (sortColumn === "brand") {
         valA = a.brand || "";
         valB = b.brand || "";
-        return sortDirection === "desc" 
-          ? valB.localeCompare(valA, "ckb") 
+        return sortDirection === "desc"
+          ? valB.localeCompare(valA, "ckb")
           : valA.localeCompare(valB, "ckb");
       } else if (sortColumn === "warehouseName") {
         valA = a.warehouseName || "";
         valB = b.warehouseName || "";
-        return sortDirection === "desc" 
-          ? valB.localeCompare(valA, "ckb") 
+        return sortDirection === "desc"
+          ? valB.localeCompare(valA, "ckb")
           : valA.localeCompare(valB, "ckb");
       } else if (sortColumn === "sellerName") {
         valA = a.sellerName || "";
         valB = b.sellerName || "";
-        return sortDirection === "desc" 
-          ? valB.localeCompare(valA, "ckb") 
+        return sortDirection === "desc"
+          ? valB.localeCompare(valA, "ckb")
           : valA.localeCompare(valB, "ckb");
       } else if (sortColumn === "purchaseDate") {
         const dateA = a.purchaseDate && a.purchaseDate !== "-" ? new Date(a.purchaseDate).getTime() : 0;
@@ -729,56 +757,76 @@ function StockReportContent() {
         <div className="hidden print:block mb-6">
           <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی کۆگا</h2>
         </div>
-        
+
         {/* Actions Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-3 mb-6 no-print">
-          {/* Quick Search for Product Name */}
-          <div className="relative w-full md:w-80">
-            <input
-              type="text"
-              placeholder="گەڕانی خێرا بەپێی ناوی کەرەستە... 🔍"
-              value={quickSearch}
-              onChange={(e) => setQuickSearch(e.target.value)}
-              className="w-full pl-8 pr-3.5 py-2 text-xs rounded-lg border border-gray-300 bg-white font-bold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0b1f50] focus:border-[#0b1f50] shadow-sm transition-all"
-            />
-            {quickSearch && (
-              <button
-                onClick={() => setQuickSearch("")}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 font-bold text-xs bg-gray-100 hover:bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center transition-colors"
-                title="سڕینەوەی گەڕان"
-              >
-                ✕
-              </button>
-            )}
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-4 mb-6 bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 no-print">
+          {/* MultiSelect Product Search and Quick Filter */}
+          <div className="flex flex-wrap items-center gap-3.5 w-full lg:w-auto flex-1 max-w-2xl">
+            {/* MultiSelect for Products */}
+            <div className="relative min-w-[300px] md:min-w-[380px] lg:min-w-[460px] flex-1 max-w-xl">
+              <MultiSelectDropdown
+                label="دیاریکردنی کەرەستە..."
+                placeholder="گەڕان و دیاریکردنی کەرەستە... 🔍"
+                options={productOptions}
+                selectedValues={filters.productIds}
+                onChange={(vals) => {
+                  const nextFilters = { ...filters, productIds: vals };
+                  setFilters(nextFilters);
+                  loadStockData(nextFilters);
+                }}
+                searchable
+                compact
+              />
+            </div>
+
+            {/* Quick Text Filter */}
+            <div className="relative w-56 md:w-64">
+              <input
+                type="text"
+                placeholder="کۆد، کاتیگۆری، براند... 🔍"
+                value={quickSearch}
+                onChange={(e) => setQuickSearch(e.target.value)}
+                className="w-full h-[48px] pl-8 pr-4 py-2 text-[14px] rounded-xl border border-slate-300 hover:border-slate-400 focus:border-[#0b1f50] bg-white font-bold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0b1f50]/20 shadow-xs transition-all"
+              />
+              {quickSearch && (
+                <button
+                  onClick={() => setQuickSearch("")}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-rose-500 font-bold text-sm"
+                  title="سڕینەوەی گەڕان"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex flex-wrap justify-end items-center gap-2 w-full md:w-auto">
-            <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
+          <div className="flex flex-wrap justify-end items-center gap-2.5 w-full lg:w-auto">
+            <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] hover:bg-[#061f5f] text-white font-bold px-4 h-[48px] rounded-xl text-sm transition shadow-sm cursor-pointer border-none">
               <span>فلتەرەکان ☰</span>
               {activeFiltersCount > 0 && (
-                <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                <span className="bg-rose-500 text-white text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                   {activeFiltersCount}
                 </span>
               )}
             </button>
             {activeFiltersCount > 0 && (
-              <button onClick={handleResetFilters} className="flex items-center justify-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 font-bold px-4 py-2.5 rounded-md hover:bg-rose-200 transition-colors cursor-pointer text-sm shadow-sm">
+              <button onClick={handleResetFilters} className="flex items-center justify-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 font-bold px-4 h-[48px] rounded-xl hover:bg-rose-200 transition text-sm shadow-sm cursor-pointer">
                 🔄 ڕێکخستنەوە
               </button>
             )}
-            <button onClick={loadStockData} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
+            <button onClick={loadStockData} className="flex items-center justify-center gap-2 bg-[#0b1f50] hover:bg-[#061f5f] text-white font-bold px-4 h-[48px] rounded-xl text-sm transition shadow-sm cursor-pointer border-none">
               گەڕان 🔍
             </button>
-            <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-md hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
+            <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 h-[48px] rounded-xl hover:bg-gray-50 transition text-sm shadow-sm cursor-pointer">
               پرینت 🖨️
             </button>
             <button onClick={() => exportTableToExcel("stock-report-table", "raporti_koga.xlsx")}
-              className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 py-2.5 rounded-md hover:bg-emerald-700 transition-colors cursor-pointer text-sm shadow-sm border-none">
+              className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 h-[48px] rounded-xl hover:bg-emerald-700 transition text-sm shadow-sm cursor-pointer border-none">
               ناردن بۆ ئێکسڵ 📊
             </button>
             <button
               onClick={() => setShowColumnModal(true)}
-              className="flex items-center justify-center gap-2 text-white font-black px-4 py-2.5 rounded-lg transition-transform hover:scale-105 cursor-pointer text-sm shadow-md border-none"
+              className="flex items-center justify-center gap-2 text-white font-black px-4 h-[48px] rounded-xl transition-transform hover:scale-105 cursor-pointer text-sm shadow-md border-none"
               style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 8px rgba(2, 132, 199, 0.35)" }}
             >
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
@@ -794,91 +842,91 @@ function StockReportContent() {
 
         {/* Totals Cards */}
         {showReportStats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-in fade-in duration-200">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6 animate-in fade-in duration-200">
             {visibleColumns.warehouseValue && (
               filters.costDisplayCurrency === 'iqd' ? (
-                <div className="bg-white rounded-xl p-4 border-r-4 border-amber-500 shadow-sm flex flex-col justify-between border border-gray-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-amber-900 font-bold text-sm flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
+                <div className="col-span-12 md:col-span-8 bg-white rounded-2xl p-5 md:p-6 border-r-4 border-amber-500 shadow-sm flex flex-col justify-between border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-amber-950 font-black text-base md:text-lg flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-amber-500 inline-block animate-pulse"></span>
                       کۆی بەهای کۆگا بە دینار
                     </span>
-                    <span className="text-[11px] font-bold text-gray-500 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                    <span className="text-xs font-bold text-amber-900 bg-amber-50/90 px-3 py-1 rounded-lg border border-amber-200 shadow-2xs">
                       100$ = {Math.round(marketRatePerDollar * 100).toLocaleString("en-US")} د.ع
                     </span>
                   </div>
-                  <div className="flex items-baseline justify-between gap-2 my-1.5">
-                    <span className="text-2xl font-black text-amber-950" dir="ltr">
-                      {Math.round(totalValueIqd).toLocaleString("en-US")} <span className="text-base font-bold text-amber-700">دینار</span>
+                  <div className="flex items-baseline justify-between gap-3 my-2">
+                    <span className="text-3xl md:text-4xl lg:text-[42px] font-black text-amber-950 tracking-tight leading-none" dir="ltr">
+                      {Math.round(totalValueIqd).toLocaleString("en-US")} <span className="text-lg md:text-xl font-black text-amber-700">دینار</span>
                     </span>
-                    <span className="text-xs font-bold text-gray-600 bg-gray-50 px-2 py-0.5 rounded border border-gray-200" dir="ltr">
+                    <span className="text-xs md:text-sm font-black text-slate-700 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 shadow-2xs" dir="ltr">
                       {formatMoney(totalEffectiveUsd, "$")}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-gray-100" dir="rtl">
+                  <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100" dir="rtl">
                     {hasDailyUsd && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-bold text-blue-900" title="کاڵاکان بە دۆلاری ڕۆژ">
-                        <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50/90 border border-blue-200 text-xs md:text-sm font-bold text-blue-950 shadow-2xs" title="کاڵاکان بە دۆلاری ڕۆژ">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
                         <span>دۆلاری ڕۆژ:</span>
-                        <span dir="ltr" className="font-black text-blue-700">{formatMoney(dailyUsdSum, "$")}</span>
+                        <span dir="ltr" className="font-black text-blue-700 text-sm md:text-base">{formatMoney(dailyUsdSum, "$")}</span>
                       </div>
                     )}
                     {hasFixedUsd && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-xs font-bold text-purple-900" title="کاڵاکان بە دۆلاری جێگیر (گەڵا بە ١٣٥)">
-                        <span className="w-2 h-2 rounded-full bg-purple-600 inline-block"></span>
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50/90 border border-purple-200 text-xs md:text-sm font-bold text-purple-950 shadow-2xs" title="کاڵاکان بە دۆلاری جێگیر (گەڵا بە ١٣٥)">
+                        <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block"></span>
                         <span>دۆلاری جێگیر:</span>
-                        <span dir="ltr" className="font-black text-purple-700">{formatMoney(fixedUsdSum, "$")}</span>
-                        <span className="text-[10px] text-purple-600 font-semibold" dir="ltr">({formatMoney(fixedUsdEffectiveSum, "$")})</span>
+                        <span dir="ltr" className="font-black text-purple-700 text-sm md:text-base">{formatMoney(fixedUsdSum, "$")}</span>
+                        <span className="text-xs text-purple-600 font-bold" dir="ltr">({formatMoney(fixedUsdEffectiveSum, "$")})</span>
                       </div>
                     )}
                     {hasIqd && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900" title="کاڵاکان بە دینار">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50/90 border border-amber-200 text-xs md:text-sm font-bold text-amber-950 shadow-2xs" title="کاڵاکان بە دینار">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
                         <span>دینار:</span>
-                        <span dir="ltr" className="font-black text-amber-800">{Math.round(iqdSum).toLocaleString("en-US")} دینار</span>
+                        <span dir="ltr" className="font-black text-amber-800 text-sm md:text-base">دینار {Math.round(iqdSum).toLocaleString("en-US")}</span>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="bg-white rounded-xl p-4 border-r-4 border-blue-600 shadow-sm flex flex-col justify-between border border-gray-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-blue-900 font-bold text-sm flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block animate-pulse"></span>
+                <div className="col-span-12 md:col-span-8 bg-white rounded-2xl p-5 md:p-6 border-r-4 border-blue-600 shadow-sm flex flex-col justify-between border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-blue-950 font-black text-base md:text-lg flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-blue-600 inline-block animate-pulse"></span>
                       کۆی بەهای کۆگا بە دۆلاری ڕۆژ
                     </span>
-                    <span className="text-[11px] font-bold text-gray-500 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                    <span className="text-xs font-bold text-blue-900 bg-blue-50/90 px-3 py-1 rounded-lg border border-blue-200 shadow-2xs">
                       100$ = {Math.round(marketRatePerDollar * 100).toLocaleString("en-US")} د.ع
                     </span>
                   </div>
 
-                  <div className="flex items-baseline justify-between gap-2 my-1.5">
-                    <span className="text-2xl font-black text-gray-900" dir="ltr">
+                  <div className="flex items-baseline justify-between gap-3 my-2">
+                    <span className="text-3xl md:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight leading-none" dir="ltr">
                       {formatMoney(totalEffectiveUsd, "$")}
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-gray-100" dir="rtl">
+                  <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100" dir="rtl">
                     {hasDailyUsd && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs font-bold text-blue-900" title="کاڵاکان بە دۆلاری ڕۆژ">
-                        <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50/90 border border-blue-200 text-xs md:text-sm font-bold text-blue-950 shadow-2xs" title="کاڵاکان بە دۆلاری ڕۆژ">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
                         <span>دۆلاری ڕۆژ:</span>
-                        <span dir="ltr" className="font-black text-blue-700">{formatMoney(dailyUsdSum, "$")}</span>
+                        <span dir="ltr" className="font-black text-blue-700 text-sm md:text-base">{formatMoney(dailyUsdSum, "$")}</span>
                       </div>
                     )}
                     {hasFixedUsd && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 border border-purple-200 text-xs font-bold text-purple-900" title="کاڵاکان بە دۆلاری جێگیر (گەڵا بە ١٣٥)">
-                        <span className="w-2 h-2 rounded-full bg-purple-600 inline-block"></span>
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50/90 border border-purple-200 text-xs md:text-sm font-bold text-purple-950 shadow-2xs" title="کاڵاکان بە دۆلاری جێگیر (گەڵا بە ١٣٥)">
+                        <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block"></span>
                         <span>دۆلاری جێگیر:</span>
-                        <span dir="ltr" className="font-black text-purple-700">{formatMoney(fixedUsdSum, "$")}</span>
-                        <span className="text-[10px] text-purple-600 font-semibold" dir="ltr">({formatMoney(fixedUsdEffectiveSum, "$")})</span>
+                        <span dir="ltr" className="font-black text-purple-700 text-sm md:text-base">{formatMoney(fixedUsdSum, "$")}</span>
+                        <span className="text-xs text-purple-600 font-bold" dir="ltr">({formatMoney(fixedUsdEffectiveSum, "$")})</span>
                       </div>
                     )}
                     {hasIqd && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900" title="کاڵاکان بە دینار">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 inline-block"></span>
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50/90 border border-amber-200 text-xs md:text-sm font-bold text-amber-950 shadow-2xs" title="کاڵاکان بە دینار">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
                         <span>دینار:</span>
-                        <span dir="ltr" className="font-black text-amber-800">{Math.round(iqdSum).toLocaleString("en-US")} دینار</span>
+                        <span dir="ltr" className="font-black text-amber-800 text-sm md:text-base">دینار {Math.round(iqdSum).toLocaleString("en-US")}</span>
                       </div>
                     )}
                   </div>
@@ -886,17 +934,32 @@ function StockReportContent() {
               )
             )}
 
-            <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-gray-500 font-normal text-sm mb-2">گشتی عدد</span>
-              <div className="text-2xl font-normal text-gray-800" dir="ltr">
-                <span className="text-sm font-normal text-gray-400 ml-1">دانە</span>
-                {totalQuantity.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            <div className={`${visibleColumns.warehouseValue ? "col-span-6 md:col-span-2" : "col-span-6 md:col-span-6"} bg-white rounded-2xl p-4 md:p-5 border-r-4 border-emerald-500 shadow-sm flex flex-col justify-between items-center text-center border border-gray-100 hover:shadow-md transition-shadow`}>
+              <span className="text-slate-600 font-bold text-xs md:text-sm flex items-center gap-1.5 mb-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                گشتی عەدەد
+              </span>
+              <div className="my-auto py-1">
+                <div className="text-2xl md:text-3xl font-black text-slate-800 flex items-baseline justify-center gap-1" dir="ltr">
+                  <span>{totalQuantity.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                  <span className="text-xs md:text-sm font-bold text-slate-400">دانە</span>
+                </div>
               </div>
+              <span className="text-[11px] text-slate-400 font-bold mt-1">کۆی گشتی یەکەکان</span>
             </div>
 
-            <div className="bg-white rounded-md p-5 border-r-4 border-gray-300 shadow-sm flex flex-col items-center justify-center">
-              <span className="text-gray-500 font-normal text-sm mb-2">گشتی کەرەستە</span>
-              <span className="text-2xl font-normal text-gray-800">{totalItems}</span>
+            <div className={`${visibleColumns.warehouseValue ? "col-span-6 md:col-span-2" : "col-span-6 md:col-span-6"} bg-white rounded-2xl p-4 md:p-5 border-r-4 border-indigo-500 shadow-sm flex flex-col justify-between items-center text-center border border-gray-100 hover:shadow-md transition-shadow`}>
+              <span className="text-slate-600 font-bold text-xs md:text-sm flex items-center gap-1.5 mb-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>
+                گشتی کەرەستە
+              </span>
+              <div className="my-auto py-1">
+                <div className="text-2xl md:text-3xl font-black text-slate-800 flex items-baseline justify-center gap-1" dir="ltr">
+                  <span>{totalItems.toLocaleString("en-US")}</span>
+                  <span className="text-xs md:text-sm font-bold text-slate-400">جۆر</span>
+                </div>
+              </div>
+              <span className="text-[11px] text-slate-400 font-bold mt-1">جۆری کاڵای کۆگا</span>
             </div>
           </div>
         )}
@@ -981,8 +1044,8 @@ function StockReportContent() {
                       <div className="flex flex-col items-center gap-3">
                         <span className="text-red-500 text-3xl">⚠️</span>
                         <span className="text-red-600 font-bold text-sm">{errorMsg}</span>
-                        <button 
-                          onClick={() => loadStockData()} 
+                        <button
+                          onClick={() => loadStockData()}
                           className="bg-[#0b1f50] text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-[#061f5f] transition-colors"
                         >
                           هەوڵی دووبارە بدەرەوە 🔄
@@ -1005,129 +1068,159 @@ function StockReportContent() {
                     const rowNumber = pageSize === "all" ? (itemIdx + 1) : ((currentPage - 1) * (pageSize as number) + itemIdx + 1);
 
                     return (
-                    <tr 
-                      key={itemIdx} 
-                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                    >
-                      {visibleColumns.id && <td className="px-2 py-2 text-center text-gray-500 font-bold">{rowNumber}</td>}
-                      {visibleColumns.productName && (
-                        <td 
-                          className="px-2 py-2 text-center text-[#4f46e5] font-bold cursor-pointer hover:underline"
-                          onClick={() => setQuickProduct({ id: item.productId, name: item.productName, code: item.productCode })}
-                          title="کلیک بکە بۆ کردارە خێراکان"
-                        >
-                          {item.productName}
-                        </td>
-                      )}
-                      {visibleColumns.category && <td className="px-2 py-2 text-center text-gray-600">{item.category}</td>}
-                      {visibleColumns.brand && <td className="px-2 py-2 text-center text-gray-600">{item.brand}</td>}
-                      {visibleColumns.sellPrice && (
-                        <td 
-                          className="px-2 py-2 text-center text-blue-600 font-bold hover:underline cursor-pointer transition-colors hover:text-blue-800" 
-                          dir="ltr"
-                          onClick={() => handleOpenPricesModal(item)}
-                        >
-                          {formatSalePrices(item)}
-                        </td>
-                      )}
-                      {visibleColumns.warehouseName && <td className="px-2 py-2 text-center text-gray-600">{item.warehouseName}</td>}
-                      {visibleColumns.quantity && (
-                        <td className="px-2 py-2 text-center text-gray-800 font-bold">
-                          {item.quantity} <span className="text-gray-400 font-normal text-[10px]">دانە</span>
-                        </td>
-                      )}
-                      {visibleColumns.purchasePrice && (
-                        <td className="px-2 py-2 text-center text-gray-800 font-bold" dir="ltr">
-                          {filters.costDisplayCurrency === "iqd" ? (
-                            <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
-                              {formatMoney(getItemDisplayPurchasePrice(item), "دینار")}
-                            </span>
-                          ) : filters.costDisplayCurrency === "usd" ? (
-                            formatMoney(getItemDisplayPurchasePrice(item), "$")
-                          ) : isIQDItem ? (
-                            <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
-                              {formatMoney(itemPurchasePrice, itemSymbol)}
-                            </span>
-                          ) : item.exchangeRateType === "FIXED" ? (
-                            <span 
-                              title={item.customExchangeRate ? `نرخی جێگیری 100$: ${Number(item.customExchangeRate).toLocaleString("en-US")} دینار` : "دۆلاری جێگیر"}
-                              className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border cursor-pointer shadow-sm"
-                              style={{ color: "#6b21a8", backgroundColor: "#f3e8ff", borderColor: "#c084fc" }}
-                            >
-                              {formatMoney(itemPurchasePrice, itemSymbol)}
-                            </span>
-                          ) : (
-                            formatMoney(itemPurchasePrice, itemSymbol)
-                          )}
-                        </td>
-                      )}
-                      {visibleColumns.expense && (
-                        <td className="px-2 py-2 text-center text-gray-800" dir="ltr">
-                          {formatMoney(getItemDisplayExpense(item), getItemDisplaySymbol(item))}
-                        </td>
-                      )}
-                      {visibleColumns.cost && (
-                        (() => {
-                          const displayCost = getItemDisplayCost(item);
-                          const displaySymbol = getItemDisplaySymbol(item);
-                          const displayDecimals = getItemDisplayDecimals(item);
-                          const isDisplayIQD = displaySymbol === "دینار";
+                      <tr
+                        key={itemIdx}
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                      >
+                        {visibleColumns.id && <td className="px-2 py-2 text-center text-gray-500 font-bold">{rowNumber}</td>}
+                        {visibleColumns.productName && (
+                          <td
+                            className="px-2 py-2 text-center text-[#4f46e5] font-bold cursor-pointer hover:underline"
+                            onClick={() => setQuickProduct({ id: item.productId, name: item.productName, code: item.productCode })}
+                            title="کلیک بکە بۆ کردارە خێراکان"
+                          >
+                            {item.productName}
+                          </td>
+                        )}
+                        {visibleColumns.category && <td className="px-2 py-2 text-center text-gray-600">{item.category}</td>}
+                        {visibleColumns.brand && <td className="px-2 py-2 text-center text-gray-600">{item.brand}</td>}
+                        {visibleColumns.sellPrice && (
+                          <td
+                            className="px-2 py-2 text-center text-blue-600 font-bold hover:underline cursor-pointer transition-colors hover:text-blue-800"
+                            dir="ltr"
+                            onClick={() => handleOpenPricesModal(item)}
+                          >
+                            {formatSalePrices(item)}
+                          </td>
+                        )}
+                        {visibleColumns.warehouseName && <td className="px-2 py-2 text-center text-gray-600">{item.warehouseName}</td>}
+                        {visibleColumns.quantity && (
+                          <td className="px-2 py-2 text-center text-gray-800 font-bold">
+                            {item.quantity} <span className="text-gray-400 font-normal text-[10px]">دانە</span>
+                          </td>
+                        )}
+                        {visibleColumns.purchasePrice && (
+                          (() => {
+                            const hasHistoricalRate = Boolean(item.purchaseExchangeRate && (item.originCurrency === "IQD" || item.hasOriginIQD || (item.rawPurchasePrice && item.rawPurchasePrice > 1000)));
+                            const rateFormatted = item.purchaseExchangeRate ? Number(item.purchaseExchangeRate).toLocaleString("en-US") : "155,000";
+                            const rawPriceFormatted = item.rawPurchasePrice ? Number(Math.round(item.rawPurchasePrice)).toLocaleString("en-US") : "";
+                            const tooltipText = hasHistoricalRate 
+                              ? `تێچووی ئەسڵی: دینار ${rawPriceFormatted}\n(${rateFormatted}) ڕەیتی کاتی کڕین`
+                              : (item.exchangeRateType === "FIXED" && item.customExchangeRate 
+                                  ? `نرخی جێگیری 100$: ${Number(item.customExchangeRate).toLocaleString("en-US")} دینار` 
+                                  : undefined);
 
-                          return (
-                            <td className="px-2 py-1 text-center text-gray-800 font-bold" dir="ltr">
-                              <div
-                                onClick={() => setCostModalItem(item)}
-                                className={`inline-block px-2.5 py-1 rounded-lg text-sm font-black cursor-pointer transition-transform hover:scale-105 ${
-                                  isDisplayIQD
-                                    ? "border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs"
-                                    : "border border-gray-200 bg-gray-50/80 hover:bg-gray-100 text-gray-800 shadow-2xs"
-                                }`}
-                                title="کلیک بکە بۆ نوێکردنەوە یان بینینی مێژووی نرخ"
+                            return (
+                              <td className="px-2 py-2 text-center text-gray-800 font-bold" dir="ltr" title={tooltipText}>
+                                {filters.costDisplayCurrency === "iqd" ? (
+                                  <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
+                                    {formatMoney(getItemDisplayPurchasePrice(item), "دینار")}
+                                  </span>
+                                ) : filters.costDisplayCurrency === "usd" ? (
+                                  hasHistoricalRate ? (
+                                    <span className="inline-flex items-center gap-1 cursor-help group">
+                                      <span>{formatMoney(getItemDisplayPurchasePrice(item), "$")}</span>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block group-hover:scale-125 transition-transform" title={tooltipText}></span>
+                                    </span>
+                                  ) : (
+                                    formatMoney(getItemDisplayPurchasePrice(item), "$")
+                                  )
+                                ) : item.exchangeRateType === "FIXED" ? (
+                                  <span
+                                    title={item.customExchangeRate ? `نرخی جێگیری 100$: ${Number(item.customExchangeRate).toLocaleString("en-US")} دینار` : "دۆلاری جێگیر"}
+                                    className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border cursor-pointer shadow-sm"
+                                    style={{ color: "#6b21a8", backgroundColor: "#f3e8ff", borderColor: "#c084fc" }}
+                                  >
+                                    {formatMoney(itemPurchasePrice, itemSymbol)}
+                                  </span>
+                                ) : hasHistoricalRate ? (
+                                  <span className="inline-flex items-center gap-1 cursor-help group">
+                                    <span>{formatMoney(itemPurchasePrice, itemSymbol)}</span>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block group-hover:scale-125 transition-transform" title={tooltipText}></span>
+                                  </span>
+                                ) : (
+                                  formatMoney(itemPurchasePrice, itemSymbol)
+                                )}
+                              </td>
+                            );
+                          })()
+                        )}
+                        {visibleColumns.expense && (
+                          <td className="px-2 py-2 text-center text-gray-800" dir="ltr">
+                            {formatMoney(getItemDisplayExpense(item), getItemDisplaySymbol(item))}
+                          </td>
+                        )}
+                        {visibleColumns.cost && (
+                          (() => {
+                            const displayCost = getItemDisplayCost(item);
+                            const displaySymbol = getItemDisplaySymbol(item);
+                            const displayDecimals = getItemDisplayDecimals(item);
+                            const isDisplayIQD = displaySymbol === "دینار";
+
+                            const hasHistoricalRate = Boolean(item.purchaseExchangeRate && (item.originCurrency === "IQD" || item.hasOriginIQD || (item.rawPurchasePrice && item.rawPurchasePrice > 1000)));
+                            const rateFormatted = item.purchaseExchangeRate ? Number(item.purchaseExchangeRate).toLocaleString("en-US") : "155,000";
+                            const rawPriceFormatted = item.rawPurchasePrice ? Number(Math.round(item.rawPurchasePrice)).toLocaleString("en-US") : "";
+                            const costTooltip = hasHistoricalRate
+                              ? `تێچووی ئەسڵی: دینار ${rawPriceFormatted}\n(${rateFormatted}) ڕەیتی کاتی کڕین\n(کلیک بکە بۆ نوێکردنەوە یان بینینی مێژووی نرخ)`
+                              : "کلیک بکە بۆ نوێکردنەوە یان بینینی مێژووی نرخ";
+
+                            return (
+                              <td className="px-2 py-1 text-center text-gray-800 font-bold" dir="ltr">
+                                <div
+                                  onClick={() => setCostModalItem(item)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-black cursor-pointer transition-transform hover:scale-105 ${isDisplayIQD
+                                      ? "border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs"
+                                      : "border border-gray-200 bg-gray-50/80 hover:bg-gray-100 text-gray-800 shadow-2xs"
+                                    }`}
+                                  title={costTooltip}
+                                >
+                                  <FormattedNumber value={displayCost} currencySymbol={displaySymbol} decimals={displayDecimals} />
+                                  {hasHistoricalRate && (
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" title={costTooltip}></span>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })()
+                        )}
+                        {visibleColumns.warehouseValue && (
+                          (() => {
+                            const displayVal = getItemDisplayWarehouseValue(item);
+                            const displaySymbol = getItemDisplaySymbol(item);
+                            const isDisplayIQD = displaySymbol === "دینار";
+
+                            return (
+                              <td className="px-2 py-2 text-center font-bold" dir="ltr">
+                                {isDisplayIQD ? (
+                                  <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
+                                    {formatMoney(displayVal, displaySymbol)}
+                                  </span>
+                                ) : (
+                                  formatMoney(displayVal, displaySymbol)
+                                )}
+                              </td>
+                            );
+                          })()
+                        )}
+                        {visibleColumns.sellerName && (
+                          <td className="px-2 py-2 text-center font-bold">
+                            {item.sellerId ? (
+                              <span
+                                className="text-[#4f46e5] cursor-pointer hover:underline"
+                                onClick={() => setQuickAccount({ id: item.sellerId, name: item.sellerName })}
+                                title="کلیک بکە بۆ کردارە خێراکان"
                               >
-                                <FormattedNumber value={displayCost} currencySymbol={displaySymbol} decimals={displayDecimals} />
-                              </div>
-                            </td>
-                          );
-                        })()
-                      )}
-                      {visibleColumns.warehouseValue && (
-                        (() => {
-                          const displayVal = getItemDisplayWarehouseValue(item);
-                          const displaySymbol = getItemDisplaySymbol(item);
-                          const isDisplayIQD = displaySymbol === "دینار";
-
-                          return (
-                            <td className="px-2 py-2 text-center font-bold" dir="ltr">
-                              {isDisplayIQD ? (
-                                <span className="inline-block px-2.5 py-1 rounded-lg text-sm font-black border border-amber-300 bg-amber-100/90 text-amber-900 shadow-xs">
-                                  {formatMoney(displayVal, displaySymbol)}
-                                </span>
-                              ) : (
-                                formatMoney(displayVal, displaySymbol)
-                              )}
-                            </td>
-                          );
-                        })()
-                      )}
-                      {visibleColumns.sellerName && (
-                        <td className="px-2 py-2 text-center font-bold">
-                          {item.sellerId ? (
-                            <span
-                              className="text-[#4f46e5] cursor-pointer hover:underline"
-                              onClick={() => setQuickAccount({ id: item.sellerId, name: item.sellerName })}
-                              title="کلیک بکە بۆ کردارە خێراکان"
-                            >
-                              {item.sellerName}
-                            </span>
-                          ) : (
-                            <span className="text-gray-500">{item.sellerName}</span>
-                          )}
-                        </td>
-                      )}
-                      {visibleColumns.purchaseDate && <td className="px-2 py-2 text-center text-gray-500 font-medium" dir="ltr">{formatDate(item.purchaseDate)}</td>}
-                    </tr>
-                  );
-                })
+                                {item.sellerName}
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">{item.sellerName}</span>
+                            )}
+                          </td>
+                        )}
+                        {visibleColumns.purchaseDate && <td className="px-2 py-2 text-center text-gray-500 font-medium" dir="ltr">{formatDate(item.purchaseDate)}</td>}
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1139,7 +1232,7 @@ function StockReportContent() {
             <div className="flex gap-3 items-center">
               <div className="flex items-center gap-1">
                 <span className="text-xs font-bold text-gray-500">پیشاندان:</span>
-                <select 
+                <select
                   value={pageSize}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -1159,7 +1252,7 @@ function StockReportContent() {
 
               {pageSize !== "all" && totalPages > 1 && (
                 <div className="flex gap-1 items-center" dir="ltr">
-                  <button 
+                  <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                     className="w-8 h-8 flex items-center justify-center bg-white border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-bold text-xs shadow-xs"
@@ -1169,7 +1262,7 @@ function StockReportContent() {
                   <span className="px-3 py-1 bg-[#0b1f50] text-white rounded-lg font-bold text-xs">
                     {currentPage} / {totalPages}
                   </span>
-                  <button 
+                  <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                     className="w-8 h-8 flex items-center justify-center bg-white border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer font-bold text-xs shadow-xs"
@@ -1218,9 +1311,9 @@ function StockReportContent() {
                 ].map(col => (
                   <label key={col.key} className="flex items-center justify-between cursor-pointer border-b border-gray-100 pb-1.5">
                     <span className="text-gray-700 font-bold text-[11px]">{col.label}</span>
-                    <input 
-                      type="checkbox" 
-                      checked={visibleColumns[col.key as keyof typeof visibleColumns]} 
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns[col.key as keyof typeof visibleColumns]}
                       onChange={() => toggleColumn(col.key as keyof typeof visibleColumns)}
                       className="w-4 h-4 rounded text-[#0b1f50] focus:ring-[#0b1f50]"
                     />
@@ -1251,7 +1344,7 @@ function StockReportContent() {
               </div>
               <button onClick={() => setEditingPriceItem(null)} className="text-white hover:text-gray-300 text-2xl font-bold cursor-pointer">×</button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto flex-1 text-right" dir="rtl">
               <div className="space-y-4">
                 {editingPrices.map((row, index) => (
@@ -1352,7 +1445,7 @@ function StockReportContent() {
             <div className="bg-[#0b1f50] text-white p-4 flex justify-between items-center">
               <h3 className="font-bold text-lg m-0">ئۆپشنەکانی فلتەرکردن</h3>
               <div className="flex gap-4 items-center">
-                <button 
+                <button
                   onClick={handleResetFilters}
                   className="text-white hover:text-gray-300 text-sm font-bold flex items-center gap-1"
                 >
@@ -1362,7 +1455,7 @@ function StockReportContent() {
               </div>
             </div>
             <div className="p-5 max-h-[85vh] overflow-y-auto text-right" style={{ direction: 'rtl' }}>
-              
+
               <div className="mb-4">
                 <h4 className="font-bold text-gray-800 text-[14px] mb-3 flex items-center gap-2 justify-end">
                   <span>📍</span> شوێن و سەرچاوە
@@ -1417,19 +1510,19 @@ function StockReportContent() {
                   <div>
                     <MultiSelectDropdown
                       label="کەرەستە"
-                      options={products?.map((p: any) => ({ value: p.id, label: p.name })) || []}
+                      options={productOptions}
                       selectedValues={filters.productIds}
                       onChange={vals => setFilters(prev => ({ ...prev, productIds: vals }))}
                       searchable
                     />
                   </div>
                   <div>
-                    <input 
-                      type="text" 
-                      placeholder="کۆد" 
+                    <input
+                      type="text"
+                      placeholder="کۆد"
                       value={filters.code}
                       onChange={e => setFilters(prev => ({ ...prev, code: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-600 outline-none text-right min-h-[48px] font-bold shadow-sm focus:border-[#0b1f50]" 
+                      className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-600 outline-none text-right min-h-[48px] font-bold shadow-sm focus:border-[#0b1f50]"
                     />
                   </div>
                 </div>
@@ -1438,12 +1531,12 @@ function StockReportContent() {
               <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 <div>
                   <h4 className="font-bold text-gray-800 text-[14px] mb-2">دۆخی کۆگا 📉</h4>
-                  <input 
-                    type="text" 
-                    placeholder="کۆدی وەجبە" 
+                  <input
+                    type="text"
+                    placeholder="کۆدی وەجبە"
                     value={filters.batchCode}
                     onChange={e => setFilters(prev => ({ ...prev, batchCode: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-600 outline-none text-right min-h-[48px] font-bold shadow-sm focus:border-[#0b1f50]" 
+                    className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-600 outline-none text-right min-h-[48px] font-bold shadow-sm focus:border-[#0b1f50]"
                   />
                 </div>
                 <div>
@@ -1465,7 +1558,7 @@ function StockReportContent() {
                   <h4 className="font-bold text-amber-900 text-[13px] mb-1.5 flex items-center gap-1 justify-end">
                     <span>🟠</span> دراوی کڕین
                   </h4>
-                  <select 
+                  <select
                     value={filters.currency}
                     onChange={e => setFilters(prev => ({ ...prev, currency: e.target.value }))}
                     className="w-full border border-amber-300 rounded-xl p-3 text-sm text-amber-950 bg-amber-50/50 outline-none text-right min-h-[48px] font-bold shadow-sm focus:border-amber-500 cursor-pointer"
@@ -1477,7 +1570,7 @@ function StockReportContent() {
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-700 text-[13px] mb-1.5">بەردەستبوونی کەرەستە</h4>
-                  <select 
+                  <select
                     value={filters.warehouseStatus}
                     onChange={e => setFilters(prev => ({ ...prev, warehouseStatus: e.target.value }))}
                     className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 outline-none text-right min-h-[48px] font-bold shadow-sm focus:border-[#0b1f50]"
@@ -1489,7 +1582,7 @@ function StockReportContent() {
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-700 text-[13px] mb-1.5">جۆری دۆلار</h4>
-                  <select 
+                  <select
                     value={filters.rateType}
                     onChange={e => setFilters(prev => ({ ...prev, rateType: e.target.value }))}
                     className="w-full border border-gray-300 rounded-xl p-3 text-sm text-gray-700 outline-none text-right min-h-[48px] font-bold shadow-sm focus:border-[#0b1f50]"
@@ -1504,11 +1597,11 @@ function StockReportContent() {
 
 
               <div className="border-t border-gray-100 pt-5 flex justify-between items-center">
-                <button 
+                <button
                   onClick={() => {
                     setShowFilterModal(false);
                     loadStockData();
-                  }} 
+                  }}
                   className="bg-[#0b1f50] text-white px-6 py-2.5 rounded-lg shadow-md text-sm font-bold hover:bg-[#061f5f] transition-colors flex items-center gap-2"
                 >
                   جێبەجێکردنی فلتەرەکان ✔️

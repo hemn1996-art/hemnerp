@@ -45,6 +45,28 @@ export default function LayoutShell({ children }: LayoutShellProps) {
   const [announcement, setAnnouncement] = useState<{ id: number; message: string; type: string } | null>(null);
   const [dismissedId, setDismissedId] = useState<number | null>(null);
 
+  const handleGlobalBack = () => {
+    // Check if current active page has unsaved changes
+    const checkFn = (window as any).hasUnsavedChanges;
+    if (typeof checkFn === "function") {
+      try {
+        const res = checkFn();
+        if (res && res.unsaved) {
+          const proceed = window.confirm("تۆ داتای خەزن نەکراوت هەیە لەسەر ئەم پەڕەیە. دڵنیایت دەتەوێت بگەڕێیتەوە؟");
+          if (!proceed) return;
+        }
+      } catch (e) {
+        console.error("Error running hasUnsavedChanges:", e);
+      }
+    }
+
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
   // Determine required permission module for current pathname
   const getRequiredModuleForPath = (path: string): string | null => {
     if (path === "/dashboard" || path === "/") return "dashboard";
@@ -433,10 +455,12 @@ export default function LayoutShell({ children }: LayoutShellProps) {
           >
             ☰
           </button>
-          <span className="font-black text-lg text-gray-900">کۆگای دۆستان</span>
+          <span className="font-black text-lg text-gray-900">سەنتەری کارەبای لەندەن</span>
           <div className="w-10"></div>
         </div>
       )}
+
+
 
       {/* Main Row - sidebar + content, fills all remaining height */}
       <div

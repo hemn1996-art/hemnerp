@@ -66,19 +66,38 @@ export async function getCalculatedWarehouseValueInUsd(dateFilter?: Date): Promi
       const costInfo = productCostMap.get(pId);
       if (costInfo && costInfo.costPrice > 0) {
         let unitCostUsd = costInfo.costPrice;
+        const isCostIQD = costInfo.costCurrencyId === 2 || costInfo.costCurrencyId === 12;
+        const isFixed = costInfo.exchangeRateType === "FIXED" && costInfo.customExchangeRate;
+
         // If cost currency is IQD, convert to USD at current market rate
-        if (costInfo.costCurrencyId === 2) {
+        if (isCostIQD) {
           unitCostUsd = costInfo.costPrice / marketRatePerDollar;
+        } else if (isFixed) {
+          // If USD cost is entered under a FIXED leaf dollar contract rate (e.g. 135,000 IQD per 100$),
+          // convert to IQD at contract rate, then convert to USD at current market rate
+          const fixedRate = costInfo.customExchangeRate > 10000
+            ? costInfo.customExchangeRate / 100
+            : costInfo.customExchangeRate;
+          const costIqd = costInfo.costPrice * fixedRate;
+          unitCostUsd = costIqd / marketRatePerDollar;
         }
-        // If cost currency is USD, it is already in USD (no conversion needed)
+        // If regular USD, it is already in USD (no conversion needed)
         totalWarehouseValueInUsd += qty * unitCostUsd;
       } else {
         // Fallback to recorded transaction unitCost if costInfo is 0
         const txs = txsByProduct.get(pId);
         const txWithCost = txs?.find((t: any) => t.unitCost && t.unitCost > 0);
         if (txWithCost) {
-          const isIQD = txWithCost.currencyId === 2 || txWithCost.unitCost > 1000;
-          const unitCostUsd = isIQD ? (txWithCost.unitCost / marketRatePerDollar) : txWithCost.unitCost;
+          const isIQD = txWithCost.currencyId === 2 || txWithCost.currencyId === 12 || (txWithCost.currencyId !== 1 && txWithCost.unitCost > 15000);
+          const isFixed = txWithCost.voucher?.account?.exchangeRateType === "FIXED";
+          const customRate = txWithCost.voucher?.account?.customExchangeRate;
+          let unitCostUsd = txWithCost.unitCost;
+          if (isIQD) {
+            unitCostUsd = txWithCost.unitCost / marketRatePerDollar;
+          } else if (isFixed && customRate) {
+            const fixedRate = customRate > 10000 ? customRate / 100 : customRate;
+            unitCostUsd = (txWithCost.unitCost * fixedRate) / marketRatePerDollar;
+          }
           totalWarehouseValueInUsd += qty * unitCostUsd;
         }
       }

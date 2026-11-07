@@ -47,6 +47,11 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const [donutPeriod, setDonutPeriod] = useState<string>("today");
   const [recentVoucherFilter, setRecentVoucherFilter] = useState<string>("all");
 
+  const [isEditingRate, setIsEditingRate] = useState(false);
+  const [editRateInput, setEditRateInput] = useState("");
+  const [isSavingRate, setIsSavingRate] = useState(false);
+  const [rateToast, setRateToast] = useState("");
+
   useEffect(() => {
     setMounted(true);
     const saved = localStorage.getItem("general_settings");
@@ -104,10 +109,21 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const formatInvoiceCurrency = (val: number, currencyCode: string) => {
     const formatted = (val || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     if (currencyCode === "IQD" || currencyCode === "دینار") {
-      return `دینار ${formatted}`;
+      return (
+        <span dir="ltr" className="inline-flex items-baseline gap-1">
+          <span className="text-[0.85em] opacity-85 font-bold">دینار</span>
+          <span>{formatted}</span>
+        </span>
+      );
     }
     const cur = currencies.find((c: any) => c.code === currencyCode);
-    return `${cur?.symbol || "$"} ${formatted}`;
+    const sym = cur?.symbol || "$";
+    return (
+      <span dir="ltr" className="inline-flex items-baseline gap-1">
+        <span className="text-[0.85em] opacity-85 font-bold">{sym}</span>
+        <span>{formatted}</span>
+      </span>
+    );
   };
 
   const getFilteredInvoices = (period: string) => {
@@ -159,7 +175,10 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     let iqd = 0;
 
     filteredInvs.forEach((inv: any) => {
-      if (inv.type === filterType) {
+      const isMatch = inv.type === filterType ||
+        (filterType === "پارەدان" && (inv.type === "پارەدان" || inv.type === "پارەی ڕۆشتوو" || inv.type === "money_out")) ||
+        (filterType === "پارە وەرگرتن" && (inv.type === "پارە وەرگرتن" || inv.type === "پارەی هاتوو" || inv.type === "money_in"));
+      if (isMatch) {
         if (sumField === "total") {
           // Use voucher's main currency or derive from items
           const allLinesIQD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 2 || l.currencyId === 12);
@@ -206,8 +225,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const salesTotals = getTotals(kpiInvoices, "فرۆشتن", "total");
   const purchaseTotals = getTotals(kpiInvoices, "کڕین", "total");
   const expenseTotals = getTotals(kpiInvoices, "خەرجی", "total");
-  const moneyInTotals = getTotals(kpiInvoices, "پارەی هاتوو", "paid");
-  const moneyOutTotals = getTotals(kpiInvoices, "پارەی ڕۆشتوو", "paid");
+  const moneyInTotals = getTotals(kpiInvoices, "پارە وەرگرتن", "paid");
+  const moneyOutTotals = getTotals(kpiInvoices, "پارەدان", "paid");
 
   const barData = [
     { name: "January", usd: 0, iqd: 0 },
@@ -257,8 +276,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const pieData = [
     { name: "فرۆشتن", typeKey: "sales", value: donutInvoices.filter((x: any) => x.type === "فرۆشتن").length, color: "#ef4444" },
     { name: "کڕین", typeKey: "purchase", value: donutInvoices.filter((x: any) => x.type === "کڕین").length, color: "#10b981" },
-    { name: "پارەی هاتوو", typeKey: "money_in", value: donutInvoices.filter((x: any) => x.type === "پارەی هاتوو").length, color: "#8b5cf6" },
-    { name: "پارەی ڕۆشتوو", typeKey: "money_out", value: donutInvoices.filter((x: any) => x.type === "پارەی ڕۆشتوو").length, color: "#14b8a6" },
+    { name: "پارە وەرگرتن", typeKey: "money_in", value: donutInvoices.filter((x: any) => x.type === "پارە وەرگرتن" || x.type === "پارەی هاتوو" || x.type === "money_in").length, color: "#8b5cf6" },
+    { name: "پارەدان", typeKey: "money_out", value: donutInvoices.filter((x: any) => x.type === "پارەدان" || x.type === "پارەی ڕۆشتوو" || x.type === "money_out").length, color: "#14b8a6" },
     { name: "خەرجی", typeKey: "expense", value: donutInvoices.filter((x: any) => x.type === "خەرجی").length, color: "#f59e0b" },
   ];
 
@@ -362,6 +381,60 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
   const iqdCurrency = currencies.find(
     (c: any) => c.code === "IQD" || c.name === "دینار" || c.name?.includes("دینار")
   );
+  let liveIqdRate100 = 150000;
+  if (iqdCurrency) {
+    let r = Number(iqdCurrency.rate || 1500);
+    if (r < 10000) r = r * 100;
+    liveIqdRate100 = r;
+  }
+
+  const handleSaveDashboardRate = async () => {
+    if (!iqdCurrency) return;
+    const num = Number(editRateInput.replace(/[^0-9]/g, ""));
+    if (!num || num < 50000 || num > 300000) {
+      alert("تکایە نرخێکی دروست بنووسە بە دینار (بۆ نموونە 150000)");
+      return;
+    }
+
+    try {
+      setIsSavingRate(true);
+      const rateToSave = num > 10000 ? num / 100 : num;
+
+      const res = await fetch("/api/currencies", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: iqdCurrency.id,
+          code: iqdCurrency.code || "IQD",
+          name: iqdCurrency.name || "دینار",
+          symbol: iqdCurrency.symbol || "د.ع",
+          rate: rateToSave,
+          mode: iqdCurrency.mode,
+          rounding: iqdCurrency.rounding,
+          decimalPlaces: iqdCurrency.decimalPlaces,
+          color: iqdCurrency.color,
+          isActive: iqdCurrency.isActive ?? true,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchCurrencies();
+        const todayStr = new Date().toISOString().split("T")[0];
+        localStorage.setItem("__daily_rate_verified_date", todayStr);
+        setRateToast(`نرخی ١٠٠ دۆلار بۆ دینار ${num.toLocaleString("en-US")} نوێکرایەوە`);
+        setIsEditingRate(false);
+        setTimeout(() => setRateToast(""), 3000);
+      } else {
+        alert("کێشەیەک لە پاشەکەوتکردنی نرخدا ڕووی دا");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("کێشەی پەیوەندیکردن بە سێرڤەرەوە ڕووی دا");
+    } finally {
+      setIsSavingRate(false);
+    }
+  };
+
   const todayStr = new Date().toISOString().split("T")[0];
   const isDailyRateVerified = typeof window !== "undefined" ? localStorage.getItem("__daily_rate_verified_date") === todayStr : true;
 
@@ -372,7 +445,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
     alerts.unshift({
       id: "daily-rate-prompt",
       type: "daily-rate",
-      title: "ئاگاداری ڕۆژانەی نرخی دۆلار 💵",
+      title: "ئاگاداری ڕۆژانەی نرخی دۆلار",
       message: `نرخی ١٠٠ دۆلار: ${rate100.toLocaleString("en-US")} دینار. ئایا ئەمڕۆ هەمان نرخە؟`,
       severity: "warning",
     });
@@ -415,11 +488,13 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
 
     return (
       <div className="flex flex-col text-right">
-        <span className={`${usdSize} mb-0.5`}>
-          $ {usd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+        <span dir="ltr" className={`${usdSize} mb-0.5 inline-flex items-baseline justify-end gap-1`}>
+          <span className="font-bold text-[0.85em] opacity-85">$</span>
+          <span>{usd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
         </span>
-        <span className={`${iqdSize}`}>
-          {iqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} دینار
+        <span dir="ltr" className={`${iqdSize} inline-flex items-baseline justify-end gap-1`}>
+          <span className="font-bold text-[0.85em] opacity-85">دینار</span>
+          <span>{iqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
         </span>
       </div>
     );
@@ -456,13 +531,143 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
         </div>
 
         <div className="flex items-center gap-3 z-20">
+          {/* Permanent Exchange Rate Box */}
+          <div className="relative">
+            <div
+              dir="ltr"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900/95 border border-slate-700/80 hover:border-indigo-500/50 backdrop-blur-xl shadow-lg hover:shadow-indigo-500/10 transition-all duration-200"
+            >
+              {/* USD Pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-black text-xs md:text-sm font-mono shadow-sm">
+                <svg className="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                <span className="tracking-wide">$ 100</span>
+              </div>
+
+              {/* Equals Badge in the Exact Middle */}
+              <span className="w-5 h-5 rounded-full bg-slate-800 border border-slate-600/80 text-slate-300 flex items-center justify-center text-xs font-black shrink-0 select-none shadow-inner">
+                =
+              </span>
+
+              {/* IQD Pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-black text-xs md:text-sm font-mono shadow-sm">
+                <span className="text-[11px] font-bold text-slate-300 opacity-90">دینار</span>
+                <span>{liveIqdRate100.toLocaleString("en-US")}</span>
+              </div>
+
+              {/* Edit Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setEditRateInput(String(liveIqdRate100));
+                  setIsEditingRate(!isEditingRate);
+                }}
+                title="دەستکاری کردنی نرخی دۆلار"
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white border border-slate-700/60 hover:border-slate-500 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm ml-0.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Edit Popover */}
+            {isEditingRate && (
+              <div className="absolute left-0 mt-2 w-72 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl p-4 z-[99999] rtl text-right animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+                    <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    <span>گۆڕینی نرخی ١٠٠ دۆلار</span>
+                  </div>
+                  <button
+                    onClick={() => setIsEditingRate(false)}
+                    className="text-slate-400 hover:text-white text-xs p-1 rounded hover:bg-slate-800"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="mb-3">
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    نرخی نوێ بۆ ١٠٠ دۆلار (بە دینار):
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      dir="ltr"
+                      value={editRateInput}
+                      onChange={(e) => setEditRateInput(e.target.value.replace(/[^0-9]/g, ""))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveDashboardRate();
+                        if (e.key === "Escape") setIsEditingRate(false);
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none pl-12 text-right"
+                      placeholder="150000"
+                      autoFocus
+                    />
+                    <span className="absolute left-3 top-2.5 text-xs text-slate-500 font-bold pointer-events-none">
+                      دینار
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    نرخ بۆ نموونە: 152000 (ڕاستەوخۆ دەبێتە نرخی گشتی دۆلار)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isSavingRate}
+                    onClick={handleSaveDashboardRate}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+                  >
+                    {isSavingRate ? (
+                      <span className="text-xs">پاشەکەوت دەکرێت...</span>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                        <span>پاشەکەوتکردن</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingRate(false)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs py-2 px-3 rounded-lg transition-all cursor-pointer"
+                  >
+                    داخستن
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Toast message if rate was updated */}
+          {rateToast && (
+            <div className="fixed bottom-6 left-6 z-[999999] bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-sm font-bold animate-in fade-in slide-in-from-bottom-2">
+              <svg className="w-5 h-5 text-emerald-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+              <span>{rateToast}</span>
+            </div>
+          )}
+
           {/* Notification Bell Dropdown */}
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/10 border border-white/20 hover:bg-white/20 hover:scale-105 active:scale-95 transition-all cursor-pointer relative backdrop-blur-md"
             >
-              <span className="text-lg">🔔</span>
+              <svg className="w-5 h-5 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+              </svg>
               {alerts.length > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[11px] font-black text-white animate-pulse shadow-md">
                   {alerts.length}
@@ -724,14 +929,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
           {renderCardValues(expenseTotals.usd, expenseTotals.iqd)}
         </div>
 
-        {/* Card 4: Outgoing Money (پارەی ڕۆشتوو) */}
+        {/* Card 4: Outgoing Money (پارەدان) */}
         <div
           className="rounded-2xl p-5 border shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg cursor-pointer"
           style={{ background: "linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)", borderColor: "#67e8f9" }}
           onClick={() => router.push('/reports/invoices?type=money_out')}
         >
           <div className="flex justify-between items-center mb-4">
-            <span className="text-cyan-900 font-black text-[15px]">پارەی ڕۆشتوو</span>
+            <span className="text-cyan-900 font-black text-[15px]">پارەدان</span>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-cyan-600 text-white shadow-md shadow-cyan-200">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -741,14 +946,14 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
           {renderCardValues(moneyOutTotals.usd, moneyOutTotals.iqd)}
         </div>
 
-        {/* Card 5: Incoming Money (پارەی هاتوو) */}
+        {/* Card 5: Incoming Money (پارە وەرگرتن) */}
         <div
           className="rounded-2xl p-5 border shadow-sm relative flex flex-col justify-between min-h-[140px] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg cursor-pointer"
           style={{ background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)", borderColor: "#d8b4fe" }}
           onClick={() => router.push('/reports/invoices?type=money_in')}
         >
           <div className="flex justify-between items-center mb-4">
-            <span className="text-purple-900 font-black text-[15px]">پارەی هاتوو</span>
+            <span className="text-purple-900 font-black text-[15px]">پارە وەرگرتن</span>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-600 text-white shadow-md shadow-purple-200">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -771,21 +976,25 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                 {chartType === "sales" ? "فرۆشی ساڵ" : "کڕینی ساڵ"}
               </span>
               {chartCurrency === "all" ? (
-                <div className="flex flex-col gap-0">
-                  <span className="text-base font-black font-mono text-[#3b82f6]">
-                    $ {chartSumUsd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                <div className="flex flex-col gap-0 items-start">
+                  <span dir="ltr" className="text-base font-black font-mono text-[#3b82f6] inline-flex items-baseline gap-1">
+                    <span className="text-[0.85em] opacity-85">$</span>
+                    <span>{chartSumUsd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                   </span>
-                  <span className="text-base font-black font-mono text-[#22c55e]">
-                    {chartSumIqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} دینار
+                  <span dir="ltr" className="text-base font-black font-mono text-[#22c55e] inline-flex items-baseline gap-1">
+                    <span className="text-[0.85em] opacity-85">دینار</span>
+                    <span>{chartSumIqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                   </span>
                 </div>
               ) : chartCurrency === "USD" ? (
-                <span className="text-xl font-black font-mono text-[#3b82f6]">
-                  $ {chartSumUsd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                <span dir="ltr" className="text-xl font-black font-mono text-[#3b82f6] inline-flex items-baseline gap-1">
+                  <span className="text-[0.85em] opacity-85">$</span>
+                  <span>{chartSumUsd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                 </span>
               ) : (
-                <span className="text-xl font-black font-mono text-[#22c55e]">
-                  {chartSumIqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} دینار
+                <span dir="ltr" className="text-xl font-black font-mono text-[#22c55e] inline-flex items-baseline gap-1">
+                  <span className="text-[0.85em] opacity-85">دینار</span>
+                  <span>{chartSumIqd.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </span>
               )}
             </div>
@@ -917,8 +1126,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
             <option value="فرۆشتن" className="text-gray-900">فرۆشتن</option>
             <option value="کڕین" className="text-gray-900">کڕین</option>
             <option value="خەرجی" className="text-gray-900">خەرجی</option>
-            <option value="پارەی هاتوو" className="text-gray-900">پارەی هاتوو</option>
-            <option value="پارەی ڕۆشتوو" className="text-gray-900">پارەی ڕۆشتوو</option>
+            <option value="پارە وەرگرتن" className="text-gray-900">پارە وەرگرتن</option>
+            <option value="پارەدان" className="text-gray-900">پارەدان</option>
           </select>
         </div>
         <div className="overflow-x-auto">
@@ -942,6 +1151,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
               {[...invoices]
                 .filter((inv: any) => {
                   if (recentVoucherFilter === "all") return true;
+                  if (recentVoucherFilter === "پارەدان") return inv.type === "پارەدان" || inv.type === "پارەی ڕۆشتوو" || inv.type === "money_out";
+                  if (recentVoucherFilter === "پارە وەرگرتن") return inv.type === "پارە وەرگرتن" || inv.type === "پارەی هاتوو" || inv.type === "money_in";
                   return inv.type === recentVoucherFilter;
                 })
                 .sort((a: any, b: any) => {
@@ -956,8 +1167,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                   if (inv.type === "فرۆشتن") badgeClass = "bg-[#fee2e2] text-[#ef4444]";
                   else if (inv.type === "کڕین") badgeClass = "bg-[#dcfce7] text-[#22c55e]";
                   else if (inv.type === "خەرجی") badgeClass = "bg-[#ffedd5] text-[#f97316]";
-                  else if (inv.type === "پارەی هاتوو") badgeClass = "bg-[#f3e8ff] text-[#8b5cf6]";
-                  else if (inv.type === "پارەی ڕۆشتوو") badgeClass = "bg-[#ecfeff] text-[#06b6d4]";
+                  else if (inv.type === "پارە وەرگرتن" || inv.type === "پارەی هاتوو") badgeClass = "bg-[#f3e8ff] text-[#8b5cf6]";
+                  else if (inv.type === "پارەدان" || inv.type === "پارەی ڕۆشتوو") badgeClass = "bg-[#ecfeff] text-[#06b6d4]";
 
                   const allLinesIQD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 2 || l.currencyId === 12);
                   const allLinesUSD = inv.lines && inv.lines.length > 0 && inv.lines.every((l: any) => l.currencyId === 1 || l.currencyId === 11);
@@ -985,8 +1196,8 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                               raw === "sales" || raw === "فرۆشتن" ? "sales" :
                               raw === "purchase" || raw === "کڕین" ? "purchase" :
                               raw === "expense" || raw === "خەرجی" ? "expense" :
-                              raw === "money_in" || raw === "پارەی هاتوو" ? "money_in" :
-                              raw === "money_out" || raw === "پارەی ڕۆشتوو" ? "money_out" :
+                              raw === "money_in" || raw === "پارە وەرگرتن" || raw === "پارەی هاتوو" ? "money_in" :
+                              raw === "money_out" || raw === "پارەدان" || raw === "پارەی ڕۆشتوو" ? "money_out" :
                               raw === "sales_return" || raw === "گەڕانەوەی فرۆشتن" ? "sales_return" :
                               raw === "purchase_return" || raw === "گەڕانەوەی کڕین" ? "purchase_return" :
                               raw === "my_debt" || raw === "من قەرزارم" || raw === "من قەرزارم" || raw === "من قەرزدارم" ? "my_debt" :
@@ -1036,7 +1247,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                         {formatInvoiceCurrency(rowTotal, currencyCode)}
                       </td>
                       <td className="px-4 py-3.5 text-center text-rose-600 font-mono">
-                        {inv.totalDiscount > 0 ? formatInvoiceCurrency(inv.totalDiscount, currencyCode) : "-"}
+                        {inv.totalDiscount > 0 ? formatInvoiceCurrency(inv.totalDiscount, inv.discountCurrencyId === 1 ? "$" : (inv.discountCurrencyId === 2 ? "دینار" : currencyCode)) : "-"}
                       </td>
                       <td className="px-4 py-3.5 text-center text-green-600 font-bold font-mono">
                         {inv.paid > 0 ? formatInvoiceCurrency(inv.paid, paidCurrencyCode) : "-"}
@@ -1117,9 +1328,9 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
             <span className="font-black text-[14px] text-slate-800 group-hover:text-orange-600">خەرجی</span>
           </button>
 
-          {/* Action 4: Outgoing Money */}
+          {/* Action 4: Outgoing Money (پارەدان) */}
           <button
-            onClick={() => openInvoice("پارەی ڕۆشتوو")}
+            onClick={() => openInvoice("پارەدان")}
             className="bg-white border-2 border-cyan-100 hover:border-cyan-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1.5 hover:shadow-md hover:bg-cyan-50/40 cursor-pointer group"
           >
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-cyan-600 text-white transition-transform group-hover:scale-110 shadow-md shadow-cyan-200">
@@ -1127,12 +1338,12 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
             </div>
-            <span className="font-black text-[14px] text-slate-800 group-hover:text-cyan-600">پارەی ڕۆشتوو</span>
+            <span className="font-black text-[14px] text-slate-800 group-hover:text-cyan-600">پارەدان</span>
           </button>
 
-          {/* Action 5: Incoming Money */}
+          {/* Action 5: Incoming Money (پارە وەرگرتن) */}
           <button
-            onClick={() => openInvoice("پارەی هاتوو")}
+            onClick={() => openInvoice("پارە وەرگرتن")}
             className="bg-white border-2 border-purple-100 hover:border-purple-500 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-sm hover:-translate-y-1.5 hover:shadow-md hover:bg-purple-50/40 cursor-pointer group"
           >
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-purple-600 text-white transition-transform group-hover:scale-110 shadow-md shadow-purple-200">
@@ -1140,7 +1351,7 @@ export default function Dashboard({ openInvoice }: DashboardProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
             </div>
-            <span className="font-black text-[14px] text-slate-800 group-hover:text-purple-600">پارەی هاتوو</span>
+            <span className="font-black text-[14px] text-slate-800 group-hover:text-purple-600">پارە وەرگرتن</span>
           </button>
 
         </div>

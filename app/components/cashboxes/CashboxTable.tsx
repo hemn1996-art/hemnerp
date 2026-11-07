@@ -28,9 +28,12 @@ export default function CashboxTable({
   }
 
   function renderBalances(cashbox: CashboxLike) {
-    const activeBalances = (cashbox.balances || []).filter(
-      (b) => Math.abs(Number(b.amount || 0)) > 0.0001
-    );
+    const activeBalances = (cashbox.balances || []).filter((b) => {
+      const amt = Number(b.amount || 0);
+      const currency = getCurrency(b.currencyId);
+      const isIQD = currency?.code === "IQD" || currency?.name?.includes("دینار");
+      return isIQD ? Math.abs(amt) >= 250 : Math.abs(amt) >= 1;
+    });
 
     if (activeBalances.length === 0) {
       return <span className="text-slate-400 font-bold text-sm">0</span>;
@@ -42,24 +45,31 @@ export default function CashboxTable({
           const currency = getCurrency(b.currencyId);
           const symbol = currency?.symbol || "$";
           const amount = Number(b.amount || 0);
-          const isNegative = amount < -0.01;
           const isIQD = currency?.code === "IQD" || currency?.name?.includes("دینار");
+          const isNegative = isIQD ? amount <= -250 : amount <= -1;
 
           return (
             <span
               key={b.currencyId}
               dir="ltr"
-              className={`font-black text-sm px-3 py-1 rounded-lg border inline-flex items-center gap-1 ${
+              className={`font-black text-sm px-3 py-1 rounded-lg border inline-flex items-baseline gap-1 ${
                 isNegative
                   ? "text-red-700 bg-red-50 border-red-200"
                   : "text-slate-900 bg-slate-50 border-slate-200"
               }`}
             >
-              <FormattedNumber 
-                value={isNegative ? -amount : amount} 
-                currencySymbol={isIQD ? "دینار" : symbol} 
-              />
-              {isNegative && <span className="mr-1 text-red-600 font-black">-</span>}
+              {isIQD ? (
+                <>
+                  <span style={{ fontSize: "0.88em", opacity: 0.85 }}>دینار</span>
+                  <span>{isNegative ? `-${Math.round(Math.abs(amount)).toLocaleString("en-US")}` : Math.round(Math.abs(amount)).toLocaleString("en-US")}</span>
+                </>
+              ) : (
+                <>
+                  {isNegative && <span className="text-red-600 font-black">-</span>}
+                  <span style={{ fontSize: "0.88em", opacity: 0.85 }}>{symbol}</span>
+                  <span>{Math.round(Math.abs(amount)).toLocaleString("en-US")}</span>
+                </>
+              )}
             </span>
           );
         })}

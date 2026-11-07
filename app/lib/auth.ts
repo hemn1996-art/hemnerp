@@ -33,7 +33,7 @@ export interface SessionUser {
 
 import crypto from "crypto";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "hemnerp-secure-session-key-2026";
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.JWT_SECRET || "orient-iraq-client-2-secure-session-key-2026";
 
 /**
  * Sign session payload with HMAC-SHA256
@@ -192,8 +192,8 @@ export const PERMISSION_MODULES = [
   { key: "vouchers_sales_return", label: "گەڕاندنەوەی فرۆش", group: "پسووڵەکان", icon: "🧾" },
   { key: "vouchers_purchase_return", label: "گەڕاندنەوەی کڕین", group: "پسووڵەکان", icon: "🧾" },
   { key: "vouchers_expense", label: "پسووڵەی خەرجی", group: "پسووڵەکان", icon: "🧾" },
-  { key: "vouchers_money_in", label: "پسووڵەی پارەی هاتوو", group: "پسووڵەکان", icon: "🧾" },
-  { key: "vouchers_money_out", label: "پسووڵەی پارەی ڕۆشتوو", group: "پسووڵەکان", icon: "🧾" },
+  { key: "vouchers_money_in", label: "پسووڵەی پارە وەرگرتن", group: "پسووڵەکان", icon: "🧾" },
+  { key: "vouchers_money_out", label: "پسووڵەی پارەدان", group: "پسووڵەکان", icon: "🧾" },
   { key: "vouchers_my_debt", label: "پسووڵەی من قەرزارم", group: "پسووڵەکان", icon: "🧾" },
   { key: "vouchers_people_debt", label: "پسووڵەی قەرزم لای خەڵکە", group: "پسووڵەکان", icon: "🧾" },
   { key: "vouchers_debt_discount_mine", label: "داشکاندنم بۆ کراوە", group: "پسووڵەکان", icon: "🧾" },

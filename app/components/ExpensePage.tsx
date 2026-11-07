@@ -447,14 +447,26 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
     const decimal = parts[1];
     const displaySymbol = isIQD ? "دینار" : symbol;
 
+    const numberJSX = (
+      <span>
+        <span>{whole}</span>
+        {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+      </span>
+    );
+
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {isNegative && <span>-</span>}
-        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
-        <span>
-          <span>{whole}</span>
-          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
-        </span>
+        {isIQD ? (
+          <>
+            {numberJSX}
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>دینار</span>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{symbol}</span>
+            {numberJSX}
+          </>
+        )}
       </span>
     );
   }
@@ -1117,7 +1129,10 @@ export default function ExpensePage({ headerSelector, editId }: Props) {
           </div>
 
           <div style={sideActions}>
-            <button style={outlineBlueBtn} onClick={handleNewReceipt}>
+            <button
+              style={outlineBlueBtn}
+              onClick={handleNewReceipt}
+            >
               پسوڵەی نوێ
             </button>
 

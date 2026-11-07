@@ -168,10 +168,9 @@ export async function GET(request: Request) {
       const sellerAcc = line.voucher.account;
       const rateType = (line.voucher as any)?.exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType;
       const customRate = (line.voucher as any)?.customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate;
-      const isWarehouseStockWithCustom = line.voucher.type === "warehouse_stock" && customRate && (customRate === 135000 || customRate === 132000 || customRate < 145000);
-      const isFixed = rateType === "FIXED" || Boolean(isWarehouseStockWithCustom);
-
       const effectiveCurrencyId = line.currencyId || line.voucher.currencyId || 1;
+      const isLineIQD = effectiveCurrencyId === 2 || effectiveCurrencyId === 12;
+      const isFixed = rateType === "FIXED" && !isLineIQD;
 
       return {
         id: line.id,

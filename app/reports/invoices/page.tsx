@@ -12,6 +12,15 @@ import BackButton from "../../components/BackButton";
 import { formatCurrencyString, formatCurrencyJSX, roundCurrency } from "../../utils/currencyHelper";
 import ProductQuickModal from "../../components/ProductQuickModal";
 import AccountQuickModal from "../../components/AccountQuickModal";
+import QuickDateFilter from "../../components/QuickDateFilter";
+import { getDefaultReportDateRange } from "../../utils/datePresets";
+import {
+  buildProductCostMaps,
+  calculateVoucherProfit,
+  extractInventoryTransactionsFromVouchers,
+  normalizeExchangeRate,
+  getProductUnitCostUSD,
+} from "../../../lib/profitCalculation";
 
 // TypeScript Interfaces for DB Vouchers & Relations
 interface Product {
@@ -99,6 +108,7 @@ interface RawVoucher {
   exchangeRate: number;
   totalAmount: number;
   totalDiscount: number;
+  discountCurrencyId?: number | null;
   netAmount: number;
   internalNote: string | null;
   printNote: string | null;
@@ -205,8 +215,8 @@ function InvoiceReportContent() {
     const allOptions = [
       { value: "sales", label: "فرۆشتن" },
       { value: "purchase", label: "کڕین" },
-      { value: "money_in", label: "پارەی هاتوو" },
-      { value: "money_out", label: "پارەی ڕۆشتوو" },
+      { value: "money_in", label: "پارە وەرگرتن" },
+      { value: "money_out", label: "پارەدان" },
       { value: "people_debt", label: "قەرزم لای خەڵکە" },
       { value: "my_debt", label: "من قەرزارم" },
       { value: "people_debt_discount", label: "داشکاندنم کردوە" },
@@ -290,19 +300,17 @@ function InvoiceReportContent() {
     return null;
   };
 
-  // Date Filters (default: 6 months ago → today)
+  // Date Filters (default: 1st of current month → today)
+  const defaultDates = useMemo(() => getDefaultReportDateRange(), []);
   const [startDate, setStartDate] = useState(() => {
     const s = searchParams.get("startDate");
     if (s) return s;
-    const d = new Date();
-    d.setMonth(d.getMonth() - 6);
-    d.setDate(1);
-    return d.toISOString().slice(0, 10);
+    return defaultDates.startDate;
   });
   const [endDate, setEndDate] = useState(() => {
     const e = searchParams.get("endDate");
     if (e) return e;
-    return new Date().toISOString().slice(0, 10);
+    return defaultDates.endDate;
   });
 
   // Modal displays
@@ -362,6 +370,8 @@ function InvoiceReportContent() {
         const data = JSON.parse(stored);
         if (data.startDate) setStartDate(data.startDate);
         if (data.endDate) setEndDate(data.endDate);
+        if (data.searchTerm !== undefined) setSearchTerm(data.searchTerm);
+        if (data.generalSearch !== undefined) setGeneralSearch(data.generalSearch);
         if (data.filterInvoiceTypes) setFilterInvoiceTypes(data.filterInvoiceTypes);
         if (data.filterPaymentStatus) setFilterPaymentStatus(data.filterPaymentStatus);
         if (data.filterStatus) setFilterStatus(data.filterStatus);
@@ -389,6 +399,8 @@ function InvoiceReportContent() {
       const filtersObj = {
         startDate,
         endDate,
+        searchTerm,
+        generalSearch,
         filterInvoiceTypes,
         filterPaymentStatus,
         filterStatus,
@@ -411,6 +423,8 @@ function InvoiceReportContent() {
     filtersLoaded,
     startDate,
     endDate,
+    searchTerm,
+    generalSearch,
     filterInvoiceTypes,
     filterPaymentStatus,
     filterStatus,
@@ -565,9 +579,13 @@ function InvoiceReportContent() {
       case "purchase":
         return "کڕین";
       case "money_in":
-        return "پارەی هاتوو";
+      case "پارە وەرگرتن":
+      case "پارەی هاتوو":
+        return "پارە وەرگرتن";
       case "money_out":
-        return "پارەی ڕۆشتوو";
+      case "پارەدان":
+      case "پارەی ڕۆشتوو":
+        return "پارەدان";
       case "expense":
         return "خەرجی";
       case "quotation":
@@ -662,9 +680,15 @@ function InvoiceReportContent() {
   };
 
   const normalizeRate = (rate: number | null | undefined) => {
-    if (!rate || rate <= 0) return 1520;
+    const getMarketFallback = () => {
+      const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2 || c.id === 12);
+      const raw = iqdCur?.rate;
+      if (raw && raw > 500) return raw > 10000 ? raw / 100 : raw;
+      return 1520;
+    };
+    if (!rate || rate <= 0) return getMarketFallback();
     if (rate > 10000) return rate / 100;
-    if (rate < 10) return rate * 100;
+    if (rate < 500) return getMarketFallback();
     return rate;
   };
 
@@ -738,12 +762,13 @@ function InvoiceReportContent() {
       return { isMixed: false, isPureIQD: false, isPureUSD: true, usdAmt, iqdAmt: 0 };
     }
     const isVoucherIQD = v?.currencyId === 2 || Number(v?.currencyId) === 2 || Number(v?.currencyId) === 12;
+    const baseAmt = Number(v?.netAmount || 0) || Number(v?.totalAmount || 0) || (Array.isArray(v?.paidAmounts) && v.paidAmounts.length > 0 ? Number(v.paidAmounts[0].amount || 0) : 0);
     return {
       isMixed: false,
       isPureIQD: isVoucherIQD,
       isPureUSD: !isVoucherIQD,
-      usdAmt: isVoucherIQD ? 0 : Number(v?.netAmount || 0),
-      iqdAmt: isVoucherIQD ? Number(v?.netAmount || 0) : 0,
+      usdAmt: isVoucherIQD ? 0 : baseAmt,
+      iqdAmt: isVoucherIQD ? baseAmt : 0,
     };
   };
 
@@ -849,7 +874,8 @@ function InvoiceReportContent() {
   // Helper: Calculate paid sum in original currency, converted to USD
   const getVoucherPaidUSD = (voucher: RawVoucher) => {
     return voucher.paidAmounts.reduce((sum, pa) => {
-      const paUSD = convertAmount(pa.amount, pa.currencyId, "USD", voucher.exchangeRate);
+      const paRate = (pa as any).exchangeRate || voucher.exchangeRate;
+      const paUSD = convertAmount(pa.amount, pa.currencyId, "USD", paRate);
       return sum + paUSD;
     }, 0);
   };
@@ -862,287 +888,42 @@ function InvoiceReportContent() {
     }, 0);
   };
 
-  // Map of product purchase custom exchange rates
-  const productFixedRateMap = useMemo(() => {
-    const map: Record<number, number> = {};
-    if (!vouchers) return map;
-    const sorted = [...vouchers].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
-    sorted.forEach((v: any) => {
-      let versionData: any = {};
-      if (v.versions && v.versions.length > 0) {
-        const sortedV = [...v.versions].sort((a: any, b: any) => (a.version || 0) - (b.version || 0));
-        const latestV = sortedV[sortedV.length - 1];
-        try { versionData = JSON.parse(latestV.data); } catch (e) {}
-      }
-
-      const acc = v.account || (accounts || []).find((a: any) => a.id === v.accountId);
-      const rateType = v.exchangeRateType || versionData.exchangeRateType || acc?.exchangeRateType;
-      const customRate = v.customExchangeRate || versionData.customExchangeRate || acc?.customExchangeRate;
-
-      // Only check incoming stock vouchers: purchase, warehouse_stock, or incoming inventory movements
-      const isIncoming = v.type === "purchase" || v.type === "warehouse_stock" || v.rawType === "purchase" || v.rawType === "warehouse_stock" || (v.inventoryTransactions || []).some((t: any) => t.qtyChange > 0);
-
-      if (isIncoming) {
-        const isFixed = rateType === "FIXED" && Boolean(customRate);
-        const rateVal = isFixed ? (Number(customRate) > 10000 ? Number(customRate) / 100 : Number(customRate)) : null;
-
-        const updateProd = (pId: number) => {
-          if (!pId) return;
-          if (isFixed && rateVal) {
-            map[pId] = rateVal;
-          } else {
-            // Newest purchase is daily market or not fixed -> clear any prior fixed rate!
-            delete map[pId];
-          }
-        };
-
-        if (v.lines) {
-          v.lines.forEach((l: any) => {
-            const lineCur = l.currencyId || v.currencyId || 1;
-            if (l.productId && (lineCur === 1 || lineCur === 11)) updateProd(l.productId);
-          });
-        }
-        if (v.inventoryTransactions) {
-          v.inventoryTransactions.forEach((t: any) => {
-            if (t.productId && t.qtyChange > 0) updateProd(t.productId);
-          });
-        }
-      }
-    });
-    return map;
-  }, [vouchers, accounts]);
-
-  // Pre-calculate product unit costs from incoming purchase/warehouse transactions
-  // For fixed-rate products: cost stored in IQD (unitCost$ × fixedRate)
-  // For regular products: cost stored in USD
-  const { productCostsMap, fixedRateCostIQDMap, productCostCurrencyMap } = useMemo(() => {
-    const stats: Record<number, { runningCostUSD: number; runningOnHandQty: number; latestCostUSD: number; isMultiBatch: boolean }> = {};
-    const fixedStats: Record<number, { runningCostIQD: number; runningOnHandQty: number; latestCostIQD: number; isMultiBatch: boolean }> = {};
-    const usdCur = currencies?.find((c: any) => c.code === "USD");
-    const usdId = usdCur ? usdCur.id : 1;
-    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
-    const iqdId = iqdCur?.id || 2;
-    const rawRate = iqdCur?.rate || 1520;
-    const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
-
-    const productCostCurrencyMap: Record<number, number> = {};
-
-    const sortedVouchers = [...(vouchers || [])].sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
-    sortedVouchers.forEach((v: any) => {
-      const vRate = normalizeRate(v.exchangeRate) || marketRate;
-
-      (v.inventoryTransactions || []).forEach((t: any) => {
-        const pId = t.productId;
-        const prod = (products || []).find((p: any) => p.id === pId);
-        const isMultiBatch = prod?.isMultiBatch || false;
-        const fixedRate = productFixedRateMap[pId];
-        const txCurId = t.currencyId ?? v.currencyId ?? usdId;
-        const isCostIQD = txCurId === iqdId || txCurId === 2 || txCurId === 12;
-
-        if (t.qtyChange > 0 && t.unitCost > 0) {
-          const qtyIn = t.qtyChange;
-          productCostCurrencyMap[pId] = txCurId;
-
-          // Fixed-rate product (cost in USD but with fixed IQD rate)
-          if (fixedRate && !isCostIQD) {
-            if (!fixedStats[pId]) {
-              fixedStats[pId] = { runningCostIQD: 0, runningOnHandQty: 0, latestCostIQD: 0, isMultiBatch };
-            }
-            const costIQD = t.unitCost * fixedRate;
-            fixedStats[pId].latestCostIQD = costIQD;
-
-            if (isMultiBatch) {
-              fixedStats[pId].runningCostIQD = costIQD;
-              fixedStats[pId].runningOnHandQty += qtyIn;
-            } else {
-              const currentOnHand = fixedStats[pId].runningOnHandQty || 0;
-              if (currentOnHand <= 0) {
-                fixedStats[pId].runningCostIQD = costIQD;
-                fixedStats[pId].runningOnHandQty = qtyIn;
-              } else {
-                const totalVal = (currentOnHand * fixedStats[pId].runningCostIQD) + (qtyIn * costIQD);
-                const newOnHand = currentOnHand + qtyIn;
-                fixedStats[pId].runningOnHandQty = newOnHand;
-                fixedStats[pId].runningCostIQD = totalVal / newOnHand;
-              }
-            }
-          } else {
-            // Regular product (USD or IQD)
-            if (!stats[pId]) {
-              stats[pId] = { runningCostUSD: 0, runningOnHandQty: 0, latestCostUSD: 0, isMultiBatch };
-            }
-            const effectiveCostUSD = isCostIQD ? (t.unitCost / vRate) : t.unitCost;
-            stats[pId].latestCostUSD = effectiveCostUSD;
-
-            if (isMultiBatch) {
-              stats[pId].runningCostUSD = effectiveCostUSD;
-              stats[pId].runningOnHandQty += qtyIn;
-            } else {
-              const currentOnHand = stats[pId].runningOnHandQty || 0;
-              if (currentOnHand <= 0) {
-                stats[pId].runningCostUSD = effectiveCostUSD;
-                stats[pId].runningOnHandQty = qtyIn;
-              } else {
-                const totalVal = (currentOnHand * stats[pId].runningCostUSD) + (qtyIn * effectiveCostUSD);
-                const newOnHand = currentOnHand + qtyIn;
-                stats[pId].runningOnHandQty = newOnHand;
-                stats[pId].runningCostUSD = totalVal / newOnHand;
-              }
-            }
-          }
-        } else if (t.qtyChange < 0) {
-          if (fixedStats[pId]) {
-            fixedStats[pId].runningOnHandQty += t.qtyChange;
-          }
-          if (stats[pId]) {
-            stats[pId].runningOnHandQty += t.qtyChange;
-          }
-        }
-      });
-    });
-
-    // Regular products: cost in USD
-    const costs: Record<number, number> = {};
-    for (const [pId, s] of Object.entries(stats)) {
-      costs[Number(pId)] = s.isMultiBatch ? s.latestCostUSD : s.runningCostUSD;
-    }
-
-    // Fixed-rate products: cost in IQD
-    const fixedIQD: Record<number, number> = {};
-    for (const [pId, s] of Object.entries(fixedStats)) {
-      fixedIQD[Number(pId)] = s.isMultiBatch ? s.latestCostIQD : s.runningCostIQD;
-    }
-
-    return { productCostsMap: costs, fixedRateCostIQDMap: fixedIQD, productCostCurrencyMap };
-  }, [vouchers, currencies, products, productFixedRateMap]);
+  // Unified single source of truth cost maps
+  const costMaps = useMemo(() => {
+    const allTxs = extractInventoryTransactionsFromVouchers(vouchers);
+    return buildProductCostMaps(allTxs, products || [], currencies || []);
+  }, [vouchers, products, currencies]);
 
   // Helper: Get item cost in USD for a specific voucher
-  // For fixed-rate products, converts IQD cost to USD at the sale voucher's daily rate
   const getItemCostUsdForVoucher = (voucher: RawVoucher, productId: number, rawCost?: number, rawCurId?: number) => {
-    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
-    const iqdId = iqdCur?.id || 2;
-    const rawRate = iqdCur?.rate || 1520;
-    const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
-    const saleRate = normalizeRate(voucher.exchangeRate) || marketRate;
-
-    // Foundational cost currency resolution strictly from incoming origin (productCostCurrencyMap)
-    const originCurId = productCostCurrencyMap[productId] || rawCurId || 1;
-    const isCostIQD = originCurId === iqdId || originCurId === 2 || originCurId === 12;
-
-    // Check if product has fixed exchange rate from purchase/stock voucher
-    const fixedRate = productFixedRateMap[productId];
-    if (fixedRate && fixedRate > 0) {
-      if (rawCost && rawCost > 0) {
-        const costIQD = isCostIQD ? rawCost : (rawCost * fixedRate);
-        return costIQD / saleRate;
-      }
-      const fixedCostIQD = fixedRateCostIQDMap[productId];
-      if (fixedCostIQD !== undefined && fixedCostIQD > 0) {
-        return fixedCostIQD / saleRate;
-      }
-    }
-
-    // Regular product: cost already in USD or check transaction cost
-    if (rawCost && rawCost > 0) {
-      return isCostIQD ? (rawCost / saleRate) : rawCost;
-    }
-
-    let cost = productCostsMap[productId];
-    return cost || 0;
+    return getProductUnitCostUSD(voucher, productId, costMaps, currencies, rawCost, rawCurId);
   };
 
   // Helper: Calculate cost of goods sold (COGS) in USD
   const getVoucherCostUSD = (voucher: RawVoucher) => {
-    if (voucher.type !== "sales" && voucher.type !== "sales_return") return 0;
-
-    let cogs = 0;
-    if (voucher.inventoryTransactions && voucher.inventoryTransactions.length > 0) {
-      voucher.inventoryTransactions.forEach((tx: any) => {
-        const costUsd = getItemCostUsdForVoucher(voucher, tx.productId, tx.unitCost, tx.currencyId);
-        cogs += Math.abs(tx.qtyChange) * costUsd;
-      });
-    } else if (voucher.lines) {
-      voucher.lines.forEach((line: any) => {
-        const costUsd = getItemCostUsdForVoucher(voucher, line.productId, line.unitCost, line.currencyId);
-        cogs += (line.qty || line.quantity || 0) * costUsd;
-      });
-    }
-    return cogs;
+    return calculateVoucherProfit(voucher, costMaps, currencies).cogsUSD;
   };
 
-  // Helper: Calculate net profit in base currency (used for KPI totals box)
+  // Helper: Calculate net profit in base currency (used for sorting and KPI totals box)
   const getVoucherProfitBase = (voucher: RawVoucher) => {
-    if (voucher.type !== "sales" && voucher.type !== "sales_return") return 0;
-    
+    const res = calculateVoucherProfit(voucher, costMaps, currencies);
     const baseCurrency = getBaseCurrency();
-    const usdCur = currencies?.find((c: any) => c.code === "USD");
-    const usdId = usdCur ? usdCur.id : 1;
-    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
-    const iqdId = iqdCur?.id || 2;
-    const rawRate = iqdCur?.rate || 1520;
-    const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
-
-    const vCurId = voucher.currencyId || usdId;
-    const isVoucherIQD = vCurId === iqdId || vCurId === 2 || vCurId === 12;
-    const vRate = normalizeRate(voucher.exchangeRate) || marketRate;
-
-    const profile = getVoucherCurrencyProfile(voucher);
-    let netUSD = 0;
-    if (profile.isMixed) {
-      netUSD = profile.usdAmt + (profile.iqdAmt / vRate);
-    } else if (profile.isPureIQD) {
-      const rawIqd = profile.iqdAmt > 0 ? profile.iqdAmt : Number(voucher.netAmount || 0);
-      netUSD = rawIqd / vRate;
-    } else {
-      netUSD = profile.usdAmt > 0 ? profile.usdAmt : Number(voucher.netAmount || 0);
-    }
-
-    const costUSD = getVoucherCostUSD(voucher);
-    const profitUSD = voucher.type === "sales_return" ? -(netUSD - costUSD) : (netUSD - costUSD);
-
     if (baseCurrency.code === "IQD" || baseCurrency.id === 2 || baseCurrency.id === 12) {
-      return profitUSD * marketRate;
+      const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2);
+      const rawRate = iqdCur?.rate || 1520;
+      const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
+      return res.profitUSD * marketRate;
     }
-    return profitUSD;
+    return res.profitUSD;
   };
 
   // Helper: Calculate profit in the correct display currency per-row
   const getVoucherProfitInVoucherCurrency = (voucher: RawVoucher): { amount: number; currencyId: number } => {
-    const fallback = { amount: 0, currencyId: voucher.currencyId || 1 };
-    if (voucher.type !== "sales" && voucher.type !== "sales_return") return fallback;
-
-    const usdCur = currencies?.find((c: any) => c.code === "USD");
-    const usdId = usdCur ? usdCur.id : 1;
-    const iqdCur = currencies?.find((c: any) => c.code === "IQD" || c.id === 2 || c.id === 12);
-    const iqdId = iqdCur?.id || 2;
-    const rawRate = iqdCur?.rate || 1520;
-    const marketRate = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
-    const vRate = normalizeRate(voucher.exchangeRate) || marketRate;
-
-    const profile = getVoucherCurrencyProfile(voucher);
-
-    let netUSD = 0;
-    if (profile.isMixed) {
-      netUSD = profile.usdAmt + (profile.iqdAmt / vRate);
-    } else if (profile.isPureIQD) {
-      const rawIqd = profile.iqdAmt > 0 ? profile.iqdAmt : Number(voucher.netAmount || 0);
-      netUSD = rawIqd / vRate;
-    } else {
-      netUSD = profile.usdAmt > 0 ? profile.usdAmt : Number(voucher.netAmount || 0);
-    }
-
-    const costUSD = getVoucherCostUSD(voucher);
-    const profitUSD = voucher.type === "sales_return" ? -(netUSD - costUSD) : (netUSD - costUSD);
-
-    if (profile.isMixed) {
-      return { amount: profitUSD, currencyId: usdId };
-    }
-
-    if (profile.isPureIQD) {
-      return { amount: profitUSD * vRate, currencyId: iqdId };
-    } else {
-      return { amount: profitUSD, currencyId: usdId };
-    }
+    const res = calculateVoucherProfit(voucher, costMaps, currencies);
+    return {
+      amount: res.profitInVoucherCurrency,
+      currencyId: res.profitCurrencyId,
+    };
   };
 
   // Helper: Calculate payment status
@@ -1154,8 +935,10 @@ function InvoiceReportContent() {
     if (paidUSD <= 0.01) {
       return { label: "قەرز", color: "bg-rose-50 text-rose-700 border-rose-200 font-bold" };
     }
-    // If remaining is less than $1 USD (or equivalent < 1000 IQD), treat as fully paid (نەقد)
-    if (remainingUSD < 1.0) {
+    // If remaining is less than $5 USD (or equivalent < 5000 IQD), treat as fully paid (نەقد)
+    const normRate = normalizeRate(voucher.exchangeRate);
+    const remainingIQD = remainingUSD * normRate;
+    if (remainingUSD < 5.0 || remainingIQD < 5000) {
       return { label: "نەقد", color: "bg-emerald-50 text-emerald-700 border-emerald-200 font-bold" };
     }
     return { label: "بەشێکی دراو", color: "bg-amber-50 text-amber-800 border-amber-300/80 font-bold" };
@@ -1200,9 +983,13 @@ function InvoiceReportContent() {
   };
 
   // Group ledger entries by accountId and compute running balance chronologically
-  const voucherRunningBalances = useMemo(() => {
+  const { voucherRunningBalances, voucherAccountBalances } = useMemo<{
+    voucherRunningBalances: Record<string, number>;
+    voucherAccountBalances: Record<number, Record<number, number>>;
+  }>(() => {
     const runningBals: Record<string, number> = {};
-    if (vouchers.length === 0) return runningBals;
+    const accountVoucherBalances: Record<number, Record<number, number>> = {};
+    if (vouchers.length === 0) return { voucherRunningBalances: runningBals, voucherAccountBalances: accountVoucherBalances };
 
     const entriesByAccount: Record<number, Array<{
       date: Date;
@@ -1219,7 +1006,9 @@ function InvoiceReportContent() {
         entriesByAccount[accId] = [];
       }
 
-      let entries = v.ledgerEntries && v.ledgerEntries.length > 0 ? v.ledgerEntries : [];
+      let entries = v.ledgerEntries && v.ledgerEntries.length > 0 
+        ? v.ledgerEntries.filter(le => !le.accountId || le.accountId === accId) 
+        : [];
 
       if (entries.length === 0) {
         const curId = v.currencyId || 1;
@@ -1231,9 +1020,9 @@ function InvoiceReportContent() {
           debit = netAmt;
         } else if (["purchase", "sales_return", "my_debt", "من قەرزارم", "people_debt_discount", "debt_discount", "داشکاندنم کردوە"].includes(v.type)) {
           credit = netAmt;
-        } else if (["money_in", "پارەی هاتوو"].includes(v.type)) {
+        } else if (["money_in", "پارە وەرگرتن", "پارەی هاتوو"].includes(v.type)) {
           credit = v.paidAmounts?.[0]?.amount || netAmt;
-        } else if (["money_out", "پارەی ڕۆشتوو"].includes(v.type)) {
+        } else if (["money_out", "پارەدان", "پارەی ڕۆشتوو"].includes(v.type)) {
           debit = v.paidAmounts?.[0]?.amount || netAmt;
         }
 
@@ -1272,10 +1061,11 @@ function InvoiceReportContent() {
         }
         running[curId] += (entry.debit - entry.credit);
         runningBals[`${entry.voucherId}_${curId}`] = running[curId];
+        accountVoucherBalances[entry.voucherId] = { ...running };
       });
     });
 
-    return runningBals;
+    return { voucherRunningBalances: runningBals, voucherAccountBalances: accountVoucherBalances };
   }, [vouchers]);
 
   const getVoucherRunningBalance = (voucher: RawVoucher) => {
@@ -1289,7 +1079,7 @@ function InvoiceReportContent() {
     // Chronological fallback
     const accEntries = vouchers
       .filter(v => v.accountId === voucher.accountId)
-      .flatMap(v => v.ledgerEntries.map(le => ({
+      .flatMap(v => (v.ledgerEntries || []).map(le => ({
         date: new Date(le.date || v.date),
         voucherId: v.id,
         currencyId: le.currencyId,
@@ -1316,6 +1106,48 @@ function InvoiceReportContent() {
       }
     }
     return latestBal;
+  };
+
+  const getVoucherAccountBalances = (voucher: RawVoucher): Array<{ currencyId: number; amount: number }> | null => {
+    if (!voucher.accountId) return null;
+    let balMap = voucherAccountBalances[voucher.id];
+    
+    if (!balMap) {
+      const accVouchers = vouchers
+        .filter(v => v.accountId === voucher.accountId && !v.isDeleted)
+        .sort((a, b) => {
+          const tDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+          if (tDiff !== 0) return tDiff;
+          return a.id - b.id;
+        });
+
+      const vTime = new Date(voucher.date).getTime();
+      for (const av of accVouchers) {
+        const avTime = new Date(av.date).getTime();
+        if (avTime < vTime || (avTime === vTime && av.id <= voucher.id)) {
+          if (voucherAccountBalances[av.id]) {
+            balMap = voucherAccountBalances[av.id];
+          }
+        } else {
+          break;
+        }
+      }
+    }
+
+    if (!balMap) {
+      const curId = voucher.currencyId || 1;
+      const single = getVoucherRunningBalance(voucher);
+      if (single !== null && Math.abs(single) >= 0.001) {
+        return [{ currencyId: curId, amount: single }];
+      }
+      return [];
+    }
+
+    const activeList = Object.entries(balMap)
+      .map(([curIdStr, amt]) => ({ currencyId: Number(curIdStr), amount: Number(amt || 0) }))
+      .filter(item => Math.abs(item.amount) >= 0.001);
+
+    return activeList;
   };
 
   // Dynamic Employee List
@@ -1825,7 +1657,11 @@ function InvoiceReportContent() {
       const val = convertAmount(v.netAmount, v.currencyId, "USD", v.exchangeRate);
       const isStandaloneDiscount = v.type === "my_debt_discount" || v.type === "داشکاندنم بۆ کراوە" || v.type === "people_debt_discount" || v.type === "داشکاندنم کردوە" || v.type === "debt_discount";
       const rawDisc = (v.totalDiscount && v.totalDiscount > 0) ? v.totalDiscount : (isStandaloneDiscount ? (v.netAmount || v.totalAmount || 0) : 0);
-      const disc = convertAmount(rawDisc, v.currencyId, "USD", v.exchangeRate);
+      const discCurId = v.discountCurrencyId || v.currencyId || currencies.find((c: any) => c.code === "USD")?.id || 1;
+      const disc = convertAmount(rawDisc, discCurId, "USD", v.exchangeRate);
+      if (rawDisc > 0) {
+        discountByCurrency[discCurId] = (discountByCurrency[discCurId] || 0) + rawDisc;
+      }
       const paid = getVoucherPaidUSD(v);
       let rem = Math.max(val - paid, 0);
       if (rem < 1.0) rem = 0;
@@ -1861,7 +1697,6 @@ function InvoiceReportContent() {
         remainingByCurrency[2] = (remainingByCurrency[2] || 0) + (remIQD < 1000 ? 0 : remIQD);
       } else {
         valueByCurrency[curId] = (valueByCurrency[curId] || 0) + v.netAmount;
-        discountByCurrency[curId] = (discountByCurrency[curId] || 0) + rawDisc;
         
         const paidInVoucherCurrency = v.paidAmounts.reduce((sum, pa) => {
           return sum + convertBetweenCurrencies(pa.amount, pa.currencyId, curId, pa.exchangeRate || v.exchangeRate || 1500);
@@ -1887,14 +1722,11 @@ function InvoiceReportContent() {
       }, 0);
       expensesByCurrency[curId] = (expensesByCurrency[curId] || 0) + expInVoucherCurrency;
       
-      // Profit: calculate per-currency matching the table rows
+      // Profit: unified calculation
       if (v.type === "sales" || v.type === "sales_return") {
-        const rowProf = getVoucherProfitInVoucherCurrency(v);
-        const pCurId = rowProf.currencyId || 1;
-        profitByCurrency[pCurId] = (profitByCurrency[pCurId] || 0) + rowProf.amount;
-        const vRate = normalizeRate(v.exchangeRate) || 1520;
-        const profUSD = (pCurId === 2 || pCurId === 12) ? (rowProf.amount / vRate) : rowProf.amount;
-        totalProfitUSD += profUSD;
+        const profRes = calculateVoucherProfit(v, costMaps, currencies);
+        profitByCurrency[profRes.profitCurrencyId] = (profitByCurrency[profRes.profitCurrencyId] || 0) + profRes.profitInVoucherCurrency;
+        totalProfitUSD += profRes.profitUSD;
       }
     });
 
@@ -1913,7 +1745,7 @@ function InvoiceReportContent() {
       expensesByCurrency,
       profitByCurrency,
     };
-  }, [processedVouchers]);
+  }, [processedVouchers, costMaps, currencies]);
 
   // Paginated List
   const paginatedVouchers = useMemo(() => {
@@ -2018,10 +1850,9 @@ function InvoiceReportContent() {
     setFilterEmployees([]);
     setSearchTerm("");
     setGeneralSearch("");
-    const d = new Date();
-    d.setDate(1);
-    setStartDate(d.toISOString().slice(0, 10));
-    setEndDate(new Date().toISOString().slice(0, 10));
+    const d = getDefaultReportDateRange();
+    setStartDate(d.startDate);
+    setEndDate(d.endDate);
     try {
       sessionStorage.removeItem("__erp_invoices_report_filters_data");
     } catch (e) {}
@@ -2298,32 +2129,45 @@ function InvoiceReportContent() {
 
         {/* Filters and Action Buttons Row */}
         <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Quick Date Presets */}
+            <QuickDateFilter
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(s, e) => {
+                setStartDate(s);
+                setEndDate(e);
+              }}
+            />
+
             <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-slate-700">لە بەرواری:</span>
+              <span className="text-xs font-black text-slate-700">لە بەرواری:</span>
               <DateInput
                 value={startDate}
                 onChange={(val) => setStartDate(val)}
-                className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold shadow-sm"
+                className="border border-slate-300 rounded-xl px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold shadow-xs"
               />
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm font-black text-slate-700">بۆ بەرواری:</span>
+              <span className="text-xs font-black text-slate-700">بۆ بەرواری:</span>
               <DateInput
                 value={endDate}
                 onChange={(val) => setEndDate(val)}
-                className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold shadow-sm"
+                className="border border-slate-300 rounded-xl px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold shadow-xs"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setShowFiltersModal(true)}
-              className="bg-blue-600 text-white hover:bg-blue-700 font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-md animate-transition"
+              className="bg-blue-600 text-white hover:bg-blue-700 font-black px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer text-xs shadow-xs border-none"
             >
-              <span>🎯 فلتەرەکان</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              <span>فلتەرەکان</span>
               {activeFiltersCount > 0 && (
                 <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                   {activeFiltersCount}
@@ -2334,9 +2178,13 @@ function InvoiceReportContent() {
             {activeFiltersCount > 0 && (
               <button
                 onClick={clearFilters}
-                className="bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-300 font-black px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer text-sm shadow-sm"
+                className="bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-black px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer text-xs shadow-xs"
               >
-                🔄 ڕێکخستنەوە
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+                <span>ڕێکخستنەوە</span>
               </button>
             )}
 
@@ -2463,7 +2311,13 @@ function InvoiceReportContent() {
               <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between min-h-[90px]">
                 <span className="text-slate-600 text-xs font-bold">قازانج (فرۆشتن)</span>
                 <span className="text-amber-900 text-xl font-black mt-2">
-                  {isProfitColumnVisible ? formatCurrencyValueJSX(totals.profit, 1) : "ناچالاکە"}
+                  {isProfitColumnVisible ? (
+                    filterCurrencyId === "all" ? (
+                      formatCurrencyValueJSX(totals.profit, 1)
+                    ) : (
+                      formatKPI(totals.profit)
+                    )
+                  ) : "ناچالاکە"}
                 </span>
               </div>
             )}
@@ -2643,7 +2497,8 @@ function InvoiceReportContent() {
                       valVal = paidVal;
                     }
 
-                    const discountVal = convertBetweenCurrencies(voucher.totalDiscount, voucherCurrencyId, displayCurrencyId, voucher.exchangeRate);
+                    const discCurId = voucher.discountCurrencyId || voucherCurrencyId;
+                    const discountVal = convertBetweenCurrencies(voucher.totalDiscount, discCurId, displayCurrencyId, voucher.exchangeRate);
                     const deliveryFeeVal = voucher.deliveryFee 
                       ? convertBetweenCurrencies(voucher.deliveryFee, iqdIdForDelivery, displayCurrencyId, voucher.exchangeRate)
                       : 0;
@@ -2656,21 +2511,16 @@ function InvoiceReportContent() {
                     let remainingVal = Math.max(valVal - paidVal, 0);
                     const curObj = currencies.find((c: any) => c.id === displayCurrencyId);
                     const isIQD = curObj?.code === "IQD" || displayCurrencyId === 2 || displayCurrencyId === 12;
-                    if (isIQD && remainingVal < 1000) {
-                      remainingVal = 0;
-                      if (paidVal > 0 && Math.abs(valVal - paidVal) < 1000) {
-                        valVal = paidVal;
-                      }
-                    } else if (!isIQD && remainingVal < 1.0) {
-                      remainingVal = 0;
-                      if (paidVal > 0 && Math.abs(valVal - paidVal) < 1.0) {
-                        valVal = paidVal;
-                      }
-                    }
+                    const tolerance = isIQD ? 5000 : 5.0;
 
                     if (payStatus.label === "نەقد" && paidVal > 0) {
                       remainingVal = 0;
-                      if (Math.abs(valVal - paidVal) < (isIQD ? 1000 : 1.0)) {
+                      if (Math.abs(valVal - paidVal) < tolerance) {
+                        valVal = paidVal;
+                      }
+                    } else if (remainingVal < tolerance) {
+                      remainingVal = 0;
+                      if (paidVal > 0 && Math.abs(valVal - paidVal) < tolerance) {
                         valVal = paidVal;
                       }
                     }
@@ -2681,7 +2531,7 @@ function InvoiceReportContent() {
                       "money_in", "money_out", "my_debt_discount", "people_debt_discount",
                       "debt_discount", "debt discount",
                       "people_debt", "my_debt",
-                      "پارەی هاتوو", "پارەی ڕۆشتوو", "داشکاندنم بۆ کراوە", "داشکاندنم کردوە"
+                      "پارە وەرگرتن", "پارەدان", "پارەی هاتوو", "پارەی ڕۆشتوو", "داشکاندنم بۆ کراوە", "داشکاندنم کردوە"
                     ].includes(voucher.type);
 
                     return (
@@ -2785,7 +2635,7 @@ function InvoiceReportContent() {
                           {visibleColumns.discount && (
                             <td className="px-4 py-3.5 text-center text-rose-600">
                               {voucher.totalDiscount > 0
-                                ? formatCurrencyValueJSX(discountVal, displayCurrencyId)
+                                ? formatCurrencyValueJSX(voucher.totalDiscount, voucher.discountCurrencyId || voucher.currencyId || 1)
                                 : "-"}
                             </td>
                           )}
@@ -2798,13 +2648,25 @@ function InvoiceReportContent() {
                             <td className="px-4 py-3.5 text-center font-bold">
                               {isDebtVoucherType ? (
                                 (() => {
-                                  const runningBal = getVoucherRunningBalance(voucher);
-                                  if (runningBal === null) return <span className="text-slate-400">-</span>;
-                                  if (Math.abs(runningBal) < 0.001) return <span className="text-emerald-600">0</span>;
+                                  const balances = getVoucherAccountBalances(voucher);
+                                  if (balances === null) return <span className="text-slate-400">-</span>;
+                                  if (balances.length === 0) return <span className="text-emerald-600">0</span>;
+                                  if (balances.length === 1) {
+                                    const b = balances[0];
+                                    return (
+                                      <span className={b.amount > 0 ? "text-rose-700" : "text-emerald-700"}>
+                                        {formatCurrencyValueJSX(Math.abs(b.amount), b.currencyId)}
+                                      </span>
+                                    );
+                                  }
                                   return (
-                                    <span className={runningBal > 0 ? "text-rose-700" : "text-emerald-700"}>
-                                      {formatCurrencyValueJSX(runningBal, voucher.currencyId || 1)}
-                                    </span>
+                                    <div className="flex flex-col items-center gap-0.5 font-bold">
+                                      {balances.map(b => (
+                                        <span key={b.currencyId} className={`text-xs ${b.amount > 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                                          {formatCurrencyValueJSX(Math.abs(b.amount), b.currencyId)}
+                                        </span>
+                                      ))}
+                                    </div>
                                   );
                                 })()
                               ) : (
@@ -2821,7 +2683,7 @@ function InvoiceReportContent() {
                                     const remUSD = Math.max(0, profile.usdAmt - paidUSD);
                                     const remIQD = Math.max(0, profile.iqdAmt - paidIQD);
 
-                                    if (remUSD <= 0.01 && remIQD <= 100) {
+                                    if (payStatus.label === "نەقد" || (remUSD < 5.0 && remIQD < 5000)) {
                                       return <span className="text-emerald-600">0</span>;
                                     }
 
@@ -2842,7 +2704,7 @@ function InvoiceReportContent() {
                                   }
 
                                   return remainingVal > 0 ? (
-                                    <span className="text-rose-700">{formatCurrencyValue(remainingVal, displayCurrencyId)}</span>
+                                    <span className="text-rose-700">{formatCurrencyValueJSX(remainingVal, displayCurrencyId)}</span>
                                   ) : (
                                     <span className="text-emerald-600">0</span>
                                   );
@@ -3039,7 +2901,7 @@ function InvoiceReportContent() {
                                           {voucher.lines.map((line, idx) => {
                                             const lineCurId = line.currencyId || voucher.currencyId || 1;
                                             const isLineIQD = lineCurId === 2 || lineCurId === 12;
-                                            const fixedRate = productFixedRateMap[line.productId];
+                                            const fixedRate = costMaps.productFixedRates[line.productId];
                                             const isFixedProduct = !['sales', 'sales_return'].includes(voucher.type) && isFixedRateVoucher && fixedRate !== undefined && fixedRate > 0 && !isLineIQD;
                                             return (
                                               <tr key={line.id} className={`hover:bg-slate-50/80 transition-colors ${isFixedProduct ? "bg-purple-50/30" : ""}`}>
@@ -3067,14 +2929,14 @@ function InvoiceReportContent() {
                                                       style={{ backgroundColor: "#f3e8ff", borderColor: "#c084fc", color: "#6b21a8" }}
                                                       title={`📌 دۆلاری جێگیر: 100$ = ${Number(Number(fixedRate) > 10000 ? fixedRate : Number(fixedRate) * 100).toLocaleString("en-US")} دینار`}
                                                     >
-                                                      {formatCurrencyValue(line.unitPrice, lineCurId)}
+                                                      {formatCurrencyValueJSX(line.unitPrice, lineCurId)}
                                                     </span>
                                                   ) : (
                                                     formatCurrencyValue(line.unitPrice, lineCurId)
                                                   )}
                                                 </td>
-                                                <td className="py-2.5 text-center text-rose-500">{line.discountAmount > 0 ? formatCurrencyValue(line.discountAmount, lineCurId) : "-"}</td>
-                                                <td className="py-2.5 text-center font-black text-slate-900">{formatCurrencyValue(line.lineTotal, voucher.currencyId || 1)}</td>
+                                                <td className="py-2.5 text-center text-rose-500">{line.discountAmount > 0 ? formatCurrencyValueJSX(line.discountAmount, lineCurId) : "-"}</td>
+                                                <td className="py-2.5 text-center font-black text-slate-900">{formatCurrencyValueJSX(line.lineTotal, lineCurId)}</td>
                                               </tr>
                                             );
                                           })}
@@ -3118,7 +2980,13 @@ function InvoiceReportContent() {
                                               </div>
                                             </div>
                                             <div className="text-left">
-                                              <span className="text-lg font-black text-slate-800">{formatCurrencyValue(voucher.netAmount, voucher.currencyId || 1)}</span>
+                                              <span className="text-lg font-black text-slate-800">
+                                                {(() => {
+                                                  const dAmt = voucher.netAmount || voucher.totalAmount || (voucher.paidAmounts?.[0]?.amount ?? 0);
+                                                  const dCur = voucher.currencyId || (voucher.paidAmounts?.[0]?.currencyId ?? 1);
+                                                  return formatCurrencyValueJSX(dAmt, dCur);
+                                                })()}
+                                              </span>
                                             </div>
                                           </div>
                                         </div>
@@ -3144,12 +3012,18 @@ function InvoiceReportContent() {
                                           <span className="text-[10px] text-slate-400 font-bold block mb-1">دراو</span>
                                           <span className="text-xs font-black text-slate-800">{voucher.currency?.name || "دۆلار"} ({voucher.currency?.symbol || "$"})</span>
                                         </div>
-                                        {voucher.exchangeRate > 1 && (
-                                          <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                                            <span className="text-[10px] text-slate-400 font-bold block mb-1">ڕێژەی گۆڕینەوە</span>
-                                            <span className="text-xs font-black text-slate-800">{voucher.exchangeRate.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                                          </div>
-                                        )}
+                                        {(() => {
+                                          const hasConversion = voucher.type === "cashbox_exchange" || 
+                                            (voucher.paidAmounts && voucher.paidAmounts.some((p: any) => p.currencyId !== voucher.currencyId)) ||
+                                            (voucher.lines && voucher.lines.some((l: any) => l.currencyId && l.currencyId !== voucher.currencyId));
+                                          if (!hasConversion || !voucher.exchangeRate || voucher.exchangeRate <= 1) return null;
+                                          return (
+                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                              <span className="text-[10px] text-slate-400 font-bold block mb-1">ڕێژەی گۆڕینەوە</span>
+                                              <span className="text-xs font-black text-slate-800">{voucher.exchangeRate.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
                                     </div>
                                   </>
@@ -3174,7 +3048,7 @@ function InvoiceReportContent() {
                                           {voucher.paidAmounts.map((pa) => (
                                             <div key={pa.id} className="flex items-center justify-start gap-4 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100 text-xs">
                                               <span className="text-slate-600 font-semibold">{pa.currency?.name} ({pa.currency?.symbol})</span>
-                                              <span className="font-black text-emerald-700">{formatCurrencyValue(pa.amount, pa.currencyId)}</span>
+                                              <span className="font-black text-emerald-700">{formatCurrencyValueJSX(pa.amount, pa.currencyId)}</span>
                                             </div>
                                           ))}
                                         </div>
@@ -3192,7 +3066,7 @@ function InvoiceReportContent() {
                                           {voucher.expenses.map((exp) => (
                                             <div key={exp.id} className="flex items-center justify-between bg-purple-50/50 p-2.5 rounded-xl border border-purple-100 text-xs">
                                               <span className="text-slate-600 font-semibold">{exp.note || "خەرجی گشتی"}</span>
-                                              <span className="font-black text-purple-700">{formatCurrencyValue(exp.amount, exp.currencyId)}</span>
+                                              <span className="font-black text-purple-700">{formatCurrencyValueJSX(exp.amount, exp.currencyId)}</span>
                                             </div>
                                           ))}
                                         </div>

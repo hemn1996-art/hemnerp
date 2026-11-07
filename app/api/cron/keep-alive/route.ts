@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get("authorization");
-    // Verify cron authorization or allow GET heartbeat
     const userCount = await prisma.user.count();
     const timestamp = new Date().toISOString();
 

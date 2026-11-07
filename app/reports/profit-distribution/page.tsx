@@ -176,12 +176,11 @@ export default function ProfitDistributionPage() {
 
     return (
       <span className="inline-flex items-baseline gap-1" dir="ltr">
-        {isNeg && <span>-</span>}
+        <span>$</span>
         <span>{parts[0]}</span>
         {parts.length > 1 && (
           <span className="text-[0.72em] opacity-80 font-bold">.{parts[1]}</span>
         )}
-        <span>$</span>
       </span>
     );
   };

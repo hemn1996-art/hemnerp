@@ -84,6 +84,8 @@ type AccountLike = {
   balanceByCurrency?: Record<string, number>;
   showInPurchase?: boolean;
   showInSales?: boolean;
+  exchangeRateType?: string;
+  customExchangeRate?: number | null;
 };
 
 type TableColumns = {
@@ -561,6 +563,13 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
   const supplier = accounts.find((a: any) => a.id === supplierId);
 
+  useEffect(() => {
+    if (!supplier) return;
+    if (!editId && supplier.exchangeRateType === "FIXED" && supplier.customExchangeRate) {
+      setExchangeRate(String(supplier.customExchangeRate));
+    }
+  }, [supplier?.id, supplier?.exchangeRateType, supplier?.customExchangeRate, editId]);
+
   function getAccountBalanceBeforeMap(account?: AccountLike) {
     const map: Record<string, number> = {};
     if (!account) return map;
@@ -595,7 +604,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} دینار`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
     return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
@@ -677,14 +686,13 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {!isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
         <span>
           <span>{whole}</span>
           {decimal !== undefined && decimal !== "0" && decimal !== "00" && (
             <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
-        {isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
       </span>
     );
   }
@@ -719,19 +727,19 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     );
   }
 
-  function formatPrintBalanceMap(map: Record<string, number>, isSupplier = true) {
+  function formatPrintBalanceMap(map: Record<string, number>, isSupplier = true, fallbackCurId?: number) {
     const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return (
         <strong style={{ color: "#374151", fontSize: 14 }}>
-          {formatCurrencyAmountJSX(0, defaultCurrency?.id || 1)}
+          {formatCurrencyAmountJSX(0, fallbackCurId || effectivePurchaseCurrencyId || defaultCurrency?.id || 1)}
         </strong>
       );
     }
 
     return (
-      <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        {activeEntries.map(([curIdText, val]) => {
+      <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+        {activeEntries.map(([curIdText, val], idx) => {
           const curId = Number(curIdText);
           const absVal = Math.abs(val);
           let isRed = false;
@@ -743,9 +751,14 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
           const color = isRed ? "#dc2626" : "#16a34a";
 
           return (
-            <strong key={curIdText} style={{ color, fontSize: 14 }}>
-              {formatCurrencyAmountJSX(absVal, curId, false)}
-            </strong>
+            <Fragment key={curIdText}>
+              {idx > 0 && (
+                <span style={{ color: "#475569", fontWeight: 800, marginInline: 4, fontSize: 13 }}> + </span>
+              )}
+              <strong style={{ color, fontSize: 14 }}>
+                {formatCurrencyAmountJSX(absVal, curId, false)}
+              </strong>
+            </Fragment>
           );
         })}
       </span>
@@ -1920,12 +1933,14 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       ? "convert_to_other_currency"
       : (action === "keep_credit" ? "keep_as_same_currency_balance" : null);
 
-    const paidList = Object.entries(paidAmounts)
-      .map(([currencyIdText, amountText]) => ({
-        currencyId: Number(currencyIdText),
-        amount: toNumber(amountText),
-      }))
-      .filter((x: any) => x.amount > 0);
+    const paidList = paymentTypeMode === "debt"
+      ? []
+      : Object.entries(paidAmounts)
+          .map(([currencyIdText, amountText]) => ({
+            currencyId: Number(currencyIdText),
+            amount: toNumber(amountText),
+          }))
+          .filter((x: any) => x.amount > 0);
 
     const result = calculateLedgerEntries({
       type: "purchase",
@@ -1973,6 +1988,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       return new Date().toISOString();
     };
 
+    const isSupplierFixed = supplier?.exchangeRateType === "FIXED" && supplier?.customExchangeRate;
+
     const payload = {
       type: "purchase",
       referenceNo: String(invoiceNumber),
@@ -1981,6 +1998,8 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
       cashboxId: cashboxId || null,
       currencyId: effectivePurchaseCurrencyId,
       exchangeRate: rate,
+      exchangeRateType: isSupplierFixed ? "FIXED" : "DAILY_MARKET",
+      customExchangeRate: isSupplierFixed ? (toNumber(supplier.customExchangeRate) || 135000) : null,
       totalAmount: itemsSubtotalInBase,
       totalDiscount: 0,
       netAmount: itemsSubtotalInBase,
@@ -2059,12 +2078,14 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     const activeTargetCurrencyId = targetCurrencyId || (supplier ? getSingleAccountBalanceCurrencyId(supplier) : (defaultCurrency?.id || 1));
     const before = accountBalanceBeforeByCurrency;
 
-    const paidList = Object.entries(paidAmounts)
-      .map(([currencyIdText, amountText]) => ({
-        currencyId: Number(currencyIdText),
-        amount: toNumber(amountText),
-      }))
-      .filter((x: any) => x.amount > 0);
+    const paidList = paymentTypeMode === "debt"
+      ? []
+      : Object.entries(paidAmounts)
+          .map(([currencyIdText, amountText]) => ({
+            currencyId: Number(currencyIdText),
+            amount: toNumber(amountText),
+          }))
+          .filter((x: any) => x.amount > 0);
 
     const result = calculateLedgerEntries({
       type: "purchase",
@@ -2402,9 +2423,26 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                         setSupplierSearch(account.name);
                         setShowSupplierList(false);
                         setShowSupplierInfo(false);
+                        if (account.exchangeRateType === "FIXED" && account.customExchangeRate) {
+                          setExchangeRate(String(account.customExchangeRate));
+                        } else if (!editId) {
+                          const iqd = currencies.find((c: any) => c.code === "IQD" || c.name === "دینار" || c.name?.includes("دینار"));
+                          if (iqd && iqd.rate) {
+                            let r = Number(iqd.rate);
+                            if (r < 10000) r = r * 100;
+                            setExchangeRate(String(r));
+                          }
+                        }
                       }}
                     >
-                      <strong>{account.name}</strong>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                        <strong>{account.name}</strong>
+                        {account.exchangeRateType === "FIXED" && (
+                          <span style={{ fontSize: "11px", background: "#f3e8ff", color: "#7e22ce", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
+                            ڕەیتی جێگیر ({account.customExchangeRate?.toLocaleString("en-US")})
+                          </span>
+                        )}
+                      </div>
                       <span style={smallMuted}>
                         {account.phone || "-"} / {account.city || "-"}
                       </span>
@@ -2621,8 +2659,14 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
 
             {/* --- نرخی دۆلار (تایبەت بەم پسووڵەیە) --- */}
             {printOptions.showExchangeRate !== false && (
-              <Field label="نرخی 100 دۆلار (تایبەت بەم پسووڵەیە)">
-                <div style={{ display: "flex", border: "1px solid #93c5fd", borderRadius: 8, overflow: "hidden", background: "#f0f9ff" }}>
+              <Field label={supplier?.exchangeRateType === "FIXED" ? "نرخی 100 دۆلار (تایبەت بەم پسووڵەیە - جێگیر)" : "نرخی 100 دۆلار (تایبەت بەم پسووڵەیە)"}>
+                <div style={{
+                  display: "flex",
+                  border: supplier?.exchangeRateType === "FIXED" ? "1.5px solid #a855f7" : "1px solid #93c5fd",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  background: supplier?.exchangeRateType === "FIXED" ? "#faf5ff" : "#f0f9ff"
+                }}>
                   <FormattedNumberInput
                     value={exchangeRate}
                     disabled={isLocked}
@@ -2630,9 +2674,31 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       if (blockIfLocked()) return;
                       setExchangeRate(val);
                     }}
-                    style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 10px", background: "transparent", cursor: isLocked ? "not-allowed" : "text", color: "#1e40af", fontWeight: "bold" }}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      border: "none",
+                      outline: "none",
+                      padding: "8px 10px",
+                      background: "transparent",
+                      cursor: isLocked ? "not-allowed" : "text",
+                      color: supplier?.exchangeRateType === "FIXED" ? "#7e22ce" : "#1e40af",
+                      fontWeight: "bold"
+                    }}
                   />
-                  <span style={{ border: "none", borderRight: "1px solid #bfdbfe", background: "#e0f2fe", padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#0369a1", fontSize: "12px", minWidth: "45px" }}>
+                  <span style={{
+                    border: "none",
+                    borderRight: supplier?.exchangeRateType === "FIXED" ? "1px solid #d8b4fe" : "1px solid #bfdbfe",
+                    background: supplier?.exchangeRateType === "FIXED" ? "#f3e8ff" : "#e0f2fe",
+                    padding: "0 8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: "bold",
+                    color: supplier?.exchangeRateType === "FIXED" ? "#6b21a8" : "#0369a1",
+                    fontSize: "12px",
+                    minWidth: "45px"
+                  }}>
                     دینار
                   </span>
                 </div>
@@ -2713,11 +2779,11 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
             <button
               style={{
                 ...primaryBtn,
-                opacity: (isLocked || (!!editId && isSaved) || isSaving) ? 0.55 : 1,
-                cursor: (isLocked || (!!editId && isSaved) || isSaving) ? "not-allowed" : "pointer",
+                opacity: (isLocked || isSaving) ? 0.55 : 1,
+                cursor: (isLocked || isSaving) ? "not-allowed" : "pointer",
               }}
               onClick={handleSave}
-              disabled={isLocked || (!!editId && isSaved) || isSaving}
+              disabled={isLocked || isSaving}
             >
               {isSaving ? "چاوەڕوان بە..." : isLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
@@ -3822,7 +3888,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                 {printOptions.showBalance && (
                   <>
                     <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatPrintBalanceMap(accountBalanceBeforeByCurrency, true)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left" }}>{formatPrintBalanceMap(accountBalanceBeforeByCurrency, true, effectivePurchaseCurrencyId)}</td>
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>قەرزی پێشوو</td>
                     </tr>
                     <tr>
@@ -3830,7 +3896,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>پارەی دراو</td>
                     </tr>
                     <tr>
-                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatPrintBalanceMap(editId && supplier ? getAccountBalanceBeforeMap(supplier) : accountBalanceAfterByCurrency, true)}</td>
+                      <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "left", fontWeight: 900 }}>{formatPrintBalanceMap(editId && supplier ? getAccountBalanceBeforeMap(supplier) : accountBalanceAfterByCurrency, true, effectivePurchaseCurrencyId)}</td>
                       <td style={{ border: "1px solid #cbd5e1", padding: "6px 10px", textAlign: "right", fontWeight: "bold", whiteSpace: "nowrap" }}>کۆی گشتی ماوە</td>
                     </tr>
 

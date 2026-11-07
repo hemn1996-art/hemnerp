@@ -26,8 +26,8 @@ import BackButton from "../components/BackButton";
 const menuItems = [
   { label: "فرۆشتن",               value: "sales" },
   { label: "کڕین",                  value: "purchase" },
-  { label: "پارەی ڕۆشتوو",         value: "money_out" },
-  { label: "پارەی هاتوو",          value: "money_in" },
+  { label: "پارەدان",              value: "money_out" },
+  { label: "پارە وەرگرتن",          value: "money_in" },
   { label: "خەرجی",                value: "expense" },
   { label: "نرخاندن",              value: "quotation" },
   { label: "گەڕانەوەی فرۆشتن",    value: "sales_return" },
@@ -113,6 +113,8 @@ function InvoicesRouteContent() {
     // Kurdish fallbacks
     "فرۆشتن": "sales",
     "کڕین": "purchase",
+    "پارەدان": "money_out",
+    "پارە وەرگرتن": "money_in",
     "پارەی ڕۆشتوو": "money_out",
     "پارەی هاتوو": "money_in",
     "خەرجی": "expense",

@@ -9,13 +9,14 @@ import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
 import ProductQuickModal from "../../components/ProductQuickModal";
 import AccountQuickModal from "../../components/AccountQuickModal";
+import QuickDateFilter from "../../components/QuickDateFilter";
+import { getDefaultReportDateRange } from "../../utils/datePresets";
+import { getReportSessionState, saveReportSessionState, clearReportSessionState } from "../../utils/reportSession";
 
 interface DropdownOption {
   value: string | number;
   label: string;
 }
-
-
 
 function ItemsReportContent() {
   const router = useRouter();
@@ -23,45 +24,55 @@ function ItemsReportContent() {
   const paramProductId = searchParams.get("productId") || searchParams.get("id");
   const paramAccountId = searchParams.get("accountId");
 
+  const defaultDates = getDefaultReportDateRange();
+  const sessionSaved = getReportSessionState("__erp_mat_movements_filters", {
+    startDate: defaultDates.startDate,
+    endDate: defaultDates.endDate,
+    searchTerm: "",
+    filterProductIds: paramProductId ? [Number(paramProductId)] : [],
+    filterAccountIds: paramAccountId ? [Number(paramAccountId)] : [],
+    filterVoucherTypes: [] as string[],
+    filterCategories: [] as string[],
+    filterBrands: [] as string[],
+    itemCode: "",
+    batchCode: "",
+    currencyId: "all",
+    filterWarehouseIds: [] as number[],
+    currentPage: 1,
+  });
+
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReportStats, setShowReportStats] = useState(true);
   const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
   const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
 
-  // Date Filters
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
+  // Date Filters (default: 1st of current month to today)
+  const [startDate, setStartDate] = useState(sessionSaved.startDate || defaultDates.startDate);
+  const [endDate, setEndDate] = useState(sessionSaved.endDate || defaultDates.endDate);
 
   // Voucher Details
-  const [filterVoucherTypes, setFilterVoucherTypes] = useState<string[]>([]);
+  const [filterVoucherTypes, setFilterVoucherTypes] = useState<string[]>(sessionSaved.filterVoucherTypes || []);
   const [voucherReference, setVoucherReference] = useState("");
 
   // Item Filters
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(sessionSaved.searchTerm || "");
   const [filterProductIds, setFilterProductIds] = useState<number[]>(() => {
-    return paramProductId ? [Number(paramProductId)] : [];
+    return paramProductId ? [Number(paramProductId)] : (sessionSaved.filterProductIds || []);
   });
-  const [filterCategories, setFilterCategories] = useState<string[]>([]);
-  const [filterBrands, setFilterBrands] = useState<string[]>([]);
-  const [itemCode, setItemCode] = useState("");
-  const [batchCode, setBatchCode] = useState("");
+  const [filterCategories, setFilterCategories] = useState<string[]>(sessionSaved.filterCategories || []);
+  const [filterBrands, setFilterBrands] = useState<string[]>(sessionSaved.filterBrands || []);
+  const [itemCode, setItemCode] = useState(sessionSaved.itemCode || "");
+  const [batchCode, setBatchCode] = useState(sessionSaved.batchCode || "");
 
   // Account Filters
   const [filterAccountIds, setFilterAccountIds] = useState<number[]>(() => {
-    return paramAccountId ? [Number(paramAccountId)] : [];
+    return paramAccountId ? [Number(paramAccountId)] : (sessionSaved.filterAccountIds || []);
   });
   const [filterAccountTypeIds, setFilterAccountTypeIds] = useState<number[]>([]);
 
   // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(sessionSaved.currentPage || 1);
   const [pageSize, setPageSize] = useState(50);
 
   // Secondary Filters
@@ -197,6 +208,13 @@ function ItemsReportContent() {
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [invoices]);
 
+  const productOptions = React.useMemo(() => {
+    return (products || []).map((p: any) => ({
+      value: p.id,
+      label: p.code ? `${p.name} (${p.code})` : p.name,
+    }));
+  }, [products]);
+
   useEffect(() => {
     if (paramProductId) {
       setFilterProductIds([Number(paramProductId)]);
@@ -279,7 +297,35 @@ function ItemsReportContent() {
     profitStatus, isGift, groupReverse
   ]);
 
+  // Persist report filter state to sessionStorage
+  useEffect(() => {
+    saveReportSessionState("__erp_mat_movements_filters", {
+      startDate,
+      endDate,
+      searchTerm,
+      filterProductIds,
+      filterAccountIds,
+      filterVoucherTypes,
+      filterCategories,
+      filterBrands,
+      itemCode,
+      batchCode,
+      currencyId,
+      filterWarehouseIds,
+      currentPage,
+    });
+  }, [
+    startDate, endDate, searchTerm, filterProductIds, filterAccountIds,
+    filterVoucherTypes, filterCategories, filterBrands, itemCode, batchCode,
+    currencyId, filterWarehouseIds, currentPage
+  ]);
+
   const handleResetFilters = () => {
+    clearReportSessionState("__erp_mat_movements_filters");
+    const d = getDefaultReportDateRange();
+    setStartDate(d.startDate);
+    setEndDate(d.endDate);
+    setSearchTerm("");
     setFilterVoucherTypes([]);
     setVoucherReference("");
     setFilterProductIds([]);
@@ -296,6 +342,7 @@ function ItemsReportContent() {
     setProfitStatus("all");
     setIsGift("all");
     setGroupReverse("all");
+    setCurrentPage(1);
     setTimeout(() => {
       fetchItems();
     }, 0);
@@ -315,8 +362,8 @@ function ItemsReportContent() {
       case "inventory_in": return "هاتنەناوەوە";
       case "inventory_out": return "چوونەدەرەوە";
       case "expense": return "خەرجی";
-      case "money_in": return "پارەی هاتوو";
-      case "money_out": return "پارەی ڕۆشتوو";
+      case "money_in": return "پارە وەرگرتن";
+      case "money_out": return "پارەدان";
       case "quotation": return "نرخاندن";
       case "cashbox_transfer": return "گواستنەوەی پارە";
       case "cashbox_exchange": return "گۆڕینەوەی پارە";
@@ -349,6 +396,11 @@ function ItemsReportContent() {
 
   const filteredItems = React.useMemo(() => {
     let result = items;
+    if (filterProductIds.length > 0) {
+      result = result.filter((item: any) =>
+        filterProductIds.includes(item.productId) || filterProductIds.includes(Number(item.productId))
+      );
+    }
     if (filterVoucherTypes.length > 0) {
       result = result.filter((item: any) => filterVoucherTypes.includes(item.voucherType));
     }
@@ -364,7 +416,7 @@ function ItemsReportContent() {
       );
     }
     return result;
-  }, [items, filterVoucherTypes, searchTerm]);
+  }, [items, filterProductIds, filterVoucherTypes, searchTerm]);
 
   const paginatedItems = React.useMemo(() => {
     if (pageSize >= 100000) return filteredItems;
@@ -404,8 +456,19 @@ function ItemsReportContent() {
     const isNegative = num < 0;
     const isIQD = code === "IQD" || symbol === "دینار" || symbol === "د.ع";
     if (isIQD) {
-      const roundedVal = Math.round(num).toLocaleString("en-US");
-      return <span className={isNegative ? "text-rose-600 font-bold" : ""}>{roundedVal} دینار</span>;
+      const absNum = Math.abs(num);
+      const roundedVal = Math.round(absNum).toLocaleString("en-US");
+      return (
+        <span
+          className={isNegative ? "text-rose-600 font-bold" : ""}
+          style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: "3px" }}
+          dir="ltr"
+        >
+          {isNegative && <span>-</span>}
+          <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>دینار</span>
+          <span>{roundedVal}</span>
+        </span>
+      );
     }
 
     const absNum = Math.abs(num);
@@ -452,15 +515,25 @@ function ItemsReportContent() {
         </div>
 
         {/* Search Bar and Quick Actions */}
-        <div className="flex flex-wrap items-center gap-3 flex-1 justify-end">
-          {/* Direct Real-time Material Search Input */}
-          <div className="relative min-w-[240px] max-w-[340px] w-full sm:w-auto">
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </div>
+        <div className="flex flex-wrap items-center gap-3.5 flex-1 justify-end">
+          {/* Product MultiSelect Search Dropdown */}
+          <div className="min-w-[300px] md:min-w-[380px] lg:min-w-[460px] flex-1 max-w-xl">
+            <MultiSelectDropdown
+              label="دیاریکردنی کەرەستە..."
+              placeholder="گەڕان و دیاریکردنی کەرەستە... 🔍"
+              options={productOptions}
+              selectedValues={filterProductIds}
+              onChange={(vals) => {
+                setFilterProductIds(vals);
+                setCurrentPage(1);
+              }}
+              searchable
+              compact
+            />
+          </div>
+
+          {/* Text/Code Quick Search Input */}
+          <div className="relative w-56 md:w-64">
             <input
               type="text"
               value={searchTerm}
@@ -468,44 +541,49 @@ function ItemsReportContent() {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="گەڕان بەدوای ناوی کەرەستە، کۆد، بارکۆد..."
-              className="w-full bg-slate-50 border border-slate-300 hover:border-slate-400 rounded-xl pr-9 pl-8 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all shadow-inner"
+              placeholder="کۆد، بارکۆد، تێبینی... 🔍"
+              className="w-full h-[48px] bg-white border border-slate-300 hover:border-slate-400 focus:border-[#0b1f50] rounded-xl px-4 py-2 text-[14px] font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b1f50]/20 transition-all shadow-xs"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm("")}
-                className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400 hover:text-rose-500 transition"
+                className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 hover:text-rose-500 transition text-sm font-bold"
                 title="پاککردنەوە"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                ✕
               </button>
             )}
           </div>
 
           {/* Quick Dates */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <QuickDateFilter
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(s, e) => {
+                setStartDate(s);
+                setEndDate(e);
+              }}
+            />
             <DateInput value={startDate} onChange={setStartDate} label="لە بەرواری" />
             <DateInput value={endDate} onChange={setEndDate} label="تا بەرواری" />
           </div>
 
-          <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 bg-slate-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-700 transition shadow-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <button onClick={() => setShowFilterModal(true)} className="flex items-center gap-2 bg-[#0b1f50] hover:bg-[#061f5f] text-white px-4 h-[48px] rounded-xl text-sm font-bold transition shadow-sm cursor-pointer border-none">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
             </svg>
             <span>فلتەرەکان</span>
             {activeFiltersCount > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+              <span className="bg-rose-500 text-white text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                 {activeFiltersCount}
               </span>
             )}
           </button>
           
           {activeFiltersCount > 0 && (
-            <button onClick={handleResetFilters} className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-rose-100 transition shadow-sm">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <button onClick={handleResetFilters} className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3.5 h-[48px] rounded-xl text-sm font-bold hover:bg-rose-100 transition shadow-sm cursor-pointer">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
               </svg>
@@ -515,10 +593,10 @@ function ItemsReportContent() {
           
           <button
             onClick={() => setShowColumnsModal(true)}
-            className="flex items-center gap-2 text-white font-black px-3.5 py-2 rounded-xl text-xs transition-transform hover:scale-105 cursor-pointer shadow-sm border-none"
-            style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 6px rgba(2, 132, 199, 0.3)" }}
+            className="flex items-center gap-2 text-white font-black px-4 h-[48px] rounded-xl text-sm transition-transform hover:scale-105 cursor-pointer shadow-md border-none"
+            style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 8px rgba(2, 132, 199, 0.35)" }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
               <line x1="12" y1="3" x2="12" y2="21" />
               <path d="M3 9h18" />
@@ -527,8 +605,8 @@ function ItemsReportContent() {
             <span>کۆڵۆمەکان</span>
           </button>
           
-          <button onClick={() => window.print()} className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-100 transition shadow-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button onClick={() => window.print()} className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 h-[48px] rounded-xl text-sm font-bold hover:bg-slate-50 transition shadow-sm cursor-pointer">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 6 2 18 2 18 9" />
               <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
               <rect x="6" y="14" width="12" height="8" />
@@ -537,8 +615,8 @@ function ItemsReportContent() {
           </button>
 
           <button onClick={() => exportTableToExcel("material-movements-table", "jwlay_kerestekan.xlsx")}
-            className="flex items-center gap-1.5 bg-emerald-600 border border-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition cursor-pointer border-none shadow-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            className="flex items-center gap-2 bg-emerald-600 border border-emerald-700 text-white px-4 h-[48px] rounded-xl text-sm font-bold hover:bg-emerald-700 transition cursor-pointer border-none shadow-sm">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
@@ -954,7 +1032,7 @@ function ItemsReportContent() {
                   <div>
                     <MultiSelectDropdown
                       label="کەرەستە"
-                      options={products?.map((p: any) => ({ value: p.id, label: p.name })) || []}
+                      options={productOptions}
                       selectedValues={filterProductIds}
                       onChange={setFilterProductIds}
                       searchable

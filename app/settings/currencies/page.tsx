@@ -11,6 +11,7 @@ type Currency = {
   rate: number;
   mode: string | null;
   rounding: boolean;
+  decimalPlaces: number;
   color: string | null;
   isActive: boolean;
   createdAt: string;
@@ -135,6 +136,7 @@ export default function CurrenciesPage() {
   const [formRate, setFormRate] = useState("1");
   const [formMode, setFormMode] = useState("1");
   const [formRounding, setFormRounding] = useState(false);
+  const [formDecimalPlaces, setFormDecimalPlaces] = useState<number>(0);
   const [formIsActive, setFormIsActive] = useState(true);
   const [formColor, setFormColor] = useState("#3b82f6");
 
@@ -188,6 +190,7 @@ export default function CurrenciesPage() {
     setFormRate(String((curr.rate ?? 0) * 100));
     setFormMode(curr.mode || "1");
     setFormRounding(curr.rounding);
+    setFormDecimalPlaces(curr.decimalPlaces !== undefined && curr.decimalPlaces !== null ? Number(curr.decimalPlaces) : (curr.code === "IQD" ? 0 : 2));
     setFormIsActive(curr.isActive);
     setFormColor(curr.color || "#3b82f6");
     setView("form");
@@ -202,6 +205,7 @@ export default function CurrenciesPage() {
     setFormRate("100");
     setFormMode("1");
     setFormRounding(false);
+    setFormDecimalPlaces(0);
     setFormIsActive(true);
     setFormColor("#3b82f6");
     setView("form");
@@ -222,6 +226,7 @@ export default function CurrenciesPage() {
       rate: Number(formRate) / 100,
       mode: formMode,
       rounding: formRounding,
+      decimalPlaces: Number(formDecimalPlaces),
       color: formColor,
       isActive: formIsActive,
     };
@@ -387,6 +392,7 @@ export default function CurrenciesPage() {
                   <th className="px-6 py-4 text-sm font-bold text-center">نرخ بۆ ١٠٠ $</th>
                   <th className="px-6 py-4 text-sm font-bold text-center">مۆد</th>
                   <th className="px-6 py-4 text-sm font-bold text-center">نزیککردنەوە</th>
+                  <th className="px-6 py-4 text-sm font-bold text-center">ژمارەی پۆینتەکان</th>
                   <th className="px-6 py-4 text-sm font-bold text-center">ڕەنگ</th>
                   <th className="px-6 py-4 text-sm font-bold text-center">حاڵەت</th>
                   <th className="px-6 py-4 text-sm font-bold">دروستکرا</th>
@@ -396,13 +402,13 @@ export default function CurrenciesPage() {
               <tbody className="divide-y divide-slate-100 bg-white font-semibold text-slate-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-slate-450">
+                    <td colSpan={9} className="text-center py-12 text-slate-450">
                       باردەکرێت... 🔄
                     </td>
                   </tr>
                 ) : filteredCurrencies.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12 text-slate-450">
+                    <td colSpan={9} className="text-center py-12 text-slate-450">
                       هیچ دراوێک نەدۆزرایەوە 📭
                     </td>
                   </tr>
@@ -425,6 +431,9 @@ export default function CurrenciesPage() {
                         }`}>
                           {curr.rounding ? "بەڵێ" : "نەخێر"}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-center text-slate-700 font-black">
+                        {curr.decimalPlaces ?? 0}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div
@@ -579,7 +588,7 @@ export default function CurrenciesPage() {
               </div>
             </div>
 
-            {/* Row 4: Rounding, Active */}
+            {/* Row 4: Rounding, Decimal Places */}
             <div className="grid grid-cols-2 gap-4">
               <div className="relative border border-slate-200 rounded-xl bg-white focus-within:border-blue-500 transition-all p-1">
                 <span className="absolute -top-2.5 right-4 px-1.5 bg-white text-[11px] font-bold text-slate-400">
@@ -597,6 +606,26 @@ export default function CurrenciesPage() {
 
               <div className="relative border border-slate-200 rounded-xl bg-white focus-within:border-blue-500 transition-all p-1">
                 <span className="absolute -top-2.5 right-4 px-1.5 bg-white text-[11px] font-bold text-slate-400">
+                  ژمارەی پۆینتەکان *
+                </span>
+                <select
+                  value={formDecimalPlaces}
+                  onChange={(e) => setFormDecimalPlaces(Number(e.target.value))}
+                  className="w-full bg-transparent px-3 py-2.5 text-sm font-semibold outline-none text-slate-700 cursor-pointer appearance-none text-right"
+                >
+                  <option value={0}>0</option>
+                  <option value={1}>1</option>
+                  <option value={2}>2</option>
+                  <option value={3}>3</option>
+                  <option value={4}>4</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Row 5: Active, Color Pick */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="relative border border-slate-200 rounded-xl bg-white focus-within:border-blue-500 transition-all p-1">
+                <span className="absolute -top-2.5 right-4 px-1.5 bg-white text-[11px] font-bold text-slate-400">
                   حاڵەت *
                 </span>
                 <select
@@ -608,20 +637,19 @@ export default function CurrenciesPage() {
                   <option value="inactive">ناچالاک</option>
                 </select>
               </div>
-            </div>
 
-            {/* Row 5: Color Pick */}
-            <div className="relative border border-slate-200 rounded-xl bg-white focus-within:border-blue-500 transition-all p-3 flex items-center justify-between">
-              <span className="absolute -top-2.5 right-4 px-1.5 bg-white text-[11px] font-bold text-slate-400">
-                ڕەنگ (Color Theme)
-              </span>
-              <span className="text-sm font-bold text-slate-500">ڕەنگی تایبەتی دراو</span>
-              <input
-                type="color"
-                value={formColor}
-                onChange={(e) => setFormColor(e.target.value)}
-                className="w-10 h-10 border-0 rounded-lg cursor-pointer bg-transparent"
-              />
+              <div className="relative border border-slate-200 rounded-xl bg-white focus-within:border-blue-500 transition-all p-1 flex items-center justify-between px-3">
+                <span className="absolute -top-2.5 right-4 px-1.5 bg-white text-[11px] font-bold text-slate-400">
+                  ڕەنگ (Color Theme)
+                </span>
+                <span className="text-xs font-bold text-slate-500">ڕەنگی تایبەتی دراو</span>
+                <input
+                  type="color"
+                  value={formColor}
+                  onChange={(e) => setFormColor(e.target.value)}
+                  className="w-8 h-8 border-0 rounded-lg cursor-pointer bg-transparent"
+                />
+              </div>
             </div>
 
             {/* Large Preview Color Box */}

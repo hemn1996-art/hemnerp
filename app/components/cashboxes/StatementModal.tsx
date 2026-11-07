@@ -62,18 +62,13 @@ export default function StatementModal({
       : absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
     const isNegative = num < -0.0001;
+    const sign = isNegative ? "-" : "";
 
     if (isIQD) {
-      if (isChange) {
-        return num >= 0 ? `+ ${formattedNum} دینار` : `- ${formattedNum} دینار`;
-      }
-      return isNegative ? `- ${formattedNum} دینار` : `${formattedNum} دینار`;
+      return isNegative ? `دینار -${formattedNum}` : `دینار ${formattedNum}`;
     }
 
-    if (isChange) {
-      return num >= 0 ? `+ ${symbol} ${formattedNum}` : `- ${symbol} ${formattedNum}`;
-    }
-    return isNegative ? `- ${symbol} ${formattedNum}` : `${symbol} ${formattedNum}`;
+    return isNegative ? `-${symbol} ${formattedNum}` : `${symbol} ${formattedNum}`;
   }
 
   function formatChanges(changesMap: Record<number, number>) {
@@ -113,8 +108,8 @@ export default function StatementModal({
   function getKurdishType(type: string) {
     if (type === "sales") return "فرۆشتن";
     if (type === "purchase") return "کڕین";
-    if (type === "money_in") return "پارەی هاتوو";
-    if (type === "money_out") return "پارەی ڕۆشتوو";
+    if (type === "money_in") return "پارە وەرگرتن";
+    if (type === "money_out") return "پارەدان";
     if (type === "expense") return "خەرجی";
     if (type === "sales_return") return "گەڕانەوەی فرۆشتن";
     if (type === "purchase_return") return "گەڕانەوەی کڕین";

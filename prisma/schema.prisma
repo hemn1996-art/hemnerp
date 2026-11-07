@@ -14,6 +14,7 @@ model Currency {
   rate            Float               @default(1.0)
   mode            String?
   rounding        Boolean             @default(false)
+  decimalPlaces   Int                 @default(0)
   color           String?
   isActive        Boolean             @default(true)
   createdAt       DateTime            @default(now())
@@ -159,13 +160,12 @@ model Voucher {
   exchangeRate          Float                  @default(1)
   totalAmount           Float                  @default(0)
   totalDiscount         Float                  @default(0)
+  discountCurrencyId    Int?
   netAmount             Float                  @default(0)
   internalNote          String?
   printNote             String?
   isSaved               Boolean                @default(false)
   isDeleted             Boolean                @default(false)
-  isArrived             Boolean                @default(true)
-  arrivalDate           DateTime?
   employeeName          String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt

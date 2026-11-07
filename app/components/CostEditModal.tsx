@@ -133,7 +133,7 @@ export default function CostEditModal({
       minimumFractionDigits: isIqdItem ? 0 : 2,
       maximumFractionDigits: 4,
     });
-    return isIqdItem ? `${formatted} دینار` : `$ ${formatted}`;
+    return isIqdItem ? `دینار ${formatted}` : `$ ${formatted}`;
   };
 
   const formatHistoryDate = (dateStr: string) => {

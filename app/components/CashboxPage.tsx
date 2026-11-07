@@ -174,17 +174,27 @@ export default function CashboxPage() {
 
   function formatMoney(amount: number, currencyId: number) {
     const currency = getCurrency(currencyId);
-    const symbol = currency?.symbol || "";
+    const isIQD = currency?.code === "IQD" || currency?.name?.includes("دینار") || currency?.symbol === "دینار";
+    const symbol = isIQD ? "دینار" : (currency?.symbol || "$");
+    const num = Number(amount || 0);
+    const isNeg = isIQD ? num <= -250 : num <= -1;
+    const sign = isNeg ? "-" : "";
+    const absVal = Math.round(Math.abs(num)).toLocaleString("en-US");
 
-    if (currency?.code === "IQD") {
-      return `${Math.round(Number(amount || 0)).toLocaleString("en-US")} دینار`;
+    if (isIQD) {
+      return isNeg ? `دینار -${absVal}` : `دینار ${absVal}`;
     }
-    return `${Math.round(Number(amount || 0)).toLocaleString("en-US")} ${symbol}`;
+    return isNeg ? `-${symbol} ${absVal}` : `${symbol} ${absVal}`;
   }
 
   function formatAllBalances(cashbox: CashboxLike) {
     const parts = cashbox.balances
-      .filter((balance) => Math.abs(Number(balance.amount || 0)) > 0.0001)
+      .filter((balance) => {
+        const amt = Number(balance.amount || 0);
+        const cur = getCurrency(balance.currencyId);
+        const isIQD = cur?.code === "IQD" || cur?.name?.includes("دینار");
+        return isIQD ? Math.abs(amt) >= 250 : Math.abs(amt) >= 1;
+      })
       .map((balance) => formatMoney(balance.amount, balance.currencyId));
 
     if (parts.length === 0) return "0";
@@ -259,7 +269,7 @@ export default function CashboxPage() {
       .filter((currency: any) => currency.isActive !== false)
       .map((currency: any) => ({
         currencyId: currency.id,
-        amount: toNumber(form.balances[currency.id]),
+        amount: 0,
       }));
 
     const data: CashboxLike = {
@@ -461,9 +471,11 @@ export default function CashboxPage() {
               </svg>
             </div>
           </div>
-          <div className="text-2xl font-black text-slate-900 tracking-tight" dir="ltr">
-            <span>{Math.round(totalIqd).toLocaleString("en-US")}</span>{" "}
+          <div className="text-2xl font-black text-slate-900 tracking-tight flex items-baseline gap-1.5" dir="ltr">
             <span className="text-base font-bold text-blue-700">دینار</span>
+            <span className={totalIqd < -0.01 ? "text-red-600 font-black" : ""}>
+              {totalIqd < -0.01 ? `-${Math.round(Math.abs(totalIqd)).toLocaleString("en-US")}` : Math.round(Math.abs(totalIqd)).toLocaleString("en-US")}
+            </span>
           </div>
           <div className="mt-2 text-xs text-slate-500 font-medium flex items-center gap-1">
             <span>کۆی گشتی دیناری بەردەست لە هەموو قاسە و بانکەکان</span>
@@ -481,9 +493,10 @@ export default function CashboxPage() {
               </svg>
             </div>
           </div>
-          <div className="text-2xl font-black text-emerald-700 tracking-tight" dir="ltr">
+          <div className="text-2xl font-black tracking-tight flex items-baseline gap-1" dir="ltr">
+            {totalUsd < -0.01 && <span className="text-red-600 font-black">-</span>}
             <span className="text-base font-bold text-emerald-600 mr-1">$</span>
-            <span>{Math.round(totalUsd).toLocaleString("en-US")}</span>
+            <span className={totalUsd < -0.01 ? "text-red-600" : "text-emerald-700"}>{Math.round(Math.abs(totalUsd)).toLocaleString("en-US")}</span>
           </div>
           <div className="mt-2 text-xs text-slate-500 font-medium flex items-center gap-1">
             <span>کۆی گشتی دۆلاری نەقدی بەردەست</span>

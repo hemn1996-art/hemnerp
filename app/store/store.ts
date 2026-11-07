@@ -270,8 +270,8 @@ export const useStore = create<StoreState>((set, get) => ({
           let uiType = v.type;
           if (v.type === "sales") uiType = "فرۆشتن";
           else if (v.type === "purchase") uiType = "کڕین";
-          else if (v.type === "money_in") uiType = "پارەی هاتوو";
-          else if (v.type === "money_out") uiType = "پارەی ڕۆشتوو";
+          else if (v.type === "money_in") uiType = "پارە وەرگرتن";
+          else if (v.type === "money_out") uiType = "پارەدان";
           else if (v.type === "expense") uiType = "خەرجی";
           else if (v.type === "quotation") uiType = "نرخاندن";
           else if (v.type === "sales_return") uiType = "گەڕانەوەی فرۆشتن";
@@ -310,6 +310,7 @@ export const useStore = create<StoreState>((set, get) => ({
             total: effectiveTotal,
             paid: v.paidAmounts?.reduce((sum: number, pa: any) => sum + pa.amount, 0) || 0,
             totalDiscount: v.totalDiscount || 0,
+            discountCurrencyId: v.discountCurrencyId,
             date: v.date,
             referenceNo: v.referenceNo,
             accountName: v.account?.name || "",

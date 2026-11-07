@@ -95,6 +95,8 @@ export interface Product {
 export type InvoiceType =
   | "فرۆشتن"
   | "کڕین"
+  | "پارە وەرگرتن"
+  | "پارەدان"
   | "پارەی هاتوو"
   | "پارەی ڕۆشتوو"
   | "خەرجی"

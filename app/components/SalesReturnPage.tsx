@@ -46,6 +46,8 @@ type AccountLike = {
   balance?: number;
   balanceByCurrency?: Record<string, number>;
   showInSales?: boolean;
+  exchangeRateType?: string;
+  customExchangeRate?: number | null;
 };
 
 type ReturnRow = {
@@ -365,13 +367,16 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
   useEffect(() => {
     if (customer) {
+      if (!editId && customer.exchangeRateType === "FIXED" && customer.customExchangeRate) {
+        setExchangeRate(String(customer.customExchangeRate));
+      }
       const balanceMap = getAccountBalanceBeforeMap(customer);
       const activeCurKeys = Object.keys(balanceMap).filter(key => Math.abs(balanceMap[key]) > 0.01);
       if (activeCurKeys.length === 1) {
         setPaidCurrencyId(Number(activeCurKeys[0]));
       }
     }
-  }, [customerId, customer]);
+  }, [customerId, customer, editId]);
   const selectedCashbox = cashboxes.find((c: any) => c.id === cashboxId);
 
   function getAccountBalanceBeforeMap(account?: AccountLike) {
@@ -429,15 +434,48 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
     const decimal = parts[1];
     const displaySymbol = isIQD ? "دینار" : symbol;
 
+    const numberJSX = (
+      <span>
+        <span>{whole}</span>
+        {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+      </span>
+    );
+
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {isNegative && <span>-</span>}
-        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
-        <span>
-          <span>{whole}</span>
-          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
-        </span>
+        {isIQD ? (
+          <>
+            {numberJSX}
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>دینار</span>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{symbol}</span>
+            {numberJSX}
+          </>
+        )}
       </span>
+    );
+  }
+
+  function formatAccountBalanceWithColors(map: Record<string, number>) {
+    const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(val) > 0.01);
+    if (activeEntries.length === 0) {
+      return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+        {activeEntries.map(([curIdText, val]) => {
+          const color = val > 0.01 ? "#16a34a" : (val < -0.01 ? "#dc2626" : "#9ca3af");
+          const curId = Number(curIdText);
+
+          return (
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
+              {formatCurrencyAmountJSX(Math.abs(val), curId)}
+            </span>
+          );
+        })}
+      </div>
     );
   }
 
@@ -454,7 +492,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
 
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
-              {formatCurrencyAmountJSX(val, curId)}
+              {formatCurrencyAmountJSX(Math.abs(val), curId)}
             </span>
           );
         })}
@@ -1508,6 +1546,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
           discountAmount: toNumber(row.discount),
           lineTotal: getRowTotal(row),
           note: row.note,
+          currencyId: row.currencyId || returnCurrencyId,
           warehouseId,
           unitCost: toNumber(row.costPrice || 0),
         };
@@ -1762,9 +1801,26 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
                           setCustomerSearch(acc.name);
                           setShowCustomerList(false);
                           setShowCustomerInfo(true);
+                          if (acc.exchangeRateType === "FIXED" && acc.customExchangeRate) {
+                            setExchangeRate(String(acc.customExchangeRate));
+                          } else if (!editId) {
+                            const iqd = currencies.find((c: any) => c.code === "IQD" || c.name === "دینار" || c.name?.includes("دینار"));
+                            if (iqd && iqd.rate) {
+                              let r = Number(iqd.rate);
+                              if (r < 10000) r = r * 100;
+                              setExchangeRate(String(r));
+                            }
+                          }
                         }}
                       >
-                        <strong>{acc.name}</strong>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                          <strong>{acc.name}</strong>
+                          {acc.exchangeRateType === "FIXED" && (
+                            <span style={{ fontSize: "11px", background: "#f3e8ff", color: "#7e22ce", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
+                              ڕەیتی جێگیر ({acc.customExchangeRate?.toLocaleString("en-US")})
+                            </span>
+                          )}
+                        </div>
                         <span style={smallMuted}>
                           مۆبایل: {acc.phone || "-"} / باڵانس:{" "}
                           {formatCurrencyMap(getAccountBalanceBeforeMap(acc))}
@@ -1805,7 +1861,7 @@ export default function SalesReturnPage({ headerSelector, editId }: Props) {
               </InfoRow>
 
               <InfoRow label="باڵانس">
-                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(customer))}
+                {formatAccountBalanceWithColors(getAccountBalanceBeforeMap(customer))}
               </InfoRow>
             </div>
           )}

@@ -36,12 +36,13 @@ export default function LoginPage() {
       const data = await res.json();
       if (res.ok && data.success) {
         setLoginSuccess(true);
-        if (data.user && typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem("user_session_cache", JSON.stringify(data.user));
+        document.cookie = "auth_token=authenticated_session; path=/; max-age=604800; SameSite=Lax";
+        if (data.user) {
+          document.cookie = `user_session=${encodeURIComponent(JSON.stringify(data.user))}; path=/; max-age=604800; SameSite=Lax`;
         }
         setTimeout(() => {
           window.location.href = "/dashboard";
-        }, 600);
+        }, 800);
       } else {
         setError(data.error || "یوزەرنەیم یان پاسوۆرد هەڵەیە");
       }
@@ -594,7 +595,7 @@ export default function LoginPage() {
                 lineHeight: 1.2,
                 textAlign: "center",
               }}>
-                کۆگای دۆستان
+                سەنتەری کارەبای لەندەن
               </h1>
 
               {/* Tagline */}

@@ -48,6 +48,8 @@ type AccountLike = {
   creditLimitCurrencyId?: number;
   balanceCurrencyId?: number;
   showInPurchase?: boolean;
+  exchangeRateType?: string;
+  customExchangeRate?: number | null;
 };
 
 type ReturnRow = {
@@ -298,7 +300,19 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     }
   }, [cashboxes, editId, cashboxId]);
 
-  const [returnCurrencyId] = useState<number>(defaultCurrency.id);
+  const [returnCurrencyId, setReturnCurrencyId] = useState<number>(defaultCurrency.id);
+
+  function handleReturnCurrencyChange(newCurId: number) {
+    if (isLocked) return;
+    setReturnCurrencyId(newCurId);
+    setPaidCurrencyId(newCurId);
+    setRows((prev) =>
+      prev.map((r) => ({
+        ...r,
+        currencyId: newCurId,
+      }))
+    );
+  }
 
   const [paidCurrencyId, setPaidCurrencyId] = useState<number>(
     defaultCurrency.id
@@ -373,13 +387,16 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
 
   useEffect(() => {
     if (supplier) {
+      if (!editId && supplier.exchangeRateType === "FIXED" && supplier.customExchangeRate) {
+        setExchangeRate(String(supplier.customExchangeRate));
+      }
       const balanceMap = getAccountBalanceBeforeMap(supplier);
       const activeCurKeys = Object.keys(balanceMap).filter(key => Math.abs(balanceMap[key]) > 0.01);
       if (activeCurKeys.length === 1) {
         setPaidCurrencyId(Number(activeCurKeys[0]));
       }
     }
-  }, [supplierId, supplier]);
+  }, [supplierId, supplier, editId]);
   const selectedCashbox = cashboxes.find((c: any) => c.id === cashboxId);
 
   const filteredSuppliers = useMemo(() => {
@@ -711,7 +728,6 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     const symbol = getCurrencySymbol(currencyId);
     const isIQD = code === "IQD";
     const absVal = Math.abs(Number(value || 0));
-    const isNegative = isNegativeParam !== undefined ? isNegativeParam : Number(value || 0) < -0.001;
     const formatted = absVal.toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: isIQD ? 0 : 2,
@@ -720,17 +736,50 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     const parts = formatted.split('.');
     const whole = parts[0];
     const decimal = parts[1];
-    const displaySymbol = isIQD ? "دینار" : symbol;
+
+    const numberJSX = (
+      <span>
+        <span>{whole}</span>
+        {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
+      </span>
+    );
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {isNegative && <span>-</span>}
-        <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{displaySymbol}</span>
-        <span>
-          <span>{whole}</span>
-          {decimal && decimal !== "0" && decimal !== "00" && <span style={{ fontSize: "0.8em", opacity: 0.85 }}>.{decimal}</span>}
-        </span>
+        {isIQD ? (
+          <>
+            {numberJSX}
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>دینار</span>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: "0.85em", opacity: 0.85, fontWeight: 700 }}>{symbol}</span>
+            {numberJSX}
+          </>
+        )}
       </span>
+    );
+  }
+
+  function formatAccountBalanceWithColors(map: Record<string, number>) {
+    const activeEntries = Object.entries(map || {}).filter(([_, val]) => Math.abs(val) > 0.01);
+    if (activeEntries.length === 0) {
+      return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+        {activeEntries.map(([curIdText, val]) => {
+          const isNegative = val < -0.01;
+          const color = isNegative ? "#dc2626" : "#16a34a";
+          const curId = Number(curIdText);
+
+          return (
+            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
+              {formatCurrencyAmountJSX(Math.abs(val), curId)}
+            </span>
+          );
+        })}
+      </div>
     );
   }
 
@@ -742,12 +791,12 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
         {activeEntries.map(([curIdText, val]) => {
-          const color = val > 0.01 ? "#dc2626" : "#16a34a";
+          const color = Math.abs(val) > 0.01 ? "#dc2626" : "#9ca3af";
           const curId = Number(curIdText);
 
           return (
             <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }}>
-              {formatCurrencyAmountJSX(val, curId)}
+              {formatCurrencyAmountJSX(Math.abs(val), curId)}
             </span>
           );
         })}
@@ -1100,6 +1149,11 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
     const rowCurrencyId =
       product.purchaseCurrencyId || product.costCurrencyId || returnCurrencyId;
 
+    if (rows.length === 0 && rowCurrencyId) {
+      setReturnCurrencyId(rowCurrencyId);
+      setPaidCurrencyId(rowCurrencyId);
+    }
+
     const newRow: ReturnRow = {
       id: Date.now() + Math.floor(Math.random() * 100000),
       productId: product.id,
@@ -1371,7 +1425,9 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
         exchangeRate: (p.currencyId === returnCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: extraHandling,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      itemsTotalsByCurrency: getReturnTotalsByCurrency(),
+      currencies
     });
 
     const combineDateAndTime = (dateStr: string, timeStr: string) => {
@@ -1425,8 +1481,9 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
           unitPrice: toNumber(row.returnPrice),
           discountPercent: 0,
           discountAmount: toNumber(row.discount),
-          lineTotal: getRowTotal(row),
+          lineTotal: getRowTotalInOwnCurrency(row),
           note: row.note,
+          currencyId: row.currencyId,
           warehouseId,
           unitCost: toNumber(row.returnPrice),
         };
@@ -1495,7 +1552,9 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
         exchangeRate: (p.currencyId === returnCurrencyId) ? 1 : rate
       })),
       extraPaymentHandling: null,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      itemsTotalsByCurrency: getReturnTotalsByCurrency(),
+      currencies
     });
 
     if (result.excess.exists) {
@@ -1720,9 +1779,26 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                         setSupplierSearch(account.name);
                         setShowSupplierList(false);
                         setShowSupplierInfo(false);
+                        if (account.exchangeRateType === "FIXED" && account.customExchangeRate) {
+                          setExchangeRate(String(account.customExchangeRate));
+                        } else if (!editId) {
+                          const iqd = currencies.find((c: any) => c.code === "IQD" || c.name === "دینار" || c.name?.includes("دینار"));
+                          if (iqd && iqd.rate) {
+                            let r = Number(iqd.rate);
+                            if (r < 10000) r = r * 100;
+                            setExchangeRate(String(r));
+                          }
+                        }
                       }}
                     >
-                      <strong>{account.name}</strong>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                        <strong>{account.name}</strong>
+                        {account.exchangeRateType === "FIXED" && (
+                          <span style={{ fontSize: "11px", background: "#f3e8ff", color: "#7e22ce", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
+                            ڕەیتی جێگیر ({account.customExchangeRate?.toLocaleString("en-US")})
+                          </span>
+                        )}
+                      </div>
                       <span style={smallMuted}>
                         {account.phone || "-"} / {account.city || "-"}
                       </span>
@@ -1762,7 +1838,7 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
               </InfoRow>
 
               <InfoRow label="باڵانس">
-                {formatCurrencyMapWithColors(getAccountBalanceBeforeMap(supplier))}
+                {formatAccountBalanceWithColors(getAccountBalanceBeforeMap(supplier))}
               </InfoRow>
             </div>
           )}
@@ -1855,6 +1931,57 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
                 <span>{getPaidSummaryText()}</span>
               </div>
             )}
+
+            {/* دراوی پسوڵە - Currency Selector */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                marginTop: 6,
+                marginBottom: 6,
+                background: "#f8fafc",
+                padding: "8px 10px",
+                borderRadius: 10,
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "#475569" }}>
+                  دراوی سەرەکی گەڕانەوە:
+                </span>
+                <span style={{ fontSize: "11px", color: "#64748b" }}>
+                  (باڵانسی هەژمار بەم دراوە دەگۆڕێت)
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {currencies.map((c: any) => {
+                  const isSelected = returnCurrencyId === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => handleReturnCurrencyChange(c.id)}
+                      style={{
+                        flex: 1,
+                        padding: "7px 10px",
+                        borderRadius: 8,
+                        border: isSelected ? "2px solid #2563eb" : "1px solid #cbd5e1",
+                        background: isSelected ? "#2563eb" : "#ffffff",
+                        color: isSelected ? "#ffffff" : "#334155",
+                        fontWeight: isSelected ? 800 : 600,
+                        fontSize: "12px",
+                        cursor: isLocked ? "not-allowed" : "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      {c.name} ({c.symbol})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* --- نرخی دۆلار (تایبەت بەم پسووڵەیە) --- */}
             {printOptions.showExchangeRate !== false && (
@@ -2520,7 +2647,33 @@ export default function PurchaseReturnPage({ headerSelector, editId }: Props) {
             </div>
 
             <div style={settingsStack}>
-                            <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={settingsSection}>
+                <h3 style={settingsTitle}>دراوی سەرەکی گەڕانەوە</h3>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {currencies.map((curr: any) => (
+                    <button
+                      key={curr.id}
+                      type="button"
+                      onClick={() => handleReturnCurrencyChange(curr.id)}
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: returnCurrencyId === curr.id ? "2px solid #2563eb" : "1px solid #d1d5db",
+                        background: returnCurrencyId === curr.id ? "#eff6ff" : "#fff",
+                        color: returnCurrencyId === curr.id ? "#1d4ed8" : "#374151",
+                        fontWeight: returnCurrencyId === curr.id ? 800 : 600,
+                        cursor: "pointer",
+                        fontSize: 13,
+                      }}
+                    >
+                      {curr.name} ({curr.symbol})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ ...settingsSection, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <h4 style={{ fontSize: "11px", fontWeight: "bold", color: "#4b5563", marginBottom: 6 }}>ڕێکخستنی زانیاری پسووڵە</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, backgroundColor: "#f9fafb" }}>

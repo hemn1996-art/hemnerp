@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useStore } from "../store/store";
 import SellingPricesModal from "./SellingPricesModal";
 import { performBackupFlow } from "../lib/backupClient";
@@ -213,7 +214,7 @@ export default function Sidebar({
       {isExpanded && (
         <div className="flex flex-col items-center py-4 mb-4 border-b border-white/5">
           <span className="font-extrabold text-2xl tracking-wider bg-gradient-to-r from-white to-[#a5b4fc] bg-clip-text text-transparent text-center">
-            کۆگای دۆستان
+            سەنتەری کارەبای لەندەن
           </span>
           <span className="text-[10px] font-bold text-[#818cf8] mt-1 tracking-widest font-mono">
             V 1
@@ -269,59 +270,88 @@ export default function Sidebar({
 
           return (
             <div key={item.name}>
-              <button
-                onClick={() => {
-                  if (hasChildren) {
+              {hasChildren ? (
+                <button
+                  type="button"
+                  onClick={() => {
                     if (!isExpanded) {
-                      // If collapsed and clicking a parent, expand first
                       setCollapsed(false);
                       setHoveredOpen(false);
                       setOpenMenu(item.name);
                     } else {
                       setOpenMenu(openMenu === item.name ? "" : item.name);
                     }
-                  } else if (item.path) {
-                    handleNavigate(item.path);
-                  }
-                }}
-                title={item.name}
-                className={`w-full py-2 rounded-xl border-none cursor-pointer text-white text-base font-bold transition-all ${
-                  isExpanded ? "px-3" : "px-1"
-                } ${
-                  isActive ? "bg-[#233e72] shadow-md" : "bg-transparent hover:bg-[#172c54]"
-                }`}
-              >
-                <div
-                  className={`flex items-center w-full ${
-                    isExpanded ? "justify-between" : "justify-center"
+                  }}
+                  title={item.name}
+                  className={`w-full py-2 rounded-xl border-none cursor-pointer text-white text-base font-bold transition-all ${
+                    isExpanded ? "px-3" : "px-1"
+                  } ${
+                    isActive ? "bg-[#233e72] shadow-md" : "bg-transparent hover:bg-[#172c54]"
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className={isExpanded ? "text-xl" : "text-lg"}>{item.icon}</span>
-                    {isExpanded && <span className="text-sm font-semibold whitespace-nowrap">{item.name}</span>}
+                  <div
+                    className={`flex items-center w-full ${
+                      isExpanded ? "justify-between" : "justify-center"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={isExpanded ? "text-xl" : "text-lg"}>{item.icon}</span>
+                      {isExpanded && <span className="text-sm font-semibold whitespace-nowrap">{item.name}</span>}
+                    </div>
+                    {isExpanded && (
+                      <span className="text-[10px] opacity-60 font-normal mr-2">
+                        {openMenu === item.name ? "▲" : "▼"}
+                      </span>
+                    )}
                   </div>
-                  {isExpanded && hasChildren && (
-                    <span className="text-[10px] opacity-60 font-normal mr-2">
-                      {openMenu === item.name ? "▲" : "▼"}
-                    </span>
-                  )}
-                </div>
-              </button>
+                </button>
+              ) : (
+                <Link
+                  href={item.path || "#"}
+                  title={item.name}
+                  onClick={() => {
+                    if (window.innerWidth < 1024) {
+                      setIsOpenMobile(false);
+                    }
+                  }}
+                  className={`w-full py-2 rounded-xl text-white text-base font-bold transition-all no-underline block cursor-pointer ${
+                    isExpanded ? "px-3" : "px-1"
+                  } ${
+                    isActive ? "bg-[#233e72] shadow-md" : "bg-transparent hover:bg-[#172c54]"
+                  }`}
+                >
+                  <div
+                    className={`flex items-center w-full ${
+                      isExpanded ? "justify-between" : "justify-center"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={isExpanded ? "text-xl" : "text-lg"}>{item.icon}</span>
+                      {isExpanded && <span className="text-sm font-semibold whitespace-nowrap">{item.name}</span>}
+                    </div>
+                  </div>
+                </Link>
+              )}
 
               {hasChildren && openMenu === item.name && isExpanded && (
                 <div className="mr-4 mt-1.5 mb-2 space-y-1">
                   {visibleChildren!.map((child: any) => {
                     const isChildActive = pathname === child.path;
                     return (
-                      <button
+                      <Link
                         key={child.name}
-                        onClick={() => handleNavigate(child.path)}
-                        className={`w-full py-1.5 px-3 rounded-lg border-none cursor-pointer text-white text-xs text-right transition-colors ${
+                        href={child.path}
+                        onClick={() => {
+                          if (window.innerWidth < 1024) {
+                            setIsOpenMobile(false);
+                          }
+                        }}
+                        className={`w-full py-1.5 px-3 rounded-lg text-white text-xs text-right transition-colors no-underline block cursor-pointer ${
                           isChildActive ? "bg-[#233e72] font-bold shadow-inner" : "bg-[#172c54]/40 hover:bg-[#172c54]"
                         }`}
                       >
                         {child.name}
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>

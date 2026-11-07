@@ -17,8 +17,8 @@ export default function DashboardPage() {
     let typeParam = "";
     if (type === "فرۆشتن") typeParam = "sales";
     else if (type === "کڕین") typeParam = "purchase";
-    else if (type === "پارەی هاتوو") typeParam = "money_in";
-    else if (type === "پارەی ڕۆشتوو") typeParam = "money_out";
+    else if (type === "پارە وەرگرتن" || type === "پارەی هاتوو") typeParam = "money_in";
+    else if (type === "پارەدان" || type === "پارەی ڕۆشتوو") typeParam = "money_out";
     else if (type === "خەرجی") typeParam = "expense";
     
     if (typeParam) {

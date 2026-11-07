@@ -106,6 +106,10 @@ export async function GET(request: Request) {
       })
     ]);
 
+    const iqdCur = currencies.find(c => c.code === "IQD" || c.id === 2 || c.id === 12);
+    const rawRate = iqdCur?.rate || 1520;
+    const marketRatePerDollar = rawRate > 10000 ? rawRate / 100 : (rawRate > 100 ? rawRate : 1520);
+
     // Build balance lookup map: accountId -> { currencyId -> balance }
     const balanceMap = new Map<number, Record<string, number>>();
     for (const agg of balanceAggs) {
@@ -118,26 +122,8 @@ export async function GET(request: Request) {
     }
 
     const reportData = accounts.map((account: any) => {
-      const balanceByCurrency = balanceMap.get(account.id) || {};
+      const balanceByCurrency: Record<string, number> = { ...(balanceMap.get(account.id) || {}) };
       
-      // Calculate total USD equivalent for filtering and sorting
-      let totalDebtInUsd = 0;
-      for (const [curIdText, amount] of Object.entries(balanceByCurrency)) {
-        const curId = Number(curIdText);
-        const cur = currencies.find(c => c.id === curId);
-        const rate = cur ? cur.rate : 1;
-        if (cur?.code === "IQD") {
-          totalDebtInUsd += amount / rate;
-        } else {
-          totalDebtInUsd += amount;
-        }
-      }
-
-      // Filter out small micro-balances (< $1 USD equivalent) from debt report
-      if (debtType === "people" && totalDebtInUsd < 1.0) return null;
-      if (debtType === "mine" && totalDebtInUsd > -1.0) return null;
-      if ((!debtType || debtType === "all") && Math.abs(totalDebtInUsd) < 1.0) return null;
-
       const lastPaymentVoucher = account.vouchers[0];
       let lastPaymentAmount = 0;
       let lastPaymentCurrencyId = 1;
@@ -172,6 +158,50 @@ export async function GET(request: Request) {
           }
         }
       }
+
+      // Check if account has payment
+      const hasPayment = Boolean(lastPaymentVoucher && (lastPaymentAmount > 0 || lastPaymentDate));
+
+      // Rule: For accounts where payment is made, if remaining debt is < 7000 IQD and < $5 USD, zero it out so it doesn't remain as an account balance!
+      if (hasPayment) {
+        for (const [curIdText, amount] of Object.entries(balanceByCurrency)) {
+          const curId = Number(curIdText);
+          const cur = currencies.find(c => c.id === curId);
+          const isIQD = cur?.code === "IQD" || curId === 2 || curId === 12 || cur?.symbol === "دینار";
+          if (isIQD) {
+            if (Math.abs(amount) < 7000) {
+              balanceByCurrency[curIdText] = 0;
+            }
+          } else {
+            if (Math.abs(amount) < 5.0) {
+              balanceByCurrency[curIdText] = 0;
+            }
+          }
+        }
+      }
+
+      // Calculate total USD equivalent for filtering and sorting
+      let totalDebtInUsd = 0;
+      for (const [curIdText, amount] of Object.entries(balanceByCurrency)) {
+        if (!amount || Math.abs(amount) === 0) continue;
+        const curId = Number(curIdText);
+        const cur = currencies.find(c => c.id === curId);
+        const isIQD = cur?.code === "IQD" || curId === 2 || curId === 12 || cur?.symbol === "دینار";
+        if (isIQD) {
+          totalDebtInUsd += amount / marketRatePerDollar;
+        } else if (account.exchangeRateType === "FIXED") {
+          const custom = account.customExchangeRate || 132000;
+          const fixedRatePerDollar = custom > 10000 ? custom / 100 : custom;
+          totalDebtInUsd += (amount * fixedRatePerDollar) / marketRatePerDollar;
+        } else {
+          totalDebtInUsd += amount;
+        }
+      }
+
+      // Filter out small micro-balances (< $1 USD equivalent) from debt report
+      if (debtType === "people" && totalDebtInUsd < 1.0) return null;
+      if (debtType === "mine" && totalDebtInUsd > -1.0) return null;
+      if ((!debtType || debtType === "all") && Math.abs(totalDebtInUsd) < 1.0) return null;
 
       // Filter by beforeDate if provided
       if (beforeDate && lastPaymentDate) {

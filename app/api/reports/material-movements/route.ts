@@ -141,6 +141,7 @@ export async function GET(request: Request) {
               select: {
                 productId: true,
                 unitCost: true,
+                currencyId: true,
                 warehouseId: true,
                 warehouse: { select: { name: true } },
               },
@@ -157,6 +158,8 @@ export async function GET(request: Request) {
       select: {
         productId: true,
         unitCost: true,
+        currencyId: true,
+        date: true,
         voucher: {
           select: {
             type: true,
@@ -167,7 +170,8 @@ export async function GET(request: Request) {
             lines: { select: { productId: true, currencyId: true } }
           }
         }
-      }
+      },
+      orderBy: { date: "asc" }
     });
 
     const productFixedRates: Record<number, { isFixed: boolean, customRate: number, costCurrencyId: number }> = {};
@@ -182,18 +186,17 @@ export async function GET(request: Request) {
       const rateType = (pt.voucher as any)?.exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType;
       const customRate = (pt.voucher as any)?.customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate;
       const pLine = pt.voucher?.lines?.find((l: any) => l.productId === pt.productId);
-      const lineCostCur = pLine?.currencyId || pt.voucher?.currencyId || 1;
+      const lineCostCur = pt.currencyId || pLine?.currencyId || pt.voucher?.currencyId || 1;
 
-      const isWarehouseStockWithCustom = pt.voucher?.type === "warehouse_stock" && customRate && (customRate === 135000 || customRate === 132000 || customRate < 145000);
-      const isFixed = rateType === "FIXED" || Boolean(isWarehouseStockWithCustom);
+      const isFixed = rateType === "FIXED";
 
-      if (isFixed && customRate) {
+      if (isFixed && customRate && lineCostCur === 1) {
         productFixedRates[pt.productId] = {
           isFixed: true,
           customRate: customRate > 10000 ? customRate / 100 : customRate,
-          costCurrencyId: lineCostCur
+          costCurrencyId: 1
         };
-      } else if (!productFixedRates[pt.productId]) {
+      } else {
         productFixedRates[pt.productId] = {
           isFixed: false,
           customRate: 1500,
@@ -221,20 +224,17 @@ export async function GET(request: Request) {
 
       // Determine cost currency strictly from purchase record / product
       let fixedInfo = productFixedRates[line.productId];
-      const isHisense = line.product.brand === "Hisense" || line.product.brand === "هایسنس" || line.product.name?.includes("هایسنس");
-      if ((!fixedInfo || !fixedInfo.isFixed) && isHisense) {
-        fixedInfo = {
-          isFixed: true,
-          customRate: 1350,
-          costCurrencyId: 1
-        };
-        productFixedRates[line.productId] = fixedInfo;
-      }
-      const costCurrencyId = fixedInfo?.costCurrencyId || (line.voucher.type === 'purchase' ? priceCurrencyId : 1);
+      const isPurchase = line.voucher.type === 'purchase' || line.voucher.type === 'purchase_return';
+      const costCurrencyId = isPurchase
+        ? priceCurrencyId
+        : (fixedInfo?.costCurrencyId || invTrans?.currencyId || 1);
       const costCurObj = currencyMap.get(costCurrencyId);
       const isCostIQD = costCurrencyId === 2 || costCurrencyId === 12 || costCurObj?.code === "IQD" || costCurObj?.symbol === "دینار";
       const costCurrencySymbol = isCostIQD ? "دینار" : (costCurObj?.symbol || "$");
       const costCurrencyCode = isCostIQD ? "IQD" : (costCurObj?.code || "USD");
+
+      // For purchase & purchase return, the cost is the purchase unit price in that invoice's currency
+      const finalUnitCost = isPurchase ? unitPrice : unitCost;
 
       // Calculate line total in line's own price currency
       const lineTotalInPriceCur = (unitPrice * qty) - discount;
@@ -247,15 +247,15 @@ export async function GET(request: Request) {
       let costInUSD = 0;
       let costInIQD = 0;
       if (isCostIQD) {
-        costInIQD = unitCost * qty;
+        costInIQD = finalUnitCost * qty;
         costInUSD = costInIQD / rate;
       } else {
-        if (fixedInfo && fixedInfo.isFixed && unitCost > 0) {
+        if (fixedInfo && fixedInfo.isFixed && finalUnitCost > 0) {
           const customRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate / 100 : fixedInfo.customRate;
-          costInIQD = (unitCost * customRate) * qty;
+          costInIQD = (finalUnitCost * customRate) * qty;
           costInUSD = costInIQD / rate;
         } else {
-          costInUSD = unitCost * qty;
+          costInUSD = finalUnitCost * qty;
           costInIQD = costInUSD * rate;
         }
       }
@@ -295,10 +295,10 @@ export async function GET(request: Request) {
       if (vType === "warehouse_stock") {
         const vRateType = (line.voucher as any).exchangeRateType || versionData.exchangeRateType;
         const vCustomRate = (line.voucher as any).customExchangeRate || versionData.customExchangeRate;
-        if (vRateType === "FIXED" || (vCustomRate && (vCustomRate === 135000 || vCustomRate === 132000 || vCustomRate < 145000))) {
+        if (vRateType === "FIXED" && vCustomRate && !isCostIQD) {
           isLineFixedRate = true;
           lineCustomExchangeRate = vCustomRate > 10000 ? vCustomRate : (vCustomRate ? vCustomRate * 100 : 135000);
-        } else if (fixedInfo && fixedInfo.isFixed) {
+        } else if (fixedInfo && fixedInfo.isFixed && !isCostIQD) {
           isLineFixedRate = true;
           lineCustomExchangeRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100;
         }
@@ -306,24 +306,30 @@ export async function GET(request: Request) {
         const sellerAcc = line.voucher.account;
         const rateType = (line.voucher as any).exchangeRateType || versionData.exchangeRateType || sellerAcc?.exchangeRateType;
         const customRate = (line.voucher as any).customExchangeRate || versionData.customExchangeRate || sellerAcc?.customExchangeRate;
-        if (rateType === "FIXED" || (customRate && customRate < 145000)) {
+        if (rateType === "FIXED" && customRate && !isCostIQD) {
           isLineFixedRate = true;
           lineCustomExchangeRate = customRate > 10000 ? customRate : (customRate ? customRate * 100 : 135000);
-        } else if (fixedInfo && fixedInfo.isFixed) {
+        } else if (fixedInfo && fixedInfo.isFixed && !isCostIQD) {
           isLineFixedRate = true;
           lineCustomExchangeRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100;
         }
       } else if (vType === "sales" || vType === "sales_return") {
         // Sales & sales return for fixed dollar rate items (e.g. Hisense) must show fixed rate cost
-        if (fixedInfo && fixedInfo.isFixed) {
+        if (fixedInfo && fixedInfo.isFixed && !isCostIQD) {
           isLineFixedRate = true;
           lineCustomExchangeRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100;
         }
       } else {
-        if (fixedInfo && fixedInfo.isFixed) {
+        if (fixedInfo && fixedInfo.isFixed && !isCostIQD) {
           isLineFixedRate = true;
           lineCustomExchangeRate = fixedInfo.customRate > 10000 ? fixedInfo.customRate : fixedInfo.customRate * 100;
         }
+      }
+
+      // CRITICAL: Fixed rate dollar is strictly for USD! Never for IQD
+      if (isCostIQD) {
+        isLineFixedRate = false;
+        lineCustomExchangeRate = null;
       }
 
       return {
@@ -339,7 +345,7 @@ export async function GET(request: Request) {
         label: "-", 
         warehouseId: invTrans?.warehouseId || null,
         warehouseName: invTrans?.warehouse?.name || "-",
-        cost: unitCost,
+        cost: finalUnitCost,
         costCurrencyId,
         costCurrencySymbol,
         costCurrencyCode,

@@ -435,7 +435,7 @@ export default function CashWithdrawalPage({ headerSelector, editId }: Props) {
     const symbol = getCurrencySymbol(id);
     const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} دینار`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     }
     return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }

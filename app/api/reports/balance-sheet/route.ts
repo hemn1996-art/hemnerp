@@ -248,6 +248,12 @@ export async function GET(request: Request) {
     const iqdId = dbIQD ? dbIQD.id : 2;
     const marketRatePerDollar = customIQDRate || currencyRate;
 
+    const paymentAccountIds = new Set(
+      vouchers
+        .filter((v: any) => (v.type === "money_in" || v.type === "money_out") && v.accountId)
+        .map((v: any) => v.accountId)
+    );
+
     let accountsReceivable = 0;
     let accountsPayable = 0;
 
@@ -256,8 +262,14 @@ export async function GET(request: Request) {
       const acc = nonShareholderMap.get(accId);
       if (!acc) continue;
 
-      const usdBal = curBals[usdId] || 0;
-      const iqdBal = curBals[iqdId] || 0;
+      let usdBal = curBals[usdId] || 0;
+      let iqdBal = curBals[iqdId] || 0;
+
+      // Filter settled micro-balances identically to debts report
+      if (paymentAccountIds.has(accId)) {
+        if (Math.abs(usdBal) < 5.0) usdBal = 0;
+        if (Math.abs(iqdBal) < 7000) iqdBal = 0;
+      }
 
       let effectiveUsd = 0;
       if (acc.exchangeRateType === "FIXED") {
@@ -405,7 +417,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       asOfDate,
-      exchangeRate: normalizedDefaultRate * 100,
+      exchangeRate: (customIQDRate !== null ? customIQDRate : normalizedDefaultRate) * 100,
       currencySymbol: targetCurrency?.symbol || "$",
       currencyCode: targetCurrency?.code || "USD",
       shareholders,

@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import DateInput from "../../components/DateInput";
 import { useStore } from "../../store/store";
 import PrintHeader from "../../components/PrintHeader";
+import { formatCurrencyJSX } from "../../utils/currencyHelper";
+import QuickDateFilter from "../../components/QuickDateFilter";
+import { getDefaultReportDateRange } from "../../utils/datePresets";
+import { getReportSessionState, saveReportSessionState, clearReportSessionState } from "../../utils/reportSession";
 
 interface Option {
   value: string | number;
@@ -25,14 +29,28 @@ export default function ProfitReportPage() {
     invoices, fetchInvoices
   } = useStore() as any;
 
-  const [selectedCurrencyId, setSelectedCurrencyId] = useState<number>(1);
-  const [accountIds, setAccountIds] = useState<number[]>([]);
-  const [accountTypeIds, setAccountTypeIds] = useState<number[]>([]);
-  const [brands, setBrands] = useState<string[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [productIds, setProductIds] = useState<number[]>([]);
-  const [warehouseIds, setWarehouseIds] = useState<number[]>([]);
-  const [createdBys, setCreatedBys] = useState<string[]>([]);
+  const defaultDates = useMemo(() => getDefaultReportDateRange(), []);
+  const sessionSaved = getReportSessionState("__erp_profit_report_filters", {
+    startDate: defaultDates.startDate,
+    endDate: defaultDates.endDate,
+    selectedCurrencyId: 1,
+    accountIds: [] as number[],
+    accountTypeIds: [] as number[],
+    brands: [] as string[],
+    categories: [] as string[],
+    productIds: [] as number[],
+    warehouseIds: [] as number[],
+    createdBys: [] as string[],
+  });
+
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState<number>(sessionSaved.selectedCurrencyId || 1);
+  const [accountIds, setAccountIds] = useState<number[]>(sessionSaved.accountIds || []);
+  const [accountTypeIds, setAccountTypeIds] = useState<number[]>(sessionSaved.accountTypeIds || []);
+  const [brands, setBrands] = useState<string[]>(sessionSaved.brands || []);
+  const [categories, setCategories] = useState<string[]>(sessionSaved.categories || []);
+  const [productIds, setProductIds] = useState<number[]>(sessionSaved.productIds || []);
+  const [warehouseIds, setWarehouseIds] = useState<number[]>(sessionSaved.warehouseIds || []);
+  const [createdBys, setCreatedBys] = useState<string[]>(sessionSaved.createdBys || []);
 
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
   const [brandsList, setBrandsList] = useState<any[]>([]);
@@ -58,56 +76,12 @@ export default function ProfitReportPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [showReportStats, setShowReportStats] = useState(true);
-  
-  const [quickRange, setQuickRange] = useState<string>("year");
 
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-01-01`;
-  });
-  
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  });
+  // Date Filters (default: 1st of current month to today)
+  const [startDate, setStartDate] = useState(sessionSaved.startDate || defaultDates.startDate);
+  const [endDate, setEndDate] = useState(sessionSaved.endDate || defaultDates.endDate);
 
-  const handleQuickRangeChange = (rangeKey: string) => {
-    setQuickRange(rangeKey);
-    if (rangeKey === "custom") return;
 
-    const now = new Date();
-    const formatDate = (d: Date) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
-
-    const todayStr = formatDate(now);
-
-    if (rangeKey === "today") {
-      setStartDate(todayStr);
-      setEndDate(todayStr);
-    } else if (rangeKey === "week") {
-      const dayOfWeek = now.getDay();
-      const diffToSaturday = (dayOfWeek + 1) % 7;
-      const saturday = new Date(now);
-      saturday.setDate(now.getDate() - diffToSaturday);
-      setStartDate(formatDate(saturday));
-      setEndDate(todayStr);
-    } else if (rangeKey === "month") {
-      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      setStartDate(formatDate(firstOfMonth));
-      setEndDate(todayStr);
-    } else if (rangeKey === "year") {
-      const firstOfYear = new Date(now.getFullYear(), 0, 1);
-      setStartDate(formatDate(firstOfYear));
-      setEndDate(todayStr);
-    }
-  };
 
   useEffect(() => {
     fetchAccounts?.();
@@ -143,12 +117,28 @@ export default function ProfitReportPage() {
   const employeeOptions = useMemo(() => {
     if (!invoices) return [];
     const fromVouchers = invoices.map((v: any) => v.employeeName).filter(Boolean) as string[];
-    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار کۆگای دۆستان", "هێمن حەمە فەرهاد"];
+    const defaults = ["کۆساری مەلا فەرهاد", "کاک زاھیر ھەڵەبجە", "کۆسار سەنتەری لەندەن", "هێمن حەمە فەرهاد"];
     return Array.from(new Set([...defaults, ...fromVouchers]));
   }, [invoices]);
 
+  useEffect(() => {
+    saveReportSessionState("__erp_profit_report_filters", {
+      startDate,
+      endDate,
+      selectedCurrencyId,
+      accountIds,
+      accountTypeIds,
+      brands,
+      categories,
+      productIds,
+      warehouseIds,
+      createdBys,
+    });
+  }, [startDate, endDate, selectedCurrencyId, accountIds, accountTypeIds, brands, categories, productIds, warehouseIds, createdBys]);
+
   const activeFiltersCount = useMemo(() => {
     let count = 0;
+    if (startDate !== defaultDates.startDate || endDate !== defaultDates.endDate) count++;
     if (accountIds.length > 0) count++;
     if (accountTypeIds.length > 0) count++;
     if (brands.length > 0) count++;
@@ -157,7 +147,7 @@ export default function ProfitReportPage() {
     if (warehouseIds.length > 0) count++;
     if (createdBys.length > 0) count++;
     return count;
-  }, [accountIds, accountTypeIds, brands, categories, productIds, warehouseIds, createdBys]);
+  }, [startDate, endDate, defaultDates, accountIds, accountTypeIds, brands, categories, productIds, warehouseIds, createdBys]);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -205,6 +195,7 @@ export default function ProfitReportPage() {
   ]);
 
   const handleResetFilters = () => {
+    clearReportSessionState("__erp_profit_report_filters");
     setAccountIds([]);
     setAccountTypeIds([]);
     setBrands([]);
@@ -213,15 +204,14 @@ export default function ProfitReportPage() {
     setWarehouseIds([]);
     setCreatedBys([]);
     
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    setStartDate(`${today.getFullYear()}-01-01`);
-    setEndDate(todayStr);
-    setQuickRange("year");
+    const d = getDefaultReportDateRange();
+    setStartDate(d.startDate);
+    setEndDate(d.endDate);
   };
 
   const handleCardClick = (type: string) => {
     let typeParam = "";
+    let discountTypeParam = "";
     switch (type) {
       case "sales":
       case "cogs":
@@ -229,13 +219,15 @@ export default function ProfitReportPage() {
         typeParam = "sales,sales_return";
         break;
       case "my_debt_discount":
-        typeParam = "my_debt_discount";
+        typeParam = "my_debt_discount,money_out";
+        discountTypeParam = "discounted";
         break;
       case "expenses":
         typeParam = "expense,warehouse_damage,خەسارەی کۆگا,زیانی کۆگا,material_issue,سەرفی مواد,سەرفی مەواد";
         break;
       case "people_debt_discount":
-        typeParam = "people_debt_discount";
+        typeParam = "people_debt_discount,money_in";
+        discountTypeParam = "discounted";
         break;
       case "final_profit":
         typeParam = "sales,sales_return,my_debt_discount,people_debt_discount,expense,warehouse_damage,خەسارەی کۆگا,زیانی کۆگا,material_issue,سەرفی مواد,سەرفی مەواد";
@@ -246,8 +238,10 @@ export default function ProfitReportPage() {
 
     const params = new URLSearchParams();
     params.append("type", typeParam);
+    if (discountTypeParam) params.append("discountType", discountTypeParam);
     if (startDate) params.append("startDate", startDate);
     if (endDate) params.append("endDate", endDate);
+    if (accountIds && accountIds.length > 0) params.append("accountId", accountIds.join(","));
 
     router.push(`/reports/invoices?${params.toString()}`);
   };
@@ -255,27 +249,7 @@ export default function ProfitReportPage() {
   const formatCur = (num: number) => {
     const symbol = data.currencySymbol || "$";
     const activeCurrency = currencies?.find((c: any) => c.symbol === symbol || c.code === symbol || (symbol === "IQD" && c.code === "IQD"));
-    const isRounding = activeCurrency ? activeCurrency.rounding : false;
-    const formatted = Math.abs(num).toLocaleString("en-US", {minimumFractionDigits: 0, maximumFractionDigits: isRounding ? 0 : 2});
-    const isNegative = num < 0;
-    const parts = formatted.split('.');
-    const wholePart = parts[0];
-    const decimalPart = parts[1];
-
-    return (
-      <span className={isNegative ? "text-rose-600 font-bold" : ""} style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", direction: "ltr" }}>
-        {isNegative && <span style={{ marginRight: "2px" }}>-</span>}
-        <span style={{ fontSize: "0.8em", opacity: 0.7, marginRight: "4px" }}>
-          {symbol}
-        </span>
-        <span>{wholePart}</span>
-        {decimalPart && (
-          <span style={{ fontSize: "0.7em", opacity: 0.8, verticalAlign: "baseline" }}>
-            .{decimalPart}
-          </span>
-        )}
-      </span>
-    );
+    return formatCurrencyJSX(num, activeCurrency || symbol, currencies);
   };
 
   return (
@@ -314,9 +288,19 @@ export default function ProfitReportPage() {
 
       {/* TOOLBAR SECTION */}
       <div className="bg-white border border-slate-200 p-3 rounded-2xl shadow-sm mb-6 flex flex-wrap items-center justify-between gap-3 no-print">
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Quick Date Presets */}
+          <QuickDateFilter
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(s, e) => {
+              setStartDate(s);
+              setEndDate(e);
+            }}
+          />
+
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-500">لە بەرواری:</span>
+            <span className="text-xs font-bold text-slate-500">لە بەرواری:</span>
             <DateInput
               value={startDate}
               onChange={(val) => setStartDate(val)}
@@ -324,7 +308,7 @@ export default function ProfitReportPage() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-500">تا بەرواری:</span>
+            <span className="text-xs font-bold text-slate-500">تا بەرواری:</span>
             <DateInput
               value={endDate}
               onChange={(val) => setEndDate(val)}
@@ -332,8 +316,8 @@ export default function ProfitReportPage() {
             />
           </div>
           
-          <div className="flex items-center gap-2 border-r border-slate-200 pr-4">
-            <span className="text-[11px] font-bold text-slate-500">دراو:</span>
+          <div className="flex items-center gap-2 border-r border-slate-200 pr-3">
+            <span className="text-xs font-bold text-slate-500">دراو:</span>
             <select
               value={selectedCurrencyId}
               onChange={(e) => setSelectedCurrencyId(Number(e.target.value))}
@@ -346,29 +330,17 @@ export default function ProfitReportPage() {
               ))}
             </select>
           </div>
-
-          <div className="flex items-center gap-2 border-r border-slate-200 pr-4">
-            <span className="text-[11px] font-bold text-slate-500">فلتەری خێرا:</span>
-            <select
-              value={quickRange}
-              onChange={(e) => handleQuickRangeChange(e.target.value)}
-              className="border border-blue-400 bg-blue-50/80 text-blue-900 p-1.5 text-xs rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer hover:bg-blue-100 transition shadow-sm"
-            >
-              <option value="custom">دیاریکراو (دەیستی)</option>
-              <option value="today">ئەمڕۆ</option>
-              <option value="week">ئەم هەفتەیە</option>
-              <option value="month">ئەم مانگە</option>
-              <option value="year">ئەم ساڵە</option>
-            </select>
-          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowFilterModal(true)}
-            className="flex items-center gap-2 bg-[#061f5f] text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-[#03133f] transition shadow-md cursor-pointer border-none outline-none"
+            className="flex items-center gap-1.5 bg-[#061f5f] text-white px-3.5 py-2 rounded-xl text-xs font-black hover:bg-[#03133f] transition shadow-xs cursor-pointer border-none outline-none"
           >
-            <span>☰ فلتەرەکان</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            <span>فلتەرەکان</span>
             {activeFiltersCount > 0 && (
               <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                 {activeFiltersCount}
@@ -376,18 +348,29 @@ export default function ProfitReportPage() {
             )}
           </button>
 
-          <button
-            onClick={handleResetFilters}
-            className="flex items-center gap-1 bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition cursor-pointer"
-          >
-            ✖️ ڕێکخستنەوە
-          </button>
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={handleResetFilters}
+              className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-rose-100 transition cursor-pointer shadow-xs"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span>ڕێکخستنەوە</span>
+            </button>
+          )}
 
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-md cursor-pointer border-none outline-none"
+            className="flex items-center gap-1.5 bg-slate-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-700 transition shadow-xs cursor-pointer border-none outline-none"
           >
-            🖨️ پرێنتکردن
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>پرینت</span>
           </button>
         </div>
       </div>
@@ -463,7 +446,7 @@ export default function ProfitReportPage() {
                 <div className="w-11 h-11 bg-emerald-200 text-emerald-700 rounded-xl flex items-center justify-center text-xl shadow-inner">💲</div>
               </div>
               <div className="text-2xl font-black text-emerald-800 mb-2" dir="ltr">{formatCur(data.myDebtDiscount)}</div>
-              <p className="text-xs text-emerald-500 font-medium m-0">بڕی پارەی داشکێنراو لە پسووڵەی کڕین، پارەی ڕۆشتوو و من قەرزارم</p>
+              <p className="text-xs text-emerald-500 font-medium m-0">بڕی پارەی داشکێنراو لە پسووڵەی کڕین، پارەدان و من قەرزارم</p>
             </div>
           </div>
 
@@ -493,7 +476,7 @@ export default function ProfitReportPage() {
                 <div className="w-11 h-11 bg-rose-200 text-rose-700 rounded-xl flex items-center justify-center text-xl shadow-inner">✂️</div>
               </div>
               <div className="text-2xl font-black text-rose-800 mb-2" dir="ltr">{formatCur(data.peopleDebtDiscount)}</div>
-              <p className="text-xs text-rose-500 font-medium m-0">بڕی پارەی داشکێنراو لە پسووڵەی فرۆشتن، پارەی هاتوو، قەرزم لای خەڵکە</p>
+              <p className="text-xs text-rose-500 font-medium m-0">بڕی پارەی داشکێنراو لە پسووڵەی فرۆشتن، پارە وەرگرتن، قەرزم لای خەڵکە</p>
             </div>
 
             {/* قازانجی کۆتایی - Final Profit */}

@@ -28,7 +28,7 @@ export function formatCurrency(value: number | string | null | undefined, symbol
   const sign = isNeg ? "-" : "";
 
   if (symbol === "IQD" || symbol === "دینار" || symbol?.includes("دینار") || symbol?.includes("IQD") || symbol === "د.ع") {
-    return `${sign}دینار ${absFormatted}`;
+    return `\u2066${sign}دینار ${absFormatted}\u2069`;
   }
-  return `${sign}${symbol} ${absFormatted}`;
+  return `\u2066${sign}${symbol} ${absFormatted}\u2069`;
 }

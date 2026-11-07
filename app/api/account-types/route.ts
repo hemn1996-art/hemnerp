@@ -94,7 +94,14 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Account type not found" }, { status: 404 });
     }
 
-    // Allow deleting any account type as long as it has no accounts linked to it
+    if (
+      existing.name === "کڕیار" || 
+      existing.name === "دابینکەر" || 
+      existing.name === "کریار" || 
+      existing.name === "کڕیار و دابینکەر"
+    ) {
+      return NextResponse.json({ error: "Cannot delete built-in account types" }, { status: 400 });
+    }
 
     // Check if used by accounts
     const usedCount = await prisma.account.count({

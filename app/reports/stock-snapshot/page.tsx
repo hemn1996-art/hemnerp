@@ -138,6 +138,13 @@ function StockSnapshotReportContent() {
     }
   }, [asOfDate, paramProductId, paramSellerId]);
 
+  const productOptions = useMemo(() => {
+    return (products || []).map((p: any) => ({
+      value: p.id,
+      label: p.code ? `${p.name} (${p.code})` : p.name,
+    }));
+  }, [products]);
+
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (filters.warehouseIds.length > 0) count++;
@@ -357,50 +364,66 @@ function StockSnapshotReportContent() {
           <PrintHeader />
           <h2 className="text-center font-black text-lg mb-6">ڕاپۆرتی ئاستی کۆگا</h2>
         </div>
-        
-        {/* Actions Bar */}
-        <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-6 no-print">
-          
-          {/* As Of Date Picker */}
-          <DateInput value={asOfDate} onChange={setAsOfDate} label="بەروار" className="mr-auto" />
 
-          <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
-            <span>فلتەرەکان ☰</span>
-            {activeFiltersCount > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
+        {/* Actions Bar */}
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-4 mb-6 bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 no-print">
           
-          {activeFiltersCount > 0 && (
-            <button onClick={handleResetFilters} className="flex items-center justify-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 font-bold px-4 py-2.5 rounded-md hover:bg-rose-200 transition-colors cursor-pointer text-sm shadow-sm">
-              🔄 ڕێکخستنەوە
+          <div className="flex flex-wrap items-center gap-3.5 w-full lg:w-auto flex-1">
+            {/* As Of Date Picker */}
+            <DateInput value={asOfDate} onChange={setAsOfDate} label="بەروار" />
+
+            {/* MultiSelect for Products */}
+            <div className="relative min-w-[300px] md:min-w-[380px] lg:min-w-[460px] flex-1 max-w-xl">
+              <MultiSelectDropdown
+                label="دیاریکردنی کەرەستە..."
+                placeholder="گەڕان و دیاریکردنی کەرەستە... 🔍"
+                options={productOptions}
+                selectedValues={filters.productIds}
+                onChange={(vals) => setFilters(prev => ({ ...prev, productIds: vals }))}
+                searchable
+                compact
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-end items-center gap-2.5 w-full lg:w-auto">
+            <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] hover:bg-[#061f5f] text-white font-bold px-4 h-[48px] rounded-xl text-sm transition shadow-sm cursor-pointer border-none">
+              <span>فلتەرەکان ☰</span>
+              {activeFiltersCount > 0 && (
+                <span className="bg-rose-500 text-white text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                  {activeFiltersCount}
+                </span>
+              )}
             </button>
-          )}
-          <button onClick={loadStockData} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-md hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
-            گەڕان 🔍
-          </button>
-          <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 py-2.5 rounded-md hover:bg-gray-50 transition-colors cursor-pointer text-sm shadow-sm">
-            پرینت 🖨️
-          </button>
-          <button onClick={() => exportTableToExcel("stock-snapshot-table", "raporti_ast_koga.xlsx")}
-            className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 py-2.5 rounded-md hover:bg-emerald-700 transition-colors cursor-pointer text-sm shadow-sm border-none">
-            ناردن بۆ ئێکسڵ 📊
-          </button>
-          <button
-            onClick={() => setShowColumnModal(true)}
-            className="flex items-center justify-center gap-2 text-white font-black px-4 py-2.5 rounded-lg transition-transform hover:scale-105 cursor-pointer text-sm shadow-md border-none"
-            style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 8px rgba(2, 132, 199, 0.35)" }}
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <line x1="12" y1="3" x2="12" y2="21" />
-              <path d="M3 9h18" />
-              <path d="M3 15h18" />
-            </svg>
-            <span>کۆڵۆمەکان</span>
-          </button>
+            {activeFiltersCount > 0 && (
+              <button onClick={handleResetFilters} className="flex items-center justify-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 font-bold px-4 h-[48px] rounded-xl hover:bg-rose-200 transition text-sm shadow-sm cursor-pointer">
+                🔄 ڕێکخستنەوە
+              </button>
+            )}
+            <button onClick={loadStockData} className="flex items-center justify-center gap-2 bg-[#0b1f50] hover:bg-[#061f5f] text-white font-bold px-4 h-[48px] rounded-xl text-sm transition shadow-sm cursor-pointer border-none">
+              گەڕان 🔍
+            </button>
+            <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 font-bold px-4 h-[48px] rounded-xl hover:bg-gray-50 transition text-sm shadow-sm cursor-pointer">
+              پرینت 🖨️
+            </button>
+            <button onClick={() => exportTableToExcel("stock-snapshot-table", "raporti_ast_koga.xlsx")}
+              className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 h-[48px] rounded-xl hover:bg-emerald-700 transition text-sm shadow-sm cursor-pointer border-none">
+              ناردن بۆ ئێکسڵ 📊
+            </button>
+            <button
+              onClick={() => setShowColumnModal(true)}
+              className="flex items-center justify-center gap-2 text-white font-black px-4 h-[48px] rounded-xl transition-transform hover:scale-105 cursor-pointer text-sm shadow-md border-none"
+              style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 8px rgba(2, 132, 199, 0.35)" }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+                <path d="M3 9h18" />
+                <path d="M3 15h18" />
+              </svg>
+              <span>کۆڵۆمەکان</span>
+            </button>
+          </div>
         </div>
 
         {/* Totals Cards */}
@@ -770,7 +793,7 @@ function StockSnapshotReportContent() {
                   <div>
                     <MultiSelectDropdown
                       label="کەرەستە"
-                      options={products?.map((p: any) => ({ value: p.id, label: p.name })) || []}
+                      options={productOptions}
                       selectedValues={filters.productIds}
                       onChange={vals => setFilters(prev => ({ ...prev, productIds: vals }))}
                       searchable

@@ -143,6 +143,13 @@ export default function AccountsPage() {
   const [toastType, setToastType] = useState<ToastType>("error");
   const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
 
+  useEffect(() => {
+    const s = searchParams?.get("search");
+    if (s) {
+      setSearch(decodeURIComponent(s));
+    }
+  }, [searchParams]);
+
   const defaultAccountCols = {
     index: true,
     name: true,

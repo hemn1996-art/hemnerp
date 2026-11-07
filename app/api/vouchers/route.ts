@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 import { calculateLedgerEntries } from "../../utils/ledgerHelper";
 import { getCurrentUser } from "../../lib/auth";
-import { sanitizeAndGuardVoucherData } from "../../../lib/voucherGuard";
+import { recalculateAndSyncProductCosts } from "../../../lib/inventoryCost";
+import { sanitizeAndGuardVoucherData, guardIncomingInventoryTransaction } from "../../../lib/voucherGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
         exchangeRate: true,
         totalAmount: true,
         totalDiscount: true,
+        discountCurrencyId: true,
         netAmount: true,
         internalNote: true,
         printNote: true,
@@ -182,12 +184,12 @@ export async function POST(request: Request) {
 
     const data = await request.json();
     const dbCurrencies = await prisma.currency.findMany();
-    sanitizeAndGuardVoucherData(data, dbCurrencies);
 
+    let account = null;
     if (data.accountId) {
-      const account = await prisma.account.findUnique({
+      account = await prisma.account.findUnique({
         where: { id: Number(data.accountId) },
-        select: { isShareholder: true },
+        select: { id: true, name: true, isShareholder: true },
       });
       const isShareholder = account?.isShareholder === true;
       const isShareholderVoucher = data.type === "shareholder_deposit" || data.type === "shareholder_withdrawal";
@@ -214,7 +216,9 @@ export async function POST(request: Request) {
       }
     }
 
-    
+    sanitizeAndGuardVoucherData(data, dbCurrencies, account);
+
+
 
     const creatorName = (data.employeeName && data.employeeName.trim() !== "")
       ? data.employeeName.trim()
@@ -246,6 +250,7 @@ export async function POST(request: Request) {
           exchangeRate: data.exchangeRate ? Number(data.exchangeRate) : 1,
           totalAmount: data.totalAmount ? Number(data.totalAmount) : 0,
           totalDiscount: data.totalDiscount ? Number(data.totalDiscount) : 0,
+          discountCurrencyId: data.discountCurrencyId ? Number(data.discountCurrencyId) : null,
           netAmount: data.netAmount ? Number(data.netAmount) : 0,
           internalNote: data.internalNote,
           printNote: data.printNote,
@@ -313,33 +318,31 @@ export async function POST(request: Request) {
               } else {
                 // Outgoing transaction (sales, damage, issue, purchase_return)
                 // NEVER use line.unitPrice (selling price) as cost!
-                if (line.unitCost !== undefined && line.unitCost !== null && line.unitCost !== "" && !isNaN(Number(line.unitCost))) {
-                  resolvedUnitCost = Number(line.unitCost);
-                } else {
-                  const incomingTx = await tx.inventoryTransaction.findFirst({
-                    where: { productId: Number(line.productId), qtyChange: { gt: 0 } },
-                    orderBy: { date: "desc" },
-                    select: { unitCost: true, currencyId: true },
-                  });
-                  resolvedUnitCost = Number(incomingTx?.unitCost ?? 0);
-                  if (!costCurrencyId && incomingTx?.currencyId) {
-                    costCurrencyId = incomingTx.currencyId;
-                  }
+                // Cost currency and unit cost must always reflect the product's actual inventory purchase currency,
+                // NEVER the sales invoice payment currency!
+                const incomingTx = await tx.inventoryTransaction.findFirst({
+                  where: { productId: Number(line.productId), qtyChange: { gt: 0 } },
+                  orderBy: { date: "desc" },
+                  select: { unitCost: true, currencyId: true },
+                });
+
+                if (incomingTx?.currencyId) {
+                  costCurrencyId = incomingTx.currencyId;
+                } else if (!costCurrencyId) {
+                  costCurrencyId = Number(line.costCurrencyId || 1);
                 }
 
-                if (!costCurrencyId) {
-                  const incomingTx = await tx.inventoryTransaction.findFirst({
-                    where: { productId: Number(line.productId), qtyChange: { gt: 0 } },
-                    orderBy: { date: "desc" },
-                    select: { currencyId: true },
-                  });
-                  costCurrencyId = incomingTx?.currencyId || Number(line.currencyId ?? data.currencyId ?? 1);
+                if (line.unitCost !== undefined && line.unitCost !== null && line.unitCost !== "" && !isNaN(Number(line.unitCost)) && Number(line.unitCost) > 0) {
+                  resolvedUnitCost = Number(line.unitCost);
+                } else if (incomingTx?.unitCost !== undefined && incomingTx?.unitCost !== null) {
+                  resolvedUnitCost = Number(incomingTx.unitCost);
+                } else {
+                  resolvedUnitCost = 0;
                 }
               }
 
-              await tx.inventoryTransaction.create({
-                data: {
-                  voucherId: createdVoucher.id,
+              const guardedInv = guardIncomingInventoryTransaction(
+                {
                   productId: Number(line.productId),
                   warehouseId: Number(line.warehouseId),
                   qtyChange,
@@ -347,6 +350,23 @@ export async function POST(request: Request) {
                   currencyId: qtyChange > 0
                     ? Number(line.currencyId ?? data.currencyId)
                     : costCurrencyId,
+                },
+                {
+                  type: createdVoucher.type,
+                  currencyId: Number(createdVoucher.currencyId || 1),
+                  exchangeRate: Number(createdVoucher.exchangeRate || 1),
+                },
+                dbCurrencies
+              );
+
+              await tx.inventoryTransaction.create({
+                data: {
+                  voucherId: createdVoucher.id,
+                  productId: Number(line.productId),
+                  warehouseId: Number(line.warehouseId),
+                  qtyChange,
+                  unitCost: guardedInv.unitCost,
+                  currencyId: guardedInv.currencyId,
                   date: createdVoucher.date,
                 },
               });
@@ -542,6 +562,21 @@ export async function POST(request: Request) {
         }
       }
 
+      if (createdVoucher.accountId) {
+        const accInfo = await tx.account.findUnique({
+          where: { id: createdVoucher.accountId },
+          select: { exchangeRateType: true, customExchangeRate: true }
+        });
+        if (accInfo?.exchangeRateType === "FIXED" && accInfo?.customExchangeRate) {
+          if (!data.customExchangeRate) {
+            data.customExchangeRate = accInfo.customExchangeRate;
+          }
+          if (!data.exchangeRateType) {
+            data.exchangeRateType = "FIXED";
+          }
+        }
+      }
+
       await tx.voucherVersion.create({
         data: {
           voucherId: createdVoucher.id,
@@ -550,6 +585,13 @@ export async function POST(request: Request) {
           data: JSON.stringify(data),
         }
       });
+
+      if (["purchase", "purchase_return", "warehouse_stock", "جەردی کۆگا"].includes(createdVoucher.type)) {
+        const affectedProductIds = (data.lines || [])
+          .map((l: any) => Number(l.productId))
+          .filter((id: number) => !isNaN(id) && id > 0);
+        await recalculateAndSyncProductCosts(affectedProductIds, tx);
+      }
 
       return createdVoucher;
     }, {

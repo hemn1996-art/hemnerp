@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
+import { formatCurrencyJSX } from "../../utils/currencyHelper";
 
 export default function BalanceSheetPage() {
   const router = useRouter();
@@ -329,37 +330,9 @@ export default function BalanceSheetPage() {
 
   const fmt = (n: number, showMinus: boolean = false) => {
     const symbol = data?.currencySymbol || currencyLabel;
-    const activeCurrency = currencies?.find((c: any) => c.id.toString() === currencyId.toString() || c.symbol === symbol || c.code === symbol);
-    const isRounding = activeCurrency ? activeCurrency.rounding : false;
-    const isIQD = symbol === "دینار" || symbol === "د.ع" || activeCurrency?.code === "IQD";
-    const absVal = Math.abs(n);
-    if (absVal > 0 && (isIQD ? absVal < 1000 : absVal < 1.0)) {
-      return (
-        <span className="inline-flex items-baseline gap-1" dir="ltr">
-          <span>0</span>
-          <span>{symbol}</span>
-        </span>
-      );
-    }
-
-    const formattedStr = Math.abs(n).toLocaleString("en-US", { 
-      minimumFractionDigits: 0, 
-      maximumFractionDigits: isRounding ? 0 : 2 
-    });
-
-    const isNeg = n < 0 || showMinus;
-    const parts = formattedStr.split(".");
-
-    return (
-      <span className="inline-flex items-baseline gap-1" dir="ltr">
-        {isNeg && <span>-</span>}
-        <span>{parts[0]}</span>
-        {parts.length > 1 && (
-          <span className="text-[0.72em] opacity-80 font-bold">.{parts[1]}</span>
-        )}
-        <span>{symbol}</span>
-      </span>
-    );
+    const activeCurrency = currencies?.find((c: any) => c.id?.toString() === currencyId?.toString() || c.symbol === symbol || c.code === symbol);
+    const val = showMinus ? -Math.abs(n) : n;
+    return formatCurrencyJSX(val, activeCurrency || symbol, currencies);
   };
 
   return (
@@ -547,193 +520,6 @@ export default function BalanceSheetPage() {
               <span className="text-sm font-bold text-slate-600">کۆی قەرز و سەرمایە</span>
             </div>
           </div>
-
-          {/* DEDICATED PARTNERSHIP LIQUIDATION & ACTUAL PROFIT SETTLEMENT SECTION */}
-          {(() => {
-            const warehouseValue = data.assets.warehouseValue || 0;
-            const cash = data.assets.cash || 0;
-            const accountsReceivable = data.assets.accountsReceivable || 0;
-            const otherAssets = data.assets.allInventory || 0;
-            const myDebts = data.liabilitiesEquity.myDebts || 0;
-            const capital = data.liabilitiesEquity.capital || 0;
-            const realProfit = warehouseValue + cash + accountsReceivable + otherAssets - myDebts - capital;
-            const totalAssets = warehouseValue + cash + accountsReceivable + otherAssets;
-            const shareholders = (data.shareholders || []).filter((sh: any) => sh.isActive !== false);
-            const totalSharePercentage = shareholders.reduce((sum: number, sh: any) => sum + (sh.sharePercentage || 0), 0);
-
-            return (
-              <div className="md:col-span-2 bg-white rounded-2xl border-2 border-emerald-300 shadow-md overflow-hidden transition-all print:border print:shadow-none">
-                {/* Header Banner */}
-                <div className="bg-gradient-to-r from-emerald-800 via-[#0b1f50] to-emerald-900 text-white p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div className="text-right">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-emerald-500 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        حیساباتی کۆتایی هاوبەشی (Liquidation)
-                      </span>
-                      <h3 className="text-lg font-black text-white m-0">
-                        ⚖️ یەکلاکردنەوەی هاوبەشی کۆن و شیکاری قازانجی فیعلی
-                      </h3>
-                    </div>
-                    <p className="text-xs text-emerald-100/80 m-0">
-                      دابەشکردنی کۆی مەوجوداتی کۆمپانیا بەپێی سەرمایەی سەرەتایی و ڕێژەی پشکی هاوبەشەکان بە ڕەیتی ١٥٥،٠٠٠ دینار
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap no-print">
-                    <button
-                      onClick={() => exportTableToExcel("partnership-settlement-table", "yeklakirdnewey_hawbashi.xlsx")}
-                      className="bg-white/10 hover:bg-white/20 text-white font-bold px-3.5 py-2 rounded-xl text-xs transition duration-150 cursor-pointer border border-white/20 flex items-center gap-1.5 backdrop-blur-sm"
-                    >
-                      <span>ناردن بۆ ئێکسڵ</span>
-                      <span>📊</span>
-                    </button>
-                    <button
-                      onClick={() => window.print()}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-2 rounded-xl text-xs transition duration-150 cursor-pointer border-none shadow-sm flex items-center gap-1.5"
-                    >
-                      <span>چاپکردنی ڕاپۆرت</span>
-                      <span>🖨️</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3 Summary KPI Cards */}
-                <div className="p-5 bg-slate-50/70 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4 text-right" dir="rtl">
-                  {/* Total Assets */}
-                  <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm">
-                    <span className="text-xs font-bold text-slate-500 block mb-1">🏛️ کۆی گشتی مەوجودات (کاش + قەرز + کۆگا)</span>
-                    <span className="text-2xl font-black text-blue-900 block" dir="ltr">{fmt(totalAssets)}</span>
-                    <div className="text-[11px] text-slate-500 font-semibold mt-1">
-                      کاش: {fmt(cash)} • قەرز: {fmt(accountsReceivable)} • کۆگا: {fmt(warehouseValue)}
-                    </div>
-                  </div>
-
-                  {/* Total Capital */}
-                  <div className="bg-white p-4 rounded-xl border border-purple-100 shadow-sm">
-                    <span className="text-xs font-bold text-slate-500 block mb-1">🏦 کۆی سەرمایەی هاوبەشەکان</span>
-                    <span className="text-2xl font-black text-purple-900 block" dir="ltr">{fmt(capital)}</span>
-                    <div className="text-[11px] text-slate-500 font-semibold mt-1">
-                      ٣ هاوبەش • پشکی تەواو: ١٠٠٪
-                    </div>
-                  </div>
-
-                  {/* Actual Realized Profit */}
-                  <div className="bg-gradient-to-br from-emerald-50 to-green-100/60 p-4 rounded-xl border-2 border-emerald-400 shadow-sm">
-                    <span className="text-xs font-bold text-emerald-800 block mb-1">💰 قازانجی فیعلی بۆ دابەشکردن (Actual Profit)</span>
-                    <span className="text-2xl font-black text-emerald-700 block" dir="ltr">{fmt(realProfit)}</span>
-                    <div className="text-[11px] text-emerald-800 font-semibold mt-1">
-                      مەوجودات {fmt(totalAssets)} - سەرمایە {fmt(capital)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* The Distribution Table */}
-                <div className="p-5 overflow-x-auto text-right" dir="rtl">
-                  <h4 className="text-sm font-black text-slate-700 mb-3 flex items-center justify-between">
-                    <span>وردەکاری ماف و بەشە قازانجی هەر هاوبەشێک لە هاوبەشیەکەدا:</span>
-                    <span className="text-xs font-bold text-slate-400">ڕەیتی دۆلار: ١٥٥،٠٠٠ دینار بۆ ١٠٠$</span>
-                  </h4>
-                  <table id="partnership-settlement-table" className="w-full text-center border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100 border-b-2 border-slate-200">
-                        <th className="py-3 px-2 text-slate-500 font-bold text-xs w-10 text-center">#</th>
-                        <th className="py-3 px-4 text-slate-700 font-black text-xs text-right">خاوەن پشک (هاوبەش)</th>
-                        <th className="py-3 px-4 text-slate-700 font-black text-xs text-center">ڕێژەی پشک</th>
-                        <th className="py-3 px-4 text-slate-700 font-black text-xs text-center">سەرمایەی سەرەتایی</th>
-                        <th className="py-3 px-4 text-slate-700 font-black text-xs text-center">بەشە قازانجی فیعلی</th>
-                        <th className="py-3 px-4 text-emerald-800 font-black text-xs text-center bg-emerald-50/70 border-x border-emerald-200">
-                          کۆی گشتی شایستە بۆ وەرگرتن (سەرمایە + قازانج)
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {shareholders.map((sh: any, index: number) => {
-                        const shCapital = sh.balanceUSD || 0;
-                        const shProfit = realProfit * ((sh.sharePercentage || 0) / 100);
-                        const shTotalDue = shCapital + shProfit;
-
-                        return (
-                          <tr key={sh.id} className="border-b border-slate-100 hover:bg-emerald-50/30 transition-colors">
-                            <td className="py-3.5 px-2 text-slate-400 text-xs font-bold text-center">{index + 1}</td>
-                            <td className="py-3.5 px-4 text-slate-900 font-black text-sm text-right">
-                              {sh.name}
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              <span className="bg-blue-100 text-blue-800 font-black text-xs px-3 py-1 rounded-full">
-                                {sh.sharePercentage || 0}%
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 font-black text-sm text-center text-slate-700" dir="ltr">
-                              {fmt(shCapital)}
-                            </td>
-                            <td className="py-3.5 px-4 font-black text-sm text-center text-emerald-700" dir="ltr">
-                              +{fmt(shProfit)}
-                            </td>
-                            <td className="py-3.5 px-4 font-black text-base text-center text-emerald-800 bg-emerald-50/40 border-x border-emerald-200" dir="ltr">
-                              {fmt(shTotalDue)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-
-                      {/* Total / Settlement Verification Row */}
-                      <tr className="bg-slate-100/90 border-t-2 border-slate-300 font-black text-slate-900">
-                        <td className="py-3.5 px-2 text-center font-bold">∑</td>
-                        <td className="py-3.5 px-4 text-right text-sm">کۆی گشتی (تەواوی شایستەکان)</td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="bg-emerald-100 text-emerald-800 font-black text-xs px-3 py-1 rounded-full">
-                            {Number(totalSharePercentage.toFixed(3))}%
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-black text-sm text-center text-slate-800" dir="ltr">
-                          {fmt(capital)}
-                        </td>
-                        <td className="py-3.5 px-4 font-black text-sm text-center text-emerald-700" dir="ltr">
-                          {fmt(realProfit)}
-                        </td>
-                        <td className="py-3.5 px-4 font-black text-base text-center text-emerald-900 bg-emerald-100/60 border-x border-emerald-300" dir="ltr">
-                          {fmt(totalAssets)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-
-                  {/* Detailed Breakdown of All Assets Sources */}
-                  <div className="mt-5 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-semibold text-slate-600">
-                    <div className="bg-white p-3 rounded-lg border border-slate-200">
-                      <span className="font-bold text-slate-800 block mb-1">💵 نووسینگەی بازاڕ</span>
-                      <div dir="ltr" className="text-slate-700 font-bold">$ 145,725.621</div>
-                      <div dir="ltr" className="text-slate-500">20,573,146 دینار</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border border-slate-200">
-                      <span className="font-bold text-slate-800 block mb-1">🏦 حواله صین</span>
-                      <div dir="ltr" className="text-slate-700 font-bold">$ 123,180</div>
-                      <div className="text-slate-400">بێ باڵانسی دینار</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border border-slate-200">
-                      <span className="font-bold text-slate-800 block mb-1">📋 کۆی قەرزی لای خەڵک</span>
-                      <div dir="ltr" className="text-slate-700 font-bold">$ 175,047.8</div>
-                      <div dir="ltr" className="text-slate-500">2,800,000 دینار</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border border-slate-200">
-                      <span className="font-bold text-slate-800 block mb-1">📦 بەهای کۆگا (کۆگای سەرەکی)</span>
-                      <div dir="ltr" className="text-slate-700 font-bold">$ 37,694.9613</div>
-                      <div className="text-slate-500">کۆی گشتی ٢٣٦ دانە</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Notes & Legal / Accounting Balance Statement */}
-                <div className="p-4 bg-emerald-50/50 border-t border-emerald-200 text-center text-xs font-bold text-emerald-800 flex items-center justify-between flex-wrap gap-2">
-                  <span>
-                    ✅ حیسابات بە وردی هاوسەنگە: کۆی سەرمایەی خاوەن پشکەکان (${capital.toLocaleString()}) + کۆی قازانجی فیعلی (${realProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}) = کۆی مەوجودات (${totalAssets.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})})
-                  </span>
-                  <span className="text-slate-500">
-                    بەرواری دەرهێنان: {new Date().toLocaleDateString("en-US")}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
 
           {/* Bottom Buttons for Shareholders */}
           <div className="md:col-span-2 flex justify-center mt-4 gap-4 flex-wrap no-print">

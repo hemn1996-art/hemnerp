@@ -84,7 +84,7 @@ export function getVoucherCOGSInUSD(
     ? (voucher.exchangeRate > 10000 ? voucher.exchangeRate / 100 : voucher.exchangeRate)
     : marketRatePerDollar;
 
-  const getCostUSD = (productId: number, rawCost?: number, _rawCurId?: number): number => {
+  const getCostUSD = (productId: number, rawCost?: number, rawCurId?: number): number => {
     // Check fixed-rate IQD cost first
     const fixedIQD = fixedCostIQDMap?.[productId];
     if (fixedIQD !== undefined && fixedIQD > 0) {
@@ -94,7 +94,7 @@ export function getVoucherCOGSInUSD(
     let costUSD = productCostsUSD[productId];
     if (costUSD === undefined || costUSD === null || costUSD === 0) {
       if (rawCost && rawCost > 0) {
-        const isCostIQD = _rawCurId === 2 || _rawCurId === 12;
+        const isCostIQD = rawCurId === 2 || rawCurId === 12;
         costUSD = isCostIQD ? (rawCost / saleRate) : rawCost;
       }
     }

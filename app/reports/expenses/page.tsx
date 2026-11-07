@@ -9,6 +9,9 @@ import DateInput from "../../components/DateInput";
 import { exportTableToExcel } from "../../utils/excelExport";
 import { normalizeKurdishSearchText } from "../../utils/digits";
 import AccountQuickModal from "../../components/AccountQuickModal";
+import QuickDateFilter from "../../components/QuickDateFilter";
+import { getDefaultReportDateRange } from "../../utils/datePresets";
+import { getReportSessionState, saveReportSessionState, clearReportSessionState } from "../../utils/reportSession";
 
 interface ExpenseVoucherLine {
   id: number;
@@ -50,35 +53,33 @@ export default function ExpensesReportPage() {
   const router = useRouter();
   const { currencies, fetchCurrencies, accounts, fetchAccounts, cashboxes, fetchCashboxes } = useStore() as any;
 
+  const defaultDates = useMemo(() => getDefaultReportDateRange(), []);
+  const sessionSaved = getReportSessionState("__erp_expenses_report_filters", {
+    startDate: defaultDates.startDate,
+    endDate: defaultDates.endDate,
+    searchTerm: "",
+    selectedProductIds: [] as number[],
+    selectedAccountIds: [] as number[],
+    selectedCashboxIds: [] as number[],
+    selectedCurrencyId: "all",
+    currentPage: 1,
+  });
+
   const [vouchers, setVouchers] = useState<ExpenseVoucher[]>([]);
   const [expenseProducts, setExpenseProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activePeriod, setActivePeriod] = useState<"today" | "week" | "month" | "year" | "all" | "custom">("month");
+  const [searchTerm, setSearchTerm] = useState(sessionSaved.searchTerm || "");
   const [quickAccount, setQuickAccount] = useState<{ id: number; name: string; code?: string } | null>(null);
 
-  // Helper date functions
-  const formatDateStr = (d: Date) => {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
-
   // Date range state
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(1); // First day of current month
-    return formatDateStr(d);
-  });
-
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    return formatDateStr(d);
-  });
+  const [startDate, setStartDate] = useState(sessionSaved.startDate || defaultDates.startDate);
+  const [endDate, setEndDate] = useState(sessionSaved.endDate || defaultDates.endDate);
 
   // Multi-select filters
-  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>([]);
-  const [selectedCashboxIds, setSelectedCashboxIds] = useState<number[]>([]);
-  const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>("all");
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>(sessionSaved.selectedProductIds || []);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<number[]>(sessionSaved.selectedAccountIds || []);
+  const [selectedCashboxIds, setSelectedCashboxIds] = useState<number[]>(sessionSaved.selectedCashboxIds || []);
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState<string>(sessionSaved.selectedCurrencyId || "all");
 
   // Modals
   const [selectedVoucherForModal, setSelectedVoucherForModal] = useState<ExpenseVoucher | null>(null);
@@ -156,43 +157,18 @@ export default function ExpensesReportPage() {
     loadExpenses();
   }, [startDate, endDate, selectedAccountIds, selectedProductIds, selectedCashboxIds, selectedCurrencyId]);
 
-  // Quick period change handlers
-  const handleSetPeriod = (period: "today" | "week" | "month" | "year" | "all" | "custom") => {
-    setActivePeriod(period);
-    if (period === "custom") return;
-
-    const today = new Date();
-    const todayStr = formatDateStr(today);
-
-    if (period === "today") {
-      setStartDate(todayStr);
-      setEndDate(todayStr);
-    } else if (period === "week") {
-      const d = new Date(today);
-      const day = d.getDay();
-      const diff = (day + 1) % 7;
-      d.setDate(d.getDate() - diff);
-      setStartDate(formatDateStr(d));
-      setEndDate(todayStr);
-    } else if (period === "month") {
-      const d = new Date(today.getFullYear(), today.getMonth(), 1);
-      setStartDate(formatDateStr(d));
-      setEndDate(todayStr);
-    } else if (period === "year") {
-      const d = new Date(today.getFullYear(), 0, 1);
-      setStartDate(formatDateStr(d));
-      setEndDate(todayStr);
-    } else if (period === "all") {
-      setStartDate("2020-01-01");
-      setEndDate(todayStr);
-    }
-  };
-
-  const handleCustomDateChange = (type: "start" | "end", val: string) => {
-    setActivePeriod("custom");
-    if (type === "start") setStartDate(val);
-    if (type === "end") setEndDate(val);
-  };
+  useEffect(() => {
+    saveReportSessionState("__erp_expenses_report_filters", {
+      startDate,
+      endDate,
+      searchTerm,
+      selectedProductIds,
+      selectedAccountIds,
+      selectedCashboxIds,
+      selectedCurrencyId,
+      currentPage,
+    });
+  }, [startDate, endDate, searchTerm, selectedProductIds, selectedAccountIds, selectedCashboxIds, selectedCurrencyId, currentPage]);
 
   // Product options for multi-select
   const productOptions: Option[] = useMemo(() => {
@@ -275,7 +251,10 @@ export default function ExpensesReportPage() {
 
   // Reset all filters
   const handleResetFilters = () => {
-    handleSetPeriod("month");
+    clearReportSessionState("__erp_expenses_report_filters");
+    const d = getDefaultReportDateRange();
+    setStartDate(d.startDate);
+    setEndDate(d.endDate);
     setSelectedProductIds([]);
     setSelectedAccountIds([]);
     setSelectedCashboxIds([]);
@@ -428,39 +407,33 @@ export default function ExpensesReportPage() {
       {/* Control & Filter Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3 print:hidden">
         {/* Main Row: Period Select + From Date + To Date + Expense Product Multi-Select */}
+        {/* Main Row: Period Quick Date + From Date + To Date + Expense Product Multi-Select */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            {/* 1 Box for Period - Reordered: Today, This Week, This Month, This Year, All, Custom */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-500 whitespace-nowrap">ماوە:</span>
-              <select
-                value={activePeriod}
-                onChange={(e) => handleSetPeriod(e.target.value as any)}
-                className="text-xs font-bold py-2.5 px-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer text-slate-800"
-              >
-                <option value="today">ئەمڕۆ</option>
-                <option value="week">ئەم هەفتەیە</option>
-                <option value="month">ئەم مانگە</option>
-                <option value="year">ئەمساڵ</option>
-                <option value="all">کۆی گشتی</option>
-                <option value="custom">دیاریکراو</option>
-              </select>
-            </div>
+            {/* Quick Date Presets */}
+            <QuickDateFilter
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(s, e) => {
+                setStartDate(s);
+                setEndDate(e);
+              }}
+            />
 
             {/* From Date (Wider unified DateInput box) */}
             <DateInput
               value={startDate}
-              onChange={(val) => handleCustomDateChange("start", val)}
+              onChange={(val) => setStartDate(val)}
               label="لە بەرواری"
-              className="w-48 text-xs font-bold py-1 px-1 bg-slate-50 border-slate-200 rounded-xl"
+              className="w-44 text-xs font-bold py-1 px-1 bg-slate-50 border-slate-200 rounded-xl"
             />
 
             {/* To Date (Wider unified DateInput box) */}
             <DateInput
               value={endDate}
-              onChange={(val) => handleCustomDateChange("end", val)}
+              onChange={(val) => setEndDate(val)}
               label="تا بەرواری"
-              className="w-48 text-xs font-bold py-1 px-1 bg-slate-50 border-slate-200 rounded-xl"
+              className="w-44 text-xs font-bold py-1 px-1 bg-slate-50 border-slate-200 rounded-xl"
             />
 
             {/* Multi-Select Expense Items (کەرەستەی خەرجی) */}
@@ -476,13 +449,17 @@ export default function ExpensesReportPage() {
           </div>
 
           <div>
-            {(selectedProductIds.length > 0 || modalFiltersCount > 0 || searchTerm.trim() !== "" || activePeriod !== "month") && (
+            {(selectedProductIds.length > 0 || modalFiltersCount > 0 || searchTerm.trim() !== "" || startDate !== defaultDates.startDate || endDate !== defaultDates.endDate) && (
               <button
                 onClick={handleResetFilters}
-                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
                 title="پاککردنەوەی هەموو فلتەرەکان"
               >
-                پاککردنەوەی فلتەر
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+                <span>ڕێکخستنەوەی فلتەر</span>
               </button>
             )}
           </div>
@@ -1013,6 +990,7 @@ export default function ExpensesReportPage() {
           </div>
         </div>
       )}
+
       {/* Account Quick Action Modal */}
       <AccountQuickModal
         isOpen={Boolean(quickAccount)}

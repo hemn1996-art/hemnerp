@@ -65,43 +65,19 @@ export default function AddCashboxModal({
             </Field>
           </div>
 
-          <div className="border border-gray-100 rounded-2xl p-5 bg-gray-50/50">
-            <div className="mb-4 text-lg font-black text-gray-800 flex items-center gap-2">
-              <span className="text-xl">💰</span> باڵانسی سەرەتایی
+          {!editingId && (
+            <div className="border border-blue-100 rounded-2xl p-4 bg-blue-50/60 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="text-sm text-blue-900 leading-relaxed font-medium">
+                <span className="font-bold block mb-1">باڵانسی سەرەتایی:</span>
+                هەموو قاسەیەکی نوێ بە باڵانسی (٠) دروست دەبێت. بۆ دانانی سەرمایەی سەرەتایی یان تێکردنی پارە، تکایە لە بەشی <span className="font-bold underline">دانانی پارە</span> تۆماری بکە.
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {allCurrencies
-                .filter((currency: any) => currency.isActive !== false)
-                .map((currency: any) => (
-                  <Field
-                    key={currency.id}
-                    label={`${currency.name} - ${currency.symbol}`}
-                  >
-                    <input
-                      value={form.balances[currency.id] || "0"}
-                      disabled={!!editingId}
-                      onChange={(event) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          balances: {
-                            ...prev.balances,
-                            [currency.id]: onlyDecimal(event.target.value),
-                          },
-                        }))
-                      }
-                      className={`w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-sans ltr text-left ${
-                        editingId ? "bg-slate-100 cursor-not-allowed text-slate-500" : ""
-                      }`}
-                      inputMode="decimal"
-                      lang="en"
-                      dir="ltr"
-                      placeholder="0"
-                    />
-                  </Field>
-                ))}
-            </div>
-          </div>
+          )}
 
           <label className="inline-flex items-center gap-3 w-fit px-4 py-3 border border-green-200 bg-green-50 text-green-700 rounded-xl cursor-pointer hover:bg-green-100 transition-colors font-bold select-none">
             <input

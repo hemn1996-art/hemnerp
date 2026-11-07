@@ -24,10 +24,12 @@ export function saveInvoice(
       handleSale(invoice);
       break;
 
+    case "پارە وەرگرتن":
     case "پارەی هاتوو":
       handleIncome(invoice);
       break;
 
+    case "پارەدان":
     case "پارەی ڕۆشتوو":
       handleExpense(invoice);
       break;

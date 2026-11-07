@@ -26,15 +26,21 @@ function isIQD(id: number, customCurrencies?: { id: number; code: string }[]): b
 }
 
 function getOtherCurrencyId(id: number, customCurrencies?: { id: number; code: string }[]): number {
-  const list = getActiveCurrencies(customCurrencies);
-  const isUsd = isUSD(id, customCurrencies);
-  const other = list.find(c => isUsd ? c.code === "IQD" : c.code === "USD");
-  if (other) return other.id;
+  if (customCurrencies && customCurrencies.length > 0) {
+    const isUsd = isUSD(id, customCurrencies);
+    const other = customCurrencies.find(c => isUsd ? c.code === "IQD" : c.code === "USD");
+    if (other) return other.id;
+  }
 
+  // Primary Database IDs: USD is 1, IQD is 2
+  if (id === 1) return 2;
+  if (id === 2) return 1;
+  // Mock IDs fallback
   if (id === 5) return 6;
   if (id === 6) return 5;
-  if (id === 1 || id === 11) return 12;
-  if (id === 2 || id === 12) return 11;
+  // Legacy / custom IDs fallback
+  if (id === 11) return 12;
+  if (id === 12) return 11;
   return id;
 }
 
@@ -46,8 +52,14 @@ export function convertCurrency(
   customCurrencies?: { id: number; code: string }[]
 ): number {
   if (fromId === toId) return amount;
-  if (isIQD(fromId, customCurrencies) && isUSD(toId, customCurrencies)) return amount / rate; // IQD to USD
-  if (isUSD(fromId, customCurrencies) && isIQD(toId, customCurrencies)) return amount * rate; // USD to IQD
+  let effectiveRate = rate;
+  if (effectiveRate <= 50) {
+    // Safety guard: if rate is 1 or missing, NEVER divide/multiply by 1 between USD and IQD!
+    const iqdCur = (customCurrencies || []).find(c => isIQD(c.id, customCurrencies));
+    effectiveRate = (iqdCur && (iqdCur as any).rate > 50) ? (iqdCur as any).rate : 1500;
+  }
+  if (isIQD(fromId, customCurrencies) && isUSD(toId, customCurrencies)) return amount / effectiveRate; // IQD to USD
+  if (isUSD(fromId, customCurrencies) && isIQD(toId, customCurrencies)) return amount * effectiveRate; // USD to IQD
   return amount;
 }
 
@@ -61,6 +73,7 @@ export interface CalculateLedgerEntriesParams {
   balanceBeforeByCurrency: Record<string, number>;
   currencies?: { id: number; code: string; symbol: string; name: string }[];
   itemsTotalsByCurrency?: Record<string, number>;
+  isCashSettled?: boolean;
 }
 
 export function calculateLedgerEntries({
@@ -73,6 +86,7 @@ export function calculateLedgerEntries({
   balanceBeforeByCurrency,
   currencies,
   itemsTotalsByCurrency,
+  isCashSettled,
 }: CalculateLedgerEntriesParams) {
   // Normalize types
   const incomingTypes = ["sales", "money_in", "purchase_return", "people_debt_discount", "debt_discount", "داشکاندنم کردوە"];
@@ -364,6 +378,37 @@ export function calculateLedgerEntries({
           tempBalance[String(pCurId)] += pAmount;
         }
       }
+    }
+  }
+
+  if (isCashSettled) {
+    // When an invoice is fully settled in cash (within small tolerance < 5000 IQD and < $5),
+    // ensure that customer balance is not left with residual micro-debt or micro-credit.
+    for (const k of Object.keys(tempBalance)) {
+      tempBalance[k] = balanceBeforeByCurrency[k] || 0;
+    }
+    // Remove any entries in currencies not present in items or payments
+    const relevantCurIds = new Set([
+      currencyId,
+      ...paidAmounts.map(p => p.currencyId),
+      ...(itemsTotalsByCurrency ? Object.keys(itemsTotalsByCurrency).map(Number) : [])
+    ]);
+    for (let i = ledgerEntries.length - 1; i >= 0; i--) {
+      if (!relevantCurIds.has(ledgerEntries[i].currencyId)) {
+        ledgerEntries.splice(i, 1);
+      }
+    }
+    // Make sure debit and credit match on customer entries so no balance shift occurs
+    const totalDebit = ledgerEntries.reduce((s, e) => s + e.debit, 0);
+    const totalCredit = ledgerEntries.reduce((s, e) => s + e.credit, 0);
+    const delta = totalDebit - totalCredit;
+    if (Math.abs(delta) > 0.001) {
+      ledgerEntries.push({
+        currencyId,
+        debit: delta < 0 ? Math.abs(delta) : 0,
+        credit: delta > 0 ? delta : 0,
+        exchangeRate: isUSD(currencyId, currencies) ? 1 : exchangeRate,
+      });
     }
   }
 

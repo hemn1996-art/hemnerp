@@ -145,15 +145,15 @@ export function formatCurrencyString(
   const sign = "";
 
   if (isIQD) {
-    return `دینار ${formattedNum}`;
+    return `\u2066دینار ${formattedNum}\u2069`;
   }
 
   const symbol = cfg?.symbol || "$";
   if (symbol === "$") {
-    return `$ ${formattedNum}`;
+    return `\u2066$ ${formattedNum}\u2069`;
   }
 
-  return `${symbol} ${formattedNum}`;
+  return `\u2066${symbol} ${formattedNum}\u2069`;
 }
 
 /**

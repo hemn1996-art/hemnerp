@@ -80,17 +80,13 @@ export async function POST(request: Request) {
       });
 
       for (const currency of activeCurrencies) {
-        // Initialize balance for this cashbox and currency
-        const initialBal = (data.balances || []).find(
-          (b: any) => Number(b.currencyId) === Number(currency.id)
-        );
-        const initialAmount = Number(initialBal?.amount || 0);
-
+        // Initialize balance with 0 for all active currencies.
+        // Direct initial balance entry is disallowed; all cash entries must be recorded via cash deposit.
         await tx.cashboxBalance.create({
           data: {
             cashboxId: cashbox.id,
             currencyId: currency.id,
-            amount: initialAmount,
+            amount: 0,
           },
         });
       }
@@ -159,15 +155,35 @@ export async function DELETE(request: Request) {
       );
     }
 
+    const cashboxId = Number(id);
+
+    // Check if cashbox is linked to any vouchers or transfers
+    const hasVouchers = await prisma.voucher.findFirst({
+      where: {
+        OR: [
+          { cashboxId },
+          { fromCashboxId: cashboxId },
+          { toCashboxId: cashboxId },
+        ],
+      },
+    });
+
+    if (hasVouchers) {
+      return NextResponse.json(
+        { error: "ناتوانیت ئەم قاسەیە بسڕیتەوە چونکە پسوولە یان جوڵەی دارایی پێوە بەستراوە" },
+        { status: 400 }
+      );
+    }
+
     await prisma.$transaction(async (tx) => {
       // Delete associated cashbox balances first to avoid foreign key violations
       await tx.cashboxBalance.deleteMany({
-        where: { cashboxId: Number(id) },
+        where: { cashboxId },
       });
 
       // Now delete the cashbox itself
       await tx.cashbox.delete({
-        where: { id: Number(id) },
+        where: { id: cashboxId },
       });
     });
 

@@ -1308,10 +1308,9 @@ export default function WarehouseStockPage({ headerSelector, editId }: Props) {
                               const numDisplay = (
                                 <span dir="ltr" style={{ display: "inline-flex", alignItems: "baseline", gap: "1px" }}>
                                   {rawVal < 0 && <span>-</span>}
-                                  {!isIQD && <span style={{ fontSize: "0.82em", opacity: 0.85, fontWeight: 800 }}>$</span>}
+                                  <span style={{ fontSize: "0.82em", opacity: 0.85, fontWeight: 800 }}>{isIQD ? "دینار" : "$"}</span>
                                   <span style={{ fontWeight: 900 }}>{whole}</span>
                                   {dec !== ".00" && <span style={{ fontSize: "0.72em", opacity: 0.75, fontWeight: 700 }}>{dec}</span>}
-                                  {isIQD && <span style={{ fontSize: "0.82em", opacity: 0.85, fontWeight: 800, marginInlineStart: "2px" }}>دینار</span>}
                                 </span>
                               );
 

@@ -3,6 +3,7 @@ import { openPrintWindow } from "@/app/utils/printWindow";
 import DateInput from "./DateInput";
 import FormattedNumberInput from "./FormattedNumberInput";
 import PrintHeader, { PrintWatermark } from "./PrintHeader";
+import AccountDetailsModal from "./AccountDetailsModal";
 
 import { useRouter } from "next/navigation";
 
@@ -12,6 +13,7 @@ import {
   useState,
   useRef,
   useCallback,
+  Fragment,
   type CSSProperties,
   type ReactNode,
 } from "react";
@@ -95,8 +97,9 @@ type AccountLike = {
   name: string;
   accountTypeId?: number;
   phone?: string;
-  city?: string;
+  city?: any;
   address?: string;
+  fullAddress?: string;
   balance?: number;
   balanceByCurrency?: Record<string, number>;
   balanceCurrencyId?: number;
@@ -105,7 +108,12 @@ type AccountLike = {
   creditLimit?: number;
   creditLimitCurrencyId?: number;
   debtAlertDays?: number;
+  discountPercent?: number;
   guarantorName?: string;
+  exchangeRateType?: string;
+  customExchangeRate?: number | null;
+  accountType?: any;
+  isShareholder?: boolean;
 };
 
 type TableColumns = {
@@ -438,6 +446,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   const [accountId, setAccountId] = useState<number | undefined>();
   const [showAccountList, setShowAccountList] = useState(false);
   const [showAccountInfo, setShowAccountInfo] = useState(false);
+  const [showAccountDetailsModal, setShowAccountDetailsModal] = useState(false);
   const [isTemporaryCustomer, setIsTemporaryCustomer] = useState(false);
   const [tempCustomerName, setTempCustomerName] = useState("");
   const [tempCustomerPhone, setTempCustomerPhone] = useState("");
@@ -745,11 +754,24 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               });
             }
             setPaidAmounts(initialPaid);
+            userEditedPaidRef.current = true; // Prevent automatic overwrite of loaded historical payments
 
             const rawVoucherRate = Number(voucher.exchangeRate || 0);
-            const voucherRate = rawVoucherRate > 10000
-              ? rawVoucherRate / 100
-              : (rawVoucherRate < 100 && rawVoucherRate > 0 ? rawVoucherRate * 100 : (rawVoucherRate || 1500));
+            let voucherRate = 1650;
+            if (rawVoucherRate >= 10000) {
+              voucherRate = rawVoucherRate / 100;
+            } else if (rawVoucherRate >= 500 && rawVoucherRate <= 5000) {
+              voucherRate = rawVoucherRate;
+            } else {
+              // rawVoucherRate is 1 or missing: check paidAmounts or current IQD rate
+              const paWithRate = voucher.paidAmounts?.find((pa: any) => Number(pa.exchangeRate) >= 500);
+              if (paWithRate) {
+                voucherRate = Number(paWithRate.exchangeRate);
+              } else {
+                const iqd = currencies.find((c: any) => c.code === "IQD");
+                voucherRate = iqd?.rate || 1650;
+              }
+            }
 
             const totalPaidValConverted = (voucher.paidAmounts || []).reduce((sum: number, pa: any) => {
               const amount = Number(pa.amount) || 0;
@@ -768,9 +790,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
             const netVal = Number(voucher.netAmount) || 0;
             const paidDiff = Math.abs(totalPaidValConverted - netVal);
+            const isInvUsd = (voucher.currencyId === 1 || voucher.currencyId === 11);
+            const paidDiffUsd = isInvUsd ? paidDiff : (voucherRate > 0 ? paidDiff / voucherRate : paidDiff);
+            const paidDiffIqd = isInvUsd ? paidDiff * voucherRate : paidDiff;
+
             if (totalPaidValConverted <= 0.01) {
               setPaymentTypeMode("debt");
-            } else if (paidDiff < 1.0 || totalPaidValConverted >= netVal - 1) {
+            } else if (totalPaidValConverted >= netVal - 0.01 || (paidDiffUsd < 5.0 && paidDiffIqd < 5000)) {
               setPaymentTypeMode("cash");
             } else {
               setPaymentTypeMode("partial");
@@ -793,9 +819,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               setDeliveryFee(voucher.deliveryFee ? String(voucher.deliveryFee) : "");
             }
             
-            if (voucher.exchangeRate) {
-              setExchangeRate(String(voucherRate * 100));
-            }
+            setExchangeRate(String(Math.round(voucherRate * 100)));
             if (voucher.totalDiscount > 0) {
               setInvoiceDiscountValue(String(voucher.totalDiscount));
               setInvoiceDiscountMode("amount");
@@ -869,6 +893,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
   const selectedAccount = accounts.find((a: any) => a.id === accountId);
 
+  useEffect(() => {
+    if (!selectedAccount) return;
+    if (!editId && selectedAccount.exchangeRateType === "FIXED" && selectedAccount.customExchangeRate) {
+      setExchangeRate(String(selectedAccount.customExchangeRate));
+    }
+  }, [selectedAccount?.id, selectedAccount?.exchangeRateType, selectedAccount?.customExchangeRate, editId]);
+
   function getAccountBalanceBeforeMap(account?: AccountLike) {
     const map: Record<string, number> = {};
     if (!account) return map;
@@ -903,7 +934,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const symbol = currencies.find((c: any) => c.id === currencyId)?.symbol || "$";
     const absVal = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} دینار`;
+      return `دینار ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
     return `${symbol} ${absVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
@@ -914,15 +945,18 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-        {activeEntries.map(([curIdText, val]) => {
+      <div style={{ display: "flex", flexDirection: "row", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {activeEntries.map(([curIdText, val], idx) => {
           // Positive balance (val > 0.01): customer owes us -> GREEN (#16a34a)
           // Negative balance (val < -0.01): we owe customer -> RED (#dc2626)
           const color = val > 0.01 ? "#16a34a" : (val < -0.01 ? "#dc2626" : "#9ca3af");
           return (
-            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {formatCurrencyAmountJSX(Math.abs(val), Number(curIdText))}
-            </span>
+            <Fragment key={curIdText}>
+              {idx > 0 && <span style={{ color: "#64748b", fontWeight: 800, marginInline: 2 }}> + </span>}
+              <span style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
+                {formatCurrencyAmountJSX(Math.abs(val), Number(curIdText))}
+              </span>
+            </Fragment>
           );
         })}
       </div>
@@ -935,32 +969,35 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       return <span style={{ color: "#9ca3af", fontWeight: 900 }}>0</span>;
     }
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-        {activeEntries.map(([curIdText, val]) => {
+      <div style={{ display: "flex", flexDirection: "row", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {activeEntries.map(([curIdText, val], idx) => {
           const color = val > 0.01 ? "#dc2626" : "#16a34a";
           return (
-            <span key={curIdText} style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
-              {formatCurrencyAmountJSX(Math.abs(val), Number(curIdText))}
-            </span>
+            <Fragment key={curIdText}>
+              {idx > 0 && <span style={{ color: "#64748b", fontWeight: 800, marginInline: 2 }}> + </span>}
+              <span style={{ color, fontWeight: 900, fontSize: 14 }} dir="ltr">
+                {formatCurrencyAmountJSX(Math.abs(val), Number(curIdText))}
+              </span>
+            </Fragment>
           );
         })}
       </div>
     );
   }
 
-  function formatPrintBalanceMap(map: Record<string, number>, isSupplier = false) {
+  function formatPrintBalanceMap(map: Record<string, number>, isSupplier = false, fallbackCurId?: number) {
     const activeEntries = Object.entries(map).filter(([_, val]) => Math.abs(val) > 0.01);
     if (activeEntries.length === 0) {
       return (
         <strong style={{ color: "#374151", fontSize: 14 }}>
-          {formatCurrencyAmountJSX(0, defaultCurrency?.id || 1)}
+          {formatCurrencyAmountJSX(0, fallbackCurId || invoiceCurrencyId || defaultCurrency?.id || 1)}
         </strong>
       );
     }
 
     return (
-      <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        {activeEntries.map(([curIdText, val]) => {
+      <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+        {activeEntries.map(([curIdText, val], idx) => {
           const curId = Number(curIdText);
           const absVal = Math.abs(val);
           let isRed = false;
@@ -972,25 +1009,30 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           const color = isRed ? "#dc2626" : "#16a34a";
 
           return (
-            <strong key={curIdText} style={{ color, fontSize: 14 }}>
-              {formatCurrencyAmountJSX(absVal, curId, false)}
-            </strong>
+            <Fragment key={curIdText}>
+              {idx > 0 && (
+                <span style={{ color: "#475569", fontWeight: 800, marginInline: 4, fontSize: 13 }}> + </span>
+              )}
+              <strong style={{ color, fontSize: 14 }}>
+                {formatCurrencyAmountJSX(absVal, curId, false)}
+              </strong>
+            </Fragment>
           );
         })}
       </span>
     );
   }
 
-  function formatCurrencyMap(map: Record<string, number>) {
+  function formatCurrencyMap(map: Record<string, number>, fallbackCurId?: number) {
     const active = Object.entries(map).filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001);
     if (active.length === 0) {
-      return formatCurrencyAmountJSX(0, defaultCurrency?.id || 1);
+      return formatCurrencyAmountJSX(0, fallbackCurId || invoiceCurrencyId || defaultCurrency?.id || 1);
     }
     return (
       <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 4 }}>
         {active.map(([currencyIdText, amount], idx) => (
           <span key={currencyIdText} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {idx > 0 && <span style={{ color: "#6b7280" }}> ، </span>}
+            {idx > 0 && <span style={{ color: "#475569", fontWeight: 800, marginInline: 4, fontSize: 13 }}> + </span>}
             {formatCurrencyAmountJSX(amount, Number(currencyIdText))}
           </span>
         ))}
@@ -1016,14 +1058,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {!isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
         <span>
           <span>{whole}</span>
           {decimal !== undefined && decimal !== "0" && decimal !== "00" && (
             <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
-        {isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
       </span>
     );
   }
@@ -1189,6 +1230,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
   }, [invoiceCurrencyId, exchangeRate, currencies]);
 
   useEffect(() => {
+    if (editId) return; // In edit mode, do NOT automatically overwrite loaded paidAmounts!
     if (paymentTypeMode === "cash" && !userEditedPaidRef.current) {
       const itemTotals = getItemsTotalsByCurrency();
       const newPaid: PaidAmounts = {};
@@ -1203,7 +1245,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
       setPaidAmounts(newPaid);
     }
-  }, [rows, total, paymentTypeMode, paidCurrencyId, getFullPaidAmountForCurrency]);
+  }, [rows, total, paymentTypeMode, paidCurrencyId, getFullPaidAmountForCurrency, editId]);
 
   const accountBalanceAfterByCurrency = useMemo(() => {
     if (!selectedAccount) return {};
@@ -1236,6 +1278,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       balanceBeforeByCurrency: before,
       itemsTotalsByCurrency: getInvoiceNetTotalsByCurrency(),
       currencies,
+      isCashSettled: (paymentTypeMode === "cash" && recon.isCashSettled),
     });
 
     return result.balanceAfterByCurrency;
@@ -1272,6 +1315,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       balanceBeforeByCurrency: before,
       itemsTotalsByCurrency: getInvoiceNetTotalsByCurrency(),
       currencies,
+      isCashSettled: (paymentTypeMode === "cash" && recon.isCashSettled),
     });
 
     return result.balanceAfterByCurrency;
@@ -1586,70 +1630,31 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     const isInvIqd = invoiceCurrencyId === iqdId || (currencies.find((c: any) => c.id === invoiceCurrencyId)?.code === "IQD");
     const isInvUsd = invoiceCurrencyId === usdId || (currencies.find((c: any) => c.id === invoiceCurrencyId)?.code === "USD");
 
-    const usdPaidItem = paidList.find((p: any) => p.currencyId === usdId);
-    const iqdPaidItem = paidList.find((p: any) => p.currencyId === iqdId);
-    const currentUsdPaid = usdPaidItem ? usdPaidItem.amount : 0;
-    const currentIqdPaid = iqdPaidItem ? iqdPaidItem.amount : 0;
-
-    let effectiveRate = rawRate;
-
-    if (isInvIqd && currentUsdPaid > 0) {
-      const neededIqd = Math.max(0, total - currentIqdPaid);
-      if (neededIqd > 0) {
-        const calcRate = neededIqd / currentUsdPaid;
-        const stdUsdInIqd = currentUsdPaid * rawRate;
-        const totalPaidAtStd = currentIqdPaid + stdUsdInIqd;
-        const diffAtStd = total - totalPaidAtStd;
-
-        if (totalPaidAtStd >= total || (diffAtStd > 0 && diffAtStd <= 5000)) {
-          effectiveRate = calcRate;
-        }
-      }
-    } else if (isInvUsd && currentIqdPaid > 0) {
-      const neededUsd = Math.max(0, total - currentUsdPaid);
-      if (neededUsd > 0) {
-        const calcRate = currentIqdPaid / neededUsd;
-        const stdIqdInUsd = currentIqdPaid / rawRate;
-        const totalPaidAtStd = currentUsdPaid + stdIqdInUsd;
-        const diffAtStd = total - totalPaidAtStd;
-
-        if (totalPaidAtStd >= total || (diffAtStd > 0 && diffAtStd <= 5.0)) {
-          effectiveRate = calcRate;
-        }
-      }
-    }
-
     let totalPaidInInvCur = 0;
     paidList.forEach((p: any) => {
       if (p.currencyId === invoiceCurrencyId) {
         totalPaidInInvCur += p.amount;
-      } else if (isInvIqd && (p.currencyId === usdId)) {
-        totalPaidInInvCur += p.amount * effectiveRate;
-      } else if (isInvUsd && (p.currencyId === iqdId)) {
-        totalPaidInInvCur += p.amount / effectiveRate;
+      } else if (isInvIqd && p.currencyId === usdId) {
+        totalPaidInInvCur += p.amount * rawRate;
+      } else if (isInvUsd && p.currencyId === iqdId) {
+        totalPaidInInvCur += p.amount / rawRate;
       } else {
         totalPaidInInvCur += convertCurrency(p.amount, p.currencyId, invoiceCurrencyId);
       }
     });
 
-    const diff = total - totalPaidInInvCur;
-    let fractionDiscount = 0;
-    let effectiveNetAmount = total;
-    let isCashSettled = false;
+    const diffInInvCur = Math.abs(total - totalPaidInInvCur);
+    const diffInUsd = isInvUsd ? diffInInvCur : (rawRate > 0 ? diffInInvCur / rawRate : diffInInvCur);
+    const diffInIqd = isInvUsd ? diffInInvCur * rawRate : diffInInvCur;
 
-    if (diff <= 0.01) {
-      isCashSettled = true;
-      effectiveNetAmount = totalPaidInInvCur;
-    } else if ((isInvIqd && diff <= 5000) || (!isInvIqd && diff <= 5.0)) {
-      isCashSettled = true;
-      fractionDiscount = diff;
-      effectiveNetAmount = totalPaidInInvCur;
-    }
+    // Rule: If cash invoice and difference is less than 5,000 IQD AND less than $5 USD, treat as fully settled cash (سفر)
+    const isWithinCashTolerance = diffInUsd < 5.0 && diffInIqd < 5000;
+    const isCashSettled = paymentTypeMode === "cash" && (totalPaidInInvCur >= total - 0.01 || isWithinCashTolerance);
 
     return {
-      effectiveRate,
-      effectiveNetAmount,
-      fractionDiscount,
+      effectiveRate: rawRate,
+      effectiveNetAmount: total,
+      fractionDiscount: 0,
       isCashSettled,
     };
   }
@@ -1822,6 +1827,26 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       }
     }
 
+    // For cash sales: if remaining difference is < 5000 IQD and < $5 USD, show as 0 (سفر):
+    if (paymentTypeMode === "cash") {
+      const rawRate = (toNumber(exchangeRate) / 100) || 1500;
+      let totalRemUSD = 0;
+      for (const [key, val] of Object.entries(diffs)) {
+        const curId = Number(key);
+        const cur = currencies.find((c: any) => Number(c.id) === curId);
+        const isCurIQD = cur?.code === "IQD" || curId === 2 || curId === 12;
+        if (isCurIQD) {
+          totalRemUSD += (val / rawRate);
+        } else {
+          totalRemUSD += val;
+        }
+      }
+      const totalRemIQD = totalRemUSD * rawRate;
+      if (Math.abs(totalRemUSD) < 5.0 && Math.abs(totalRemIQD) < 5000) {
+        return { [invCurKey]: 0 };
+      }
+    }
+
     const result: Record<string, number> = {};
     for (const [key, val] of Object.entries(diffs)) {
       const curId = Number(key);
@@ -1873,14 +1898,13 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     return (
       <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: 3 }} dir="ltr">
-        {!isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
+        <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>
         <span>
           <span>{whole}</span>
           {decimal !== undefined && decimal !== "0" && decimal !== "00" && (
             <span style={{ fontSize: "0.7em", opacity: 0.75 }}>.{decimal}</span>
           )}
         </span>
-        {isIQD && <span style={{ fontSize: "0.85em", opacity: 0.8 }}>{displaySymbol}</span>}
       </span>
     );
   }
@@ -2368,16 +2392,6 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
     setRows((prevRows) =>
       prevRows.map((row) => {
-        // If price was manually entered on the invoice:
-        // Keep the number as is, only change currency!
-        if (isRowPriceManual(row)) {
-          return {
-            ...row,
-            currencyId: newCurId,
-            price: row.price,
-          };
-        }
-
         const product = products.find((p: any) => p.id === row.productId);
         let newPriceStr = "";
 
@@ -2703,6 +2717,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
     setAccountId(undefined);
     setAccountSearch("");
     setShowAccountInfo(false);
+    setShowAccountDetailsModal(false);
     setIsTemporaryCustomer(false);
     setTempCustomerName("");
     setTempCustomerPhone("");
@@ -2771,7 +2786,8 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
       extraPaymentHandling: extraHandling,
       balanceBeforeByCurrency: before,
       currencies,
-      itemsTotalsByCurrency: getInvoiceNetTotalsByCurrency()
+      itemsTotalsByCurrency: getInvoiceNetTotalsByCurrency(),
+      isCashSettled: (paymentTypeMode === "cash" && recon.isCashSettled),
     });
 
     const combineDateAndTime = (dateStr: string, timeStr: string) => {
@@ -2832,7 +2848,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
           unitPrice: toNumber(row.price),
           discountPercent: row.discountMode === "percent" ? toNumber(row.discountValue) : 0,
           discountAmount: getRowDiscountAmount(row),
-          lineTotal: getRowTotal(row),
+          lineTotal: getRowNetTotalInRowCurrency(row),
           note: row.note,
           currencyId: row.currencyId,
           warehouseId,
@@ -3198,85 +3214,163 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
       <div style={pageGrid} className="no-print">
         <aside style={leftPanel}>
-          <div style={sideHeader}>
-            <label style={tempCustomerCheck} title="کڕیاری کاتی">
-              <input
-                type="checkbox"
-                checked={isTemporaryCustomer}
-                disabled={isInvoiceLocked}
-                onChange={(e) => {
-                  if (blockIfLocked()) return;
-
-                  const checked = e.target.checked;
-                  setIsTemporaryCustomer(checked);
-
-                  if (checked) {
-                    setAccountId(undefined);
-                    setAccountSearch("");
-                    setShowAccountInfo(false);
-                  } else {
-                    setTempCustomerName("");
-                    setTempCustomerPhone("");
-                    setTempCustomerAddress("");
-                  }
+          {accountId && !isTemporaryCustomer ? (
+            <div style={{ marginBottom: 6 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "4px 2px",
                 }}
-              />
-            </label>
-
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <label style={labelStyle}>هەژمار</label>
-              </div>
-
-              <div className="account-search-container" style={{ position: "relative", width: "100%" }}>
-                {accountId && !isTemporaryCustomer ? (
-                  <div
+              >
+                {/* Right side in RTL: Customer Name in bold blue */}
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!accountId) return;
+                      if (currentInvoiceDraft) {
+                        saveVoucherDraft("sales", currentInvoiceDraft);
+                      }
+                      router.push(`/reports/account-statement?accountId=${accountId}`);
+                    }}
+                    onAuxClick={(e) => {
+                      if (e.button === 1 && accountId) {
+                        e.preventDefault();
+                        window.open(`/reports/account-statement?accountId=${accountId}`, "_blank");
+                      }
+                    }}
                     style={{
-                      ...input,
+                      color: "#1d4ed8",
+                      fontWeight: 900,
+                      fontSize: "17px",
+                      cursor: "pointer",
+                      textDecoration: "none",
+                    }}
+                    className="hover:underline"
+                    title="کلیک بکە بۆ بینینی کەشفی حسابی ئەم هەژمارە"
+                  >
+                    {selectedAccount?.name || accountSearch}
+                  </span>
+                </div>
+
+                {/* Left side in RTL: Action icons [Eye] [Red Circle X] */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAccountDetailsModal(true)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingLeft: 40,
-                      paddingRight: 14,
-                      background: isInvoiceLocked ? "#f3f4f6" : "#ffffff",
-                      cursor: "pointer",
-                      borderColor: "#93c5fd",
+                      justifyContent: "center",
+                      padding: 0,
+                      color: "#2563eb",
+                      lineHeight: 0,
+                      transition: "transform 0.15s ease",
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.15)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                    title="وردەکاری هەژمار"
                   >
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!accountId) return;
-                        if (currentInvoiceDraft) {
-                          saveVoucherDraft("sales", currentInvoiceDraft);
-                        }
-                        router.push(`/reports/account-statement?accountId=${accountId}`);
-                      }}
-                      onAuxClick={(e) => {
-                        if (e.button === 1 && accountId) {
-                          e.preventDefault();
-                          window.open(`/reports/account-statement?accountId=${accountId}`, "_blank");
-                        }
-                      }}
-                      style={{
-                        color: "#1d4ed8",
-                        fontWeight: 800,
-                        fontSize: "14px",
-                        textDecoration: "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        cursor: "pointer",
-                        flex: 1,
-                        height: "100%",
-                      }}
-                      className="hover:underline"
-                      title="کلیک بکە بۆ بینینی کەشفی حسابی ئەم هەژمارە (کەرەستە و پسووڵەکەت پارێزراوە)"
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#2563eb"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      <span>{selectedAccount?.name || accountSearch}</span>
-                    </span>
-                  </div>
-                ) : (
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+
+                  {!isInvoiceLocked && (
+                    <button
+                      type="button"
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0,
+                        color: "#ef4444",
+                        lineHeight: 0,
+                        transition: "transform 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.12)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                      onClick={() => {
+                        if (blockIfLocked()) return;
+                        setAccountId(undefined);
+                        setAccountSearch("");
+                        setShowAccountInfo(false);
+                        setShowAccountDetailsModal(false);
+                      }}
+                      title="لابردنی هەژمار"
+                    >
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#ef4444"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="15" y1="9" x2="9" y2="15" />
+                        <line x1="9" y1="9" x2="15" y2="15" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Separator line underneath as in Image 1 */}
+              <div style={{ width: "100%", height: "1px", backgroundColor: "#e2e8f0", marginTop: "8px", marginBottom: "8px" }} />
+            </div>
+          ) : (
+            <div style={sideHeader}>
+              <label style={tempCustomerCheck} title="کڕیاری کاتی">
+                <input
+                  type="checkbox"
+                  checked={isTemporaryCustomer}
+                  disabled={isInvoiceLocked}
+                  onChange={(e) => {
+                    if (blockIfLocked()) return;
+
+                    const checked = e.target.checked;
+                    setIsTemporaryCustomer(checked);
+
+                    if (checked) {
+                      setAccountId(undefined);
+                      setAccountSearch("");
+                      setShowAccountInfo(false);
+                    } else {
+                      setTempCustomerName("");
+                      setTempCustomerPhone("");
+                      setTempCustomerAddress("");
+                    }
+                  }}
+                />
+              </label>
+
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <label style={labelStyle}>هەژمار</label>
+                </div>
+
+                <div className="account-search-container" style={{ position: "relative", width: "100%" }}>
                   <input
                     value={accountSearch}
                     disabled={isTemporaryCustomer || isInvoiceLocked}
@@ -3299,86 +3393,68 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                         : {}),
                     }}
                   />
-                )}
 
-                {accountId && !isTemporaryCustomer && !isInvoiceLocked && (
-                  <button
-                    type="button"
-                    style={{
-                      position: "absolute",
-                      left: 8,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      width: 24,
-                      height: 24,
-                      borderRadius: "50%",
-                      border: "1px solid #fecaca",
-                      background: "#fee2e2",
-                      color: "#dc2626",
-                      fontSize: 16,
-                      fontWeight: 900,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: 0,
-                      zIndex: 5,
-                    }}
-                    onClick={() => {
-                      if (blockIfLocked()) return;
-                      setAccountId(undefined);
-                      setAccountSearch("");
-                      setShowAccountInfo(false);
-                    }}
-                    title="لابردنی هەژمار"
-                  >
-                    ×
-                  </button>
-                )}
-
-                {!isTemporaryCustomer && showAccountList && !isInvoiceLocked && (
-                  <div style={dropdownLarge}>
-                    {filteredAccounts.length === 0 ? (
-                      <div style={emptyText}>هیچ هەژمارێک نەدۆزرایەوە</div>
-                    ) : (
-                      filteredAccounts.map((account: any) => {
-                        const isPinned = isDailyCashSalesAccount(account);
-                        return (
-                          <button
-                            key={account.id}
-                            style={{
-                              ...dropdownItem,
-                              ...(isPinned ? { background: "#f0fdf4", borderBottom: "1px solid #bbf7d0" } : {}),
-                            }}
-                            onMouseDown={() => {
-                              setAccountId(account.id);
-                              setAccountSearch(account.name);
-                              setShowAccountList(false);
-                              setShowAccountInfo(false);
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-                              <strong style={isPinned ? { color: "#15803d" } : {}}>
-                                {isPinned ? "📌 " : ""}{account.name}
-                              </strong>
-                              {isPinned && (
-                                <span style={{ fontSize: 11, color: "#16a34a", fontWeight: "bold" }}>
-                                  پین کراو
-                                </span>
-                              )}
-                            </div>
-                            <span style={smallMuted}>
-                              {account.phone || "-"} / {account.city || "-"}
-                            </span>
-                          </button>
-                        );
-                      })
+                  {!isTemporaryCustomer && showAccountList && !isInvoiceLocked && (
+                    <div style={dropdownLarge}>
+                      {filteredAccounts.length === 0 ? (
+                        <div style={emptyText}>هیچ هەژمارێک نەدۆزرایەوە</div>
+                      ) : (
+                        filteredAccounts.map((account: any) => {
+                          const isPinned = isDailyCashSalesAccount(account);
+                          return (
+                            <button
+                              key={account.id}
+                              style={{
+                                ...dropdownItem,
+                                ...(isPinned ? { background: "#f0fdf4", borderBottom: "1px solid #bbf7d0" } : {}),
+                              }}
+                              onMouseDown={() => {
+                                setAccountId(account.id);
+                                setAccountSearch(account.name);
+                                setShowAccountList(false);
+                                setShowAccountInfo(false);
+                                if (account.exchangeRateType === "FIXED" && account.customExchangeRate) {
+                                  setExchangeRate(String(account.customExchangeRate));
+                                } else if (!editId) {
+                                  const iqd = currencies.find((c: any) => c.code === "IQD" || c.name === "دینار" || c.name?.includes("دینار"));
+                                  if (iqd && iqd.rate) {
+                                    let r = Number(iqd.rate);
+                                    if (r < 10000) r = r * 100;
+                                    setExchangeRate(String(r));
+                                  }
+                                }
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                                <strong style={isPinned ? { color: "#15803d" } : {}}>
+                                  {isPinned ? "📌 " : ""}{account.name}
+                                </strong>
+                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                  {account.exchangeRateType === "FIXED" && (
+                                    <span style={{ fontSize: 11, background: "#f3e8ff", color: "#7e22ce", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
+                                      ڕەیتی جێگیر ({account.customExchangeRate?.toLocaleString("en-US")})
+                                    </span>
+                                  )}
+                                  {isPinned && (
+                                    <span style={{ fontSize: 11, color: "#16a34a", fontWeight: "bold" }}>
+                                      پین کراو
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <span style={smallMuted}>
+                                {account.phone || "-"} / {account.city || "-"}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        </div>
+          )}
 
           {isTemporaryCustomer && (
             <div style={tempCustomerBox}>
@@ -3461,81 +3537,7 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             </div>
           )}
 
-          {selectedAccount && !isTemporaryCustomer && (
-            <div style={accountInfoToggleBox}>
-              <button
-                type="button"
-                style={noteToggleBtn}
-                onClick={() => setShowAccountInfo((prev) => !prev)}
-              >
-                {showAccountInfo
-                  ? "▲ شاردنەوەی زانیاری هەژمار"
-                  : "▼ زانیاری هەژمار"}
-              </button>
-            </div>
-          )}
 
-          {selectedAccount && showAccountInfo && !isTemporaryCustomer && (
-            <div style={accountCard}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={sectionTitle}>زانیاری هەژمار</div>
-                <a
-                  href={`/reports/account-statement?accountId=${selectedAccount.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    fontSize: 12,
-                    color: "#2563eb",
-                    fontWeight: "bold",
-                    textDecoration: "underline",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <span>کەشفی حساب</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                </a>
-              </div>
-
-              <InfoRow label="جۆری هەژمار">
-                {getAccountTypeName(selectedAccount.accountTypeId)}
-              </InfoRow>
-
-              <InfoRow label="ژمارەی تەلەفۆن">
-                {selectedAccount.phone || "-"}
-              </InfoRow>
-
-              <InfoRow label="شار">{selectedAccount.city || "-"}</InfoRow>
-
-              <InfoRow label="ناونیشان">
-                {selectedAccount.address || "-"}
-              </InfoRow>
-
-              <InfoRow label="سنووری قەرز">
-                {selectedAccount.creditLimit || 0}{" "}
-                {getCurrencySymbol(selectedAccount.creditLimitCurrencyId)}
-              </InfoRow>
-
-              <InfoRow label="قەرز">
-                {formatAccountBalanceWithColors(getAccountBalanceBeforeMap(selectedAccount))}
-              </InfoRow>
-
-              <InfoRow label="ئاگاداری دواکەوتن">
-                {selectedAccount.debtAlertDays
-                  ? `${selectedAccount.debtAlertDays} ڕۆژ`
-                  : "-"}
-              </InfoRow>
-
-              <InfoRow label="کەفیل">
-                {selectedAccount.guarantorName || "-"}
-              </InfoRow>
-            </div>
-          )}
 
           <div style={totalsCard}>
             <div style={totalGrid}>
@@ -3831,8 +3833,14 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
 
             {/* --- نرخی دۆلار (تایبەت بەم پسووڵەیە) --- */}
             {printOptions.showExchangeRate !== false && (
-              <Field label="نرخی 100 دۆلار (تایبەت بەم پسووڵەیە)">
-                <div style={{ display: "flex", border: "1px solid #93c5fd", borderRadius: 8, overflow: "hidden", background: "#f0f9ff" }}>
+              <Field label={selectedAccount?.exchangeRateType === "FIXED" ? "نرخی 100 دۆلار (تایبەت بەم پسووڵەیە - جێگیر)" : "نرخی 100 دۆلار (تایبەت بەم پسووڵەیە)"}>
+                <div style={{
+                  display: "flex",
+                  border: selectedAccount?.exchangeRateType === "FIXED" ? "1.5px solid #a855f7" : "1px solid #93c5fd",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  background: selectedAccount?.exchangeRateType === "FIXED" ? "#faf5ff" : "#f0f9ff"
+                }}>
                   <FormattedNumberInput
                     value={exchangeRate}
                     disabled={isInvoiceLocked}
@@ -3840,9 +3848,31 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
                       if (blockIfLocked()) return;
                       setExchangeRate(val);
                     }}
-                    style={{ flex: 1, minWidth: 0, border: "none", outline: "none", padding: "8px 10px", background: "transparent", cursor: isInvoiceLocked ? "not-allowed" : "text", color: "#1e40af", fontWeight: "bold" }}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      border: "none",
+                      outline: "none",
+                      padding: "8px 10px",
+                      background: "transparent",
+                      cursor: isInvoiceLocked ? "not-allowed" : "text",
+                      color: selectedAccount?.exchangeRateType === "FIXED" ? "#7e22ce" : "#1e40af",
+                      fontWeight: "bold"
+                    }}
                   />
-                  <span style={{ border: "none", borderRight: "1px solid #bfdbfe", background: "#e0f2fe", padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", color: "#0369a1", fontSize: "12px", minWidth: "45px" }}>
+                  <span style={{
+                    border: "none",
+                    borderRight: selectedAccount?.exchangeRateType === "FIXED" ? "1px solid #d8b4fe" : "1px solid #bfdbfe",
+                    background: selectedAccount?.exchangeRateType === "FIXED" ? "#f3e8ff" : "#e0f2fe",
+                    padding: "0 8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: "bold",
+                    color: selectedAccount?.exchangeRateType === "FIXED" ? "#6b21a8" : "#0369a1",
+                    fontSize: "12px",
+                    minWidth: "45px"
+                  }}>
                     دینار
                   </span>
                 </div>
@@ -3943,11 +3973,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             <button
               style={{
                 ...primaryBtn,
-                opacity: (isInvoiceLocked || (!!editId && isInvoiceSaved) || isSaving) ? 0.55 : 1,
-                cursor: (isInvoiceLocked || (!!editId && isInvoiceSaved) || isSaving) ? "not-allowed" : "pointer",
+                opacity: (isInvoiceLocked || isSaving) ? 0.55 : 1,
+                cursor: (isInvoiceLocked || isSaving) ? "not-allowed" : "pointer",
               }}
               onClick={handleSaveInvoice}
-              disabled={isInvoiceLocked || (!!editId && isInvoiceSaved) || isSaving}
+              disabled={isInvoiceLocked || isSaving}
             >
               {isSaving ? "چاوەڕوان بە..." : isInvoiceLocked ? "خەزن کراوە" : editId ? "نوێکردنەوە" : "خەزنکردن"}
             </button>
@@ -5157,6 +5187,22 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
         </div>
       )}
 
+      {/* Account Details Modal (Triggered by Eye button) */}
+      <AccountDetailsModal
+        isOpen={showAccountDetailsModal}
+        onClose={() => setShowAccountDetailsModal(false)}
+        account={selectedAccount}
+        currencies={currencies}
+        accountTypes={accountTypes}
+        onViewStatement={(accId) => {
+          setShowAccountDetailsModal(false);
+          if (currentInvoiceDraft) {
+            saveVoucherDraft("sales", currentInvoiceDraft);
+          }
+          window.open(`/reports/account-statement?accountId=${accId}`, "_blank");
+        }}
+      />
+
       {/* --- INVOICE PRINT AREA --- */}
       <div id="invoice-print-area">
         <div style={printSheetStyle}>
@@ -5337,17 +5383,17 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
             <div style={printBottomBoxStyle}>
               <div style={printSummaryLineStyle}>
                 <span>کۆی گشتی :</span>
-                <strong style={{ fontSize: 15 }}>{formatCurrencyMap(getItemsTotalsByCurrency())}</strong>
+                <strong style={{ fontSize: 15 }}>{formatCurrencyMap(getItemsTotalsByCurrency(), invoiceCurrencyId)}</strong>
               </div>
               {printOptions.showPrintBalance && (
                 <>
                   <div style={printSummaryLineStyle}>
                     <span>واسڵکراو :</span>
-                    <strong style={{ fontSize: 15, color: "#16a34a" }}>{formatCurrencyMap(getPaidAmountsByCurrency())}</strong>
+                    <strong style={{ fontSize: 15, color: "#16a34a" }}>{formatCurrencyMap(getPaidAmountsByCurrency(), invoiceCurrencyId)}</strong>
                   </div>
                   <div style={{ ...printSummaryLineStyle, borderBottom: "none" }}>
                     <span>ماوە :</span>
-                    <strong style={{ fontSize: 15, color: "#dc2626" }}>{formatCurrencyMap(getInvoiceRemainingByCurrency())}</strong>
+                    <strong style={{ fontSize: 15, color: "#dc2626" }}>{formatCurrencyMap(getInvoiceRemainingByCurrency(), invoiceCurrencyId)}</strong>
                   </div>
                 </>
               )}
@@ -5358,11 +5404,11 @@ export default function InvoicePage({ headerSelector, invoiceType, editId }: Pro
               <div style={printBottomBoxStyle}>
                 <div style={printSummaryLineStyle}>
                   <span>قەرزی پێشوو :</span>
-                  {formatPrintBalanceMap(accountBalanceBeforeByCurrency, false)}
+                  {formatPrintBalanceMap(accountBalanceBeforeByCurrency, false, invoiceCurrencyId)}
                 </div>
                 <div style={{ ...printSummaryLineStyle, borderBottom: "none" }}>
                   <span>کۆی گشتی قەرز :</span>
-                  {formatPrintBalanceMap(accountBalanceAfterByCurrency, false)}
+                  {formatPrintBalanceMap(accountBalanceAfterByCurrency, false, invoiceCurrencyId)}
                 </div>
               </div>
             )}

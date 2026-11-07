@@ -8,6 +8,7 @@ import DateInput from "../../components/DateInput";
 import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import AccountQuickModal from "../../components/AccountQuickModal";
+import { getReportSessionState, saveReportSessionState, clearReportSessionState } from "../../utils/reportSession";
 
 type DebtReportData = {
   id: number;
@@ -93,13 +94,13 @@ export default function DebtReportPage() {
   const formatMoneyJSX = (val: number, curId: number) => {
     const currencyObj = currencies?.find((c: any) => c.id === curId);
     const code = currencyObj?.code;
-    const isIQD = code === "IQD" || curId === 12 || currencyObj?.symbol === "دینار";
+    const isIQD = code === "IQD" || curId === 12 || curId === 2 || currencyObj?.symbol === "دینار";
     const symbol = isIQD ? "دینار" : (currencyObj?.symbol || "$");
 
     if (isIQD) {
       const roundedVal = Math.round(Math.abs(val)).toLocaleString("en-US");
       return (
-        <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: "3px" }} dir="ltr">
+        <span style={{ display: "inline-flex", flexDirection: "row", alignItems: "baseline", gap: "4px" }} dir="ltr">
           <span style={{ fontSize: "0.85em" }} className="text-amber-600 font-bold">{symbol}</span>
           <span>{roundedVal}</span>
         </span>
@@ -127,16 +128,20 @@ export default function DebtReportPage() {
     );
   };
 
-  const isMicroBalance = (val: number, curIdText: string) => {
+  const isMicroBalance = (val: number, curIdText: string, hasPayment?: boolean) => {
     const curId = Number(curIdText);
     const currencyObj = currencies?.find((c: any) => c.id === curId);
-    const isIQD = curId === 2 || curId === 12 || currencyObj?.code === "IQD";
+    const isIQD = curId === 2 || curId === 12 || currencyObj?.code === "IQD" || currencyObj?.symbol === "دینار";
+    if (hasPayment) {
+      if (isIQD) return Math.abs(val) < 7000;
+      return Math.abs(val) < 5.0;
+    }
     if (isIQD) return Math.abs(val) < 1000;
     return Math.abs(val) < 1.0;
   };
 
-  const renderBalance = (map: Record<string, number>) => {
-    const entries = Object.entries(map || {}).filter(([curIdText, val]) => !isMicroBalance(val, curIdText));
+  const renderBalance = (map: Record<string, number>, hasPayment?: boolean) => {
+    const entries = Object.entries(map || {}).filter(([curIdText, val]) => !isMicroBalance(val, curIdText, hasPayment));
     if (entries.length === 0) return <span className="text-gray-500 font-bold">0</span>;
     return (
       <div className="flex flex-col gap-1 items-center text-center">
@@ -153,18 +158,44 @@ export default function DebtReportPage() {
     );
   };
 
-  const [search, setSearch] = useState("");
-  const [quickSearch, setQuickSearch] = useState("");
+  const sessionSaved = getReportSessionState("__erp_debts_report_filters", {
+    search: "",
+    quickSearch: "",
+    filterAccountType: "all",
+    filterAccountIds: [] as number[],
+    filterCity: "all",
+    filterDistrict: "all",
+    filterBeforeDate: "",
+    filterDebtType: "people",
+    filterRateType: "all",
+  });
+
+  const [search, setSearch] = useState(sessionSaved.search || "");
+  const [quickSearch, setQuickSearch] = useState(sessionSaved.quickSearch || "");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showColumnsModal, setShowColumnsModal] = useState(false);
   
-  const [filterAccountType, setFilterAccountType] = useState("all");
-  const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
-  const [filterCity, setFilterCity] = useState("all");
-  const [filterDistrict, setFilterDistrict] = useState("all");
-  const [filterBeforeDate, setFilterBeforeDate] = useState("");
-  const [filterDebtType, setFilterDebtType] = useState("people"); // "people", "mine"
-  const [filterRateType, setFilterRateType] = useState("all"); // "all", "FIXED", "DAILY_MARKET"
+  const [filterAccountType, setFilterAccountType] = useState(sessionSaved.filterAccountType || "all");
+  const [filterAccountIds, setFilterAccountIds] = useState<number[]>(sessionSaved.filterAccountIds || []);
+  const [filterCity, setFilterCity] = useState(sessionSaved.filterCity || "all");
+  const [filterDistrict, setFilterDistrict] = useState(sessionSaved.filterDistrict || "all");
+  const [filterBeforeDate, setFilterBeforeDate] = useState(sessionSaved.filterBeforeDate || "");
+  const [filterDebtType, setFilterDebtType] = useState(sessionSaved.filterDebtType || "people"); // "people", "mine"
+  const [filterRateType, setFilterRateType] = useState(sessionSaved.filterRateType || "all"); // "all", "FIXED", "DAILY_MARKET"
+
+  useEffect(() => {
+    saveReportSessionState("__erp_debts_report_filters", {
+      search,
+      quickSearch,
+      filterAccountType,
+      filterAccountIds,
+      filterCity,
+      filterDistrict,
+      filterBeforeDate,
+      filterDebtType,
+      filterRateType,
+    });
+  }, [search, quickSearch, filterAccountType, filterAccountIds, filterCity, filterDistrict, filterBeforeDate, filterDebtType, filterRateType]);
 
   const defaultDebtCols = {
     account: true,
@@ -262,9 +293,10 @@ export default function DebtReportPage() {
       const iqdCurIds = currencies?.filter((c: any) => c.code === "IQD" || c.id === 2 || c.id === 12 || c.symbol === "دینار").map((c: any) => String(c.id)) || ["2", "12"];
       return filteredData.filter((item) => {
         const map = item.balanceByCurrency || {};
+        const hasPayment = Boolean(item.lastPaymentDate || item.lastPaymentAmount > 0);
         return Object.entries(map).some(([curIdText, val]) => {
           const numVal = Number(val || 0);
-          return Math.abs(numVal) > 0.01 && (iqdCurIds.includes(curIdText) || curIdText === "2" || curIdText === "12");
+          return !isMicroBalance(numVal, curIdText, hasPayment) && (iqdCurIds.includes(curIdText) || curIdText === "2" || curIdText === "12");
         });
       });
     }
@@ -283,10 +315,12 @@ export default function DebtReportPage() {
     let sumUsd = 0;
     filteredByRateData.forEach((item) => {
       const map = item.balanceByCurrency || {};
+      const hasPayment = Boolean(item.lastPaymentDate || item.lastPaymentAmount > 0);
       let itemTotalIqd = 0;
       for (const [curIdText, val] of Object.entries(map)) {
         const curId = Number(curIdText);
         const numVal = Number(val || 0);
+        if (isMicroBalance(numVal, curIdText, hasPayment)) continue;
         if (curId === 2 || curId === 12) {
           itemTotalIqd += numVal;
         } else {
@@ -301,7 +335,7 @@ export default function DebtReportPage() {
       sumUsd += itemTotalIqd / marketRatePerDollar;
     });
     return Math.abs(sumUsd);
-  }, [filteredByRateData, marketRatePerDollar]);
+  }, [filteredByRateData, marketRatePerDollar, currencies]);
 
   const totalsBreakdown = useMemo(() => {
     let iqdSum = 0;
@@ -311,10 +345,12 @@ export default function DebtReportPage() {
     filteredByRateData.forEach((item) => {
       const map = item.balanceByCurrency || {};
       const isFixed = item.exchangeRateType === "FIXED";
+      const hasPayment = Boolean(item.lastPaymentDate || item.lastPaymentAmount > 0);
 
       for (const [curIdText, val] of Object.entries(map)) {
         const curId = Number(curIdText);
         const numVal = Number(val || 0);
+        if (isMicroBalance(numVal, curIdText, hasPayment)) continue;
         const curObj = currencies?.find((c: any) => c.id === curId);
         const isIQD = curObj?.code === "IQD" || curId === 2 || curId === 12 || curObj?.symbol === "دینار";
 
@@ -396,7 +432,7 @@ export default function DebtReportPage() {
         <div className="flex items-center gap-3 w-full md:w-auto">
           <button
             onClick={() => document.dispatchEvent(new CustomEvent("open-sidebar"))}
-            className="sidebar-toggle-btn items-center justify-center w-10 h-10 bg-gradient-to-b from-[#061f5f] to-[#03133f] text-white rounded-xl shadow-sm border border-[#ffffff20] transition-transform hover:scale-105 cursor-pointer text-xl"
+            className="sidebar-toggle-btn items-center justify-center w-12 h-12 bg-gradient-to-b from-[#061f5f] to-[#03133f] text-white rounded-xl shadow-sm border border-[#ffffff20] transition-transform hover:scale-105 cursor-pointer text-xl"
             title="گەورەکردنی سایدبار"
           >
             ☰
@@ -413,12 +449,12 @@ export default function DebtReportPage() {
             placeholder="گەڕانی خێرا بەپێی ناوی هەژمار... 🔍"
             value={quickSearch}
             onChange={(e) => setQuickSearch(e.target.value)}
-            className="w-full pl-8 pr-3.5 py-2.5 text-xs rounded-xl border border-gray-300 bg-white font-bold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#061f5f] focus:border-[#061f5f] shadow-sm transition-all"
+            className="w-full h-[48px] pl-8 pr-4 text-[14px] rounded-xl border border-slate-300 hover:border-slate-400 focus:border-[#0b1f50] bg-white font-bold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0b1f50]/20 shadow-xs transition-all"
           />
           {quickSearch && (
             <button
               onClick={() => setQuickSearch("")}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 font-bold text-xs bg-gray-100 hover:bg-gray-200 rounded-full w-5 h-5 flex items-center justify-center transition-colors cursor-pointer border-none"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 font-bold text-xs bg-gray-100 hover:bg-gray-200 rounded-full w-5 h-5 flex items-center justify-center transition-colors cursor-pointer border-none"
               title="سڕینەوەی گەڕان"
             >
               ✕
@@ -426,10 +462,10 @@ export default function DebtReportPage() {
           )}
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-           <button
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          <button
             onClick={() => setShowColumnsModal(true)}
-            className="flex items-center justify-center gap-2 text-white font-black px-4 py-2 rounded-lg transition-transform hover:scale-105 cursor-pointer text-sm shadow-md border-none"
+            className="flex items-center justify-center gap-2 text-white font-black px-4 h-[48px] rounded-xl transition-transform hover:scale-105 cursor-pointer text-sm shadow-md border-none"
             style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", boxShadow: "0 2px 8px rgba(2, 132, 199, 0.35)" }}
           >
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#bae6fd" }}>
@@ -442,31 +478,47 @@ export default function DebtReportPage() {
           </button>
           <button
             onClick={() => window.print()}
-            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-1.5 hover:bg-gray-50 shadow-sm"
+            className="px-4 h-[48px] bg-white border border-slate-300 text-gray-700 rounded-xl text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 hover:bg-gray-50 shadow-xs"
           >
-            🖨️ پرینت
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>پرینت</span>
           </button>
 
           <button
             onClick={() => exportTableToExcel("debts-report-table", "raporti_qarzekan.xlsx")}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors cursor-pointer flex items-center gap-1.5 border-none shadow-sm"
+            className="px-4 h-[48px] bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors cursor-pointer flex items-center gap-2 border-none shadow-xs"
           >
-            ناردن بۆ ئێکسڵ 📊
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="8" y1="13" x2="16" y2="13" />
+              <line x1="8" y1="17" x2="16" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            <span>ناردن بۆ ئێکسڵ</span>
           </button>
-           <button
+          <button
             onClick={() => setShowFilterModal(true)}
-            className="px-4 py-2 bg-[#061f5f] hover:bg-[#03133f] text-white rounded-lg text-sm font-bold transition-colors border-none cursor-pointer flex items-center gap-1.5 shadow-sm"
+            className="px-4 h-[48px] bg-[#0b1f50] hover:bg-[#061f5f] text-white rounded-xl text-sm font-bold transition-colors border-none cursor-pointer flex items-center gap-2 shadow-xs"
           >
-             <span>فلترەکان</span>
-             {activeFiltersCount > 0 && (
-               <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
-                 {activeFiltersCount}
-               </span>
-             )}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            <span>فلترەکان</span>
+            {activeFiltersCount > 0 && (
+              <span className="bg-rose-500 text-white text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
           {activeFiltersCount > 0 && (
             <button
               onClick={() => {
+                clearReportSessionState("__erp_debts_report_filters");
                 setFilterAccountType("all");
                 setFilterAccountIds([]);
                 setFilterCity("all");
@@ -475,9 +527,13 @@ export default function DebtReportPage() {
                 setFilterRateType("all");
                 setQuickSearch("");
               }}
-              className="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-sm font-bold transition-colors border-none cursor-pointer shadow-sm"
+              className="px-4 h-[48px] bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 rounded-xl text-sm font-bold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
             >
-               ڕێکخستنەوە
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span>ڕێکخستنەوە</span>
             </button>
           )}
         </div>
@@ -639,20 +695,40 @@ export default function DebtReportPage() {
                     {visibleColumns.totalDebt && (
                       <td className="p-3 text-sm font-black text-center">
                         {item.exchangeRateType === "FIXED" ? (
-                          <div
-                            className="inline-flex flex-col items-center px-3.5 py-1.5 rounded-xl border-2 shadow-sm cursor-help transition-transform hover:scale-105"
-                            style={{ backgroundColor: "#f3e8ff", borderColor: "#c084fc", color: "#6b21a8" }}
-                            title={`نرخی جێگیری 100$: ${((item.customExchangeRate || 132000) > 10000 ? (item.customExchangeRate || 132000) : (item.customExchangeRate || 132000) * 100).toLocaleString("en-US")} دینار`}
-                          >
-                            <div className="text-base font-black">
-                              {renderBalance(item.balanceByCurrency)}
-                            </div>
-                            <span className="text-xs font-black mt-0.5" style={{ color: "#7e22ce" }}>
-                              📌 جێگیر: 100$ = {((item.customExchangeRate || 132000) > 10000 ? (item.customExchangeRate || 132000) : (item.customExchangeRate || 132000) * 100).toLocaleString("en-US")} د.ع
-                            </span>
-                          </div>
+                          (() => {
+                            const customRate = item.customExchangeRate || 132000;
+                            const fixedRatePerDollar = customRate > 10000 ? customRate / 100 : customRate;
+                            let effDailyUsd = 0;
+                            const hasPayment = Boolean(item.lastPaymentDate || item.lastPaymentAmount > 0);
+                            for (const [cId, v] of Object.entries(item.balanceByCurrency || {})) {
+                              const numV = Number(v || 0);
+                              if (isMicroBalance(numV, cId, hasPayment)) continue;
+                              if (Number(cId) === 2 || Number(cId) === 12) {
+                                effDailyUsd += numV / marketRatePerDollar;
+                              } else {
+                                effDailyUsd += (numV * fixedRatePerDollar) / marketRatePerDollar;
+                              }
+                            }
+                            return (
+                              <div
+                                className="inline-flex flex-col items-center px-3.5 py-1.5 rounded-xl border-2 shadow-sm cursor-help transition-transform hover:scale-105"
+                                style={{ backgroundColor: "#f3e8ff", borderColor: "#c084fc", color: "#6b21a8" }}
+                                title={`نرخی جێگیری 100$: دینار ${(customRate > 10000 ? customRate : customRate * 100).toLocaleString("en-US")}`}
+                              >
+                                <div className="text-base font-black">
+                                  {renderBalance(item.balanceByCurrency, hasPayment)}
+                                </div>
+                                <span className="text-xs font-black mt-0.5" style={{ color: "#7e22ce" }}>
+                                  📌 جێگیر: 100$ = {(customRate > 10000 ? customRate : customRate * 100).toLocaleString("en-US")} د.ع
+                                </span>
+                                <span className="text-[11px] font-bold mt-1 px-1.5 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-200" dir="ltr">
+                                  ≈ {formatMoneyJSX(effDailyUsd, 1)} بە دۆلاری ڕۆژ
+                                </span>
+                              </div>
+                            );
+                          })()
                         ) : (
-                          renderBalance(item.balanceByCurrency)
+                          renderBalance(item.balanceByCurrency, Boolean(item.lastPaymentDate || item.lastPaymentAmount > 0))
                         )}
                       </td>
                     )}
@@ -853,20 +929,21 @@ export default function DebtReportPage() {
                     <span className="text-sm font-medium text-gray-700">{label}</span>
                   </label>
                 ))}
-             </div>
+              </div>
              
-             <div className="p-4 border-t border-gray-100">
-                <button onClick={() => setShowColumnsModal(false)} className="w-full px-6 py-2 bg-[#061f5f] hover:bg-[#03133f] text-white font-bold rounded-lg border-none cursor-pointer transition-colors">جێبەجێکردن</button>
-             </div>
-          </div>
-        </div>
-      )}
-      {/* Account Quick Action Modal */}
-      <AccountQuickModal
-        isOpen={Boolean(quickAccount)}
-        onClose={() => setQuickAccount(null)}
-        account={quickAccount}
-      />
-    </div>
-  );
+              <div className="p-4 border-t border-gray-100">
+                 <button onClick={() => setShowColumnsModal(false)} className="w-full px-6 py-2 bg-[#061f5f] hover:bg-[#03133f] text-white font-bold rounded-lg border-none cursor-pointer transition-colors">جێبەجێکردن</button>
+              </div>
+           </div>
+         </div>
+       )}
+
+       {/* Account Quick Action Modal */}
+       <AccountQuickModal
+         isOpen={Boolean(quickAccount)}
+         onClose={() => setQuickAccount(null)}
+         account={quickAccount}
+       />
+     </div>
+   );
 }

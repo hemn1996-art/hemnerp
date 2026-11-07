@@ -8,6 +8,9 @@ import PrintHeader from "../../components/PrintHeader";
 import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
 import ProductQuickModal from "../../components/ProductQuickModal";
+import QuickDateFilter from "../../components/QuickDateFilter";
+import { getDefaultReportDateRange } from "../../utils/datePresets";
+import { getReportSessionState, saveReportSessionState, clearReportSessionState } from "../../utils/reportSession";
 
 import { normalizeKurdishSearchText } from "../../utils/digits";
 
@@ -22,9 +25,27 @@ function ItemsReportContent() {
   const paramProductId = searchParams.get("productId") || searchParams.get("id");
   const paramAccountId = searchParams.get("accountId");
 
+  const defaultDates = getDefaultReportDateRange();
+  const sessionSaved = getReportSessionState("__erp_items_report_filters", {
+    startDate: defaultDates.startDate,
+    endDate: defaultDates.endDate,
+    searchTerm: "",
+    showSearch: false,
+    filterProductIds: paramProductId ? [Number(paramProductId)] : [],
+    filterAccountIds: paramAccountId ? [Number(paramAccountId)] : [],
+    filterVoucherTypes: [] as string[],
+    filterCategories: [] as string[],
+    filterBrands: [] as string[],
+    itemCode: "",
+    batchCode: "",
+    currencyId: "all",
+    filterWarehouseIds: [] as number[],
+    currentPage: 1,
+  });
+
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(sessionSaved.searchTerm || "");
   const [showReportStats, setShowReportStats] = useState(true);
   const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
 
@@ -37,36 +58,29 @@ function ItemsReportContent() {
     invoices, fetchInvoices
   } = useStore() as any;
 
-  // Date Filters
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
+  // Date Filters (default: 1st of current month to today)
+  const [startDate, setStartDate] = useState(sessionSaved.startDate || defaultDates.startDate);
+  const [endDate, setEndDate] = useState(sessionSaved.endDate || defaultDates.endDate);
 
   // Filters
-  const [filterVoucherTypes, setFilterVoucherTypes] = useState<string[]>([]);
+  const [filterVoucherTypes, setFilterVoucherTypes] = useState<string[]>(sessionSaved.filterVoucherTypes || []);
   const [filterProductIds, setFilterProductIds] = useState<number[]>(() => {
-    return paramProductId ? [Number(paramProductId)] : [];
+    return paramProductId ? [Number(paramProductId)] : (sessionSaved.filterProductIds || []);
   });
-  const [filterCategories, setFilterCategories] = useState<string[]>([]);
-  const [filterBrands, setFilterBrands] = useState<string[]>([]);
-  const [itemCode, setItemCode] = useState("");
-  const [batchCode, setBatchCode] = useState("");
+  const [filterCategories, setFilterCategories] = useState<string[]>(sessionSaved.filterCategories || []);
+  const [filterBrands, setFilterBrands] = useState<string[]>(sessionSaved.filterBrands || []);
+  const [itemCode, setItemCode] = useState(sessionSaved.itemCode || "");
+  const [batchCode, setBatchCode] = useState(sessionSaved.batchCode || "");
   // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(sessionSaved.currentPage || 1);
   const [pageSize, setPageSize] = useState(50);
 
   const [filterAccountIds, setFilterAccountIds] = useState<number[]>(() => {
-    return paramAccountId ? [Number(paramAccountId)] : [];
+    return paramAccountId ? [Number(paramAccountId)] : (sessionSaved.filterAccountIds || []);
   });
   const [filterAccountTypeIds, setFilterAccountTypeIds] = useState<number[]>([]);
-  const [currencyId, setCurrencyId] = useState("all");
-  const [filterWarehouseIds, setFilterWarehouseIds] = useState<number[]>([]);
+  const [currencyId, setCurrencyId] = useState(sessionSaved.currencyId || "all");
+  const [filterWarehouseIds, setFilterWarehouseIds] = useState<number[]>(sessionSaved.filterWarehouseIds || []);
   const [label, setLabel] = useState("all");
   const [filterCreatedBys, setFilterCreatedBys] = useState<string[]>([]);
   const [isGift, setIsGift] = useState("all");
@@ -79,7 +93,7 @@ function ItemsReportContent() {
 
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showColumnsModal, setShowColumnsModal] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
+  const [showSearch, setShowSearch] = useState(sessionSaved.showSearch || Boolean(sessionSaved.searchTerm));
 
   const defaultItemsCols = {
     voucherReference: true,
@@ -197,6 +211,13 @@ function ItemsReportContent() {
     return list;
   }, [brandsList, products]);
 
+  const productOptions = React.useMemo(() => {
+    return (products || []).map((p: any) => ({
+      value: p.id,
+      label: p.code ? `${p.name} (${p.code})` : p.name,
+    }));
+  }, [products]);
+
 
   useEffect(() => {
     if (paramProductId) {
@@ -251,8 +272,33 @@ function ItemsReportContent() {
     }
   };
 
+  useEffect(() => {
+    saveReportSessionState("__erp_items_report_filters", {
+      startDate,
+      endDate,
+      searchTerm,
+      showSearch,
+      filterProductIds,
+      filterAccountIds,
+      filterVoucherTypes,
+      filterCategories,
+      filterBrands,
+      itemCode,
+      batchCode,
+      currencyId,
+      filterWarehouseIds,
+      currentPage,
+    });
+  }, [
+    startDate, endDate, searchTerm, showSearch, filterProductIds, filterAccountIds,
+    filterVoucherTypes, filterCategories, filterBrands, itemCode, batchCode,
+    currencyId, filterWarehouseIds, currentPage
+  ]);
+
   const activeFiltersCount = React.useMemo(() => {
     let count = 0;
+    if (startDate !== defaultDates.startDate || endDate !== defaultDates.endDate) count++;
+    if (searchTerm) count++;
     if (filterVoucherTypes.length > 0) count++;
     if (filterProductIds.length > 0) count++;
     if (filterCategories.length > 0) count++;
@@ -269,12 +315,19 @@ function ItemsReportContent() {
     if (groupReverse !== "all") count++;
     return count;
   }, [
+    startDate, endDate, defaultDates, searchTerm,
     filterVoucherTypes, filterProductIds, filterCategories, filterBrands, itemCode, batchCode,
     filterAccountIds, filterAccountTypeIds, currencyId, filterWarehouseIds, label,
     filterCreatedBys, isGift, groupReverse
   ]);
 
   const handleResetFilters = () => {
+    clearReportSessionState("__erp_items_report_filters");
+    const d = getDefaultReportDateRange();
+    setStartDate(d.startDate);
+    setEndDate(d.endDate);
+    setSearchTerm("");
+    setShowSearch(false);
     setFilterVoucherTypes([]);
     setFilterProductIds([]);
     setFilterCategories([]);
@@ -289,6 +342,7 @@ function ItemsReportContent() {
     setFilterCreatedBys([]);
     setIsGift("all");
     setGroupReverse("all");
+    setCurrentPage(1);
     setTimeout(() => {
       fetchItems();
     }, 0);
@@ -308,8 +362,8 @@ function ItemsReportContent() {
       case "inventory_in": return "هاتنەناوەوە";
       case "inventory_out": return "چوونەدەرەوە";
       case "expense": return "خەرجی";
-      case "money_in": return "پارەی هاتوو";
-      case "money_out": return "پارەی ڕۆشتوو";
+      case "money_in": return "پارە وەرگرتن";
+      case "money_out": return "پارەدان";
       case "quotation": return "نرخاندن";
       case "cashbox_transfer": return "گواستنەوەی پارە";
       case "cashbox_exchange": return "گۆڕینەوەی پارە";
@@ -334,6 +388,13 @@ function ItemsReportContent() {
 
   const itemsMatchingNonVoucherFilters = React.useMemo(() => {
     let result = items;
+
+    // Apply product filter
+    if (filterProductIds.length > 0) {
+      result = result.filter((item: any) =>
+        filterProductIds.includes(item.productId) || filterProductIds.includes(Number(item.productId))
+      );
+    }
 
     // Apply category filter
     if (filterCategories.length > 0) {
@@ -440,9 +501,9 @@ function ItemsReportContent() {
       maximumFractionDigits: 2
     });
     if (currencyObj?.code === "IQD") {
-      return `${formattedNumber} دینار`;
+      return `دینار ${formattedNumber}`;
     } else if (currencyObj?.code === "USD") {
-      return `${formattedNumber} دۆلار`;
+      return `$ ${formattedNumber}`;
     }
     return `${formattedNumber} ${currencyObj?.name || ""}`;
   };
@@ -479,31 +540,68 @@ function ItemsReportContent() {
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 no-print">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="bg-white border-b border-slate-200 p-4 md:p-5 flex flex-wrap items-center justify-between gap-4 no-print shadow-xs">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Quick Dates */}
+          <QuickDateFilter
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(s, e) => {
+              setStartDate(s);
+              setEndDate(e);
+            }}
+          />
           {/* Dates */}
           <DateInput value={startDate} onChange={setStartDate} label="لە بەرواری" />
           <DateInput value={endDate} onChange={setEndDate} label="تا بەرواری" />
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Search */}
-          {showSearch && (
-            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-              placeholder="گەڕان..."
-              className="border border-blue-400 p-1.5 text-xs rounded w-48 outline-none" autoFocus />
-          )}
-          <button onClick={() => setShowSearch(!showSearch)}
-            className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-xs hover:bg-blue-700 transition">
-            🔍 گەڕان
-          </button>
+        <div className="flex items-center gap-3.5 flex-wrap flex-1 justify-end">
+          {/* MultiSelect Product Search */}
+          <div className="min-w-[300px] md:min-w-[380px] lg:min-w-[460px] flex-1 max-w-xl">
+            <MultiSelectDropdown
+              label="دیاریکردنی کەرەستە..."
+              placeholder="گەڕان و دیاریکردنی کەرەستە... 🔍"
+              options={productOptions}
+              selectedValues={filterProductIds}
+              onChange={(vals) => {
+                setFilterProductIds(vals);
+                setCurrentPage(1);
+              }}
+              searchable
+              compact
+            />
+          </div>
+
+          {/* Quick Text Search */}
+          <div className="relative w-56 md:w-64">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="کۆد، تێبینی... 🔍"
+              className="w-full h-[48px] bg-white border border-slate-300 hover:border-slate-400 focus:border-[#0b1f50] rounded-xl px-4 py-2 text-[14px] font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b1f50]/20 transition-all shadow-xs"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 hover:text-rose-500 transition text-sm font-bold"
+                title="پاککردنەوە"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
           {/* Filter */}
           <button onClick={() => setShowFilterModal(true)}
-            className="flex items-center gap-1.5 bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs hover:bg-slate-200 transition">
-            <span>☰ فلتەرەکان</span>
+            className="flex items-center gap-2 bg-[#0b1f50] hover:bg-[#061f5f] text-white px-4 h-[48px] rounded-xl text-sm font-bold transition cursor-pointer shadow-sm border-none">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            <span>فلتەرەکان</span>
             {activeFiltersCount > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+              <span className="bg-rose-500 text-white text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                 {activeFiltersCount}
               </span>
             )}
@@ -511,21 +609,37 @@ function ItemsReportContent() {
 
           {activeFiltersCount > 0 && (
             <button onClick={handleResetFilters}
-              className="flex items-center gap-1 bg-rose-100 border border-rose-300 text-rose-700 px-3 py-1.5 rounded text-xs hover:bg-rose-200 transition">
-              🔄 ڕێکخستنەوە
+              className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3.5 h-[48px] rounded-xl text-sm font-bold hover:bg-rose-100 transition cursor-pointer shadow-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span>ڕێکخستنەوە</span>
             </button>
           )}
 
           {/* Print */}
           <button onClick={() => window.print()}
-            className="flex items-center gap-1 bg-slate-100 border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs hover:bg-slate-200 transition">
-            🖨 پرینت
+            className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-4 h-[48px] rounded-xl text-sm font-bold hover:bg-slate-50 transition cursor-pointer shadow-sm">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            <span>پرینت</span>
           </button>
 
           {/* Export to Excel */}
           <button onClick={() => exportTableToExcel("items-report-table", "raporti_kerestekan.xlsx")}
-            className="flex items-center gap-1.5 bg-emerald-600 border border-emerald-700 text-white px-3 py-1.5 rounded text-xs hover:bg-emerald-700 transition cursor-pointer font-bold border-none shadow-sm">
-            ناردن بۆ ئێکسڵ 📊
+            className="flex items-center gap-2 bg-emerald-600 border border-emerald-700 text-white px-4 h-[48px] rounded-xl text-sm font-bold hover:bg-emerald-700 transition cursor-pointer border-none shadow-sm">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="8" y1="13" x2="16" y2="13" />
+              <line x1="8" y1="17" x2="16" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            <span>ناردن بۆ ئێکسڵ</span>
           </button>
 
 
@@ -866,7 +980,7 @@ function ItemsReportContent() {
                   <div>
                     <MultiSelectDropdown
                       label="کەرەستە"
-                      options={products?.map((p: any) => ({ value: p.id, label: p.name })) || []}
+                      options={productOptions}
                       selectedValues={filterProductIds}
                       onChange={setFilterProductIds}
                       searchable

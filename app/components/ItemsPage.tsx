@@ -7,6 +7,7 @@ import { currencies as mockCurrencies } from "../data/mockData";
 import { Product } from "../types";
 import AlertModal from "./AlertModal";
 import SingleSelectDropdown from "./SingleSelectDropdown";
+import MultiSelectDropdown from "./MultiSelectDropdown";
 import { convertDigits } from "../utils/digits";
 import ProductQuickModal from "./ProductQuickModal";
 
@@ -112,10 +113,18 @@ function ItemsList({
 }) {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
+  const [selectedProductIds, setSelectedProductIds] = useState<(number | string)[]>([]);
 
   const products = useStore((state) => state.products) || [];
   const fetchProducts = useStore((state) => state.fetchProducts);
   const deleteProduct = useStore((state) => state.deleteProduct);
+
+  const productOptions = useMemo(() => {
+    return (products || []).map((p: any) => ({
+      value: p.id,
+      label: p.code ? `${p.name} (${p.code})` : p.name,
+    }));
+  }, [products]);
 
   const [quickProduct, setQuickProduct] = useState<{ id: number; name: string; code?: string | null } | null>(null);
 
@@ -155,22 +164,33 @@ function ItemsList({
   }, [successMsg, clearSuccessMsg]);
 
   const filteredProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    let result = products;
 
-    if (!q) return products;
-
-    return products.filter((item: Product) => {
-      const typeName = getItemType(item);
-
-      return (
-        item.name.toLowerCase().includes(q) ||
-        (item.code || "").toLowerCase().includes(q) ||
-        (item.category || "").toLowerCase().includes(q) ||
-        (item.brand || "").toLowerCase().includes(q) ||
-        typeName.toLowerCase().includes(q)
+    if (selectedProductIds.length > 0) {
+      result = result.filter((item: Product) =>
+        selectedProductIds.includes(item.id) ||
+        selectedProductIds.includes(Number(item.id)) ||
+        selectedProductIds.includes(String(item.id))
       );
-    });
-  }, [search, products]);
+    }
+
+    const q = search.trim().toLowerCase();
+    if (q) {
+      result = result.filter((item: Product) => {
+        const typeName = getItemType(item);
+
+        return (
+          item.name.toLowerCase().includes(q) ||
+          (item.code || "").toLowerCase().includes(q) ||
+          (item.category || "").toLowerCase().includes(q) ||
+          (item.brand || "").toLowerCase().includes(q) ||
+          typeName.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    return result;
+  }, [search, selectedProductIds, products]);
 
   async function handleDelete(item: Product) {
     showAlert(
@@ -194,7 +214,7 @@ function ItemsList({
       <div style={topBar}>
         <button
           onClick={() => document.dispatchEvent(new CustomEvent("open-sidebar"))}
-          className="sidebar-toggle-btn items-center justify-center w-10 h-10 bg-gradient-to-b from-[#061f5f] to-[#03133f] text-white rounded-xl shadow-sm border border-[#ffffff20] transition-transform hover:scale-105 cursor-pointer text-xl"
+          className="sidebar-toggle-btn items-center justify-center w-12 h-12 bg-gradient-to-b from-[#061f5f] to-[#03133f] text-white rounded-xl shadow-sm border border-[#ffffff20] transition-transform hover:scale-105 cursor-pointer text-xl"
           title="گەورەکردنی سایدبار"
         >
           ☰
@@ -203,13 +223,29 @@ function ItemsList({
           + زیادکردن
         </button>
 
-        <button style={outlineBtn} onClick={() => fetchProducts()}>ڕێکخستنەوە</button>
+        <button style={outlineBtn} onClick={() => {
+          setSelectedProductIds([]);
+          setSearch("");
+          fetchProducts();
+        }}>ڕێکخستنەوە</button>
         <button style={printBtn} onClick={() => window.print()}>🖨</button>
+
+        <div style={{ minWidth: "320px", maxWidth: "460px", flex: 1 }}>
+          <MultiSelectDropdown
+            label="دیاریکردنی کەرەستە..."
+            placeholder="گەڕان و دیاریکردنی کەرەستە... 🔍"
+            options={productOptions}
+            selectedValues={selectedProductIds}
+            onChange={setSelectedProductIds}
+            searchable
+            compact
+          />
+        </div>
 
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="گەڕان بە ناو، کۆد، براند، کاتێگۆری..."
+          placeholder="گەڕان بە ناو، کۆد، براند، کاتێگۆری... 🔍"
           style={searchInput}
         />
       </div>
@@ -1130,7 +1166,7 @@ const pageBox: CSSProperties = {
 
 const topBar: CSSProperties = {
   display: "flex",
-  gap: 10,
+  gap: 12,
   marginBottom: 20,
   alignItems: "center",
   flexWrap: "wrap",
@@ -1139,36 +1175,62 @@ const topBar: CSSProperties = {
 const primaryBtn: CSSProperties = {
   background: "#061f5f",
   color: "white",
-  padding: "12px 25px",
+  padding: "0 24px",
+  height: 48,
+  display: "inline-flex",
+  alignItems: "center",
   border: 0,
-  borderRadius: 8,
+  borderRadius: 12,
   cursor: "pointer",
   fontWeight: "bold",
+  fontSize: 15,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
 };
 
 const outlineBtn: CSSProperties = {
   background: "white",
-  padding: "12px 25px",
+  padding: "0 20px",
+  height: 48,
+  display: "inline-flex",
+  alignItems: "center",
   border: "1px solid #cbd5e1",
-  borderRadius: 8,
+  borderRadius: 12,
   cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: 14,
+  color: "#334155",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
 };
 
 const printBtn: CSSProperties = {
   background: "white",
-  padding: "12px 18px",
+  padding: "0 18px",
+  height: 48,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
   border: "1px solid #cbd5e1",
-  borderRadius: 8,
+  borderRadius: 12,
   cursor: "pointer",
+  fontSize: 16,
+  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
 };
 
 const searchInput: CSSProperties = {
-  marginRight: "auto",
-  padding: 12,
-  borderRadius: 8,
+  padding: "0 18px",
+  borderRadius: 12,
   border: "1px solid #cbd5e1",
-  width: 350,
+  height: 48,
+  minWidth: 300,
+  maxWidth: 420,
+  flex: 1,
+  fontSize: 14,
+  fontWeight: "bold",
+  color: "#1e293b",
   direction: "rtl",
+  boxSizing: "border-box",
+  background: "#ffffff",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
 };
 
 const tableWrap: CSSProperties = { overflowX: "auto" };

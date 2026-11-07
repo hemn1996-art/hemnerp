@@ -7,6 +7,8 @@ import { exportTableToExcel } from "../../utils/excelExport";
 import DateInput from "../../components/DateInput";
 import BackButton from "../../components/BackButton";
 import { formatCurrencyJSX } from "../../utils/currencyHelper";
+import QuickDateFilter from "../../components/QuickDateFilter";
+import { getDefaultReportDateRange } from "../../utils/datePresets";
 
 interface Product { id: number; name: string; code: string | null; costPrice: number | null; }
 interface VoucherLine { id: number; productId: number; qty: number; unitPrice: number; discountAmount: number; lineTotal: number; note: string | null; product: Product; }
@@ -14,7 +16,7 @@ interface VoucherPaidAmount { id: number; currencyId: number; amount: number; ex
 interface VoucherExpense { id: number; amount: number; currencyId: number; note: string | null; accountId: number | null; addToAccountDebt?: boolean; }
 interface LedgerEntry { id: number; debit: number; credit: number; currencyId: number; exchangeRate?: number; date?: string; currency: any; accountId?: number | null; }
 interface Account { id: number; name: string; phone?: string; creditLimit?: number; accountTypeId: number; isShareholder: boolean; exchangeRateType?: string; customExchangeRate?: number; }
-interface RawVoucher { id: number; isDeleted?: boolean; referenceNo: string | null; type: string; date: string; accountId: number | null; currencyId: number | null; exchangeRate: number; totalAmount: number; totalDiscount: number; netAmount: number; internalNote: string | null; printNote: string | null; hasDelivery: boolean; deliveryFee: number | null; account: Account | null; lines: VoucherLine[]; paidAmounts: VoucherPaidAmount[]; expenses: VoucherExpense[]; ledgerEntries: LedgerEntry[]; }
+interface RawVoucher { id: number; isDeleted?: boolean; referenceNo: string | null; type: string; date: string; accountId: number | null; currencyId: number | null; exchangeRate: number; totalAmount: number; totalDiscount: number; discountCurrencyId?: number | null; netAmount: number; internalNote: string | null; printNote: string | null; hasDelivery: boolean; deliveryFee: number | null; account: Account | null; lines: VoucherLine[]; paidAmounts: VoucherPaidAmount[]; expenses: VoucherExpense[]; ledgerEntries: LedgerEntry[]; }
 
 function AccountStatementContent() {
   const router = useRouter();
@@ -25,22 +27,21 @@ function AccountStatementContent() {
   const [vouchers, setVouchers] = useState<RawVoucher[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Date Filters
+  // Date Filters (default: 1st of current month to today)
+  const defaultDates = useMemo(() => getDefaultReportDateRange(), []);
   const [startDate, setStartDate] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("__erp_statement_start_date");
       if (saved) return saved;
     }
-    const year = new Date().getFullYear();
-    return `${year}-01-01`;
+    return defaultDates.startDate;
   });
   const [endDate, setEndDate] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("__erp_statement_end_date");
       if (saved) return saved;
     }
-    const year = new Date().getFullYear();
-    return `${year}-12-31`;
+    return defaultDates.endDate;
   });
 
   useEffect(() => {
@@ -74,25 +75,22 @@ function AccountStatementContent() {
     let count = 0;
     if (filterCurrencyId !== "all") count++;
     if (filterShowItems !== "شاردنەوە") count++;
-    
-    const year = new Date().getFullYear();
-    const defaultStartDateStr = `${year}-01-01`;
-    const defaultEndDateStr = `${year}-12-31`;
 
-    if (startDate !== defaultStartDateStr) count++;
-    if (endDate !== defaultEndDateStr) count++;
+    if (startDate !== defaultDates.startDate) count++;
+    if (endDate !== defaultDates.endDate) count++;
     
     return count;
-  }, [filterCurrencyId, filterShowItems, startDate, endDate]);
+  }, [filterCurrencyId, filterShowItems, startDate, endDate, defaultDates]);
 
   const handleResetFilters = () => {
-    const year = new Date().getFullYear();
-    const defaultStartDateStr = `${year}-01-01`;
-    const defaultEndDateStr = `${year}-12-31`;
-    setStartDate(defaultStartDateStr);
-    setEndDate(defaultEndDateStr);
+    setStartDate(defaultDates.startDate);
+    setEndDate(defaultDates.endDate);
     setFilterCurrencyId("all");
     setFilterShowItems("شاردنەوە");
+    try {
+      localStorage.removeItem("__erp_statement_start_date");
+      localStorage.removeItem("__erp_statement_end_date");
+    } catch (e) {}
   };
 
   const visibleColCount = 1 +
@@ -144,8 +142,14 @@ function AccountStatementContent() {
     switch (type) {
       case "sales": return "فرۆشتن";
       case "purchase": return "کڕین";
-      case "money_in": return "وەرگرتنی پارە";
-      case "money_out": return "پارەی ڕۆشتوو";
+      case "money_in":
+      case "پارە وەرگرتن":
+      case "پارەی هاتوو":
+        return "پارە وەرگرتن";
+      case "money_out":
+      case "پارەدان":
+      case "پارەی ڕۆشتوو":
+        return "پارەدان";
       case "expense": return "خەرجی";
       case "sales_return": return "گەڕانەوەی فرۆشتن";
       case "purchase_return": return "گەڕانەوەی کڕین";
@@ -343,9 +347,9 @@ function AccountStatementContent() {
             debit = netAmt;
           } else if (["purchase", "sales_return", "my_debt", "من قەرزارم", "people_debt_discount", "debt_discount", "داشکاندنم کردوە"].includes(v.type)) {
             credit = netAmt;
-          } else if (["money_in", "پارەی هاتوو", "shareholder_deposit", "دانانی پارە"].includes(v.type)) {
+          } else if (["money_in", "پارە وەرگرتن", "پارەی هاتوو", "shareholder_deposit", "دانانی پارە"].includes(v.type)) {
             credit = v.paidAmounts?.[0]?.amount || v.totalAmount || netAmt;
-          } else if (["money_out", "پارەی ڕۆشتوو", "shareholder_withdrawal", "کشانەوەی پارە"].includes(v.type)) {
+          } else if (["money_out", "پارەدان", "پارەی ڕۆشتوو", "shareholder_withdrawal", "کشانەوەی پارە"].includes(v.type)) {
             debit = v.paidAmounts?.[0]?.amount || v.totalAmount || netAmt;
           }
 
@@ -354,7 +358,7 @@ function AccountStatementContent() {
           }
         }
 
-        let rowCurrencyId = v.currencyId || 1;
+        let rowCurrencyId = (entries && entries.length > 0 && entries[0].currencyId) ? entries[0].currencyId : (v.currencyId || 1);
         let rowTotalAmount = (v.type === "shareholder_deposit" || v.type === "shareholder_withdrawal" || !v.netAmount) ? (v.totalAmount || v.netAmount || 0) : v.netAmount;
         let rowTotalDiscount = v.totalDiscount || 0;
 
@@ -372,12 +376,13 @@ function AccountStatementContent() {
           }
         }
 
-        if (v.type === "money_out" || v.type === "money_in" || v.type === "پارەی ڕۆشتوو" || v.type === "پارەی هاتوو") {
+        // For simple legacy vouchers without ledger entries where payment was recorded in Dinars
+        if ((!entries || entries.length === 0) && (v.type === "money_out" || v.type === "money_in" || v.type === "پارەدان" || v.type === "پارە وەرگرتن" || v.type === "پارەی ڕۆشتوو" || v.type === "پارەی هاتوو")) {
           const nonZeroPayments = (v.paidAmounts || []).filter((pa: any) => pa.amount > 0);
           if (nonZeroPayments.length === 1) {
             const singlePaidCurId = nonZeroPayments[0].currencyId;
-            rowCurrencyId = singlePaidCurId;
             if (singlePaidCurId === 2 && rowTotalAmount < 5000 && nonZeroPayments[0].amount > 10000) {
+              rowCurrencyId = 2;
               rowTotalAmount = nonZeroPayments[0].amount;
             }
           }
@@ -394,6 +399,7 @@ function AccountStatementContent() {
           totalAmount: rowTotalAmount,
           currencyId: rowCurrencyId,
           totalDiscount: rowTotalDiscount,
+          discountCurrencyId: v.discountCurrencyId || (rowTotalDiscount > 0 ? (v.currencyId || rowCurrencyId || 1) : null),
           paidAmounts: v.paidAmounts ? v.paidAmounts.map(pa => ({ currencyId: pa.currencyId, amount: pa.amount, exchangeRate: pa.exchangeRate })) : [],
           note: v.printNote || v.internalNote || "",
           rawPrintNote: v.printNote,
@@ -726,9 +732,12 @@ function AccountStatementContent() {
       <div id="print-area" className="p-2 md:p-6 mx-auto bg-white min-h-screen shadow-sm print-border">
         {/* Toolbar */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 no-print border-b border-gray-100 pb-4">
-          <div className="flex gap-3 items-center w-full md:w-auto flex-wrap">
-            <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-lg hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
-              <span>فلتەرەکان ⚙️</span>
+          <div className="flex gap-2 items-center w-full md:w-auto flex-wrap">
+            <button onClick={() => setShowFilterModal(true)} className="flex items-center justify-center gap-1.5 bg-[#0b1f50] text-white font-bold px-3.5 py-2 rounded-xl hover:bg-[#061f5f] transition-colors cursor-pointer text-xs shadow-xs border-none">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              <span>فلتەرەکان</span>
               {activeFiltersCount > 0 && (
                 <span className="bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
                   {activeFiltersCount}
@@ -738,31 +747,59 @@ function AccountStatementContent() {
             {activeFiltersCount > 0 && (
               <button 
                 onClick={handleResetFilters}
-                className="flex items-center justify-center gap-2 bg-rose-100 border border-rose-300 text-rose-700 font-bold px-4 py-2.5 rounded-lg hover:bg-rose-200 transition-colors cursor-pointer text-sm shadow-sm"
+                className="flex items-center justify-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 font-bold px-3.5 py-2 rounded-xl hover:bg-rose-100 transition-colors cursor-pointer text-xs shadow-xs"
               >
-                🔄 ڕێکخستنەوە
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+                <span>ڕێکخستنەوە</span>
               </button>
             )}
             <button 
               onClick={loadVouchers}
-              className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-lg hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm"
+              className="flex items-center justify-center gap-1.5 bg-blue-600 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-blue-700 transition-colors cursor-pointer text-xs shadow-xs border-none"
             >
-              گەڕان 🔍
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span>گەڕان</span>
             </button>
 
-            <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-[#0b1f50] text-white font-bold px-4 py-2.5 rounded-lg hover:bg-[#061f5f] transition-colors cursor-pointer text-sm shadow-sm">
-              پرینت 🖨️
+            <button onClick={handlePrint} className="flex items-center justify-center gap-1.5 bg-slate-800 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-slate-700 transition-colors cursor-pointer text-xs shadow-xs border-none">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              <span>پرینت</span>
             </button>
 
             <button onClick={() => exportTableToExcel("account-statement-table", `keshf_hisab_${account.name}.xlsx`)}
-              className="flex items-center justify-center gap-2 bg-emerald-600 border border-emerald-700 text-white font-bold px-4 py-2.5 rounded-lg hover:bg-emerald-705 transition-colors cursor-pointer text-sm shadow-sm border-none">
-              ناردن بۆ ئێکسڵ 📊
+              className="flex items-center justify-center gap-1.5 bg-emerald-600 border border-emerald-700 text-white font-bold px-3.5 py-2 rounded-xl hover:bg-emerald-700 transition-colors cursor-pointer text-xs shadow-xs border-none">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="8" y1="13" x2="16" y2="13" />
+                <line x1="8" y1="17" x2="16" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              <span>ناردن بۆ ئێکسڵ</span>
             </button>
           </div>
 
-          <div className="flex gap-4 items-center flex-wrap">
-            <DateInput value={startDate} onChange={setStartDate} label="بەرواری دەستپێک" className="h-12" />
-            <DateInput value={endDate} onChange={setEndDate} label="بەرواری کۆتایی" className="h-12" />
+          <div className="flex gap-2 items-center flex-wrap">
+            <QuickDateFilter
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(s, e) => {
+                setStartDate(s);
+                setEndDate(e);
+              }}
+            />
+            <DateInput value={startDate} onChange={setStartDate} label="بەرواری دەستپێک" className="h-10 text-xs" />
+            <DateInput value={endDate} onChange={setEndDate} label="بەرواری کۆتایی" className="h-10 text-xs" />
           </div>
         </div>
 
@@ -968,7 +1005,11 @@ function AccountStatementContent() {
                     sales:             { header: "bg-blue-50 border-blue-300",   badge: "bg-blue-600 text-white",   itemBg: "bg-blue-50/40",   itemBorder: "border-blue-200",   balanceBg: "bg-blue-100", paidText: "text-emerald-700" },
                     purchase:          { header: "bg-emerald-50 border-emerald-300", badge: "bg-emerald-600 text-white", itemBg: "bg-emerald-50/40", itemBorder: "border-emerald-200", balanceBg: "bg-emerald-100", paidText: "text-emerald-700" },
                     money_in:          { header: "bg-teal-50 border-teal-300",   badge: "bg-teal-600 text-white",   itemBg: "bg-teal-50/40",   itemBorder: "border-teal-200",   balanceBg: "bg-teal-100", paidText: "text-teal-700" },
+                    "پارە وەرگرتن":   { header: "bg-teal-50 border-teal-300",   badge: "bg-teal-600 text-white",   itemBg: "bg-teal-50/40",   itemBorder: "border-teal-200",   balanceBg: "bg-teal-100", paidText: "text-teal-700" },
+                    "پارەی هاتوو":     { header: "bg-teal-50 border-teal-300",   badge: "bg-teal-600 text-white",   itemBg: "bg-teal-50/40",   itemBorder: "border-teal-200",   balanceBg: "bg-teal-100", paidText: "text-teal-700" },
                     money_out:         { header: "bg-rose-50 border-rose-300",   badge: "bg-rose-600 text-white",   itemBg: "bg-rose-50/40",   itemBorder: "border-rose-200",   balanceBg: "bg-rose-100", paidText: "text-rose-700" },
+                    "پارەدان":         { header: "bg-rose-50 border-rose-300",   badge: "bg-rose-600 text-white",   itemBg: "bg-rose-50/40",   itemBorder: "border-rose-200",   balanceBg: "bg-rose-100", paidText: "text-rose-700" },
+                    "پارەی ڕۆشتوو":    { header: "bg-rose-50 border-rose-300",   badge: "bg-rose-600 text-white",   itemBg: "bg-rose-50/40",   itemBorder: "border-rose-200",   balanceBg: "bg-rose-100", paidText: "text-rose-700" },
                     expense:           { header: "bg-orange-50 border-orange-300", badge: "bg-orange-600 text-white", itemBg: "bg-orange-50/40", itemBorder: "border-orange-200", balanceBg: "bg-orange-100", paidText: "text-orange-700" },
                     sales_return:      { header: "bg-purple-50 border-purple-300", badge: "bg-purple-600 text-white", itemBg: "bg-purple-50/40", itemBorder: "border-purple-200", balanceBg: "bg-purple-100", paidText: "text-purple-700" },
                     purchase_return:   { header: "bg-indigo-50 border-indigo-300", badge: "bg-indigo-600 text-white", itemBg: "bg-indigo-50/40", itemBorder: "border-indigo-200", balanceBg: "bg-indigo-100", paidText: "text-indigo-700" },
@@ -1055,7 +1096,7 @@ function AccountStatementContent() {
                         )}
                         {visibleColumns.discount && (
                           <td className="p-3 text-center text-red-500 print:p-1 whitespace-nowrap print:whitespace-nowrap text-xs print:text-[10.5px]" dir="ltr">
-                            {v.totalDiscount > 0 ? formatMoney(v.totalDiscount, v.currencyId || 1) : "—"}
+                            {v.totalDiscount > 0 ? formatMoney(v.totalDiscount, v.discountCurrencyId || v.currencyId || 1) : "—"}
                           </td>
                         )}
                         {visibleColumns.paidAmount && (

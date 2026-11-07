@@ -194,8 +194,29 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
             }
             setDiscountCurrencyId(loadedDiscountCurId);
 
-            if (voucher.exchangeRate) {
-              setExchangeRate(String(voucher.exchangeRate * 100));
+            let loadedRate = 0;
+            const rawRate = Number(voucher.exchangeRate || 0);
+            if (rawRate >= 10000) {
+              loadedRate = rawRate;
+            } else if (rawRate >= 500 && rawRate < 10000) {
+              loadedRate = rawRate * 100;
+            } else {
+              const paidWithRate = voucher.paidAmounts?.find((p: any) => Number(p.exchangeRate) >= 500);
+              if (paidWithRate) {
+                const pr = Number(paidWithRate.exchangeRate);
+                loadedRate = pr >= 10000 ? pr : pr * 100;
+              } else {
+                const iqd = currencies?.find((c: any) => c.code === "IQD");
+                if (iqd && iqd.rate) {
+                  const ir = Number(iqd.rate);
+                  loadedRate = ir >= 10000 ? ir : ir * 100;
+                } else {
+                  loadedRate = 165000;
+                }
+              }
+            }
+            if (loadedRate > 0) {
+              setExchangeRate(String(Math.round(loadedRate)));
             }
             if (voucher.employeeName) {
               setEmployeeName(voucher.employeeName);
@@ -518,17 +539,19 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
     if (!isMultiCurrencyAccount && activeDiscountCurrencyId !== activeTargetId) {
       const converted = convertCurrency(rawDiscount, activeDiscountCurrencyId, activeTargetId);
+      const isTargetUsd = (activeTargetId === 1 || activeTargetId === 5 || activeTargetId === 11);
       return {
         currencyId: activeTargetId,
         amount: converted,
-        exchangeRate: 1
+        exchangeRate: isTargetUsd ? 1 : rate
       };
     }
 
+    const isDiscUsd = (activeDiscountCurrencyId === 1 || activeDiscountCurrencyId === 5 || activeDiscountCurrencyId === 11);
     return {
       currencyId: activeDiscountCurrencyId,
       amount: rawDiscount,
-      exchangeRate: (activeDiscountCurrencyId === activeTargetId) ? 1 : rate
+      exchangeRate: isDiscUsd ? 1 : rate
     };
   };
 
@@ -564,7 +587,11 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
   const hasMixedPaidCurrency =
     new Set(paidCurrencies.map((x: any) => x.currencyId)).size > 1;
 
-  const showRate = hasMixedPaidCurrency || paidCurrencyId !== activeTargetCurrencyId;
+  const effectivePaidCurrencyId = paidCurrencies.length === 1 
+    ? paidCurrencies[0].currencyId 
+    : paidCurrencyId;
+
+  const showRate = hasMixedPaidCurrency || (effectivePaidCurrencyId !== activeTargetCurrencyId);
 
   const currentSnapshot = useMemo(() => {
     return JSON.stringify({
@@ -615,8 +642,11 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     }
     if (!selectedAccount) return {};
     const before = accountBalanceBeforeByCurrency;
-    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
-    const rate = toNumber(exchangeRate) / 100;
+    const paidCurrenciesList = getPaidCurrencies();
+    const singleAccountCurId = getSingleAccountBalanceCurrencyId(selectedAccount, before);
+    const activeTargetCurrencyId: number = targetCurrencyId || singleAccountCurId || (paidCurrenciesList.length === 1 ? paidCurrenciesList[0].currencyId : (defaultCurrency.id || 1));
+    const rawRateVal = toNumber(exchangeRate);
+    const rate = rawRateVal >= 10000 ? rawRateVal / 100 : (rawRateVal >= 500 ? rawRateVal : 1650);
 
     const result = calculateLedgerEntries({
       type: "money_out",
@@ -627,12 +657,13 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
         ...getPaidCurrencies().map((p: any) => ({
           currencyId: p.currencyId,
           amount: p.amount,
-          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+          exchangeRate: (p.currencyId === 1 || p.currencyId === 5 || p.currencyId === 11) ? 1 : rate
         })),
         ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
       ],
       extraPaymentHandling: null,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      currencies
     });
 
     return result.balanceAfterByCurrency;
@@ -644,8 +675,11 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     }
     if (!selectedAccount) return {};
     const before = screenAccountBalanceBeforeByCurrency;
-    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
-    const rate = toNumber(exchangeRate) / 100;
+    const paidCurrenciesList = getPaidCurrencies();
+    const singleAccountCurId = getSingleAccountBalanceCurrencyId(selectedAccount, before);
+    const activeTargetCurrencyId: number = targetCurrencyId || singleAccountCurId || (paidCurrenciesList.length === 1 ? paidCurrenciesList[0].currencyId : (defaultCurrency.id || 1));
+    const rawRateVal = toNumber(exchangeRate);
+    const rate = rawRateVal >= 10000 ? rawRateVal / 100 : (rawRateVal >= 500 ? rawRateVal : 1650);
 
     const result = calculateLedgerEntries({
       type: "money_out",
@@ -656,12 +690,13 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
         ...getPaidCurrencies().map((p: any) => ({
           currencyId: p.currencyId,
           amount: p.amount,
-          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+          exchangeRate: (p.currencyId === 1 || p.currencyId === 5 || p.currencyId === 11) ? 1 : rate
         })),
         ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
       ],
       extraPaymentHandling: null,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      currencies
     });
 
     return result.balanceAfterByCurrency;
@@ -792,7 +827,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     const symbol = getCurrencySymbol(currencyId);
     const absValue = Math.abs(Number(value || 0));
     if (code === "IQD") {
-      return `${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} دینار`;
+      return `دینار ${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
     }
     return `${symbol} ${absValue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
@@ -947,23 +982,24 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
     return `${day}/${month}/${year}`;
   }
 
-  function getSingleAccountBalanceCurrencyId(account?: AccountLike): number {
-    const defaultId = defaultCurrency.id || 11;
+  function getSingleAccountBalanceCurrencyId(account?: AccountLike, balanceMap?: Record<string, number>): number {
+    const defaultId = defaultCurrency.id || 1;
     const isValidId = (id?: number) => id && currencies.some((c: any) => c.id === id);
 
-    if (!account?.balanceByCurrency) {
+    const sourceMap = balanceMap || account?.balanceByCurrency;
+    if (!sourceMap) {
       const targetId = account?.balanceCurrencyId || account?.creditLimitCurrencyId;
       return isValidId(targetId) ? targetId! : defaultId;
     }
 
-    const activeCurrencies = Object.entries(account.balanceByCurrency)
+    const activeCurrencies = Object.entries(sourceMap)
       .filter(([, amount]) => Math.abs(Number(amount || 0)) > 0.0001)
       .map(([currencyIdText]) => Number(currencyIdText))
       .filter(id => isValidId(id));
 
     if (activeCurrencies.length === 1) return activeCurrencies[0];
 
-    const targetId = account.balanceCurrencyId || account.creditLimitCurrencyId;
+    const targetId = account?.balanceCurrencyId || account?.creditLimitCurrencyId;
     return isValidId(targetId) ? targetId! : defaultId;
   }
 
@@ -1160,7 +1196,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
   function validateBeforeSave() {
     if (!accountId) {
-      showToast("پسوڵەی پارەی ڕۆشتوو نابێت بێ هەژمار خەزن بکرێت.");
+      showToast("پسوڵەی پارەدان نابێت بێ هەژمار خەزن بکرێت.");
       return false;
     }
 
@@ -1247,12 +1283,13 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
         ...getPaidCurrencies().map((p: any) => ({
           currencyId: p.currencyId,
           amount: p.amount,
-          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+          exchangeRate: (p.currencyId === 1 || p.currencyId === 5 || p.currencyId === 11) ? 1 : rate
         })),
         ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
       ],
       extraPaymentHandling: extraHandling,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      currencies
     });
 
     if (account.balanceByCurrency) {
@@ -1356,9 +1393,12 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
     setExcessModalConfig(null);
 
-    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
     const before = accountBalanceBeforeByCurrency;
-    const rate = toNumber(exchangeRate) / 100;
+    const paidCurrenciesList = getPaidCurrencies();
+    const singleAccountCurId = getSingleAccountBalanceCurrencyId(selectedAccount, before);
+    const activeTargetCurrencyId: number = targetCurrencyId || singleAccountCurId || (paidCurrenciesList.length === 1 ? paidCurrenciesList[0].currencyId : (defaultCurrency.id || 1));
+    const rawRateVal = toNumber(exchangeRate);
+    const rate = rawRateVal >= 10000 ? rawRateVal / 100 : (rawRateVal >= 500 ? rawRateVal : 1650);
 
     let finalNote = receiptNote;
 
@@ -1375,12 +1415,13 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
         ...getPaidCurrencies().map((p: any) => ({
           currencyId: p.currencyId,
           amount: p.amount,
-          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+          exchangeRate: (p.currencyId === 1 || p.currencyId === 5 || p.currencyId === 11) ? 1 : rate
         })),
         ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
       ],
       extraPaymentHandling: extraHandling,
-      balanceBeforeByCurrency: before
+      balanceBeforeByCurrency: before,
+      currencies
     });
 
     const totalPaidInTargetCurrency = getPaidCurrencies().reduce((sum, item) => {
@@ -1434,7 +1475,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
       paidAmounts: getPaidCurrencies().map((p: any) => ({
         currencyId: p.currencyId,
         amount: p.amount,
-        exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+        exchangeRate: (p.currencyId === 1 || p.currencyId === 5 || p.currencyId === 11) ? 1 : rate
       })),
       ledgerEntries: result.ledgerEntries,
       extraPaymentHandling: extraHandling
@@ -1479,7 +1520,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
           showToast(
             editId
                ? "پسوڵەکە بە سەرکەوتوویی نوێکرایەوە ✅"
-               : "پسوڵەی پارەی ڕۆشتوو خەزن کرا ✅ قاسە کەمکرایەوە و قەرزی هەژمار زیادکرایەوە.",
+               : "پسوڵەی پارەدان خەزن کرا ✅ قاسە کەمکرایەوە و قەرزی هەژمار زیادکرایەوە.",
             "success"
           );
         } else {
@@ -1503,8 +1544,10 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
     if (!validateBeforeSave()) return;
 
-    const activeTargetCurrencyId = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount);
-    const rate = toNumber(exchangeRate) / 100;
+    const beforeSave = accountBalanceBeforeByCurrency;
+    const activeTargetCurrencyId: number = targetCurrencyId || getSingleAccountBalanceCurrencyId(selectedAccount, beforeSave) || defaultCurrency.id || 1;
+    const rawRateVal = toNumber(exchangeRate);
+    const rate = rawRateVal >= 10000 ? rawRateVal / 100 : (rawRateVal >= 500 ? rawRateVal : 1650);
 
     const result = calculateLedgerEntries({
       type: "money_out",
@@ -1515,12 +1558,13 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
         ...getPaidCurrencies().map((p: any) => ({
           currencyId: p.currencyId,
           amount: p.amount,
-          exchangeRate: (p.currencyId === activeTargetCurrencyId) ? 1 : rate
+          exchangeRate: (p.currencyId === 1 || p.currencyId === 5 || p.currencyId === 11) ? 1 : rate
         })),
         ...(getDiscountLedgerPayload(activeTargetCurrencyId, rate) ? [getDiscountLedgerPayload(activeTargetCurrencyId, rate)!] : [])
       ],
       extraPaymentHandling: null,
-      balanceBeforeByCurrency: accountBalanceBeforeByCurrency
+      balanceBeforeByCurrency: accountBalanceBeforeByCurrency,
+      currencies
     });
 
     if (result.excess.exists) {
@@ -2220,7 +2264,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
 
         <main style={mainContent}>
           <div style={headerCard}>
-            {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>پارەی ڕۆشتوو</h2>}
+            {headerSelector ? headerSelector : <h2 style={{ margin: 0 }}>پارەدان</h2>}
             
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "14px", fontWeight: "bold", color: "#4b5563" }}>ژمارەی پسوڵە لای وەرگر:</span>
@@ -2263,7 +2307,7 @@ export default function MoneyOutPage({ headerSelector, editId }: Props) {
               {/* Right Column: Invoice Info Box */}
               {printOptions.showReceiptInfo ? (
                 <div style={{ ...printInfoBox, width: "100%", minWidth: "220px" }}>
-                  <PrintInfoLine label="جۆری پسوڵە" value="پارەی ڕۆشتوو" />
+                  <PrintInfoLine label="جۆری پسوڵە" value="پارەدان" />
                   <PrintInfoLine label="ژمارەی پسوڵە" value={receiptNumber || (originalVoucher?.id ? String(originalVoucher.id) : (editId ? String(editId) : "-"))} />
                   <PrintInfoLine
                     label="بەروار"

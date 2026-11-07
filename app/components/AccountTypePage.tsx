@@ -231,6 +231,10 @@ export default function AccountTypePage() {
   };
 
   const handleDelete = (item: AccountTypeRow) => {
+    if (isProtected(item)) {
+      showAlert("error", "شیاوی سڕینەوە نییە", "ئەم جۆرە سیستەمییە و ناتوانرێت بسڕدرێتەوە.");
+      return;
+    }
 
     const usedCount = usageMap.get(item.id) || 0;
 

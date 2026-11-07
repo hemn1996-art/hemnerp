@@ -23,11 +23,13 @@ export default function FormattedNumber({
   const displaySymbol = currencySymbol;
   const actualDecimals = isIQD ? 0 : Math.min(decimals, 2);
   const processedValue = isIQD ? Math.round(numValue) : Math.round(numValue * 100) / 100;
-  const isInteger = processedValue % 1 === 0;
+  const isNegative = processedValue < 0;
+  const absVal = Math.abs(processedValue);
+  const isInteger = absVal % 1 === 0;
 
   // Format to string with fixed decimals
-  const formatted = processedValue.toLocaleString('en-US', {
-    minimumFractionDigits: isInteger ? 0 : 2,
+  const formatted = absVal.toLocaleString('en-US', {
+    minimumFractionDigits: isInteger ? 0 : actualDecimals,
     maximumFractionDigits: actualDecimals
   });
 
@@ -37,8 +39,11 @@ export default function FormattedNumber({
 
   return (
     <span className={className} dir="ltr" style={{ display: 'inline-flex', flexDirection: 'row', alignItems: 'baseline', gap: '3px' }}>
-      {!isIQD && displaySymbol && <span style={{ fontSize: '0.78em', opacity: 0.8, fontWeight: 700 }}>{displaySymbol}</span>}
-      {isIQD && <span style={{ fontSize: '0.78em', opacity: 0.8, fontWeight: 700 }}>دینار</span>}
+      {displaySymbol && (
+        <span style={{ fontSize: '0.78em', opacity: 0.8, fontWeight: 700 }}>
+          {isIQD ? "دینار" : displaySymbol}
+        </span>
+      )}
       <span>
         <span>{wholePart}</span>
         {decimalPart && (

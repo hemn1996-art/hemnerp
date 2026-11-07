@@ -243,6 +243,8 @@ export default function DateInput({
     borderRadius: "12px",
     border: "1px solid #cbd5e1",
     background: "white",
+    height: "48px",
+    minHeight: "48px",
     cursor: disabled ? "not-allowed" : "pointer",
     userSelect: "none",
     ...style,
