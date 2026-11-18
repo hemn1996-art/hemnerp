@@ -112,11 +112,13 @@ export function sanitizeAndGuardVoucherData(
         line.lineTotal = Math.max(0, (lQty * lPrice) - lDisc);
       }
     } else if (isIncomingStock) {
-      // For purchases and purchase returns, line currency MUST match voucher currency.
-      // This prevents a USD purchase of $170 from having lines tagged as IQD (2),
-      // which would destroy product moving average costs.
+      // For purchases and purchase returns, preserve explicit line currency if chosen by user
       for (const line of data.lines) {
-        line.currencyId = voucherCurrencyId;
+        if (!line.currencyId) {
+          line.currencyId = voucherCurrencyId;
+        } else {
+          line.currencyId = Number(line.currencyId);
+        }
       }
     } else if (isOutgoingStock) {
       // For sales, sales_return, damage: lines can legitimately be multi-currency (e.g. USD appliance, IQD accessories).
@@ -337,7 +339,7 @@ export function guardIncomingInventoryTransaction(
 
   const isStockInventory = voucher.type === "warehouse_stock" || voucher.type === "جەردی کۆگا";
   const vCurId = Number(voucher.currencyId || 1);
-  let resolvedCurId = isStockInventory ? (Number(invTx.currencyId) || vCurId) : vCurId;
+  let resolvedCurId = Number(invTx.currencyId) || vCurId;
   let resolvedCost = Number(invTx.unitCost || 0);
 
   const rate = normalizeExchangeRatePerDollar(voucher.exchangeRate, 2, currencies);

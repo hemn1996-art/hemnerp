@@ -1510,6 +1510,24 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
     );
   }
 
+  function changeRowCurrency(row: PurchaseRow, newCurrencyId: number) {
+    if (blockIfLocked()) return;
+    if (row.currencyId === newCurrencyId) return;
+
+    const currentPriceNum = toNumber(row.purchasePrice);
+    let newPriceStr = row.purchasePrice;
+    if (currentPriceNum > 0) {
+      const converted = convertCurrency(currentPriceNum, row.currencyId, newCurrencyId);
+      const isNewIqd = isIqd(newCurrencyId);
+      newPriceStr = String(isNewIqd ? Math.round(converted) : Math.round(converted * 100) / 100);
+    }
+
+    updateRow(row.id, {
+      currencyId: newCurrencyId,
+      purchasePrice: newPriceStr,
+    });
+  }
+
   function removeRow(rowId: number) {
     if (blockIfLocked()) return;
 
@@ -3049,9 +3067,43 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                     }
                                     style={{ ...smallInput, ...lockedFieldStyle }}
                                   />
-                                  <span style={{ fontSize: 13, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>
-                                    {getCurrencySymbol(row.currencyId)}
-                                  </span>
+                                  <select
+                                    value={row.currencyId}
+                                    disabled={isLocked}
+                                    onChange={(e) => {
+                                      const newCurId = Number(e.target.value);
+                                      changeRowCurrency(row, newCurId);
+                                    }}
+                                    style={{
+                                      width: 62,
+                                      height: 38,
+                                      padding: "2px 4px",
+                                      borderRadius: 8,
+                                      border:
+                                        row.currencyId === 2
+                                          ? "1.5px solid #86efac"
+                                          : "1.5px solid #93c5fd",
+                                      backgroundColor:
+                                        row.currencyId === 2 ? "#f0fdf4" : "#eff6ff",
+                                      color:
+                                        row.currencyId === 2 ? "#166534" : "#1d4ed8",
+                                      fontWeight: 800,
+                                      fontSize: 12,
+                                      cursor: isLocked ? "not-allowed" : "pointer",
+                                      textAlign: "center",
+                                      outline: "none",
+                                      fontFamily: appFont,
+                                      boxSizing: "border-box",
+                                      ...lockedFieldStyle,
+                                    }}
+                                    title="دیاریکردنی جۆری دراو (دۆلار / دینار)"
+                                  >
+                                    {currencies.map((curr: any) => (
+                                      <option key={curr.id} value={curr.id}>
+                                        {curr.code === "IQD" ? "دینار" : curr.symbol || "$"}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </div>
                               </td>
                             )}
@@ -3234,9 +3286,7 @@ export default function PurchasePage({headerSelector,  invoiceType = "کڕین",
                                         value={row.currencyId}
                                         disabled={isLocked}
                                         onChange={(e) =>
-                                          updateRow(row.id, {
-                                            currencyId: Number(e.target.value),
-                                          })
+                                          changeRowCurrency(row, Number(e.target.value))
                                         }
                                         style={{
                                           ...compactInput,
