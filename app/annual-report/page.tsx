@@ -250,10 +250,10 @@ export default function AnnualBalanceSheetReportPage() {
               </button>
 
               <Link
-                href="/dashboard"
+                href="/invoices"
                 className="w-full sm:w-auto px-6 py-4 bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-sm rounded-2xl border border-slate-700 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <span>داشبۆردی سەرەکی</span>
+                <span>سیستەمی پسووڵە و دارایی</span>
               </Link>
             </div>
 

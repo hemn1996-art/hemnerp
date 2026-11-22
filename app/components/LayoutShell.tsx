@@ -35,7 +35,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const isLoginPage = pathname === "/login";
-  const isStandalonePage = isLoginPage || pathname === "/annual-report";
+  const isStandalonePage = isLoginPage || pathname === "/annual-report" || pathname === "/dashboard" || pathname === "/";
   
   const fetchCurrencies = useStore((s) => s.fetchCurrencies);
   const fetchCurrentUser = useStore((s) => s.fetchCurrentUser);
