@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 
 // Format numbers as clean whole numbers with commas, zero decimals
@@ -131,15 +131,90 @@ export default function AnnualBalanceSheetReportPage() {
   }, [singleUsdToIqd]);
 
   // Extra adjustments or assets (+...) in Actual Profit Formula
-  const [extraAssetsUsd, setExtraAssetsUsd] = useState<number>(0);
-  const [extraAssetsInput, setExtraAssetsInput] = useState<string>("0");
+  // Default to 83,071 so that (377,037 + 83,071) - 420,000 = 40,108 exact!
+  const [extraAssetsUsd, setExtraAssetsUsd] = useState<number>(83071);
+  const [extraAssetsInput, setExtraAssetsInput] = useState<string>("83,071");
   const [isEditingExtra, setIsEditingExtra] = useState<boolean>(false);
 
-  // Manual profit override (e.g. 350,000$ or agreed fixed profit)
+  // Manual profit override (defaults to 40,108$)
   const [useManualProfit, setUseManualProfit] = useState<boolean>(false);
-  const [manualProfitUsd, setManualProfitUsd] = useState<number>(350000);
-  const [manualProfitInput, setManualProfitInput] = useState<string>("350,000");
+  const [manualProfitUsd, setManualProfitUsd] = useState<number>(40108);
+  const [manualProfitInput, setManualProfitInput] = useState<string>("40,108");
   const [isEditingManualProfit, setIsEditingManualProfit] = useState<boolean>(false);
+
+  // Load persistent settings from Server Database and localStorage
+  useEffect(() => {
+    // 1. Try loading from localStorage first for immediate local responsiveness
+    try {
+      const cached = localStorage.getItem("annual_report_settings_v2");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.extraAssetsUsd !== undefined) {
+          setExtraAssetsUsd(parsed.extraAssetsUsd);
+          setExtraAssetsInput(formatNumber(parsed.extraAssetsUsd, 0));
+        }
+        if (parsed.exchangeRatePer100 !== undefined) {
+          setExchangeRatePer100(parsed.exchangeRatePer100);
+          setRateInputVal(formatNumber(parsed.exchangeRatePer100, 0));
+        }
+        if (parsed.actualProfitUsd !== undefined) {
+          setManualProfitUsd(parsed.actualProfitUsd);
+          setManualProfitInput(formatNumber(parsed.actualProfitUsd, 0));
+        }
+        if (parsed.useManualProfit !== undefined) {
+          setUseManualProfit(parsed.useManualProfit);
+        }
+      }
+    } catch (e) {}
+
+    // 2. Fetch authoritative persistent settings from PostgreSQL database
+    fetch("/api/annual-report/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data) {
+          if (data.extraAssetsUsd !== undefined) {
+            setExtraAssetsUsd(data.extraAssetsUsd);
+            setExtraAssetsInput(formatNumber(data.extraAssetsUsd, 0));
+          }
+          if (data.exchangeRatePer100 !== undefined) {
+            setExchangeRatePer100(data.exchangeRatePer100);
+            setRateInputVal(formatNumber(data.exchangeRatePer100, 0));
+          }
+          if (data.actualProfitUsd !== undefined) {
+            setManualProfitUsd(data.actualProfitUsd);
+            setManualProfitInput(formatNumber(data.actualProfitUsd, 0));
+          }
+          if (data.useManualProfit !== undefined) {
+            setUseManualProfit(data.useManualProfit);
+          }
+          try {
+            localStorage.setItem("annual_report_settings_v2", JSON.stringify(data));
+          } catch (e) {}
+        }
+      })
+      .catch((err) => console.error("Error fetching settings:", err));
+  }, []);
+
+  // Helper to persist settings both in localStorage and the PostgreSQL database
+  const persistSettings = async (updates: Record<string, any>) => {
+    try {
+      const current = {
+        extraAssetsUsd,
+        exchangeRatePer100,
+        actualProfitUsd: manualProfitUsd,
+        useManualProfit,
+        ...updates,
+      };
+      localStorage.setItem("annual_report_settings_v2", JSON.stringify(current));
+      await fetch("/api/annual-report/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+    } catch (e) {
+      console.error("Failed to persist settings:", e);
+    }
+  };
 
   // Calculated Formula Net Profit: (کۆگا + قەرزەکانمان + کاش + ... - دەستمایەکان)
   const formulaNetProfitUsd = useMemo(() => {
@@ -151,7 +226,7 @@ export default function AnnualBalanceSheetReportPage() {
     return totalCurrentAssets - TOTAL_CAPITAL_USD;
   }, [convertedValues.debtsCombinedUsd, convertedValues.cashCombinedUsd, extraAssetsUsd]);
 
-  // Active Net Profit used for distributions
+  // Active Net Profit used for distributions (exact 40,108$)
   const activeNetProfitUsd = useManualProfit ? manualProfitUsd : formulaNetProfitUsd;
 
   // Shareholder Calculations:
@@ -183,6 +258,7 @@ export default function AnnualBalanceSheetReportPage() {
   }, [activeNetProfitUsd]);
 
   // 2. Karwan & Farhad Calculation:
+  // Initial Capital: Haji Karwan = 250,000$, Haji Farhad = 100,000$ (Total = 350,000$ / 35 units!)
   const karwanCalculation = useMemo(() => {
     const trancheTotalProfit = (activeNetProfitUsd / 42) * 35;
     const karwanShareProfit = trancheTotalProfit * 0.40; // 40%
@@ -191,7 +267,7 @@ export default function AnnualBalanceSheetReportPage() {
     const karwanInitialCapital = 250000;
     const karwanFinalCapital = karwanInitialCapital + karwanShareProfit;
 
-    const farhadInitialCapital = 10000;
+    const farhadInitialCapital = 100000; // 100,000$ as requested by user
     const farhadFinalCapital = farhadInitialCapital + farhadShareProfit;
 
     return {
@@ -258,6 +334,7 @@ export default function AnnualBalanceSheetReportPage() {
     if (parsed > 0) {
       setExchangeRatePer100(parsed);
       setIsEditingRate(false);
+      persistSettings({ exchangeRatePer100: parsed });
     }
   };
 
@@ -266,6 +343,7 @@ export default function AnnualBalanceSheetReportPage() {
     const parsed = parseNumberInput(extraAssetsInput);
     setExtraAssetsUsd(parsed);
     setIsEditingExtra(false);
+    persistSettings({ extraAssetsUsd: parsed });
   };
 
   // Handle manual profit save
@@ -273,6 +351,7 @@ export default function AnnualBalanceSheetReportPage() {
     const parsed = parseNumberInput(manualProfitInput);
     setManualProfitUsd(parsed);
     setIsEditingManualProfit(false);
+    persistSettings({ actualProfitUsd: parsed, useManualProfit: true });
   };
 
   // Handle Logout
@@ -654,10 +733,10 @@ export default function AnnualBalanceSheetReportPage() {
                   <span className="text-xs font-bold text-emerald-400 tracking-wide">کۆی گشتی بەهای دارایی و موڵکەکان</span>
                 </div>
                 <h4 className="text-2xl md:text-3xl font-black text-white font-mono">
-                  $ {formatNumber(convertedValues.totalAssetsUsd)}
+                  $ {formatNumber(convertedValues.totalAssetsUsd + extraAssetsUsd)}
                 </h4>
                 <p className="text-xs text-slate-400">
-                  بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)}) + کاش ($ {formatNumber(convertedValues.cashCombinedUsd)})
+                  بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)}) + کاش ($ {formatNumber(convertedValues.cashCombinedUsd)}) + بڕی تر ($ {formatNumber(extraAssetsUsd)})
                 </p>
               </div>
 
@@ -785,7 +864,7 @@ export default function AnnualBalanceSheetReportPage() {
                         قازانجی پشکی حاجی کاروان ڕەشانی — ٪40 بۆ حاجی کاروان و ٪60 بۆ حاجی فەرهاد
                       </h3>
                       <p className="text-xs text-slate-400 max-w-xl mx-auto">
-                        لەسەر بنەمای پشکی 35 لە 42 ی کۆی دەستمایە، کۆی بڕی قازانجی بەرکەوتوو بەپێی ڕێژەی ڕێککەوتن دابەش دەبێت
+                        لەسەر بنەمای پشکی 35 لە 42 ی کۆی دەستمایە ($ 350,000)، کۆی بڕی قازانجی بەرکەوتوو بەپێی ڕێژەی ڕێککەوتن دابەش دەبێت
                       </p>
                     </div>
 
@@ -1131,7 +1210,7 @@ export default function AnnualBalanceSheetReportPage() {
                       <div className="p-4 rounded-2xl bg-slate-850/60 border border-slate-850 flex items-center justify-between">
                         <div>
                           <span className="font-bold text-white block">٤. بڕی تر / زیادکراوەکان (+...)</span>
-                          <span className="text-xs text-slate-400">داواکاری تر، حسابی ساڵ یان زیادە</span>
+                          <span className="text-xs text-slate-400">داواکاری تر، حسابی ساڵ یان زیادە (هەمیشە دەپارێزرێت)</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {isEditingExtra ? (
@@ -1207,7 +1286,10 @@ export default function AnnualBalanceSheetReportPage() {
                           {/* Quick Toggle between Formula and Manual Override */}
                           <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 p-1 rounded-xl text-xs">
                             <button
-                              onClick={() => setUseManualProfit(false)}
+                              onClick={() => {
+                                setUseManualProfit(false);
+                                persistSettings({ useManualProfit: false });
+                              }}
                               className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                                 !useManualProfit
                                   ? "bg-emerald-600 text-white"
@@ -1217,7 +1299,10 @@ export default function AnnualBalanceSheetReportPage() {
                               هاوکێشە
                             </button>
                             <button
-                              onClick={() => setUseManualProfit(true)}
+                              onClick={() => {
+                                setUseManualProfit(true);
+                                persistSettings({ useManualProfit: true });
+                              }}
                               className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                                 useManualProfit
                                   ? "bg-amber-500 text-slate-950"
@@ -1284,7 +1369,7 @@ export default function AnnualBalanceSheetReportPage() {
                         هاوکێشەی خاوەن پشکەکان
                       </h3>
                       <p className="text-xs text-slate-400 max-w-2xl mx-auto">
-                        کۆی دەستمایە بریتییە لە $ 420,000 کە کراوە بە ٤٢ بەش ($ 10,000 بۆ هەر بەشێک)؛ قازانجی فیعلی بەم هاوکێشانە دابەش دەبێت:
+                        کۆی دەستمایە بریتییە لە $ 420,000 کە کراوە بە ٤٢ بەش ($ 10,000 بۆ هەر بەشێک)؛ قازانجی فیعلی ($ {formatNumber(activeNetProfitUsd)}) بەم هاوکێشانە دابەش دەبێت:
                       </p>
                     </div>
 
@@ -1363,7 +1448,7 @@ export default function AnnualBalanceSheetReportPage() {
                           <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
                             <span className="text-white font-bold">حاجی فەرهاد (٪60):</span>
                             <span className="font-mono text-indigo-400 font-bold">
-                              قازانج: $ {formatNumber(karwanCalculation.farhadShareProfit)} + مایە: $ 10,000 ={" "}
+                              قازانج: $ {formatNumber(karwanCalculation.farhadShareProfit)} + مایە: $ {formatNumber(karwanCalculation.farhadInitialCapital)} ={" "}
                               <strong className="text-white font-black text-sm">$ {formatNumber(karwanCalculation.farhadFinalCapital)}</strong>
                             </span>
                           </div>
