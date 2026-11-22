@@ -1032,9 +1032,6 @@ export default function AnnualBalanceSheetReportPage() {
                       <h3 className="text-xl md:text-3xl font-black text-white">
                         قازانجی پشکی حاجی کاروان ڕەشانی — ٪40 بۆ حاجی کاروان و ٪60 بۆ حاجی فەرهاد
                       </h3>
-                      <p className="text-xs text-slate-400 max-w-xl mx-auto">
-                        لەسەر بنەمای پشکی 35 لە 42 ی کۆی دەستمایە ($ 350,000)، کۆی بڕی قازانجی بەرکەوتوو بەپێی ڕێژەی ڕێککەوتن دابەش دەبێت
-                      </p>
                     </div>
 
                     {/* Quick Stats for this tranche */}
