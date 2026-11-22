@@ -165,6 +165,20 @@ export default function AnnualBalanceSheetReportPage() {
     }
   };
 
+  // Handle Logout
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Logout API error:", error);
+    }
+    document.cookie = "auth_token=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "user_session=; path=/; max-age=0; SameSite=Lax";
+    sessionStorage.clear();
+    localStorage.removeItem("user_session");
+    window.location.href = "/login";
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-emerald-500 selection:text-slate-950" dir="rtl">
       
@@ -174,6 +188,24 @@ export default function AnnualBalanceSheetReportPage() {
       {currentView === "landing" && (
         <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-12 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
           
+          {/* Top Bar for Landing View */}
+          <div className="absolute top-5 left-5 right-5 z-20 flex items-center justify-between max-w-6xl mx-auto">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-800 text-xs text-slate-400 backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="font-bold text-white">کۆگای دۆستان</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-slate-900/80 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 text-xs font-bold rounded-2xl border border-slate-800 hover:border-rose-500/40 flex items-center gap-2 transition-all cursor-pointer backdrop-blur-md shadow-md"
+              title="چوونە دەرەوە لە سیستەم"
+            >
+              <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+              </svg>
+              <span>چوونە دەرەوە</span>
+            </button>
+          </div>
+
           {/* Subtle Ambient Background Gradients */}
           <div className="absolute top-1/4 -right-20 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-1/4 -left-20 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -255,6 +287,17 @@ export default function AnnualBalanceSheetReportPage() {
               >
                 <span>سیستەمی پسووڵە و دارایی</span>
               </Link>
+
+              <button
+                onClick={handleLogout}
+                className="w-full sm:w-auto px-6 py-4 bg-slate-800/60 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 font-bold text-sm rounded-2xl border border-slate-700 hover:border-rose-500/40 transition-all cursor-pointer flex items-center justify-center gap-2"
+                title="چوونە دەرەوە لە ئەکاونت"
+              >
+                <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                </svg>
+                <span>چوونە دەرەوە</span>
+              </button>
             </div>
 
             {/* Footer Notice */}
@@ -360,6 +403,18 @@ export default function AnnualBalanceSheetReportPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
                 </svg>
                 <span>چاپکردن</span>
+              </button>
+
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 text-xs font-bold rounded-xl border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition-all cursor-pointer"
+                title="چوونە دەرەوە لە سیستەم"
+              >
+                <svg className="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                </svg>
+                <span>چوونە دەرەوە</span>
               </button>
 
             </div>
