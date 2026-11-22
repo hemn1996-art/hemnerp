@@ -73,8 +73,10 @@ export default function AnnualBalanceSheetReportPage() {
   >("none");
 
   // Isolated Password Protection for Profit Section
-  // null = locked, "karwan" = hemn1@, "sarhad" = hemn2@, "actual_profit" = hemn3@
-  const [unlockedMode, setUnlockedMode] = useState<null | "karwan" | "sarhad" | "actual_profit">(null);
+  // null = locked, "karwan" = hemn1@, "sarhad" = hemn2@, "actual_profit" = hemn3@, "farhad_summary" = hemn4@
+  const [unlockedMode, setUnlockedMode] = useState<
+    null | "karwan" | "sarhad" | "actual_profit" | "farhad_summary"
+  >(null);
   const [passwordInput, setPasswordInput] = useState<string>("");
   const [passwordError, setPasswordError] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -85,6 +87,7 @@ export default function AnnualBalanceSheetReportPage() {
 
   // Base Data Constants
   const WAREHOUSE_USD = 40823;
+  const GOODS_IN_TRANSIT_USD = 123180; // $ 123,180 کاڵای نەگەیشتوو
   const DEBTS_USD = 145620;
   const DEBTS_IQD = 1350000;
   const TOTAL_CAPITAL_USD = 420000; // 420,000$ base (42 units)
@@ -281,6 +284,36 @@ export default function AnnualBalanceSheetReportPage() {
     };
   }, [activeNetProfitUsd]);
 
+  // 3. Haji Farhad Grand Total Position across both tranches (hemn4@):
+  const farhadSummaryCalculation = useMemo(() => {
+    // From Sarhad's tranche (7 units, 50% Farhad)
+    const fromSarhadProfit = sarhadCalculation.farhadShareProfit;
+    const fromSarhadInitial = sarhadCalculation.farhadInitialCapital; // 0$
+    const fromSarhadFinal = sarhadCalculation.farhadFinalCapital;
+
+    // From Karwan's tranche (35 units, 60% Farhad)
+    const fromKarwanProfit = karwanCalculation.farhadShareProfit;
+    const fromKarwanInitial = karwanCalculation.farhadInitialCapital; // 100,000$
+    const fromKarwanFinal = karwanCalculation.farhadFinalCapital;
+
+    // Grand Totals for Haji Farhad
+    const totalInitialCapital = fromSarhadInitial + fromKarwanInitial; // 100,000$
+    const totalProfitEarned = fromSarhadProfit + fromKarwanProfit; // 3,342$ + 20,054$ = 23,396$
+    const totalFinalCapital = totalInitialCapital + totalProfitEarned; // 123,396$
+
+    return {
+      fromSarhadProfit,
+      fromSarhadInitial,
+      fromSarhadFinal,
+      fromKarwanProfit,
+      fromKarwanInitial,
+      fromKarwanFinal,
+      totalInitialCapital,
+      totalProfitEarned,
+      totalFinalCapital,
+    };
+  }, [sarhadCalculation, karwanCalculation]);
+
   // Handle password submission for the main lock card
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,6 +328,9 @@ export default function AnnualBalanceSheetReportPage() {
     } else if (cleanPass === "hemn3@") {
       setUnlockedMode("actual_profit");
       setPasswordError("");
+    } else if (cleanPass === "hemn4@") {
+      setUnlockedMode("farhad_summary");
+      setPasswordError("");
     } else {
       setPasswordError("وشەی نهێنی هەڵەیە! تکایە وشەی نهێنی دروست بنووسە.");
     }
@@ -308,7 +344,6 @@ export default function AnnualBalanceSheetReportPage() {
       setActiveModal("none");
       setHemn3ModalInput("");
       setHemn3ModalError("");
-      // Scroll to profit section smoothly
       setTimeout(() => {
         document.getElementById("profit-section")?.scrollIntoView({ behavior: "smooth" });
       }, 100);
@@ -589,169 +624,281 @@ export default function AnnualBalanceSheetReportPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                
-                {/* CARD 1: بەهای کۆگا */}
-                <div
-                  onClick={() => setActiveModal("warehouse")}
-                  className="group relative p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 hover:from-slate-850 hover:to-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl transition-all duration-200 cursor-pointer shadow-lg hover:shadow-emerald-500/10"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-slate-400">بەهای مەوادی ناو کۆگا</span>
-                    <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                      </svg>
-                    </span>
-                  </div>
+              {/* If Karwan's mode is unlocked: display ONLY Warehouse, Goods in Transit ($ 123,180), Debts (NO Cash, NO Total Capital) */}
+              {unlockedMode === "karwan" ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   
-                  <div className="space-y-1">
-                    <div className="text-2xl font-black text-white font-mono">
-                      $ {formatNumber(WAREHOUSE_USD)}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-emerald-400 font-bold">
-                    <span>بینینی ڕاپۆرتی کۆگا</span>
-                    <svg className="w-3.5 h-3.5 rtl:rotate-180 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* CARD 2: قەرزەکان */}
-                <div
-                  onClick={() => setActiveModal("debts")}
-                  className="group relative p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 hover:from-slate-850 hover:to-slate-900 border border-slate-800 hover:border-rose-500/50 rounded-2xl transition-all duration-200 cursor-pointer shadow-lg hover:shadow-rose-500/10"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-slate-400">کۆی گشتی قەرز (بازاڕ)</span>
-                    <span className="p-2 rounded-xl bg-rose-500/10 text-rose-400 group-hover:scale-110 transition-transform">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                      </svg>
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs text-slate-400">قەرزی دۆلار:</span>
-                      <span className="text-lg font-black text-white font-mono">$ {formatNumber(DEBTS_USD)}</span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs text-slate-400">قەرزی دینار:</span>
-                      <span className="text-sm font-bold text-amber-400 font-mono">دینار {formatNumber(DEBTS_IQD)}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-rose-400 font-bold">
-                    <span>بینینی وردەکاری قەرز</span>
-                    <svg className="w-3.5 h-3.5 rtl:rotate-180 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* CARD 3: نەختینەی کاش (دۆلار و دینار) */}
-                <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl shadow-lg flex flex-col justify-between">
-                  <div>
+                  {/* CARD 1: بەهای کۆگا */}
+                  <div
+                    onClick={() => setActiveModal("warehouse")}
+                    className="group relative p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 hover:from-slate-850 hover:to-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl transition-all duration-200 cursor-pointer shadow-lg hover:shadow-emerald-500/10"
+                  >
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-bold text-slate-400">کۆی گشتی کاش و نەختینە</span>
-                      <span className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                      <span className="text-xs font-bold text-slate-400">بەهای مەوادی ناو کۆگا</span>
+                      <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                         </svg>
                       </span>
                     </div>
-
-                    {/* Clickable sub-bars for Dollar and Dinar */}
-                    <div className="space-y-2">
-                      {/* USD Cash Button */}
-                      <button
-                        onClick={() => setActiveModal("cash_usd")}
-                        className="w-full p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-blue-500/50 flex items-center justify-between text-right transition-all cursor-pointer group"
-                      >
-                        <div>
-                          <span className="text-[11px] text-slate-400 block">کاشی دۆلار (وردەکاری)</span>
-                          <span className="text-base font-black text-blue-400 font-mono">$ {formatNumber(CASH_USD)}</span>
-                        </div>
-                        <svg className="w-4 h-4 text-slate-500 group-hover:text-blue-400 rtl:rotate-180 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                      </button>
-
-                      {/* IQD Cash Button */}
-                      <button
-                        onClick={() => setActiveModal("cash_iqd")}
-                        className="w-full p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/50 flex items-center justify-between text-right transition-all cursor-pointer group"
-                      >
-                        <div>
-                          <span className="text-[11px] text-slate-400 block">کاشی دینار (وردەکاری)</span>
-                          <span className="text-sm font-black text-amber-400 font-mono">دینار {formatNumber(CASH_IQD)}</span>
-                        </div>
-                        <svg className="w-4 h-4 text-slate-500 group-hover:text-amber-400 rtl:rotate-180 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* CARD 4: کۆی گشتی دەستمایە */}
-                <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl shadow-lg flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-bold text-slate-400">کۆی گشتی دەستمایە</span>
-                      <span className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
-                        </svg>
-                      </span>
-                    </div>
-
+                    
                     <div className="space-y-1">
                       <div className="text-2xl font-black text-white font-mono">
-                        $ {formatNumber(TOTAL_CAPITAL_USD)}
+                        $ {formatNumber(WAREHOUSE_USD)}
                       </div>
-                      <span className="text-[11px] text-purple-300 block">٤٢ بەش ($ 10,000 بۆ هەر بەشێک)</span>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-emerald-400 font-bold">
+                      <span>بینینی ڕاپۆرتی کۆگا</span>
+                      <svg className="w-3.5 h-3.5 rtl:rotate-180 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
-                    دەستمایەی کارپێکراوی بنەڕەتی لە کۆگای دۆستان
-                  </div>
-                </div>
+                  {/* CARD 2: کاڵای نەگەیشتوو */}
+                  <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl shadow-lg flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-slate-400">کاڵای نەگەیشتوو (لە ڕێگایە)</span>
+                        <span className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                          </svg>
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="text-2xl font-black text-cyan-300 font-mono">
+                          $ {formatNumber(GOODS_IN_TRANSIT_USD)}
+                        </div>
+                      </div>
+                    </div>
 
-              </div>
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400">
+                      بار و مەوادی داواکراوی نەگەیشتوو
+                    </div>
+                  </div>
+
+                  {/* CARD 3: قەرزەکان */}
+                  <div
+                    onClick={() => setActiveModal("debts")}
+                    className="group relative p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 hover:from-slate-850 hover:to-slate-900 border border-slate-800 hover:border-rose-500/50 rounded-2xl transition-all duration-200 cursor-pointer shadow-lg hover:shadow-rose-500/10"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-slate-400">کۆی قەرزی خەڵک (بازاڕ)</span>
+                      <span className="p-2 rounded-xl bg-rose-500/10 text-rose-400 group-hover:scale-110 transition-transform">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-400">قەرزی دۆلار:</span>
+                        <span className="text-lg font-black text-white font-mono">$ {formatNumber(DEBTS_USD)}</span>
+                      </div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-400">قەرزی دینار:</span>
+                        <span className="text-sm font-bold text-amber-400 font-mono">دینار {formatNumber(DEBTS_IQD)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-rose-400 font-bold">
+                      <span>بینینی وردەکاری قەرز</span>
+                      <svg className="w-3.5 h-3.5 rtl:rotate-180 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                /* Standard Section 1: 4 cards for general, Sarhad, Actual profit & Farhad summary views */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  
+                  {/* CARD 1: بەهای کۆگا */}
+                  <div
+                    onClick={() => setActiveModal("warehouse")}
+                    className="group relative p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 hover:from-slate-850 hover:to-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl transition-all duration-200 cursor-pointer shadow-lg hover:shadow-emerald-500/10"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-slate-400">بەهای مەوادی ناو کۆگا</span>
+                      <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                        </svg>
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="text-2xl font-black text-white font-mono">
+                        $ {formatNumber(WAREHOUSE_USD)}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-emerald-400 font-bold">
+                      <span>بینینی ڕاپۆرتی کۆگا</span>
+                      <svg className="w-3.5 h-3.5 rtl:rotate-180 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* CARD 2: قەرزەکان */}
+                  <div
+                    onClick={() => setActiveModal("debts")}
+                    className="group relative p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 hover:from-slate-850 hover:to-slate-900 border border-slate-800 hover:border-rose-500/50 rounded-2xl transition-all duration-200 cursor-pointer shadow-lg hover:shadow-rose-500/10"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-slate-400">کۆی گشتی قەرز (بازاڕ)</span>
+                      <span className="p-2 rounded-xl bg-rose-500/10 text-rose-400 group-hover:scale-110 transition-transform">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-400">قەرزی دۆلار:</span>
+                        <span className="text-lg font-black text-white font-mono">$ {formatNumber(DEBTS_USD)}</span>
+                      </div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-400">قەرزی دینار:</span>
+                        <span className="text-sm font-bold text-amber-400 font-mono">دینار {formatNumber(DEBTS_IQD)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-rose-400 font-bold">
+                      <span>بینینی وردەکاری قەرز</span>
+                      <svg className="w-3.5 h-3.5 rtl:rotate-180 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* CARD 3: نەختینەی کاش (دۆلار و دینار) */}
+                  <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl shadow-lg flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-slate-400">کۆی گشتی کاش و نەختینە</span>
+                        <span className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                          </svg>
+                        </span>
+                      </div>
+
+                      {/* Clickable sub-bars for Dollar and Dinar */}
+                      <div className="space-y-2">
+                        {/* USD Cash Button */}
+                        <button
+                          onClick={() => setActiveModal("cash_usd")}
+                          className="w-full p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-blue-500/50 flex items-center justify-between text-right transition-all cursor-pointer group"
+                        >
+                          <div>
+                            <span className="text-[11px] text-slate-400 block">کاشی دۆلار (وردەکاری)</span>
+                            <span className="text-base font-black text-blue-400 font-mono">$ {formatNumber(CASH_USD)}</span>
+                          </div>
+                          <svg className="w-4 h-4 text-slate-500 group-hover:text-blue-400 rtl:rotate-180 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </button>
+
+                        {/* IQD Cash Button */}
+                        <button
+                          onClick={() => setActiveModal("cash_iqd")}
+                          className="w-full p-2.5 rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/50 flex items-center justify-between text-right transition-all cursor-pointer group"
+                        >
+                          <div>
+                            <span className="text-[11px] text-slate-400 block">کاشی دینار (وردەکاری)</span>
+                            <span className="text-sm font-black text-amber-400 font-mono">دینار {formatNumber(CASH_IQD)}</span>
+                          </div>
+                          <svg className="w-4 h-4 text-slate-500 group-hover:text-amber-400 rtl:rotate-180 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 4: کۆی گشتی دەستمایە */}
+                  <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl shadow-lg flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-slate-400">کۆی گشتی دەستمایە</span>
+                        <span className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
+                          </svg>
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="text-2xl font-black text-white font-mono">
+                          $ {formatNumber(TOTAL_CAPITAL_USD)}
+                        </div>
+                        <span className="text-[11px] text-purple-300 block">٤٢ بەش ($ 10,000 بۆ هەر بەشێک)</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
+                      دەستمایەی کارپێکراوی بنەڕەتی لە کۆگای دۆستان
+                    </div>
+                  </div>
+
+                </div>
+              )}
             </div>
 
             {/* ─── SECTION 2: TOTAL BUSINESS VALUATION SUMMARY ─── */}
-            <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1.5 text-right">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span className="text-xs font-bold text-emerald-400 tracking-wide">کۆی گشتی بەهای دارایی و موڵکەکان</span>
+            {unlockedMode === "karwan" ? (
+              /* Karwan Mode: Hide cash and capital from valuation summary */
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1.5 text-right">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-400" />
+                    <span className="text-xs font-bold text-blue-400 tracking-wide">کۆی گشتی بەهای دارایی و پشکەکان</span>
+                  </div>
+                  <h4 className="text-2xl md:text-3xl font-black text-white font-mono">
+                    $ {formatNumber(WAREHOUSE_USD + GOODS_IN_TRANSIT_USD + convertedValues.debtsCombinedUsd)}
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + کاڵای نەگەیشتوو ($ {formatNumber(GOODS_IN_TRANSIT_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)})
+                  </p>
                 </div>
-                <h4 className="text-2xl md:text-3xl font-black text-white font-mono">
-                  $ {formatNumber(convertedValues.totalAssetsUsd + extraAssetsUsd)}
-                </h4>
-                <p className="text-xs text-slate-400">
-                  بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)}) + کاش ($ {formatNumber(convertedValues.cashCombinedUsd)}) + بڕی تر ($ {formatNumber(extraAssetsUsd)})
-                </p>
               </div>
+            ) : (
+              /* Standard Section 2 */
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1.5 text-right">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-xs font-bold text-emerald-400 tracking-wide">کۆی گشتی بەهای دارایی و موڵکەکان</span>
+                  </div>
+                  <h4 className="text-2xl md:text-3xl font-black text-white font-mono">
+                    $ {formatNumber(convertedValues.totalAssetsUsd + extraAssetsUsd)}
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)}) + کاش ($ {formatNumber(convertedValues.cashCombinedUsd)}) + بڕی تر ($ {formatNumber(extraAssetsUsd)})
+                  </p>
+                </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleOpenActualProfitButton}
-                  className="px-5 py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>کردنەوەی کڵێشەی قازانجی فیعلی</span>
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleOpenActualProfitButton}
+                    className="px-5 py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>کردنەوەی کڵێشەی قازانجی فیعلی</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
 
             {/* ─── SECTION 3: ISOLATED PASSWORD PROTECTION FOR PROFIT & SHAREHOLDERS ─── */}
@@ -855,6 +1002,28 @@ export default function AnnualBalanceSheetReportPage() {
                   {/* Karwan Section */}
                   <div className="p-6 md:p-8 bg-slate-900 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
                     
+                    {/* Top 3 KPI Cards for Karwan: Warehouse ($40,823), Goods in Transit ($123,180), Debts ($146,414) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-right">
+                      <div className="p-4 rounded-xl bg-slate-850 border border-slate-800">
+                        <span className="text-xs text-slate-400 block mb-1">بەهای مەوادی ناو کۆگا</span>
+                        <span className="text-lg font-black text-emerald-400 font-mono">
+                          $ {formatNumber(WAREHOUSE_USD)}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-850 border border-slate-800">
+                        <span className="text-xs text-slate-400 block mb-1">کاڵای نەگەیشتوو (لە ڕێگایە)</span>
+                        <span className="text-lg font-black text-cyan-300 font-mono">
+                          $ {formatNumber(GOODS_IN_TRANSIT_USD)}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-850 border border-slate-800">
+                        <span className="text-xs text-slate-400 block mb-1">کۆی قەرزی خەڵک (بازاڕ)</span>
+                        <span className="text-lg font-black text-rose-400 font-mono">
+                          $ {formatNumber(convertedValues.debtsCombinedUsd)}
+                        </span>
+                      </div>
+                    </div>
+
                     {/* Header Banner */}
                     <div className="p-5 bg-gradient-to-r from-blue-950/60 via-slate-850 to-blue-950/60 border border-blue-500/40 rounded-2xl text-center space-y-2">
                       <span className="text-xs font-bold text-blue-400 tracking-wider uppercase block">
@@ -1456,6 +1625,162 @@ export default function AnnualBalanceSheetReportPage() {
 
                       </div>
 
+                    </div>
+
+                  </div>
+
+                </div>
+              )}
+
+
+              {/* CASE E: UNLOCKED FOR HAJI FARHAD TOTAL SUMMARY (hemn4@) */}
+              {unlockedMode === "farhad_summary" && (
+                <div className="space-y-6 animate-fadeIn">
+                  
+                  {/* Status Banner */}
+                  <div className="flex items-center justify-between p-4 bg-purple-950/40 border border-purple-500/30 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <span className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                        </svg>
+                      </span>
+                      <div>
+                        <h4 className="text-sm font-black text-purple-300">کۆی گشتی مایە و قازانجی حاجی فەرهاد کراوەتەوە</h4>
+                        <span className="text-xs text-purple-400/80">داخڵبووی بە دەسەڵاتی تایبەت (hemn4@)</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setUnlockedMode(null);
+                        setPasswordInput("");
+                      }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                    >
+                      داخستنەوەی پارێزراو
+                    </button>
+                  </div>
+
+                  {/* Farhad Summary Section */}
+                  <div className="p-6 md:p-8 bg-slate-900 border border-slate-800 rounded-3xl space-y-6 shadow-xl">
+                    
+                    {/* Header Banner */}
+                    <div className="p-5 bg-gradient-to-r from-purple-950/60 via-slate-850 to-purple-950/60 border border-purple-500/40 rounded-2xl text-center space-y-2">
+                      <span className="text-xs font-bold text-purple-400 tracking-wider uppercase block">
+                        پوختەی دارایی و کۆی گشتی مافەکان
+                      </span>
+                      <h3 className="text-xl md:text-3xl font-black text-white">
+                        کۆی گشتی مایەی حاجی فەرهاد
+                      </h3>
+                      <p className="text-xs text-slate-400 max-w-xl mx-auto">
+                        کۆی گشتی قازانجە بەرکەوتووەکان لە هەردوو پشکی سەرحەد حسێن و حاجی کاروان، لەگەڵ مایەی سەرەتا و مایەی ئێستا
+                      </p>
+                    </div>
+
+                    {/* 3 Quick KPI Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-right">
+                      <div className="p-4 rounded-xl bg-slate-850 border border-slate-800">
+                        <span className="text-xs text-slate-400 block mb-1">کۆی مایەی سەرەتای حاجی فەرهاد</span>
+                        <span className="text-lg font-black text-white font-mono">
+                          $ {formatNumber(farhadSummaryCalculation.totalInitialCapital)}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-850 border border-slate-800">
+                        <span className="text-xs text-slate-400 block mb-1">کۆی گشتی قازانجی بەرکەوتوو</span>
+                        <span className="text-lg font-black text-emerald-400 font-mono">
+                          $ {formatNumber(farhadSummaryCalculation.totalProfitEarned)}
+                        </span>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-850 border border-purple-500/40 bg-purple-500/5">
+                        <span className="text-xs text-purple-300 block mb-1 font-bold">کۆی گشتی مایەی ئێستا (کۆتایی)</span>
+                        <span className="text-xl font-black text-white font-mono">
+                          $ {formatNumber(farhadSummaryCalculation.totalFinalCapital)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Detailed Shareholders Breakdown Table */}
+                    <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                      <table className="w-full text-right border-collapse">
+                        <thead>
+                          <tr className="bg-slate-850 text-slate-400 text-xs font-bold border-b border-slate-800">
+                            <th className="p-4">سەرچاوەی پشک / حساب</th>
+                            <th className="p-4">مایەی سەرەتا</th>
+                            <th className="p-4">ڕێژەی پشکی فەرهاد</th>
+                            <th className="p-4">بڕی قازانجی بەرکەوتوو</th>
+                            <th className="p-4 text-emerald-400">مایەی ئێستا (کۆتایی)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800 text-sm">
+                          
+                          {/* Row 1: From Sarhad's Share */}
+                          <tr className="hover:bg-slate-850/50 transition-colors">
+                            <td className="p-4 font-black text-white flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                              <span>پشکی سەرحەد حسێن (٧ بەش لە ٤٢)</span>
+                            </td>
+                            <td className="p-4 font-mono font-bold text-slate-500">
+                              $ {formatNumber(farhadSummaryCalculation.fromSarhadInitial)}
+                            </td>
+                            <td className="p-4 font-bold text-slate-400">
+                              ٪50
+                            </td>
+                            <td className="p-4 font-mono font-black text-emerald-400">
+                              $ {formatNumber(farhadSummaryCalculation.fromSarhadProfit)}
+                            </td>
+                            <td className="p-4 font-mono font-black text-white text-base bg-emerald-500/5">
+                              $ {formatNumber(farhadSummaryCalculation.fromSarhadFinal)}
+                            </td>
+                          </tr>
+
+                          {/* Row 2: From Karwan's Share */}
+                          <tr className="hover:bg-slate-850/50 transition-colors">
+                            <td className="p-4 font-black text-white flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                              <span>پشکی حاجی کاروان ڕەشانی (٣٥ بەش لە ٤٢)</span>
+                            </td>
+                            <td className="p-4 font-mono font-bold text-slate-300">
+                              $ {formatNumber(farhadSummaryCalculation.fromKarwanInitial)}
+                            </td>
+                            <td className="p-4 font-bold text-slate-400">
+                              ٪60
+                            </td>
+                            <td className="p-4 font-mono font-black text-emerald-400">
+                              $ {formatNumber(farhadSummaryCalculation.fromKarwanProfit)}
+                            </td>
+                            <td className="p-4 font-mono font-black text-white text-base bg-emerald-500/5">
+                              $ {formatNumber(farhadSummaryCalculation.fromKarwanFinal)}
+                            </td>
+                          </tr>
+
+                          {/* Totals Row */}
+                          <tr className="bg-slate-850/80 font-bold border-t-2 border-slate-700 text-xs">
+                            <td className="p-4 font-black text-purple-300">کۆی گشتی حساباتی حاجی فەرهاد</td>
+                            <td className="p-4 font-mono text-white text-sm">
+                              $ {formatNumber(farhadSummaryCalculation.totalInitialCapital)}
+                            </td>
+                            <td className="p-4 text-slate-400">هاوبەشی گشتی</td>
+                            <td className="p-4 font-mono text-emerald-400 text-sm">
+                              $ {formatNumber(farhadSummaryCalculation.totalProfitEarned)}
+                            </td>
+                            <td className="p-4 font-mono text-purple-300 text-base font-black bg-purple-500/10">
+                              $ {formatNumber(farhadSummaryCalculation.totalFinalCapital)}
+                            </td>
+                          </tr>
+
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Explanatory Note */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-400 leading-relaxed space-y-1">
+                      <span className="text-white font-bold block">ڕوونکردنەوەی شێوازی هەژمارکردن:</span>
+                      <p>
+                        مایەی سەرەتای حاجی فەرهاد بڕی <strong>$ {formatNumber(farhadSummaryCalculation.totalInitialCapital)}</strong>ە کە لە پشکی حاجی کاروان بەشدارە.
+                        قازانجی بەرکەوتوو لە پشکی سەرحەد حسێن بریتییە لە <strong>$ {formatNumber(farhadSummaryCalculation.fromSarhadProfit)}</strong> (٪50) و لە پشکی حاجی کاروان بریتییە لە <strong>$ {formatNumber(farhadSummaryCalculation.fromKarwanProfit)}</strong> (٪60).
+                        کۆی گشتی قازانجی بەرکەوتوو دەکاتە <strong>$ {formatNumber(farhadSummaryCalculation.totalProfitEarned)}</strong> کە زیاد دەکرێتە سەر مایەی سەرەتا و مایەی کۆتایی ئێستای دەکاتە <strong>$ {formatNumber(farhadSummaryCalculation.totalFinalCapital)}</strong>.
+                      </p>
                     </div>
 
                   </div>
