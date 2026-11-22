@@ -35,6 +35,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const isLoginPage = pathname === "/login";
+  const isStandalonePage = isLoginPage || pathname === "/annual-report";
   
   const fetchCurrencies = useStore((s) => s.fetchCurrencies);
   const fetchCurrentUser = useStore((s) => s.fetchCurrentUser);
@@ -400,15 +401,15 @@ export default function LayoutShell({ children }: LayoutShellProps) {
         display: "flex",
         flexDirection: "column",
         background: "#f3f4f6",
-        minWidth: "1280px",
+        minWidth: isStandalonePage ? "100%" : "1280px",
         minHeight: "100vh",
       }}
     >
       {/* Daily USD Exchange Rate Prompt (only inside system after login) */}
-      {!isLoginPage && <DailyRatePrompt />}
+      {!isStandalonePage && <DailyRatePrompt />}
 
       {/* System Announcement Banner */}
-      {announcement && announcement.id !== dismissedId && (
+      {!isStandalonePage && announcement && announcement.id !== dismissedId && (
         <div
           onClick={() => handleDismissAnnouncement(announcement)}
           className={`px-6 py-4 flex items-center justify-center transition-all shadow-md border-b font-sans cursor-pointer hover:opacity-95 text-center relative ${
@@ -444,10 +445,10 @@ export default function LayoutShell({ children }: LayoutShellProps) {
       )}
 
       {/* Negative Cashbox Balance Alert Banner */}
-      {!isLoginPage && currentUser && <NegativeCashboxWarning />}
+      {!isStandalonePage && currentUser && <NegativeCashboxWarning />}
 
       {/* Mobile Top Bar - hidden on desktop */}
-      {!isLoginPage && (
+      {!isStandalonePage && (
         <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center z-[999] shadow-sm flex-shrink-0">
           <button
             onClick={() => setIsOpenMobile(true)}
@@ -455,7 +456,7 @@ export default function LayoutShell({ children }: LayoutShellProps) {
           >
             ☰
           </button>
-          <span className="font-black text-lg text-gray-900">سەنتەری کارەبای لەندەن</span>
+          <span className="font-black text-lg text-gray-900">کۆگای دۆستان</span>
           <div className="w-10"></div>
         </div>
       )}
@@ -473,12 +474,12 @@ export default function LayoutShell({ children }: LayoutShellProps) {
         }}
       >
         {/* Sidebar */}
-        {!isLoginPage && (
+        {!isStandalonePage && (
           <Sidebar isOpenMobile={isOpenMobile} setIsOpenMobile={setIsOpenMobile} />
         )}
 
         {/* Backdrop for Mobile Sidebar */}
-        {!isLoginPage && isOpenMobile && (
+        {!isStandalonePage && isOpenMobile && (
           <div
             onClick={() => setIsOpenMobile(false)}
             className="fixed inset-0 bg-black/50 z-[999] lg:hidden"

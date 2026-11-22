@@ -595,7 +595,7 @@ export default function LoginPage() {
                 lineHeight: 1.2,
                 textAlign: "center",
               }}>
-                سەنتەری کارەبای لەندەن
+                کۆگای دۆستان
               </h1>
 
               {/* Tagline */}

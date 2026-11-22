@@ -365,7 +365,7 @@ export default function SellingPricesModal({
         {/* Modal Footer */}
         <div className="p-3 bg-gray-50 border-t border-gray-200 flex justify-between items-center px-6">
           <span className="text-xs text-gray-500 font-semibold">
-            سەنتەری کارەبای لەندەن — لیستی نرخەکان
+            کۆگای دۆستان — لیستی نرخەکان
           </span>
           <button
             onClick={onClose}
