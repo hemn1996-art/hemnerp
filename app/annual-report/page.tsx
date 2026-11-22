@@ -3,19 +3,51 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 
-// Format numbers with commas
-function formatNumber(num: number | string, decimals: number = 2): string {
+// Format numbers as clean whole numbers with commas, zero decimals
+function formatNumber(num: number | string, decimals?: number): string {
   if (num === "" || num === null || num === undefined) return "0";
   const n = typeof num === "string" ? parseFloat(num.replace(/,/g, "")) : num;
   if (isNaN(n)) return "0";
-  
-  if (decimals === 0 || Math.floor(n) === n) {
-    return Math.round(n).toLocaleString("en-US");
+  return Math.round(n).toLocaleString("en-US");
+}
+
+// Render amount: whole number prominent, and tiny dimmed decimal if fractional
+function renderAmount(
+  num: number | string,
+  options: { currency?: string; showDimCents?: boolean } = {}
+) {
+  const { currency = "$", showDimCents = true } = options;
+  if (num === "" || num === null || num === undefined) {
+    return <span className="font-mono">{currency} 0</span>;
   }
-  return n.toLocaleString("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+  const n = typeof num === "string" ? parseFloat(num.replace(/,/g, "")) : num;
+  if (isNaN(n)) {
+    return <span className="font-mono">{currency} 0</span>;
+  }
+
+  const isWhole = Math.floor(n) === n || Math.abs(n - Math.round(n)) < 0.001;
+  if (isWhole || !showDimCents) {
+    return (
+      <span className="font-mono">
+        {currency && <span className="ml-1">{currency}</span>}
+        {Math.round(n).toLocaleString("en-US")}
+      </span>
+    );
+  }
+
+  const parts = n.toFixed(2).split(".");
+  const intPart = parseInt(parts[0], 10).toLocaleString("en-US");
+  const cents = parts[1];
+
+  return (
+    <span className="font-mono inline-flex items-baseline">
+      {currency && <span className="ml-1">{currency}</span>}
+      <span>{intPart}</span>
+      {cents && cents !== "00" && (
+        <span className="text-[0.68em] opacity-40 font-normal mr-0.5">.{cents}</span>
+      )}
+    </span>
+  );
 }
 
 // Clean number input parsing
@@ -454,10 +486,7 @@ export default function AnnualBalanceSheetReportPage() {
                   
                   <div className="space-y-1">
                     <div className="text-2xl font-black text-white font-mono">
-                      $ {formatNumber(WAREHOUSE_USD, 0)}
-                    </div>
-                    <div className="text-xs text-slate-400 font-mono">
-                      هاوتا بە: دینار {formatNumber(convertedValues.warehouseIqd, 0)}
+                      $ {formatNumber(WAREHOUSE_USD)}
                     </div>
                   </div>
 
@@ -486,16 +515,16 @@ export default function AnnualBalanceSheetReportPage() {
                   <div className="space-y-1.5">
                     <div className="flex items-baseline justify-between">
                       <span className="text-xs text-slate-400">قەرزی دۆلار:</span>
-                      <span className="text-lg font-black text-white font-mono">$ {formatNumber(DEBTS_USD, 0)}</span>
+                      <span className="text-lg font-black text-white font-mono">$ {formatNumber(DEBTS_USD)}</span>
                     </div>
                     <div className="flex items-baseline justify-between">
                       <span className="text-xs text-slate-400">قەرزی دینار:</span>
-                      <span className="text-sm font-bold text-amber-400 font-mono">دینار {formatNumber(DEBTS_IQD, 0)}</span>
+                      <span className="text-sm font-bold text-amber-400 font-mono">دینار {formatNumber(DEBTS_IQD)}</span>
                     </div>
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-rose-400 font-bold">
-                    <span>هاوتای گشتی: $ {formatNumber(convertedValues.debtsCombinedUsd, 2)}</span>
+                    <span>بینینی وردەکاری و پۆلێنکردنی قەرز</span>
                     <svg className="w-3.5 h-3.5 rtl:rotate-180 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                     </svg>
@@ -523,7 +552,7 @@ export default function AnnualBalanceSheetReportPage() {
                       >
                         <div>
                           <span className="text-[11px] text-slate-400 block">کاشی دۆلار (کلیک بکە)</span>
-                          <span className="text-base font-black text-blue-400 font-mono">$ {formatNumber(CASH_USD, 0)}</span>
+                          <span className="text-base font-black text-blue-400 font-mono">$ {formatNumber(CASH_USD)}</span>
                         </div>
                         <svg className="w-4 h-4 text-slate-500 group-hover:text-blue-400 rtl:rotate-180 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -537,18 +566,13 @@ export default function AnnualBalanceSheetReportPage() {
                       >
                         <div>
                           <span className="text-[11px] text-slate-400 block">کاشی دینار (کلیک بکە)</span>
-                          <span className="text-sm font-black text-amber-400 font-mono">دینار {formatNumber(CASH_IQD, 0)}</span>
+                          <span className="text-sm font-black text-amber-400 font-mono">دینار {formatNumber(CASH_IQD)}</span>
                         </div>
                         <svg className="w-4 h-4 text-slate-500 group-hover:text-amber-400 rtl:rotate-180 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                         </svg>
                       </button>
                     </div>
-                  </div>
-
-                  <div className="mt-3 pt-2 text-[11px] text-slate-400 flex justify-between font-mono">
-                    <span>کۆی گشتی کاش بە دۆلار:</span>
-                    <span className="text-white font-bold">$ {formatNumber(convertedValues.cashCombinedUsd, 2)}</span>
                   </div>
                 </div>
 
@@ -566,10 +590,7 @@ export default function AnnualBalanceSheetReportPage() {
 
                     <div className="space-y-1">
                       <div className="text-2xl font-black text-white font-mono">
-                        $ {formatNumber(TOTAL_CAPITAL_USD, 0)}
-                      </div>
-                      <div className="text-xs text-slate-400 font-mono">
-                        هاوتا بە: دینار {formatNumber(convertedValues.totalCapitalIqd, 0)}
+                        $ {formatNumber(TOTAL_CAPITAL_USD)}
                       </div>
                     </div>
                   </div>
@@ -583,24 +604,18 @@ export default function AnnualBalanceSheetReportPage() {
             </div>
 
             {/* ─── SECTION 2: TOTAL BUSINESS VALUATION SUMMARY ─── */}
-            <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="space-y-1 text-right">
-                <span className="text-xs font-bold text-emerald-400 tracking-wide">کۆی گشتی بەهای دارایی و موڵکەکان (Total Assets)</span>
+            <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 shadow-xl flex items-center justify-between">
+              <div className="space-y-1.5 text-right">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span className="text-xs font-bold text-emerald-400 tracking-wide">کۆی گشتی بەهای دارایی و موڵکەکان</span>
+                </div>
                 <h4 className="text-2xl md:text-3xl font-black text-white font-mono">
-                  $ {formatNumber(convertedValues.totalAssetsUsd, 2)}
+                  $ {formatNumber(convertedValues.totalAssetsUsd)}
                 </h4>
                 <p className="text-xs text-slate-400">
-                  (بەهای کۆگا: $ {formatNumber(WAREHOUSE_USD, 0)}) + (کۆی قەرز: $ {formatNumber(convertedValues.debtsCombinedUsd, 2)}) + (کۆی کاش: $ {formatNumber(convertedValues.cashCombinedUsd, 2)})
+                  بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + قەرزەکان ($ {formatNumber(DEBTS_USD)} و دینار {formatNumber(DEBTS_IQD)}) + کاش ($ {formatNumber(CASH_USD)} و دینار {formatNumber(CASH_IQD)})
                 </p>
-              </div>
-
-              <div className="flex items-center gap-3 bg-slate-950/60 border border-slate-800 px-6 py-4 rounded-2xl">
-                <div className="text-right">
-                  <span className="text-xs text-slate-400 block">هاوتای گشتی بە دینار</span>
-                  <span className="text-lg md:text-xl font-black text-amber-300 font-mono">
-                    دینار {formatNumber(convertedValues.totalAssetsIqd, 0)}
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -781,16 +796,16 @@ export default function AnnualBalanceSheetReportPage() {
                                 <span>سەرحەد حسێن</span>
                               </td>
                               <td className="p-4 font-mono font-bold text-slate-300">
-                                $ {formatNumber(sarhadCalculation.sarhadInitialCapital, 0)}
+                                $ {formatNumber(sarhadCalculation.sarhadInitialCapital)}
                               </td>
                               <td className="p-4 font-bold text-slate-400">
                                 ٪50
                               </td>
                               <td className="p-4 font-mono font-black text-emerald-400">
-                                $ {formatNumber(sarhadCalculation.sarhadShareProfit, 2)}
+                                {renderAmount(sarhadCalculation.sarhadShareProfit, { currency: "$", showDimCents: true })}
                               </td>
                               <td className="p-4 font-mono font-black text-white text-base bg-emerald-500/5">
-                                $ {formatNumber(sarhadCalculation.sarhadFinalCapital, 2)}
+                                {renderAmount(sarhadCalculation.sarhadFinalCapital, { currency: "$", showDimCents: true })}
                               </td>
                             </tr>
 
@@ -807,10 +822,10 @@ export default function AnnualBalanceSheetReportPage() {
                                 ٪50
                               </td>
                               <td className="p-4 font-mono font-black text-emerald-400">
-                                $ {formatNumber(sarhadCalculation.farhadShareProfit, 2)}
+                                {renderAmount(sarhadCalculation.farhadShareProfit, { currency: "$", showDimCents: true })}
                               </td>
                               <td className="p-4 font-mono font-black text-white text-base bg-emerald-500/5">
-                                $ {formatNumber(sarhadCalculation.farhadFinalCapital, 2)}
+                                {renderAmount(sarhadCalculation.farhadFinalCapital, { currency: "$", showDimCents: true })}
                               </td>
                             </tr>
 
@@ -819,8 +834,12 @@ export default function AnnualBalanceSheetReportPage() {
                               <td className="p-4 font-black text-slate-300">کۆی گشتی پشکی $ 70,000</td>
                               <td className="p-4 font-mono text-slate-300">$ 70,000</td>
                               <td className="p-4 text-slate-400">٪100</td>
-                              <td className="p-4 font-mono text-emerald-400">$ {formatNumber(sarhadCalculation.trancheTotalProfit, 2)}</td>
-                              <td className="p-4 font-mono text-white text-sm">$ {formatNumber(sarhadCalculation.sarhadFinalCapital + sarhadCalculation.farhadFinalCapital, 2)}</td>
+                              <td className="p-4 font-mono text-emerald-400">
+                                {renderAmount(sarhadCalculation.trancheTotalProfit, { currency: "$", showDimCents: true })}
+                              </td>
+                              <td className="p-4 font-mono text-white text-sm">
+                                {renderAmount(sarhadCalculation.sarhadFinalCapital + sarhadCalculation.farhadFinalCapital, { currency: "$", showDimCents: true })}
+                              </td>
                             </tr>
 
                           </tbody>
@@ -1154,25 +1173,14 @@ export default function AnnualBalanceSheetReportPage() {
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4">
-              <div className="p-4 rounded-2xl bg-slate-850 border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="p-5 rounded-2xl bg-slate-850 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <span className="text-sm font-bold text-white">قەرزی بازاڕ بە دۆلار:</span>
-                  <span className="font-mono font-black text-rose-400 text-base">$ {formatNumber(DEBTS_USD, 0)}</span>
+                  <span className="font-mono font-black text-rose-400 text-lg">$ {formatNumber(DEBTS_USD)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-white">قەرزی بازاڕ بە دینار:</span>
-                  <span className="font-mono font-black text-amber-400 text-base">دینار {formatNumber(DEBTS_IQD, 0)}</span>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/50 space-y-2 text-xs text-slate-300">
-                <span className="font-bold text-white block">حیسابکردنی هاوتای گشتی:</span>
-                <p className="leading-relaxed text-slate-400">
-                  بەپێی ڕەیتی ڕۆژ (100$ = دینار {formatNumber(exchangeRatePer100, 0)})، بڕی دیناری قەرزەکە بەرامبەرە بە $ {formatNumber(DEBTS_IQD / singleUsdToIqd, 2)}.
-                </p>
-                <div className="pt-2 flex justify-between font-mono font-bold text-emerald-400 text-sm">
-                  <span>کۆی هاوتای قەرز بە دۆلار:</span>
-                  <span>$ {formatNumber(convertedValues.debtsCombinedUsd, 2)}</span>
+                  <span className="font-mono font-black text-amber-400 text-lg">دینار {formatNumber(DEBTS_IQD)}</span>
                 </div>
               </div>
             </div>
@@ -1220,7 +1228,7 @@ export default function AnnualBalanceSheetReportPage() {
                   پشکی دەستنیشانکراو بڕەکەی بریتییە لە <strong>$ 70,000</strong>. ئەم بڕە بەپێی ڕێژەی دەستمایەی کارپێکراو پشکی قازانجی بەرکەوتووی لێ هەژمار دەکرێت.
                 </p>
                 <div className="p-3 bg-slate-900 rounded-xl font-mono text-xs text-slate-200 border border-slate-800">
-                  ڕێژەی پشک = (70,000 ÷ کۆی دەستمایە) = ٪{formatNumber(sarhadCalculation.trancheRatio * 100, 4)}
+                  ڕێژەی پشک = (70,000 ÷ کۆی دەستمایە)
                 </div>
               </div>
 
@@ -1232,7 +1240,9 @@ export default function AnnualBalanceSheetReportPage() {
                 </p>
                 <div className="p-3 bg-slate-900 rounded-xl font-mono text-xs text-emerald-400 border border-slate-800 flex justify-between">
                   <span>کۆی قازانجی بەرکەوتووی پشکەکە:</span>
-                  <span className="font-bold">$ {formatNumber(sarhadCalculation.trancheTotalProfit, 2)}</span>
+                  <span className="font-bold">
+                    {renderAmount(sarhadCalculation.trancheTotalProfit, { currency: "$", showDimCents: true })}
+                  </span>
                 </div>
               </div>
 
@@ -1242,11 +1252,15 @@ export default function AnnualBalanceSheetReportPage() {
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between p-2 rounded-lg bg-slate-900">
                     <span className="text-white">سەرحەد حسێن (٪50):</span>
-                    <span className="font-mono font-bold text-emerald-400">$ {formatNumber(sarhadCalculation.sarhadShareProfit, 2)}</span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      {renderAmount(sarhadCalculation.sarhadShareProfit, { currency: "$", showDimCents: true })}
+                    </span>
                   </div>
                   <div className="flex justify-between p-2 rounded-lg bg-slate-900">
                     <span className="text-white">فەرهاد حسێن (٪50):</span>
-                    <span className="font-mono font-bold text-emerald-400">$ {formatNumber(sarhadCalculation.farhadShareProfit, 2)}</span>
+                    <span className="font-mono font-bold text-emerald-400">
+                      {renderAmount(sarhadCalculation.farhadShareProfit, { currency: "$", showDimCents: true })}
+                    </span>
                   </div>
                 </div>
               </div>
