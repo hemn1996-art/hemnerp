@@ -87,11 +87,11 @@ export default function AnnualBalanceSheetReportPage() {
 
   // Base Data Constants
   const WAREHOUSE_USD = 40823;
-  const GOODS_IN_TRANSIT_USD = 123180; // $ 123,180 کاڵای نەگەیشتوو
+  const GOODS_IN_TRANSIT_USD = 123180; // $ 123,180 ئەو کاڵایانەی نەگەیشتوون (ثابت کراو)
   const DEBTS_USD = 145620;
   const DEBTS_IQD = 1350000;
   const TOTAL_CAPITAL_USD = 420000; // 420,000$ base (42 units)
-  const CASH_USD = 185000;
+  const CASH_USD = 186827; // Updated from 185,000 after Rabbat change (14,133 -> 15,960, +1,827)
   const CASH_IQD = 8160000;
 
   // Rate factor: 1 USD in IQD
@@ -112,9 +112,10 @@ export default function AnnualBalanceSheetReportPage() {
     const cashCombinedUsd = CASH_USD + cashIqdInUsd;
     const cashCombinedIqd = (CASH_USD * singleUsdToIqd) + CASH_IQD;
 
-    // Total enterprise assets (Warehouse + Debts + Cash)
-    const totalAssetsUsd = WAREHOUSE_USD + debtsCombinedUsd + cashCombinedUsd;
-    const totalAssetsIqd = warehouseIqd + debtsCombinedIqd + cashCombinedIqd;
+    // Total enterprise assets (Warehouse + Goods in Transit + Debts + Cash)
+    const totalAssetsUsd = WAREHOUSE_USD + GOODS_IN_TRANSIT_USD + debtsCombinedUsd + cashCombinedUsd;
+    const totalAssetsIqd =
+      warehouseIqd + (GOODS_IN_TRANSIT_USD * singleUsdToIqd) + debtsCombinedIqd + cashCombinedIqd;
 
     // Capital in IQD
     const totalCapitalIqd = TOTAL_CAPITAL_USD * singleUsdToIqd;
@@ -133,23 +134,23 @@ export default function AnnualBalanceSheetReportPage() {
     };
   }, [singleUsdToIqd]);
 
-  // Extra adjustments or assets (+...) in Actual Profit Formula
-  // Default to 83,071 so that (377,037 + 83,071) - 420,000 = 40,108 exact!
-  const [extraAssetsUsd, setExtraAssetsUsd] = useState<number>(83071);
-  const [extraAssetsInput, setExtraAssetsInput] = useState<string>("83,071");
+  // Extra adjustments or assets (+...) in Actual Profit Formula (defaults to 0 now that 123,180 is fixed)
+  const [extraAssetsUsd, setExtraAssetsUsd] = useState<number>(0);
+  const [extraAssetsInput, setExtraAssetsInput] = useState<string>("0");
   const [isEditingExtra, setIsEditingExtra] = useState<boolean>(false);
 
-  // Manual profit override (defaults to 40,108$)
+  // Manual profit override (defaults to 82,044$)
   const [useManualProfit, setUseManualProfit] = useState<boolean>(false);
-  const [manualProfitUsd, setManualProfitUsd] = useState<number>(40108);
-  const [manualProfitInput, setManualProfitInput] = useState<string>("40,108");
+  const [manualProfitUsd, setManualProfitUsd] = useState<number>(82044);
+  const [manualProfitInput, setManualProfitInput] = useState<string>("82,044");
   const [isEditingManualProfit, setIsEditingManualProfit] = useState<boolean>(false);
 
   // Load persistent settings from Server Database and localStorage
   useEffect(() => {
-    // 1. Try loading from localStorage first for immediate local responsiveness
+    // Remove old v2 cache so stale 123,180 in extraAssetsUsd does not double-count
     try {
-      const cached = localStorage.getItem("annual_report_settings_v2");
+      localStorage.removeItem("annual_report_settings_v2");
+      const cached = localStorage.getItem("annual_report_settings_v3");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed.extraAssetsUsd !== undefined) {
@@ -191,7 +192,7 @@ export default function AnnualBalanceSheetReportPage() {
             setUseManualProfit(data.useManualProfit);
           }
           try {
-            localStorage.setItem("annual_report_settings_v2", JSON.stringify(data));
+            localStorage.setItem("annual_report_settings_v3", JSON.stringify(data));
           } catch (e) {}
         }
       })
@@ -208,7 +209,7 @@ export default function AnnualBalanceSheetReportPage() {
         useManualProfit,
         ...updates,
       };
-      localStorage.setItem("annual_report_settings_v2", JSON.stringify(current));
+      localStorage.setItem("annual_report_settings_v3", JSON.stringify(current));
       await fetch("/api/annual-report/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -219,17 +220,18 @@ export default function AnnualBalanceSheetReportPage() {
     }
   };
 
-  // Calculated Formula Net Profit: (کۆگا + قەرزەکانمان + کاش + ... - دەستمایەکان)
+  // Calculated Formula Net Profit: (کۆگا + کاڵای نەگەیشتوو + قەرزەکانمان + کاش + ... - دەستمایەکان)
   const formulaNetProfitUsd = useMemo(() => {
     const totalCurrentAssets =
       WAREHOUSE_USD +
+      GOODS_IN_TRANSIT_USD +
       convertedValues.debtsCombinedUsd +
       convertedValues.cashCombinedUsd +
       extraAssetsUsd;
     return totalCurrentAssets - TOTAL_CAPITAL_USD;
   }, [convertedValues.debtsCombinedUsd, convertedValues.cashCombinedUsd, extraAssetsUsd]);
 
-  // Active Net Profit used for distributions (exact 40,108$)
+  // Active Net Profit used for distributions (82,044$)
   const activeNetProfitUsd = useManualProfit ? manualProfitUsd : formulaNetProfitUsd;
 
   // Shareholder Calculations:
@@ -298,8 +300,8 @@ export default function AnnualBalanceSheetReportPage() {
 
     // Grand Totals for Haji Farhad
     const totalInitialCapital = fromSarhadInitial + fromKarwanInitial; // 100,000$
-    const totalProfitEarned = fromSarhadProfit + fromKarwanProfit; // 3,342$ + 20,054$ = 23,396$
-    const totalFinalCapital = totalInitialCapital + totalProfitEarned; // 123,396$
+    const totalProfitEarned = fromSarhadProfit + fromKarwanProfit; // 6,837$ + 41,022$ = 47,859$
+    const totalFinalCapital = totalInitialCapital + totalProfitEarned; // 147,859$
 
     return {
       fromSarhadProfit,
@@ -715,8 +717,8 @@ export default function AnnualBalanceSheetReportPage() {
 
                 </div>
               ) : (
-                /* Standard Section 1: 4 cards for general, Sarhad, Actual profit & Farhad summary views */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                /* Standard Section 1: 5 cards for general, Sarhad, Actual profit & Farhad summary views */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   
                   {/* CARD 1: بەهای کۆگا */}
                   <div
@@ -746,7 +748,31 @@ export default function AnnualBalanceSheetReportPage() {
                     </div>
                   </div>
 
-                  {/* CARD 2: قەرزەکان */}
+                  {/* CARD 2: ئەو کاڵایانەی نەگەیشتوون */}
+                  <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl shadow-lg flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-slate-400">ئەو کاڵایانەی نەگەیشتوون</span>
+                        <span className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                          </svg>
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="text-2xl font-black text-cyan-300 font-mono">
+                          $ {formatNumber(GOODS_IN_TRANSIT_USD)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400">
+                      بار و مەوادی داواکراوی نەگەیشتوو (ثابت)
+                    </div>
+                  </div>
+
+                  {/* CARD 3: قەرزەکان */}
                   <div
                     onClick={() => setActiveModal("debts")}
                     className="group relative p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 hover:from-slate-850 hover:to-slate-900 border border-slate-800 hover:border-rose-500/50 rounded-2xl transition-all duration-200 cursor-pointer shadow-lg hover:shadow-rose-500/10"
@@ -779,7 +805,7 @@ export default function AnnualBalanceSheetReportPage() {
                     </div>
                   </div>
 
-                  {/* CARD 3: نەختینەی کاش (دۆلار و دینار) */}
+                  {/* CARD 4: نەختینەی کاش (دۆلار و دینار) */}
                   <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl shadow-lg flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-3">
@@ -824,7 +850,7 @@ export default function AnnualBalanceSheetReportPage() {
                     </div>
                   </div>
 
-                  {/* CARD 4: کۆی گشتی دەستمایە */}
+                  {/* CARD 5: کۆی گشتی دەستمایە */}
                   <div className="p-5 bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-800 rounded-2xl shadow-lg flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-3">
@@ -866,7 +892,7 @@ export default function AnnualBalanceSheetReportPage() {
                     $ {formatNumber(WAREHOUSE_USD + GOODS_IN_TRANSIT_USD + convertedValues.debtsCombinedUsd)}
                   </h4>
                   <p className="text-xs text-slate-400">
-                    بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + کاڵای نەگەیشتوو ($ {formatNumber(GOODS_IN_TRANSIT_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)})
+                    بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + ئەو کاڵایانەی نەگەیشتوون ($ {formatNumber(GOODS_IN_TRANSIT_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)})
                   </p>
                 </div>
               </div>
@@ -882,7 +908,8 @@ export default function AnnualBalanceSheetReportPage() {
                     $ {formatNumber(convertedValues.totalAssetsUsd + extraAssetsUsd)}
                   </h4>
                   <p className="text-xs text-slate-400">
-                    بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)}) + کاش ($ {formatNumber(convertedValues.cashCombinedUsd)}) + بڕی تر ($ {formatNumber(extraAssetsUsd)})
+                    بەهای کۆگا ($ {formatNumber(WAREHOUSE_USD)}) + ئەو کاڵایانەی نەگەیشتوون ($ {formatNumber(GOODS_IN_TRANSIT_USD)}) + قەرزەکان ($ {formatNumber(convertedValues.debtsCombinedUsd)}) + کاش ($ {formatNumber(convertedValues.cashCombinedUsd)})
+                    {extraAssetsUsd !== 0 ? ` + بڕی تر ($ ${formatNumber(extraAssetsUsd)})` : ""}
                   </p>
                 </div>
 
@@ -1320,7 +1347,7 @@ export default function AnnualBalanceSheetReportPage() {
                         کڵێشەی قازانجی فیعلی
                       </h3>
                       <p className="text-xs text-slate-400 max-w-2xl mx-auto">
-                        قازانجی فیعلی = ( کۆگا + قەرزەکانمان + کاش + ... ) - کۆی گشتی دەستمایەکان ($ 420,000)
+                        قازانجی فیعلی = ( کۆگا + قەرزەکانمان + کاش + ئەو کاڵایانەی نەگەیشتوون + ... ) - کۆی گشتی دەستمایەکان ($ 420,000)
                       </p>
                     </div>
 
@@ -1328,7 +1355,7 @@ export default function AnnualBalanceSheetReportPage() {
                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-2">
                       <span className="text-xs text-slate-400 font-semibold block">هاوکێشەی پوختەی قازانج:</span>
                       <div className="text-sm md:text-base font-black text-amber-300 font-mono tracking-wide leading-relaxed">
-                        ( بەهای کۆگا + کۆی قەرزەکان + کۆی کاش + بڕی تر ) - دەستمایەی سەرەتا ($ 420,000) = قازانجی فیعلی
+                        ( بەهای کۆگا + کۆی قەرزەکان + کۆی کاش + ئەو کاڵایانەی نەگەیشتوون + بڕی تر ) - دەستمایەی سەرەتا ($ 420,000) = قازانجی فیعلی
                       </div>
                     </div>
 
@@ -1372,10 +1399,21 @@ export default function AnnualBalanceSheetReportPage() {
                         </span>
                       </div>
 
-                      {/* Item 4: Extra (+...) */}
-                      <div className="p-4 rounded-2xl bg-slate-850/60 border border-slate-850 flex items-center justify-between">
+                      {/* Item 4: Fixed Goods in Transit ($ 123,180) */}
+                      <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 flex items-center justify-between">
                         <div>
-                          <span className="font-bold text-white block">٤. بڕی تر / زیادکراوەکان (+...)</span>
+                          <span className="font-bold text-white block">٤. ئەو کاڵایانەی نەگەیشتوون</span>
+                          <span className="text-xs text-cyan-300/80">بەهای جێگیرکراوی کاڵای داواکراو (ثابت کراو)</span>
+                        </div>
+                        <span className="font-mono font-black text-cyan-300 text-base">
+                          + $ {formatNumber(GOODS_IN_TRANSIT_USD)}
+                        </span>
+                      </div>
+
+                      {/* Item 5: Extra (+...) */}
+                      <div className="md:col-span-2 p-4 rounded-2xl bg-slate-850/60 border border-slate-850 flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-white block">٥. بڕی تر / زیادکراوەکان (+...)</span>
                           <span className="text-xs text-slate-400">داواکاری تر، حسابی ساڵ یان زیادە (هەمیشە دەپارێزرێت)</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1423,9 +1461,9 @@ export default function AnnualBalanceSheetReportPage() {
                     <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
                       
                       <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-sm">
-                        <span className="text-slate-400 font-bold">کۆی گشتی سامانەکان (کۆگا + قەرز + کاش + تر):</span>
+                        <span className="text-slate-400 font-bold">کۆی گشتی سامانەکان (کۆگا + قەرز + کاش + کاڵای نەگەیشتوو + تر):</span>
                         <span className="font-mono font-black text-white text-base">
-                          $ {formatNumber(WAREHOUSE_USD + convertedValues.debtsCombinedUsd + convertedValues.cashCombinedUsd + extraAssetsUsd)}
+                          $ {formatNumber(WAREHOUSE_USD + GOODS_IN_TRANSIT_USD + convertedValues.debtsCombinedUsd + convertedValues.cashCombinedUsd + extraAssetsUsd)}
                         </span>
                       </div>
 
@@ -1874,7 +1912,7 @@ export default function AnnualBalanceSheetReportPage() {
             
             <div className="p-5 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-black text-white">وردەکاری کاشی دۆلار ($ 185,000)</h3>
+                <h3 className="text-base font-black text-white">وردەکاری کاشی دۆلار ($ {formatNumber(CASH_USD, 0)})</h3>
                 <span className="text-xs text-slate-400">شوێنی نەختینەکان بەپێی لایەنەکان</span>
               </div>
               <button
@@ -1891,7 +1929,7 @@ export default function AnnualBalanceSheetReportPage() {
               
               <div className="p-3.5 rounded-xl bg-slate-850 border border-slate-800 flex items-center justify-between">
                 <span className="font-bold text-white text-sm">لای شەریکەی ڕەبات</span>
-                <span className="font-mono font-black text-blue-400 text-sm">$ 14,133</span>
+                <span className="font-mono font-black text-blue-400 text-sm">$ 15,960</span>
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-850 border border-slate-800 flex items-center justify-between">

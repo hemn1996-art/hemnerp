@@ -4,8 +4,8 @@ import { prisma } from "../../../../lib/prisma";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_SETTINGS = {
-  extraAssetsUsd: 83071,
-  actualProfitUsd: 40108,
+  extraAssetsUsd: 0,
+  actualProfitUsd: 82044,
   exchangeRatePer100: 170000,
   farhadInitialCapital: 100000,
   sarhadInitialCapital: 70000,
