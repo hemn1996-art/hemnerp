@@ -1064,7 +1064,7 @@ export default function AnnualBalanceSheetReportPage() {
                     {/* Quick Stats for this tranche */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-right">
                       <div className="p-4 rounded-xl bg-slate-850 border border-slate-800">
-                        <span className="text-xs text-slate-400 block mb-1">کۆی قازانجی بەرکەوتووی ئەم پشکە</span>
+                        <span className="text-xs text-slate-400 block mb-1">کۆی گشتی قازانجی ($ 350,000)</span>
                         <span className="text-lg font-black text-blue-400 font-mono">
                           $ {formatNumber(karwanCalculation.trancheTotalProfit)}
                         </span>
